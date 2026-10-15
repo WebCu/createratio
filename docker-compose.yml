@@ -1,0 +1,29 @@
+name: createratio-dev
+
+services:
+  web:
+    image: node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2
+    working_dir: /srv/www
+    command: node /srv/dev-server.js /srv/www
+    environment:
+      HOST: '0.0.0.0'
+    user: '65534:65534'
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./site/dev-server.js:/srv/dev-server.js:ro
+      - ./site/index.html:/srv/www/index.html:ro
+      - ./site/privacy.html:/srv/www/privacy.html:ro
+      - ./site/terms.html:/srv/www/terms.html:ro
+      - ./site/styles.css:/srv/www/styles.css:ro
+      - ./site/arrival.js:/srv/www/arrival.js:ro
+      - ./site/analytics.js:/srv/www/analytics.js:ro
+      - ./site/favicon.svg:/srv/www/favicon.svg:ro
+      - ./LICENSE:/srv/www/LICENSE:ro
+    ports:
+      - '127.0.0.1:${WEB_PORT:-4173}:4173'
+    labels:
+      traefik.enable: 'false'

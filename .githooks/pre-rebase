@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+branch=${2:-$(git symbolic-ref --quiet --short HEAD || true)}
+branch=${branch#refs/heads/}
+[ -n "$branch" ] || exit 0
+published=$(git for-each-ref --format='%(upstream)' "refs/heads/$branch")
+if [ -z "$published" ]; then
+  published=$(git for-each-ref --format='%(refname)' "refs/remotes/*/$branch")
+fi
+[ -n "$published" ] || exit 0
+range=$branch
+case ${1:-} in
+  ''|--root) ;;
+  *) range="$1..$branch" ;;
+esac
+merges=$(git rev-list --merges "$range" --)
+[ -z "$merges" ] || {
+  printf '%s\n' 'Refusing to flatten merge history on a published branch.' 'Fetch and merge the target branch; use git pull --rebase --ff-only before pushing.' >&2
+  exit 1
+}

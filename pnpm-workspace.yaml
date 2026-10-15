@@ -1,0 +1,8 @@
+packages:
+  - extension
+  - site
+
+saveExact: true
+engineStrict: true
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true

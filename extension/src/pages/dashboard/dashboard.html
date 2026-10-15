@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard - CreateRatio</title>
+  <link rel="stylesheet" href="popup.css"><link rel="stylesheet" href="page.css">
+</head>
+<body class="extension-page dashboard-page">
+  <header><a class="extension-brand" href="dashboard.html" aria-label="CreateRatio dashboard"><span class="mark" aria-hidden="true">&gt;</span><span><strong class="brand-name">CreateRatio</strong><span class="eyebrow">Create &gt; Consume</span></span></a><nav aria-label="Extension pages"><a href="dashboard.html" aria-current="page">Dashboard</a><a href="settings.html">Settings</a></nav></header>
+  <main>
+    <div class="page-heading"><h1>Your dashboard</h1><p>Creating, consuming, and the time behind both. All on this device.</p></div>
+    <nav class="view-nav" aria-label="Activity views"><button id="ratio-view" aria-pressed="true" aria-controls="ratio-panel">Creation score</button><button id="websites-view" aria-pressed="false" aria-controls="websites-panel">Website time</button><button id="intentions-view" aria-pressed="false" aria-controls="intentions-panel">Intentions</button></nav>
+    <section id="websites-panel" hidden aria-labelledby="websites-title">
+      <h2 id="websites-title">Website time</h2><p class="website-note">Browsing time across all sites. No creating/consuming classification or actions; never affects your creation score or limits access. Manage this separate opt-in in <a href="settings.html">Settings</a>.</p>
+      <div class="website-range"><label for="website-range">Time spent</label><select id="website-range"><option value="today">Today</option><option value="week">Last 7 days</option><option value="month" selected>Last 30 days</option></select></div>
+      <div class="website-total"><strong id="website-total">0s</strong><span id="website-count">0 websites</span></div>
+      <p id="website-status" class="website-note">Enable Website time in Settings to record browsing time across all sites.</p>
+      <table class="sites website-sites"><caption class="sr-only">Time spent by website for the selected period</caption><thead><tr><th scope="col">Website</th><th scope="col">Time</th><th scope="col">Share</th></tr></thead><tbody id="website-sites"></tbody></table>
+      <p id="website-empty" class="website-empty">No website time recorded yet.</p>
+      <p class="website-note">Stops after 30 seconds without computer activity. Private windows and browser pages are excluded. Separate from your creation score.</p>
+      <button id="website-export" class="website-export" disabled>Export website time CSV ↓</button>
+    </section>
+    <section id="intentions-panel" hidden aria-labelledby="intention-title">
+      <h2 id="intention-title">Remember why you came</h2>
+      <p class="website-note">Did your visit match your intention? Use these reminders to reflect, not to judge yourself.</p>
+      <p id="intention-status" class="website-note"></p>
+      <p class="website-note">Latest 100 access requests, newest first. A request does not mean you opened the site or completed the task. Manage saving in <a href="settings.html">Settings</a>.</p>
+      <p id="intention-empty" class="website-empty">No intentions saved yet.</p>
+      <ol id="intention-list" class="intention-list"></ol>
+      <button id="intention-clear" class="website-export" disabled>Clear intention history</button>
+    </section>
+    <div id="ratio-panel">
+    <div class="section-label"><h2>Today</h2><time id="date">Loading…</time></div>
+    <section class="score-card" aria-label="Today's creation score">
+      <div><span class="caption">Created / consumed</span><div id="score" class="score">-</div></div>
+      <div class="goal"><span aria-hidden="true">↗</span><strong>1.0</strong><small>daily target</small></div>
+      <p id="score-status">Your time, with intention.</p>
+    </section>
+    <div class="minutes"><div><span class="dot create"></span><span>Creating</span><strong id="create-min">-</strong></div><div><span class="dot consume"></span><span>Consuming</span><strong id="consume-min">-</strong></div></div>
+    <p class="method">Active minutes + 2 minutes of credit per post, reply or comment.</p>
+    <table class="sites"><caption class="sr-only">Today's time and score by site</caption><thead><tr><th scope="col">Site</th><th scope="col">Create</th><th scope="col">Consume</th><th scope="col">Score</th></tr></thead><tbody id="sites"></tbody></table>
+    <section class="actions" aria-label="Today's actions"><div><strong id="posts">0</strong><span>Posts</span></div><div><strong id="replies">0</strong><span>Replies</span></div><div><strong id="comments">0</strong><span>Comments</span></div></section>
+    <div class="light-actions"><span>Likes <b id="likes">0</b></span><span>Reposts <b id="reposts">0</b></span><span>Saved <b id="bookmarks">0</b></span></div>
+    <p class="quote-note">Quotes: <b id="quotes">0</b> <span>(included in posts)</span></p>
+    <section class="history"><div class="section-label"><h2>The last 7 days</h2><span>Active minutes</span></div><svg id="chart" viewBox="0 0 352 142" role="img" aria-labelledby="chart-title chart-desc"><title id="chart-title">Creating and consuming over seven days</title><desc id="chart-desc">Loading daily totals.</desc></svg><div class="sr-only"><table id="chart-table"><caption>Seven-day active minutes</caption><thead><tr><th scope="col">Date</th><th scope="col">Create minutes</th><th scope="col">Consume minutes</th></tr></thead><tbody></tbody></table></div><div class="legend"><span><i class="dot create"></i>Creating</span><span><i class="dot consume"></i>Consuming</span></div></section>
+    <p class="website-note measurement-note">Limit &amp; track measures creating/consuming and actions on vetted sites only, during access sessions or optional above-goal access. Website time is a separate browsing overview; the two must not be added together.</p>
+    </div>
+    <p id="error" role="alert" hidden></p>
+  </main>
+  <footer><span>Private by design. No account needed.</span><button id="export" disabled>Export CSV <span aria-hidden="true">↓</span></button></footer>
+  <script src="sites.js"></script><script src="core.js"></script><script src="web-time.js"></script><script src="messages.js"></script><script src="dashboard.js"></script>
+</body>
+</html>

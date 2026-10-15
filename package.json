@@ -1,0 +1,30 @@
+{
+  "name": "createratio",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "description": "CreateRatio: track time spent creating versus consuming online",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=12.0.0"
+  },
+  "scripts": {
+    "preview": "node site/dev-server.js",
+    "prepare": "node bin/setup-git-hooks.js --if-unconfigured",
+    "setup:hooks": "node bin/setup-git-hooks.js",
+    "verify:access": "node bin/access-equivalence.js",
+    "smoke:browser": "pnpm build:chrome && python3 -m unittest discover -s bin/tests -p test_browser_smoke.py && python3 bin/browser-smoke.py",
+    "check:environment": "node bin/agent-preflight.js",
+    "check:syntax": "node bin/check-syntax.js",
+    "check": "pnpm check:syntax && pnpm test && pnpm build && pnpm build:site",
+    "check:browser": "pnpm build:chrome && pnpm test:browser",
+    "test": "node --test --test-concurrency=4 extension/core/tests/*.test.js extension/sites/*.test.js \"extension/src/**/*.test.js\" site/tests/*.test.js bin/tests/*.test.js",
+    "test:tracers": "node --test --test-concurrency=2 extension/src/tests/tracer-journeys.test.js extension/src/tests/lifecycle-properties.test.js",
+    "test:browser": "node --test --test-concurrency=1 extension/browser-tests/*.test.js",
+    "build": "node extension/build.js",
+    "build:site": "node site/build.js",
+    "build:chrome": "node extension/build.js chrome",
+    "build:edge": "node extension/build.js edge",
+    "build:firefox": "node extension/build.js firefox"
+  }
+}

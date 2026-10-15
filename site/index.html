@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CreateRatio blocks X and LinkedIn by default, adds a deliberate pause before configurable active-tab access, and tracks creating versus consuming locally.">
+  <meta name="theme-color" content="#f9f9fc">
+  <title>CreateRatio - Create &gt; Consume</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="arrival.js" defer></script>
+  <script type="module" src="analytics.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to CreateRatio</a>
+  <section class="arrival" aria-label="A moment for your attention">
+    <div class="arrival-stage">
+      <div class="attention-orbit" aria-hidden="true"></div>
+      <div class="distractions" aria-hidden="true">
+        <span style="--x: -1; --y: -1"><small><b class="notification-count">9+</b> notifications</small><strong>See what you missed.</strong></span>
+        <span style="--x: 1; --y: -1"><small>Picked for you</small><strong>You’ll love this one.</strong></span>
+        <span style="--x: -1; --y: 0"><small>Trending now</small><strong>Everyone’s talking.</strong></span>
+        <span style="--x: 1; --y: 0"><small>Just for you</small><strong>Your next favorite.</strong></span>
+        <span style="--x: -1; --y: 1"><small>Up next</small><strong>The best part’s coming.</strong></span>
+        <span style="--x: 1; --y: 1"><small>While you were away</small><strong>A lot happened.</strong></span>
+      </div>
+      <div class="arrival-center">
+        <p class="arrival-thought"><span>Attention is</span><span>all you need.</span></p>
+        <p class="arrival-caption"><span>Your time.</span> <span>Your mind.</span> <span>Your space.</span></p>
+      </div>
+      <p class="scroll-hint" hidden>
+        <span>Scroll down</span>
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m-6-6 6 6 6-6"/></svg>
+      </p>
+    </div>
+  </section>
+  <div class="page" id="your-space">
+    <header class="header">
+      <a class="brand" href="./" aria-label="CreateRatio home"><span class="brand-mark" aria-hidden="true">&gt;</span>CreateRatio</a>
+      <nav aria-label="Main navigation">
+        <a href="#how-it-works">How it works</a>
+        <a href="https://github.com/WebCu/createratio">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="intro">This is your space. Make something of it.</p>
+          <h1 id="hero-title">Create more.<br>Consume less.</h1>
+          <p class="description">X and LinkedIn are blocked by default. Write an intention, wait 60 seconds, then start a session. It defaults to five active-tab minutes; change the duration in Settings. Time pauses when you switch away. Track active creating versus consuming with a simple daily score.</p>
+          <div class="actions">
+            <a class="button" href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Add to Chrome</a>
+            <a class="text-link" href="#install">Other browsers &amp; source</a>
+          </div>
+          <p class="availability">Free and open source. Available on the Chrome Web Store.</p>
+        </div>
+
+        <figure class="example" aria-label="Illustrative day: 48 minutes creating, 32 minutes consuming, two posts, and a score of 1.63.">
+          <div class="example-heading"><span>Create &gt; Consume</span><span class="example-label">Example day</span></div>
+          <div class="time-chart" aria-hidden="true">
+            <div class="column"><div class="time-bar creating"><span>48<small>min</small></span></div><span class="bar-label">Creating</span></div>
+            <div class="column"><div class="time-bar consuming"><span>32<small>min</small></span></div><span class="bar-label">Consuming</span></div>
+          </div>
+          <div class="example-score"><div><span class="score-label">Your daily score</span><strong>1.63</strong></div><p>Time creating, plus credit for 2 posts, divided by time consuming.</p></div>
+          <figcaption>An illustration, not your activity data.</figcaption>
+        </figure>
+      </section>
+
+      <aside class="paper-note" aria-label="The inspiration for the opening">
+        <p>The opening borrows its words from <a href="https://arxiv.org/abs/1706.03762"><cite>Attention Is All You Need</cite></a>, the 2017 paper that introduced the Transformer. A paper about machines. Here, a reminder to be intentional with our own attention.</p>
+      </aside>
+
+      <section class="features" id="how-it-works" aria-label="How CreateRatio works">
+        <article><h2>Notice your balance.</h2><p>Track active time writing posts, replies, and comments versus browsing. Idle time and background tabs don’t count.</p></article>
+        <article><h2>Find your rhythm.</h2><p>See your daily score and seven-day chart. Optionally track focused time across all websites by domain. Export totals to CSV.</p></article>
+        <article><h2>Keep it to yourself.</h2><p>Your extension activity stays in your browser. The extension has no account or analytics, collects no post text, and uploads no activity data.</p></article>
+      </section>
+
+      <section class="install" id="install" aria-labelledby="install-title">
+        <div class="install-copy">
+          <h2 id="install-title">Start with a small extension.</h2>
+          <p>Get CreateRatio from the Chrome Web Store. No developer tools needed. Save your X and LinkedIn drafts before installing: existing tabs are redirected to the access gate.</p>
+          <a class="button" href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Add to Chrome</a>
+        </div>
+        <div class="install-steps">
+          <details open>
+            <summary>Install in Chrome</summary>
+            <ol>
+              <li>Open the <a href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Chrome Web Store listing</a> and choose <strong>Add to Chrome</strong>.</li>
+              <li>Confirm the installation, then pin CreateRatio from Chrome’s extensions menu.</li>
+              <li>Visit X or LinkedIn to set an intention and start your first session. Adjust access limits in Settings.</li>
+            </ol>
+          </details>
+          <details>
+            <summary>Build from source <span>(Chrome, Edge, Firefox)</span></summary>
+            <p>You’ll need Git, stable Node.js 24+ and pnpm 12+. The extension has no runtime dependencies.</p>
+            <pre aria-label="Commands to download and build CreateRatio"><code>git clone https://github.com/WebCu/createratio.git
+cd createratio
+pnpm install --frozen-lockfile
+pnpm build</code></pre>
+            <ol>
+              <li><strong>Chrome 111+ or Edge:</strong> open <code>chrome://extensions</code> or <code>edge://extensions</code>, enable <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select <code>dist/chrome</code> or <code>dist/edge</code>.</li>
+              <li><strong>Firefox 140+:</strong> open <code>about:debugging#/runtime/this-firefox</code>, choose <strong>Load Temporary Add-on</strong>, select <code>dist/firefox/manifest.json</code>, then refresh your X and LinkedIn tabs.</li>
+            </ol>
+            <p>The temporary Firefox install is removed when Firefox restarts. Edge and Firefox are development builds, not store releases; live validation is still outstanding.</p>
+            <p><a href="https://github.com/WebCu/createratio/blob/main/extension/README.md">Read the full installation guide</a></p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>CreateRatio <span aria-hidden="true">/</span> Create &gt; Consume.</p>
+      <div><a href="privacy.html">Privacy policy</a><a href="terms.html">Terms of use</a><a href="https://github.com/WebCu/createratio">Contribute on GitHub</a><a href="https://github.com/WebCu/createratio/blob/main/LICENSE">MIT licensed</a></div>
+    </footer>
+  </div>
+</body>
+</html>

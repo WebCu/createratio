@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CreateRatio</title>
+  <link rel="stylesheet" href="popup.css"><link rel="stylesheet" href="refill.css">
+</head>
+<body class="compact-popup">
+  <header><div class="mark" aria-hidden="true">&gt;</div><div><h1>CreateRatio</h1><p class="eyebrow">Create &gt; Consume</p></div></header>
+  <main>
+    <div class="section-label"><h2>Creation score today</h2><time id="date">Loading…</time></div>
+    <section class="score-card" aria-label="Today's creation score">
+      <div><span class="caption">Created / consumed</span><div id="score" class="score">-</div></div>
+      <div class="goal"><strong>1.0</strong><small>daily target</small></div>
+      <p id="score-status">Your time, with intention.</p>
+    </section>
+    <div class="minutes"><div><span class="dot create"></span><span>Creating</span><strong id="create-min">-</strong></div><div><span class="dot consume"></span><span>Consuming</span><strong id="consume-min">-</strong></div></div>
+    <section class="blocking" aria-labelledby="blocking-title"><div class="section-label"><h2 id="blocking-title">Site access</h2><span>Active tab time</span></div><div id="access-sites"><p>Checking access…</p></div><p class="method">On: timed, tracked sessions. Off: free access.</p></section>
+    <p id="error" role="alert" hidden></p>
+  </main>
+  <footer class="popup-links"><a href="dashboard.html" target="_blank" rel="noopener">Open dashboard</a><button id="settings" disabled>Settings</button><a href="https://createratio.com/privacy.html" target="_blank" rel="noopener noreferrer">Privacy policy</a></footer>
+  <script src="sites.js"></script><script src="core.js"></script><script src="refill.js"></script><script src="messages.js"></script><script src="popup.js"></script>
+</body>
+</html>

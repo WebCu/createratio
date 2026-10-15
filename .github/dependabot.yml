@@ -1,0 +1,49 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    versioning-strategy: increase
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    open-pull-requests-limit: 10
+    reviewers:
+      - webcu
+    assignees:
+      - webcu
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    open-pull-requests-limit: 10
+    reviewers:
+      - webcu
+    assignees:
+      - webcu
+    commit-message:
+      prefix: chore
+      include: scope
+  - package-ecosystem: docker-compose
+    directory: '/'
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    open-pull-requests-limit: 10
+    reviewers:
+      - webcu
+    assignees:
+      - webcu
+    commit-message:
+      prefix: chore
+      include: scope

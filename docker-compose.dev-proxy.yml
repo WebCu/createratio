@@ -1,0 +1,16 @@
+services:
+  web:
+    ports: !reset []
+    networks:
+      - default
+      - devproxy
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: devproxy
+      traefik.http.routers.createratio.rule: Host(`createratio.localhost`)
+      traefik.http.routers.createratio.service: createratio
+      traefik.http.services.createratio.loadbalancer.server.port: '4173'
+
+networks:
+  devproxy:
+    external: true

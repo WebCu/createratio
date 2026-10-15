@@ -1,0 +1,96 @@
+'use strict';
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { page, C3, accessState } = require('../../tests/ui-harness.js');
+test('popup rejects malformed replies without changing totals or claiming a session ended', async () => {
+  const p = page('popup'); await p.ready();
+  p.state.replies.set('snapshot', { ok: 'true', day: { x: { consumeSec: 600 } }, access: {} });
+  p.refresh(); await p.ready();
+  assert.equal(p.nodes['consume-min'].textContent, '1.0m');
+  assert.equal(p.nodes.error.textContent, 'Unable to load your data.');
+  p.state.replies.delete('snapshot');
+  p.state.access = { x: accessState('x', { remainingMs: 60000 }) }; p.change(); await p.ready();
+  p.state.replies.set('access-end', { ok: true });
+  const button = p.nodes['access-sites'].children[0].children[1]; await button.fire('click');
+  assert.equal(button.textContent, 'End session'); assert.equal(button.disabled, false);
+  assert.equal(p.nodes.error.textContent, 'Unable to end session.');
+});
+test('popup keeps today summary but leaves configuration and detailed stats to full pages', async () => {
+  const p = page('popup'); await p.ready();
+  assert.equal(p.nodes['consume-min'].textContent, '1.0m'); assert.equal(p.nodes.score.textContent, '0.00');
+  for (const id of ['access-minutes', 'nudge-enabled', 'nudge-minutes', 'tracking-sites', 'website-time-enabled', 'chart', 'export']) assert.equal(p.nodes[id], undefined);
+  const html = fs.readFileSync(path.join(__dirname, 'popup.html'), 'utf8');
+  assert.match(html, /Creation score today/); assert.match(html, /href="dashboard.html"/); assert.doesNotMatch(html, /type="(?:checkbox|number)"/);
+  await p.nodes.settings.fire('click'); assert.equal(p.state.optionsOpened, 1);
+});
+test('popup shows active and paused budgets and retains request/end access actions', async () => {
+  const p = page('popup'); await p.ready();
+  p.state.access = { x: accessState('x', { remainingMs: 280000 }), linkedin: accessState('linkedin') };
+  p.change(); await p.ready(); const rows = p.nodes['access-sites'].children;
+  assert.equal(rows[0].children[0].children[1].textContent, '4:40 left · paused');
+  assert.equal(rows[0].children[1].textContent, 'End session');
+  await rows[1].children[1].fire('click'); assert.equal(p.state.tabs[0].url, 'chrome-extension://test/blocked.html?site=linkedin');
+  p.refresh(); await p.ready();
+  assert.equal(p.nodes['access-sites'].children[0].children[1], rows[0].children[1], 'refresh preserves keyboard focus on the access button');
+  await rows[0].children[1].fire('click');
+  assert.deepEqual(p.messages.find(m => m.type === 'access-end'), { type: 'access-end', site: 'x' });
+  assert.equal(p.nodes['access-sites'].children[0].children[1].textContent, 'Request access');
+  p.state.access.x = accessState('x', { remainingMs: 60000, expiresAt: Date.now() + 60000 }); p.change(); await p.ready();
+  assert.doesNotMatch(p.nodes['access-sites'].children[0].children[0].children[1].textContent, /paused/);
+});
+test('popup opens Off sites directly without requesting a session', async () => {
+  const p = page('popup'); await p.ready(); p.state.access = { x: accessState('x', { enabled: false }) }; p.change(); await p.ready();
+  const row = p.nodes['access-sites'].children[0];
+  assert.equal(row.children[0].children[1].textContent, 'Limit & track off'); assert.equal(row.children[1].textContent, 'Open site');
+  await row.children[1].fire('click'); assert.equal(p.state.tabs[0].url, 'https://x.com/home'); assert.ok(p.messages.every(message => message.type === 'snapshot'));
+});
+test('popup opens a goal-allowed site directly rather than offering request or end session', async () => {
+  const p = page('popup'); await p.ready();
+  p.state.access = { x: accessState('x', { goalAllowed: true }) };
+  p.change(); await p.ready(); const row = p.nodes['access-sites'].children[0];
+  assert.equal(row.children[0].children[1].textContent, 'Open · above daily goal');
+  assert.equal(row.children[1].textContent, 'Open site');
+  await row.children[1].fire('click'); assert.equal(p.state.tabs[0].url, 'https://x.com/home');
+  assert.equal(p.messages.some(m => m.type === 'access-end'), false);
+  p.state.access.x = { ...p.state.access.x, remainingMs: 60000, refilledAt: Date.now() };
+  p.change(); await p.ready();
+  assert.equal(row.children[0].children.length, 2, 'goal-based access does not show a timed-session refill');
+});
+
+test('popup animates a daily refill once without replacing the countdown or access button', async () => {
+  const p = page('popup'); await p.ready();
+  p.state.access = { x: accessState('x', { remainingMs: 300000, refilledAt: Date.now() }) };
+  p.change(); await p.ready();
+  const row = p.nodes['access-sites'].children[0], label = row.children[0];
+  const notice = label.children[2], button = row.children[1];
+  assert.equal(notice.children[0].textContent, 'Time refilled');
+  assert.equal(label.children[1].textContent, '5:00 left · paused');
+  p.refresh(); await p.ready();
+  assert.equal(label.children[2], notice); assert.equal(row.children[1], button);
+  await button.fire('click'); await p.ready();
+  assert.equal(label.children.length, 2); assert.equal(button.textContent, 'Request access');
+});
+test('popup refresh keeps visible totals current, including historical integrations', async () => {
+  const p = page('popup'); await p.ready(); p.setDay({ retired: { consumeSec: 120, posts: 1 } }); p.refresh(); await p.ready();
+  assert.equal(p.nodes['consume-min'].textContent, '2.0m'); assert.equal(p.nodes.score.textContent, '1.00');
+  assert.ok(p.messages.every(m => m.type === 'snapshot')); assert.equal(p.state.requested, 0);
+});
+test('failed access actions show an error and leave the button usable', async () => {
+  const p = page('popup'); await p.ready(); p.state.access = { x: accessState('x', { remainingMs: 60000 }) }; p.change(); await p.ready();
+  p.fail = true; const button = p.nodes['access-sites'].children[0].children[1]; await button.fire('click');
+  assert.equal(button.disabled, false); assert.equal(p.nodes.error.textContent, 'Could not save.');
+});
+test('refreshing during an end-session action keeps the same control busy until acknowledgement', async () => {
+  const p = page('popup'); await p.ready();
+  p.state.access = { x: accessState('x', { remainingMs: 60000 }) }; p.change(); await p.ready();
+  const button = p.nodes['access-sites'].children[0].children[1], release = p.holdMessage('access-end');
+  const ending = button.fire('click');
+  assert.equal(button.disabled, true);
+  p.refresh(); await p.ready();
+  assert.equal(p.nodes['access-sites'].children[0].children[1], button);
+  assert.equal(button.disabled, true); assert.equal(button.textContent, 'End session');
+  release(); await ending;
+  assert.equal(button.disabled, false); assert.equal(button.textContent, 'Request access');
+});

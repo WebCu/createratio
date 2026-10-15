@@ -1,0 +1,11 @@
+.DS_Store
+.pi/
+.env
+.env.*
+!.env.example
+node_modules/
+coverage/
+__pycache__/
+*.pyc
+dist/
+*.log

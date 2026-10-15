@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout (v7.0.1)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up pinned pnpm (v6.1.0)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          version: 12.11.2
+      - name: Set up pinned Node.js (v7.1.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+      - name: Install from the committed lockfile
+        run: pnpm install --frozen-lockfile
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+      - name: Check tests and all builds
+        run: pnpm check
+
+  browser-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    env:
+      BROWSER_ARTIFACT_DIR: dist/browser-artifacts
+      BH_TELEMETRY: '0'
+      BH_UPDATE_CHECK: '0'
+      CHROMIUM_NO_SANDBOX: '1'
+    steps:
+      - name: Checkout (v7.0.1)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up pinned pnpm (v6.1.0)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          version: 12.11.2
+      - name: Set up pinned Node.js (v7.1.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+      - name: Install from the committed lockfile
+        run: pnpm install --frozen-lockfile
+      - name: Install browser-harness 0.1.13
+        run: |
+          python3 -m venv "$RUNNER_TEMP/browser-harness"
+          "$RUNNER_TEMP/browser-harness/bin/pip" install --disable-pip-version-check browser-harness==0.1.13
+          echo "$RUNNER_TEMP/browser-harness/bin" >> "$GITHUB_PATH"
+      - name: Install Chrome for Testing 155.0.8059.79
+        run: |
+          curl --fail --location --retry 3 --max-time 180 https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.79/linux64/chrome-linux64.zip -o "$RUNNER_TEMP/chrome.zip"
+          echo 'bcd9a79130d7e44d70f93be87042e9bcee7fe0f0b3898e06b8c9bed5fb619dcd  '"$RUNNER_TEMP/chrome.zip" | sha256sum --check
+          unzip -q "$RUNNER_TEMP/chrome.zip" -d "$RUNNER_TEMP"
+          echo "CHROMIUM=$RUNNER_TEMP/chrome-linux64/chrome" >> "$GITHUB_ENV"
+          echo "CHROMIUM_PATH=$RUNNER_TEMP/chrome-linux64/chrome" >> "$GITHUB_ENV"
+      - name: Prepare browser evidence directory
+        run: mkdir -p "$BROWSER_ARTIFACT_DIR"
+      - name: Check the extension in disposable Chromium
+        run: pnpm smoke:browser 2>&1 | tee "$BROWSER_ARTIFACT_DIR/smoke.log"
+      - name: Check built-extension browser journeys
+        run: pnpm check:browser 2>&1 | tee "$BROWSER_ARTIFACT_DIR/journeys.log"
+      - name: Upload browser failure evidence (v7.0.2)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: failure()
+        with:
+          name: browser-failure-evidence
+          path: ${{ env.BROWSER_ARTIFACT_DIR }}
+          retention-days: 7
