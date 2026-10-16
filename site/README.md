@@ -85,7 +85,9 @@ This tracker is not included in extension builds.
 
 `arrival.js` progressively enhances native scrolling. Without JavaScript or CSS
 mask support, content remains readable. Reduced-motion preferences, keyboard
-navigation, a skip link, and direct anchors are supported. The activity graphic
+navigation, a skip link, and direct anchors are supported. After eight seconds at
+the top, **Scroll down** offers a slow, 2.8-second reveal of the homepage. Manual
+input interrupts it; reduced motion skips the animation. The activity graphic
 and notifications are illustrative, not personal data or live measurements.
 
 Run `pnpm test` and the [website verification checks](../docs/testing.md#website).

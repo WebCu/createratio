@@ -7,12 +7,11 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../arrival.js'), 'utf8');
 
-test('the opening has no interactive controls and its scroll cue starts hidden', () => {
+test('the opening has an accessible scroll button that starts hidden', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const opening = html.match(/<section class="arrival"[\s\S]*?<\/section>/);
   assert.ok(opening);
-  assert.doesNotMatch(opening[0], /<(?:a|button)\b/);
-  assert.match(opening[0], /<p class="scroll-hint" hidden>/);
+  assert.match(opening[0], /<button type="button" class="scroll-hint" hidden>/);
   assert.match(opening[0], /<span>Scroll down<\/span>/);
   assert.match(opening[0], /<svg[^>]+aria-hidden="true"/);
   assert.match(opening[0], /<div class="distractions" aria-hidden="true">/);
@@ -81,12 +80,73 @@ test('hover wiggle is limited to opening distractions, not the stats card', () =
   assert.doesNotMatch(css, /\.example:hover/);
 });
 
+test('clicking the cue slowly reveals the homepage and stops at the end of the opening', () => {
+  const h = harness();
+  h.flush();
+  h.advance(8000);
+  h.clickHint();
+  h.step(700);
+  assert.ok(h.window.scrollY > 0 && h.window.scrollY < 144);
+  assert.equal(h.scrollHint.hidden, true);
+  h.step(700);
+  assert.equal(h.window.scrollY, 144);
+  h.step(0);
+  assert.ok(parseFloat(h.properties.get('--aperture')) > 400);
+  h.step(1400);
+  h.flush();
+  assert.equal(h.window.scrollY, 288);
+  assert.ok(h.arrivalClasses.has('is-open'));
+  assert.equal(h.frames.size, 0);
+});
+
+test('manual input interrupts the automatic scroll without blocking native input', () => {
+  for (const name of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+    const h = harness();
+    h.flush();
+    h.clickHint();
+    h.step(700);
+    h.windowEvents[name].fn({ key: 'ArrowDown' });
+    const position = h.window.scrollY;
+    h.step(2800);
+    assert.equal(h.window.scrollY, position, name);
+    assert.equal(h.frames.size, 0);
+  }
+});
+
+test('resize or a reduced-motion change stops an automatic scroll', () => {
+  for (const cancel of [h => h.windowEvents.resize.fn(), h => h.changeMotion(true)]) {
+    const h = harness();
+    h.flush();
+    h.clickHint();
+    h.step(700);
+    cancel(h);
+    const position = h.window.scrollY;
+    h.step(2800);
+    assert.equal(h.window.scrollY, position);
+    assert.equal(h.frames.size, 0);
+  }
+});
+
+test('the static opening scroll button reveals the homepage without animation', () => {
+  for (const options of [{ reduced: true }, { supportsMask: false }]) {
+    const h = harness(options);
+    h.clickHint();
+    assert.equal(h.window.scrollY, 800);
+    assert.equal(h.scrolls[0].behavior, 'instant');
+    assert.equal(h.frames.size, 0);
+  }
+});
+
 function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 } = {}) {
   const frames = new Map();
   const timers = new Map();
   let now = 0;
   let nextTimer = 1;
-  const scrollHint = { hidden: true };
+  const hintEvents = {};
+  const scrollHint = {
+    hidden: true,
+    addEventListener(name, fn) { hintEvents[name] = fn; }
+  };
   const windowEvents = {};
   const documentEvents = {};
   const classes = new Set();
@@ -103,7 +163,7 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
     scrollY, innerWidth: 1280, location: { hash },
     matchMedia: () => motion,
     addEventListener(name, fn, options) { windowEvents[name] = { fn, options }; },
-    scrollTo(options) { scrolls.push(options); window.scrollY = options.top; }
+    scrollTo(options) { scrolls.push(options); window.scrollY = options.top; windowEvents.scroll.fn(); }
   };
   const motion = {
     matches: reduced,
@@ -117,7 +177,10 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
   };
   const stage = { offsetHeight: 900 };
   const pageLink = {};
-  const space = { contains: target => target === pageLink };
+  const space = {
+    contains: target => target === pageLink,
+    getBoundingClientRect: () => ({ top: 800 - window.scrollY })
+  };
   const anchorCalls = [];
   const anchor = {
     scrollIntoView(options) {
@@ -133,7 +196,7 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
     addEventListener(name, fn) { documentEvents[name] = fn; }
   };
   vm.runInNewContext(source, {
-    window, document, CSS: { supports: () => supportsMask },
+    window, document, CSS: { supports: () => supportsMask }, performance: { now: () => now },
     requestAnimationFrame(fn) { const id = nextFrame++; frames.set(id, fn); return id; },
     cancelAnimationFrame(id) { frames.delete(id); },
     setTimeout(fn, delay) { const id = nextTimer++; timers.set(id, { fn, at: now + delay }); return id; },
@@ -143,13 +206,20 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
     while (frames.size) {
       const [id, fn] = frames.entries().next().value;
       frames.delete(id);
-      fn();
+      fn(now);
     }
   }
   function scroll(top) { window.scrollY = top; windowEvents.scroll.fn(); }
   return {
     frames, windowEvents, documentEvents, classes, arrivalClasses, properties,
     scrolls, window, arrival, stage, pageLink, anchorCalls, flush, scroll, scrollHint, timers,
+    clickHint() { hintEvents.click(); },
+    step(milliseconds) {
+      now += milliseconds;
+      const pending = [...frames.values()];
+      frames.clear();
+      for (const fn of pending) fn(now);
+    },
     advance(milliseconds) {
       now += milliseconds;
       for (const [id, timer] of timers) {
@@ -168,8 +238,8 @@ test('a short native scroll opens the page, and scrolling back restores the open
   assert.equal(h.properties.get('--thought-opacity'), '1');
   assert.equal(h.scrolls.length, 0);
   assert.equal(h.windowEvents.scroll.options.passive, true);
-  assert.equal(h.windowEvents.wheel, undefined);
-  assert.equal(h.windowEvents.touchmove, undefined);
+  assert.equal(h.windowEvents.wheel.options.passive, true);
+  assert.equal(h.windowEvents.touchstart.options.passive, true);
 
   h.scroll(144);
   h.flush();
