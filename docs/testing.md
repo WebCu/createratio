@@ -4,8 +4,8 @@ This guide owns verification workflows, commands, and completion criteria.
 Coding standards live in [CONTRIBUTING.md](../CONTRIBUTING.md#coding-standards);
 agent navigation lives in [AGENTS.md](../AGENTS.md).
 
-Use stable Node.js 24+ and pnpm 12+. CI pins its own versions; contributors
-do not need to match them exactly:
+Use stable Node.js 24.x and pnpm 12.x. Other majors are not supported.
+CI pins versions within these majors; contributors need not match them exactly:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -28,7 +28,7 @@ Before shared infrastructure work or resuming an older branch, run:
 pnpm check:environment --setup-hooks --fetch
 ```
 
-This reports native architecture, selected Node/pnpm executables and minimums,
+This reports native architecture, selected Node/pnpm executables and required majors,
 actual Git hook activation, and optional browser compatibility with CI. Setup
 uses the existing hook installer only in a safe unconfigured checkout; custom
 hooks remain untouched and require manual integration. It does not install tools.
@@ -45,7 +45,7 @@ task and give other agents disjoint file scopes.
 Keep persistent toolchain activation and machine-specific downloads in the
 agent environment, not project bootstrap scripts. Select binaries for the
 reported architecture. Use CI's browser version when reproducing CI failures;
-ordinary contributors still only need the supported Node/pnpm minimums.
+ordinary contributors still only need the supported Node/pnpm majors.
 
 ## Strategy and completion
 

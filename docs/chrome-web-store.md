@@ -6,7 +6,7 @@ Use this guide to verify and package updates to that listing.
 
 ## Verify
 
-Use stable Node.js 24+ and pnpm 12+. For a reproducible release build, use the
+Use stable Node.js 24.x and pnpm 12.x. For a reproducible release build, use the
 exact tool versions recorded in `.github/workflows/ci.yml`:
 
 ```sh

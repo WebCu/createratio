@@ -5,8 +5,8 @@
   "license": "MIT",
   "description": "CreateRatio: track time spent creating versus consuming online",
   "engines": {
-    "node": ">=24.0.0",
-    "pnpm": ">=12.0.0"
+    "node": "24.x",
+    "pnpm": "12.x"
   },
   "scripts": {
     "preview": "node site/dev-server.js",

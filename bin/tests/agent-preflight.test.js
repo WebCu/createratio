@@ -77,13 +77,16 @@ function write(directory, name, contents = name + '\n') {
   fs.writeFileSync(path.join(directory, name), contents);
 }
 
-test('toolchain failures and stable minimums use the selected executables without installing', t => {
+test('toolchain checks accept only stable Node 24 and pnpm 12 without installing', t => {
   const { directory, env, run, pnpm } = repository(t);
-  for (const [nodeVersion, pnpmVersion, supported] of [
-    ['24.0.0', '12.0.0', true],
-    ['26.1.0', '13.0.1', true],
-    ['23.9.0', '11.9.0', false],
-    ['24.0.0-rc.1', '12.0.0-beta.1', false],
+  for (const [nodeVersion, pnpmVersion, nodeSupported, pnpmSupported] of [
+    ['24.0.0', '12.0.0', true, true],
+    ['24.22.0', '12.11.2', true, true],
+    ['25.0.0', '12.11.2', false, true],
+    ['24.22.0', '13.0.0', true, false],
+    ['26.1.0', '14.0.1', false, false],
+    ['23.9.0', '11.9.0', false, false],
+    ['24.0.0-rc.1', '12.0.0-beta.1', false, false],
   ]) {
     const selected = (command, args, options) => {
       if (command === process.execPath && args[0] === '--version') return { status: 0, stdout: 'v' + nodeVersion, stderr: '' };
@@ -91,9 +94,11 @@ test('toolchain failures and stable minimums use the selected executables withou
       return run(command, args, options);
     };
     const report = preflight({ cwd: directory, env, run: selected });
-    assert.equal(report.toolchain.node.compatible, supported);
-    assert.equal(report.toolchain.pnpm.compatible, supported);
-    if (!supported) assert.match(report.errors.join('\n'), /Select a compatible toolchain on PATH/);
+    assert.equal(report.toolchain.node.compatible, nodeSupported);
+    assert.equal(report.toolchain.pnpm.compatible, pnpmSupported);
+    assert.equal(report.toolchain.node.required, '24.x');
+    assert.equal(report.toolchain.pnpm.required, '12.x');
+    if (!nodeSupported || !pnpmSupported) assert.match(report.errors.join('\n'), /Select a compatible toolchain on PATH/);
   }
   const broken = preflight({ cwd: directory, env, run: (command, args, options) => command === pnpm ? { status: null, error: new Error('wrong executable architecture') } : run(command, args, options) });
   assert.equal(broken.toolchain.pnpm.compatible, false);

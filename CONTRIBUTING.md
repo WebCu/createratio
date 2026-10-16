@@ -187,7 +187,7 @@ rerun affected checks if their inputs change.
 
 Follow [Verification](docs/testing.md) for required commands, browser setup,
 completion criteria, bundle equivalence, and manual release checks. Follow the
-[dependency policy](docs/dependencies.md) for toolchain minimums, setup, and auditing.
+[dependency policy](docs/dependencies.md) for supported toolchain majors, setup, and auditing.
 Keep account-specific toolchain provisioning in the agent environment, not
 repository bootstrap scripts.
 

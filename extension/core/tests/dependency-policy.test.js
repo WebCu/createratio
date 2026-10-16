@@ -10,17 +10,17 @@ const manifests = ['package.json', 'extension/package.json'].map(file => JSON.pa
 const nodeVersion = read('.node-version').trim();
 const exactVersion = /^\d+\.\d+\.\d+$/;
 
-test('contributors need minimum stable toolchain versions, not exact pins', () => {
+test('contributors stay on Node 24 and pnpm 12 without exact minor or patch pins', () => {
   for (const manifest of manifests) {
-    assert.equal(manifest.engines.node, '>=24.0.0');
+    assert.equal(manifest.engines.node, '24.x');
     assert.equal(manifest.packageManager, undefined);
     assert.equal(manifest.devEngines, undefined);
   }
-  assert.equal(manifests[0].engines.pnpm, '>=12.0.0');
+  assert.equal(manifests[0].engines.pnpm, '12.x');
   assert.equal(nodeVersion, '24');
 });
 
-test('CI and deployment pin matching stable tools that satisfy contributor minimums', () => {
+test('CI and deployment pin matching stable tools within the supported majors', () => {
   const versions = ['ci.yml', 'deploy-site.yml'].map(file => {
     const workflow = read(`.github/workflows/${file}`);
     const node = workflow.match(/node-version: (\S+)/)?.[1];
@@ -28,8 +28,7 @@ test('CI and deployment pin matching stable tools that satisfy contributor minim
     assert.match(node, exactVersion, file);
     assert.match(pnpm, exactVersion, file);
     for (const [tool, version] of Object.entries({ node, pnpm })) {
-      const minimum = manifests[0].engines[tool].slice(2);
-      assert.ok(version.localeCompare(minimum, 'en', { numeric: true }) >= 0, `${file}: ${tool}`);
+      assert.equal(version.split('.')[0] + '.x', manifests[0].engines[tool], `${file}: ${tool}`);
     }
     assert.doesNotMatch(workflow, /node-version-file:/);
     return { node, pnpm };

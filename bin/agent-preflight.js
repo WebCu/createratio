@@ -16,14 +16,10 @@ function executable(name, env) {
   return null;
 }
 
-function compatible(version, minimum) {
-  const actual = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(version);
-  const required = /^>=(\d+)\.(\d+)\.(\d+)$/.exec(minimum);
-  if (!actual || !required) return false;
-  for (let index = 1; index <= 3; index++) {
-    if (Number(actual[index]) !== Number(required[index])) return Number(actual[index]) > Number(required[index]);
-  }
-  return true;
+function compatible(version, range) {
+  const actual = /^v?(\d+)\.\d+\.\d+$/.exec(version);
+  const required = /^(\d+)\.x$/.exec(range);
+  return Boolean(actual && required && actual[1] === required[1]);
 }
 
 function highConflict(file) {
@@ -117,7 +113,7 @@ function preflight({ cwd = process.cwd(), env = process.env, run = spawnSync, se
     engines = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')).engines;
     if (!engines?.node || !engines?.pnpm) throw new Error('Missing engines');
   } catch {
-    report.errors.push('Cannot read Node/pnpm minimums from repository package.json engines.');
+    report.errors.push('Cannot read Node/pnpm requirements from repository package.json engines.');
     return report;
   }
   const versionEnvironment = { ...env, COREPACK_ENABLE_NETWORK: '0', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0', COREPACK_ENABLE_AUTO_PIN: '0', npm_config_manage_package_manager_versions: 'false' };
@@ -125,7 +121,7 @@ function preflight({ cwd = process.cwd(), env = process.env, run = spawnSync, se
     const result = location ? execute(location, ['--version'], versionEnvironment) : null;
     const version = result?.status === 0 ? result.stdout.trim().replace(/^v/, '') : null;
     const supported = Boolean(version && compatible(version, engines[name]));
-    report.toolchain[name] = { executable: location, version, minimum: engines[name], compatible: supported };
+    report.toolchain[name] = { executable: location, version, required: engines[name], compatible: supported };
     if (!supported) report.errors.push(`${name} requires stable ${engines[name]}; found ${version || 'no runnable executable'}. Select a compatible toolchain on PATH and rerun.`);
   }
   report.browser = browserReport(cwd, env, execute, report.warnings);
@@ -188,7 +184,7 @@ function main() {
     process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   } else {
     process.stdout.write(`${report.platform}/${report.architecture}: ${report.root || 'no checkout'}\n`);
-    for (const [name, tool] of Object.entries(report.toolchain)) process.stdout.write(`${name}: ${tool.version || 'unavailable'} (${tool.executable || 'not on PATH'}), requires ${tool.minimum}\n`);
+    for (const [name, tool] of Object.entries(report.toolchain)) process.stdout.write(`${name}: ${tool.version || 'unavailable'} (${tool.executable || 'not on PATH'}), requires ${tool.required}\n`);
     if (report.browser) process.stdout.write(`Browser: ${report.browser.version || 'unavailable'} (${report.browser.executable}); CI ${report.browser.ciVersion || 'unknown'}; matches CI: ${report.browser.matchesCI ?? 'unknown'}\n`);
     if (report.hooks) {
       process.stdout.write(`Hooks: ${report.hooks.active ? 'active' : 'inactive/unverified'} (${report.hooks.path})\n`);
