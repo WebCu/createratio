@@ -28,8 +28,6 @@ pnpm audit --audit-level=high
 pnpm check
 ```
 
-The [environment preflight](testing.md#environment-preflight) reports selected
-tool versions and architecture without installing or downloading anything.
 Keep persistent machine provisioning outside the repository.
 
 Use a non-frozen install only when intentionally updating dependencies, then

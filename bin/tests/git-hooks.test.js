@@ -103,7 +103,7 @@ test('unpublished linear branches can still rebase', t => {
   assert.equal(git('rev-list', '--count', 'main..HEAD'), '1');
 });
 
-test('explicit preflight repairs hooks when an up-to-date frozen install skips prepare', t => {
+test('explicit hook setup repairs hooks when an up-to-date frozen install skips prepare', t => {
   const { directory, env, git, run } = repository(t);
   git('config', '--unset', 'core.hooksPath');
   for (const file of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.node-version', 'extension/package.json', 'site/package.json', 'bin/setup-git-hooks.js', '.githooks/pre-rebase', '.githooks/pre-commit']) {
@@ -118,11 +118,11 @@ test('explicit preflight repairs hooks when an up-to-date frozen install skips p
   const repeated = spawnSync('pnpm', ['install', '--frozen-lockfile'], { cwd: directory, env, encoding: 'utf8', timeout: 60000 });
   assert.equal(repeated.status, 0, repeated.stderr || repeated.error?.message);
   assert.equal(run('config', '--get', 'core.hooksPath').status, 1);
-  const setup = spawnSync(process.execPath, [path.join(root, 'bin/agent-preflight.js'), '--setup-hooks', '--json'], {
-    cwd: path.join(directory, 'extension'), env, encoding: 'utf8',
+  const setup = spawnSync('pnpm', ['setup:hooks'], {
+    cwd: directory, env, encoding: 'utf8', timeout: 60000,
   });
   assert.equal(setup.status, 0, setup.stdout + setup.stderr);
-  assert.equal(JSON.parse(setup.stdout).hooks.active, true);
+  assert.equal(git('config', '--get', 'core.hooksPath'), '.githooks');
   fs.writeFileSync(path.join(directory, 'bad.js'), 'const value = 1;  \n');
   git('add', 'bad.js');
   const rejected = run('commit', '-m', 'invalid whitespace');

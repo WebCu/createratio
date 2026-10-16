@@ -20,33 +20,6 @@ the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;
 missing browsers and failed checks are errors, not successful skips.
 
-## Environment preflight
-
-Before shared infrastructure work or resuming an older branch, run:
-
-```sh
-pnpm check:environment --setup-hooks --fetch
-```
-
-This reports native architecture, selected Node/pnpm executables and required majors,
-actual Git hook activation, and optional browser compatibility with CI. Setup
-uses the existing hook installer only in a safe unconfigured checkout; custom
-hooks remain untouched and require manual integration. It does not install tools.
-Use `node bin/agent-preflight.js` if pnpm cannot run yet. `--json` is available
-for agent environments; `--report-only` prints problems without failing.
-
-Without `--fetch`, upstream results use cached `origin/main` and require no
-network. With it, the check refreshes only that ref and lists overlapping
-CI, toolchain, standards, and shared-harness changes. Drift warns; it never
-merges, rebases, or changes source files. It cannot see unpushed changes in
-other clones. Assign one owner to shared infrastructure within a coordinated
-task and give other agents disjoint file scopes.
-
-Keep persistent toolchain activation and machine-specific downloads in the
-agent environment, not project bootstrap scripts. Select binaries for the
-reported architecture. Use CI's browser version when reproducing CI failures;
-ordinary contributors still only need the supported Node/pnpm majors.
-
 ## Strategy and completion
 
 Use a testing-trophy shape, not fixed test percentages:
