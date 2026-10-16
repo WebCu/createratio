@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export async function eventually(check, description, timeout = 10000) {
@@ -137,7 +137,7 @@ const inputTraceSource = `document.addEventListener('click', event => {
 }, true);`;
 
 export function extensionWorkerURL(extensionPath, manifest) {
-  const identity = manifest.key ? Buffer.from(manifest.key, 'base64') : Buffer.from(extensionPath);
+  const identity = manifest.key ? Buffer.from(manifest.key, 'base64') : Buffer.from(resolve(extensionPath));
   const id = createHash('sha256').update(identity).digest('hex').slice(0, 32).replace(/[0-9a-f]/g, value => String.fromCharCode(97 + parseInt(value, 16)));
   return `chrome-extension://${id}/${manifest.background.service_worker}`;
 }
@@ -149,6 +149,7 @@ export function workerTarget(targets, url) {
 }
 
 export async function launch(extensionPath) {
+  extensionPath = resolve(extensionPath);
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
   const workerURL = extensionWorkerURL(extensionPath, manifest);
   const directory = await mkdtemp(join(tmpdir(), 'createratio-browser-'));
