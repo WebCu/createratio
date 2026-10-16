@@ -161,10 +161,6 @@ keep review transcripts outside the public repository.
 
 ## Git synchronization
 
-Use the [environment preflight](docs/testing.md#environment-preflight) before
-shared infrastructure work or resuming an older branch. It checks real hook
-activation and upstream overlap; installer tests alone do not prove local setup.
-
 A fresh `pnpm install` enables staged-whitespace and merge-history guards when
 no custom hook path exists. Run `pnpm setup:hooks` for an existing clone or to
 enable them explicitly. Existing custom hook paths and non-sample files in Git's
@@ -187,7 +183,7 @@ rerun affected checks if their inputs change.
 
 Follow [Verification](docs/testing.md) for required commands, browser setup,
 completion criteria, bundle equivalence, and manual release checks. Follow the
-[dependency policy](docs/dependencies.md) for toolchain minimums, setup, and auditing.
+[dependency policy](docs/dependencies.md) for supported toolchain majors, setup, and auditing.
 Keep account-specific toolchain provisioning in the agent environment, not
 repository bootstrap scripts.
 

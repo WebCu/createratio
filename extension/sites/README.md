@@ -166,8 +166,8 @@ keyboard/click deduplication and disabled tracking, plus synthetic adapters for
 failure isolation and third-site support.
 
 The declared-match DOM fixtures in `test-support.js` keep tests dependency-free;
-they do not replace live CSS/markup validation. Use stable Node.js 24+ and pnpm
-12+, run `pnpm install --frozen-lockfile`, then `pnpm test` and `pnpm build`
+they do not replace live CSS/markup validation. Use stable Node.js 24.x and pnpm
+12.x, run `pnpm install --frozen-lockfile`, then `pnpm test` and `pnpm build`
 from the repository root. New integrations need manual checks
 against the site's current UI as well as automated coverage.
 

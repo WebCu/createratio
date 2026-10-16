@@ -35,9 +35,9 @@ Edge and Firefox do not have published store releases.
 
 ## Build and install
 
-Use stable **Node.js 24+** and **pnpm 12+**, as declared in
-[`package.json`](package.json). Newer stable releases are accepted; no exact
-local toolchain is required. See the [dependency policy](docs/dependencies.md).
+Use stable **Node.js 24.x** and **pnpm 12.x**, as declared in
+[`package.json`](package.json). Minor and patch updates within these majors
+are accepted; other major versions are not supported. See the [dependency policy](docs/dependencies.md).
 
 ```sh
 git clone https://github.com/WebCu/createratio.git

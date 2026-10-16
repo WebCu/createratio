@@ -5,7 +5,7 @@
   "license": "MIT",
   "description": "CreateRatio: a dependency-free local browser extension",
   "engines": {
-    "node": ">=24.0.0"
+    "node": "24.x"
   },
   "scripts": {
     "test": "node --test core/tests/*.test.js sites/*.test.js \"src/**/*.test.js\"",

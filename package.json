@@ -5,8 +5,8 @@
   "license": "MIT",
   "description": "CreateRatio: track time spent creating versus consuming online",
   "engines": {
-    "node": ">=24.0.0",
-    "pnpm": ">=12.0.0"
+    "node": "24.x",
+    "pnpm": "12.x"
   },
   "scripts": {
     "preview": "node site/dev-server.js",
@@ -14,7 +14,6 @@
     "setup:hooks": "node bin/setup-git-hooks.js",
     "verify:access": "node bin/access-equivalence.js",
     "smoke:browser": "pnpm build:chrome && python3 -m unittest discover -s bin/tests -p test_browser_smoke.py && python3 bin/browser-smoke.py",
-    "check:environment": "node bin/agent-preflight.js",
     "check:syntax": "node bin/check-syntax.js",
     "check": "pnpm check:syntax && pnpm test && pnpm build && pnpm build:site",
     "check:browser": "pnpm build:chrome && pnpm test:browser",
