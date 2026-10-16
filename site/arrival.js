@@ -17,6 +17,34 @@
   let radius = 0;
   let frame = 0;
   let lastProgress = -1;
+  let automaticFrame = 0;
+
+  function stopAutomaticScroll() {
+    cancelAnimationFrame(automaticFrame);
+    automaticFrame = 0;
+  }
+
+  function scrollThroughOpening() {
+    stopAutomaticScroll();
+    clearTimeout(hintTimer);
+    scrollHint.hidden = true;
+    if (!enabled) {
+      window.scrollTo({ top: space.getBoundingClientRect().top + window.scrollY, behavior: 'instant' });
+      return;
+    }
+    const from = window.scrollY;
+    const to = start + distance;
+    if (from >= to) return;
+    const started = performance.now();
+    function step(now) {
+      const progress = clamp((now - started) / 2800);
+      const eased = progress * progress * (3 - 2 * progress);
+      window.scrollTo({ top: from + (to - from) * eased, behavior: 'instant' });
+      schedule();
+      automaticFrame = progress < 1 ? requestAnimationFrame(step) : 0;
+    }
+    automaticFrame = requestAnimationFrame(step);
+  }
 
   function render() {
     frame = 0;
@@ -40,6 +68,7 @@
   }
 
   function measure() {
+    stopAutomaticScroll();
     if (!enabled) return;
     start = arrival.getBoundingClientRect().top + window.scrollY;
     distance = Math.max(1, arrival.offsetHeight - stage.offsetHeight);
@@ -49,6 +78,7 @@
   }
 
   function configure() {
+    stopAutomaticScroll();
     enabled = !reducedMotion.matches && supportsMask;
     document.documentElement.classList.toggle('has-arrival', enabled);
     if (enabled) {
@@ -71,9 +101,14 @@
     }
     schedule();
   }, { passive: true });
+  if (scrollHint) scrollHint.addEventListener('click', scrollThroughOpening);
+  for (const name of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+    window.addEventListener(name, stopAutomaticScroll, { passive: true });
+  }
   window.addEventListener('resize', measure);
   reducedMotion.addEventListener('change', configure);
   document.addEventListener('focusin', event => {
+    stopAutomaticScroll();
     if (enabled && space.contains(event.target) && window.scrollY < start + distance) {
       window.scrollTo({ top: start + distance, behavior: 'instant' });
       schedule();

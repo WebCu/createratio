@@ -117,8 +117,10 @@ footer div { display: flex; flex-wrap: wrap; gap: 16px 24px; }
   font-weight: 700;
   line-height: 1.4;
   white-space: nowrap;
-  pointer-events: none;
+  font-family: inherit;
+  cursor: pointer;
 }
+.scroll-hint:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
 .scroll-hint:not([hidden]) { display: inline-flex; align-items: center; gap: 12px; }
 .scroll-hint svg { flex: none; width: 32px; height: 32px; padding: 5px; background: #ffffff26; border-radius: 50%; }
 @media (prefers-reduced-motion: no-preference) {
