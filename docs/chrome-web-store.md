@@ -37,20 +37,20 @@ change permissions, or cancel an existing pending/staged submission.
 
 ### One-time setup
 
-Infrastructure and repository administration live outside this public repository:
+The release workflow requires:
 
-- `Sunset-Atomic/infra` declares a dedicated Google project, store service account,
-  and federation restricted to this repository's immutable ID, tag pushes, release
-  workflow, and `chrome-web-store` environment.
-- `Sunset-Atomic/github-repos` declares that environment, owner approval, tag-only
-  deployment policy, the pinned Google authentication action allowlist, and four
-  non-secret variables: `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID`,
+- A dedicated Google project, store service account, and federation restricted
+  to this repository's immutable ID, tag pushes, release workflow, and
+  `chrome-web-store` environment.
+- A `chrome-web-store` environment with owner approval, tag-only deployment
+  policy, the pinned Google authentication action allowed, and four non-secret
+  variables: `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID`,
   `CWS_WORKLOAD_IDENTITY_PROVIDER`, and `CWS_SERVICE_ACCOUNT`.
-- The publisher must link the service account in the Chrome Web Store Developer
-  Dashboard. Copy the publisher ID from its settings and the federation path from
-  the infrastructure output into the Terraform-owned variables in `github-repos`.
-  Missing values and setup placeholders fail before authentication or upload.
-  There are no OAuth refresh tokens or service-account keys to store in GitHub.
+- The service account linked in the Chrome Web Store Developer Dashboard.
+  Use the publisher ID from its settings and the numeric federation-provider path
+  for the corresponding environment variables. Missing values and setup
+  placeholders fail before authentication or upload. There are no OAuth refresh
+  tokens or service-account keys to store in GitHub.
 
 Google's [service-account setup](https://developer.chrome.com/docs/webstore/service-accounts)
 and [API guide](https://developer.chrome.com/docs/webstore/using-api) describe the

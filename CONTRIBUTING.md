@@ -120,6 +120,9 @@ access code, Settings, and the build discover gate support through the catalog.
   internal review transcripts, account-specific infrastructure details, publisher
   approvals, and temporary verification artifacts outside the public repository.
   Keep public privacy disclosures and reusable verification guidance.
+- **Keep references public.** Issues, pull requests, and repository documentation
+  may reference only this repository or other public repositories. Do not include
+  private repository names, links, or their issue and pull-request identifiers.
 - **Keep personal tooling local.** Editor and AI-agent preferences, extensions,
   and machine-specific setup belong in user-level or ignored local configuration.
   Shared project requirements belong in tool-neutral documentation, scripts,
