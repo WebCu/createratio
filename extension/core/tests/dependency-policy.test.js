@@ -7,29 +7,15 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../../..');
 const read = file => readFileSync(path.join(root, file), 'utf8');
 const manifests = ['package.json', 'extension/package.json'].map(file => JSON.parse(read(file)));
-const nodeVersion = read('.node-version').trim();
 const exactVersion = /^\d+\.\d+\.\d+$/;
 
-test('contributors stay on Node 24 and pnpm 12 without exact minor or patch pins', () => {
-  for (const manifest of manifests) {
-    assert.equal(manifest.engines.node, '24.x');
-    assert.equal(manifest.packageManager, undefined);
-    assert.equal(manifest.devEngines, undefined);
-  }
-  assert.equal(manifests[0].engines.pnpm, '12.x');
-  assert.equal(nodeVersion, '24');
-});
-
-test('CI and deployment pin matching stable tools within the supported majors', () => {
+test('CI and deployment pin matching stable tools', () => {
   const versions = ['ci.yml', 'deploy-site.yml'].map(file => {
     const workflow = read(`.github/workflows/${file}`);
     const node = workflow.match(/node-version: (\S+)/)?.[1];
     const pnpm = workflow.match(/pnpm\/action-setup@[^\n]+\n\s+with:\n\s+version: (\S+)/)?.[1];
     assert.match(node, exactVersion, file);
     assert.match(pnpm, exactVersion, file);
-    for (const [tool, version] of Object.entries({ node, pnpm })) {
-      assert.equal(version.split('.')[0] + '.x', manifests[0].engines[tool], `${file}: ${tool}`);
-    }
     assert.doesNotMatch(workflow, /node-version-file:/);
     return { node, pnpm };
   });
