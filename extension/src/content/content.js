@@ -160,7 +160,11 @@
   for (const type of ['c3:route-change', 'popstate', 'hashchange']) window.addEventListener(type, refresh);
   const observer = new MutationObserver(scheduleRefresh);
   observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['contenteditable', 'aria-hidden', 'style', 'class', 'data-testid'] });
-  const interval = setInterval(() => { refresh(); flush(); }, 5000);
+  const interval = setInterval(() => {
+    if (outbox.length || pageActive && document.visibilityState === 'visible' && document.hasFocus()) {
+      refresh(); flush();
+    }
+  }, 5000);
   function stop() {
     stopped = true; clearInterval(interval); clearTimeout(refreshTimer); observer.disconnect();
   }

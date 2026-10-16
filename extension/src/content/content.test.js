@@ -134,6 +134,51 @@ test('departed pages ignore pending refreshes, input, actions and timer ticks', 
   assert.equal(seconds(t, 'consume'), 2);
   assert.equal(t.packets.flatMap(packet => packet.actions).length, 0);
 });
+test('inactive trackers stop polling and synchronize settings when returning', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const inactive of ['hidden', 'unfocused', 'departed']) {
+      const messages = [];
+      const t = await tracker(browser, { reply(message, response) { messages.push(message.type); return response; } });
+      t.input(); t.setNow(2000);
+      if (inactive === 'hidden') t.visible(false);
+      else if (inactive === 'unfocused') t.focus(false);
+      else t.event('pagehide', { persisted: true });
+      await t.tick();
+      assert.equal(seconds(t, 'consume'), 2);
+      const before = messages.length;
+      t.setNow(10000); await t.tick();
+      assert.equal(messages.length, before, `${browser} ${inactive} tracker must not wake the worker`);
+      t.setSnapshot({ day: {}, settings: { ...C.DEFAULT_SETTINGS, trackedSites: [] } });
+      if (inactive === 'hidden') t.visible(true);
+      else if (inactive === 'unfocused') t.focus(true);
+      else t.event('pageshow', { persisted: true });
+      await t.tick();
+      assert.ok(messages.length > before, 'returning synchronizes preferences');
+      t.input(); t.setNow(15000); await t.tick();
+      assert.equal(seconds(t, 'consume'), 2, 'disabled tracking cannot resume with stale settings');
+      t.setSnapshot({ day: {}, settings: C.DEFAULT_SETTINGS });
+      await t.tick(); t.input(); t.setNow(20000); await t.tick();
+      assert.equal(seconds(t, 'consume'), 7, 're-enabling records only fresh activity');
+    }
+  }
+});
+
+test('inactive trackers retry undelivered activity without recording inactive time', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    const options = { failIngest: true, attempts: [] };
+    const t = await tracker(browser, options);
+    t.input(); t.setNow(2000); t.visible(false); await t.tick();
+    assert.equal(t.packets.length, 0);
+    options.failIngest = false;
+    t.setNow(10000); await t.tick();
+    assert.equal(seconds(t, 'consume'), 2);
+    assert.ok(options.attempts.length > 1);
+    assert.ok(options.attempts.every(packet => packet.id === options.attempts[0].id));
+    t.setNow(15000); await t.tick();
+    assert.equal(seconds(t, 'consume'), 2);
+  }
+});
+
 test('SPA route/editor changes split creating and consuming within a tick', async () => {
   const t = await tracker(); t.input(); t.setNow(2000); t.route('https://x.com/compose/post', true);
   t.setNow(5000); await t.tick(); assert.equal(seconds(t, 'consume'), 2); assert.equal(seconds(t, 'create'), 3);

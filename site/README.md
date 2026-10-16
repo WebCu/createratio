@@ -12,7 +12,7 @@ Edge and Firefox are development builds, not published store releases.
 
 ## Preview
 
-From the repository root, using stable Node.js 24+ and pnpm 12+:
+From the repository root, using stable Node.js 24.x and pnpm 12.x:
 
 ```sh
 pnpm install --frozen-lockfile

@@ -150,9 +150,15 @@ Automated tests enforce mechanical rules; review the decisions they cannot prove
   add a general framework for two concrete policies.
 - **Compatibility:** preserve stable IDs, saved preferences, recorded history,
   defaults, and intentional differences between integrations, including frames.
+- **Test value:** identify the observable failure each new test can detect.
+  Prefer enforcement already owned by package managers and other tools over
+  reimplementing it. Keep architecture and security policy guards distinct from
+  behavioral coverage; repeating configuration values does not test the tool
+  that consumes them.
 - **Evidence:** distinguish mocked browser-world comparisons from actual browser
-  checks. A passing build cannot prove live selectors, permissions, or routing.
-  Verify changed behavior and its failure paths, not just the happy path.
+  checks, and newly added coverage from existing tests rerun. A passing build
+  cannot prove live selectors, permissions, or routing. Verify changed behavior
+  and its failure paths, not just the happy path.
 
 Review against a fixed baseline and the originating request. Report standards
 and request coverage separately, with file locations and actionable findings.
@@ -160,10 +166,6 @@ Use the existing code-review skill when an independent review is requested;
 keep review transcripts outside the public repository.
 
 ## Git synchronization
-
-Use the [environment preflight](docs/testing.md#environment-preflight) before
-shared infrastructure work or resuming an older branch. It checks real hook
-activation and upstream overlap; installer tests alone do not prove local setup.
 
 A fresh `pnpm install` enables staged-whitespace and merge-history guards when
 no custom hook path exists. Run `pnpm setup:hooks` for an existing clone or to
@@ -187,7 +189,7 @@ rerun affected checks if their inputs change.
 
 Follow [Verification](docs/testing.md) for required commands, browser setup,
 completion criteria, bundle equivalence, and manual release checks. Follow the
-[dependency policy](docs/dependencies.md) for toolchain minimums, setup, and auditing.
+[dependency policy](docs/dependencies.md) for supported toolchain majors, setup, and auditing.
 Keep account-specific toolchain provisioning in the agent environment, not
 repository bootstrap scripts.
 
