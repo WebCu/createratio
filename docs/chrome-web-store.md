@@ -2,7 +2,65 @@
 
 CreateRatio is published on the
 [Chrome Web Store](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk).
-Use this guide to verify and package updates to that listing.
+Use this guide to verify and release updates to that listing.
+
+## Tagged releases
+
+`.github/workflows/release-chrome.yml` runs on pushed `vMAJOR.MINOR.PATCH`
+tags. The tagged commit must belong to `main` history. The tag must match
+`package.json`, `extension/package.json`, and `extension/src/manifest.json`.
+Use numeric components from 0 through 65535, without leading zeroes or prerelease
+suffixes. Each upload must have a version newer than the published package.
+
+After merging the version change and completing the manual checks below:
+
+```sh
+git tag v0.0.2 <merged-commit>
+git push origin v0.0.2
+```
+
+The workflow runs the full reusable CI, including both browser checks, then
+builds and archives only `dist/chrome`. Its `chrome-store-package` artifact
+contains the exact ZIP, SHA-256 checksum, tag, and source commit for 30 days.
+Download that artifact and inspect an extracted QA copy before approving the
+`chrome-web-store` environment. Approval confirms the manual release checklist,
+including current store disclosures and deployed legal pages. Approval does not
+replace those checks.
+
+After approval, the job verifies the checksum, exchanges GitHub OIDC for a
+short-lived Google token, uploads the archive, waits for upload processing, and
+submits it for normal Google review. Google publishes after approval using the
+listing's existing visibility. A successful workflow reports submission, not
+necessarily public availability. Check the Developer Dashboard for review results.
+Warnings block submission. The workflow does not skip review, alter the listing,
+change permissions, or cancel an existing pending/staged submission.
+
+### One-time setup
+
+Infrastructure and repository administration live outside this public repository:
+
+- `Sunset-Atomic/infra` declares a dedicated Google project, store service account,
+  and federation restricted to this repository's immutable ID, tag pushes, release
+  workflow, and `chrome-web-store` environment.
+- `Sunset-Atomic/github-repos` declares that environment, owner approval, tag-only
+  deployment policy, the pinned Google authentication action allowlist, and four
+  non-secret variables: `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID`,
+  `CWS_WORKLOAD_IDENTITY_PROVIDER`, and `CWS_SERVICE_ACCOUNT`.
+- The publisher must link the service account in the Chrome Web Store Developer
+  Dashboard. Copy the publisher ID from its settings and the federation path from
+  the infrastructure output into the Terraform-owned variables in `github-repos`.
+  Missing values and setup placeholders fail before authentication or upload.
+  There are no OAuth refresh tokens or service-account keys to store in GitHub.
+
+Google's [service-account setup](https://developer.chrome.com/docs/webstore/service-accounts)
+and [API guide](https://developer.chrome.com/docs/webstore/using-api) describe the
+provider-side requirements. Do not put credentials in this repository.
+
+If a run fails after upload or submission, inspect the dashboard before retrying.
+The script does not retry write requests, cancel reviews, or overwrite pending
+submissions. A rerun can require dashboard recovery or a new version; do not move
+an existing release tag to different code. Manual packaging and submission remain
+available below.
 
 ## Verify
 
@@ -99,7 +157,8 @@ HTTP/HTTPS tabs. Verify that privacy links open the public HTTPS policy.
 Send feedback is unavailable in
 unpacked builds; verify its reviews link after store installation. Signed-in
 posting checks require the reviewer's own account, never supplied credentials.
-Store submission and publication are manual.
+Tagged releases submit through the approved workflow above. Manual dashboard
+submission remains available for recovery.
 
 ## Store requirements
 

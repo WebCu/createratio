@@ -1,0 +1,120 @@
+name: Release Chrome extension
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chrome-web-store-release
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout release guard (v7.0.1)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up guard Node.js (v7.1.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.21.0
+      - name: Require a version tag on main history
+        run: |
+          test "$GITHUB_REF_TYPE" = tag
+          git merge-base --is-ancestor HEAD origin/main
+          node bin/chrome-store-release.js validate
+
+  checks:
+    needs: validate-release
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout package source (v7.0.1)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up packaging Node.js (v7.1.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.21.0
+      - name: Build and package only Chrome
+        run: |
+          node bin/chrome-store-release.js validate
+          node extension/build.js chrome
+          (cd dist/chrome && zip -X -r ../createratio-chrome.zip .)
+          (cd dist && sha256sum createratio-chrome.zip > createratio-chrome.zip.sha256)
+          printf 'Tag: %s\nCommit: %s\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" > dist/release.txt
+          cat dist/release.txt >> "$GITHUB_STEP_SUMMARY"
+          cat dist/createratio-chrome.zip.sha256 >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the exact package for approval and audit (v7.0.2)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: chrome-store-package
+          path: |
+            dist/createratio-chrome.zip
+            dist/createratio-chrome.zip.sha256
+            dist/release.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  submit:
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: chrome-web-store
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+      CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+      CWS_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.CWS_WORKLOAD_IDENTITY_PROVIDER }}
+      CWS_SERVICE_ACCOUNT: ${{ vars.CWS_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout tested release commit (v7.0.1)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up submission Node.js (v7.1.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.21.0
+      - name: Require configured store identity
+        run: node bin/chrome-store-release.js check-config
+      - name: Download the approved package from this run (v7.0.0)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: chrome-store-package
+          path: dist
+      - name: Verify package checksum
+        working-directory: dist
+        run: sha256sum --check createratio-chrome.zip.sha256
+      - name: Get short-lived Chrome Web Store credentials (v3.0.0)
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        id: auth
+        with:
+          workload_identity_provider: ${{ env.CWS_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.CWS_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          access_token_lifetime: 600s
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Upload and submit for Google review
+        env:
+          CWS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node bin/chrome-store-release.js submit
