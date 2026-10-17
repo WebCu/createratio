@@ -138,6 +138,33 @@ Keep tests deterministic and replayable. Reproduce bugs before fixing them.
 Follow the [tracer-bullet workflow](docs/testing.md#strategy-and-completion) for
 acceptance criteria, sensitive tests, and incremental implementation.
 
+### Resource contract
+
+Extension changes affecting timers, messages, observers, listeners, queues,
+caches, retained data, or content-script injection and bundle size are
+resource-sensitive. Apply these requirements before implementation, including
+when the change is described as a refactor:
+
+- **Quiet idle:** inactive creation trackers with no pending measurements send
+  no periodic worker requests. Local timers and resident content scripts may
+  remain; they must not keep the worker alive with empty work. Pending delivery,
+  foreground synchronization, and scheduled access enforcement remain valid work.
+- **Bounded state:** give queues, caches, and retained DOM references an explicit
+  bound and overflow or eviction policy. Preserve unsaved measurements: pause
+  new collection under sustained failure rather than silently losing queued data
+  or allowing unbounded growth. Reuse existing limits where applicable.
+- **Owned lifetimes:** identify who owns each timer, listener, observer, and
+  retained object, and when it is released or paused. Repeated navigation,
+  enable/disable, and restart cycles must not accumulate duplicate resources.
+- **Per-tab cost:** account for resources multiplied across open tabs. Prefer
+  existing shared machinery and narrowly scoped injection over another timer,
+  observer, copy of history, or bundle in every page.
+- **Evidence before acceptance:** follow
+  [resource verification](docs/testing.md#resource-verification). An increase
+  beyond the agreed measurement tolerance requires a user-facing justification
+  and explicit maintainer approval before merge. Do not weaken a regression
+  check or reset its baseline merely to make the change pass.
+
 ### Review checklist
 
 Automated tests enforce mechanical rules; review the decisions they cannot prove:

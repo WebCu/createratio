@@ -7,6 +7,9 @@ principles and [coding standards](CONTRIBUTING.md#coding-standards), and
 - For features, bug fixes, test changes, or refactors, follow
   [docs/testing.md](docs/testing.md#strategy-and-completion) for the tracer-bullet
   workflow, acceptance criteria, test interfaces, and completion gate.
+- For extension runtime or content-script injection changes, apply the
+  [resource contract](CONTRIBUTING.md#resource-contract) and
+  [resource verification gate](docs/testing.md#resource-verification).
 - For extension source moves, packaged paths, or manifest changes, read
   [extension/README.md](extension/README.md#layout-and-installation).
 - For site integrations or selectors, read
