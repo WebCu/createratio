@@ -49,12 +49,70 @@ one sensitive test and the smallest working slice, then extend it. A reproductio
 or temporary relevant mutation must make the check fail; restore mutations before
 running the completion gate.
 
+Finish source writes before dependent checks and all workspace writers before
+the final integrated check. Keep check inputs unchanged while checks run; rerun
+affected checks if their inputs change.
+
 Completion means the agreed criteria pass, the diff is reviewed, `pnpm check`
 passes, and extension/runtime, manifest, build, or browser-harness changes also
 pass `pnpm check:browser` and `pnpm smoke:browser`. Report commands, failures, and
 remaining manual checks;
-a rerun without explaining a flaky failure is not a fix. Release still requires
-the live-site and platform checks below.
+a rerun without explaining a flaky failure is not a fix. Resource-sensitive
+changes must also satisfy [resource verification](#resource-verification) before
+completion. Release still requires the live-site and platform checks below.
+
+## Resource verification
+
+Classify each pull request against the
+[resource contract](../CONTRIBUTING.md#resource-contract). A change with no
+resource impact needs a brief reason, not an invented benchmark result.
+For resource-sensitive changes:
+
+1. **Set acceptance criteria first.** Identify the affected worker, page script,
+   or extension UI; its expected idle behavior, lifetime, retained-state bound,
+   and per-tab cost. Choose a fixed baseline, representative workload, and
+   acceptable measurement tolerance before implementation. Use existing approved
+   budgets; new or relaxed budgets require maintainer approval. Include many-tab
+   and repeated navigation or enable/disable scenarios when those costs can change.
+2. **Protect observable behavior.** Add or extend a sensitive regression for the
+   affected contract and run the normal completion commands. Existing inactive
+   polling and retry coverage lives in `extension/src/content/content.test.js`;
+   `extension/browser-tests/tracker-idle.test.js` checks hidden-tab polling and
+   foreground synchronization in the built extension. Extend lifecycle coverage
+   for accumulation, bounds, and cleanup when those are affected. Keep valid
+   delivery and recovery paths working while eliminating unnecessary work.
+3. **Measure baseline and candidate.** Use generated bundles in separate
+   disposable browser profiles, the same browser version, settings, synthetic
+   pages, tab counts, and interaction sequence. Repeat each build at least three
+   times, alternating build order. Record the reproduction commands, environment,
+   observation window, repetitions, and measurements with their units; report
+   the median and range rather than selecting the best run. The recipe must be
+   reproducible from a clean checkout with documented tools; include reusable,
+   non-private fixtures or instruments when needed. Keep raw evidence outside
+   Git and use only synthetic, non-personal data.
+4. **Attribute the cost.** For worker-lifecycle changes, observe idle shutdown
+   with its debugger detached and without polling or profiling that keeps it
+   awake. Account for legitimate alarms and delivery retries; also verify wakeup
+   and settings recovery on return. For page-script changes, profile retained
+   heap separately, using an uninjected fixture as a control when estimating
+   injection cost. Compare repeated lifecycle cycles for continuing growth in
+   affected components. Worker-process memory, page heap, and whole-browser
+   memory are distinct measurements; worker exit does not mean the whole
+   extension uses zero memory. Browser shutdown timing is not an exact
+   cross-platform deadline.
+5. **Report the decision.** Include a compact resource-impact summary in the PR:
+   affected components and bounds, behavioral checks, baseline/candidate results
+   and variation, reproduction commands, and remaining limitations. Explain any
+   increase beyond tolerance and obtain the approval required by the contract.
+   Missing or unattributed evidence, or unresolved measurement noise, is
+   unverified, not proof of no regression; report it and leave the resource
+   acceptance gate incomplete.
+
+CI runs the behavioral regressions through the existing completion commands.
+The hidden-tab test checks messages, not actual worker termination or RAM use.
+There is no automated memory-budget gate: browser memory measurements and their
+acceptance remain a required contributor and maintainer review gate. A green CI
+run alone does not satisfy this section.
 
 ## Reference tracer bullets
 
@@ -205,9 +263,10 @@ Before a release, verify:
   A worker wake deducts elapsed active time; actual browser downtime does not.
 - Goal-based access applies only above today's current target and returns to
   normal gates at or below it and on a new day.
-- Limit & track Off removes a site's gate, timer, and new score measurements
-  together, retaining history and saved duration. Re-enabling starts blocked with
-  no old budget or pending wait, unless optional above-goal access applies.
+- In an already-open tab, Limit & track Off removes a site's gate, timer, and
+  new score measurements together, retaining history and saved duration.
+  Re-enabling records only fresh trusted activity and starts blocked with no old
+  budget or pending wait, unless optional above-goal access applies.
 - Midnight refills use each site's override or current inherited Default. Off
   cancels refills; above-goal access never re-enables measurement on Off sites.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
