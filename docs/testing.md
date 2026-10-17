@@ -49,6 +49,10 @@ one sensitive test and the smallest working slice, then extend it. A reproductio
 or temporary relevant mutation must make the check fail; restore mutations before
 running the completion gate.
 
+Finish source writes before dependent checks and all workspace writers before
+the final integrated check. Keep check inputs unchanged while checks run; rerun
+affected checks if their inputs change.
+
 Completion means the agreed criteria pass, the diff is reviewed, `pnpm check`
 passes, and extension/runtime, manifest, build, or browser-harness changes also
 pass `pnpm check:browser` and `pnpm smoke:browser`. Report commands, failures, and
@@ -259,9 +263,10 @@ Before a release, verify:
   A worker wake deducts elapsed active time; actual browser downtime does not.
 - Goal-based access applies only above today's current target and returns to
   normal gates at or below it and on a new day.
-- Limit & track Off removes a site's gate, timer, and new score measurements
-  together, retaining history and saved duration. Re-enabling starts blocked with
-  no old budget or pending wait, unless optional above-goal access applies.
+- In an already-open tab, Limit & track Off removes a site's gate, timer, and
+  new score measurements together, retaining history and saved duration.
+  Re-enabling records only fresh trusted activity and starts blocked with no old
+  budget or pending wait, unless optional above-goal access applies.
 - Midnight refills use each site's override or current inherited Default. Off
   cancels refills; above-goal access never re-enables measurement on Off sites.
 - Focused editors, routes, click/keyboard submissions, and light actions behave

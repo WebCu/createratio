@@ -1,8 +1,8 @@
 # Contributing to CreateRatio
 
-This guide is the authoritative source of coding standards for human and agent
-contributors. [AGENTS.md](AGENTS.md) provides agent navigation;
-[Verification](docs/testing.md) owns the testing workflow and completion checks.
+Project standards for human and agent contributors live here; verification
+procedures and completion criteria live in [docs/testing.md](docs/testing.md).
+Keep [AGENTS.md](AGENTS.md) as an entry point, not a second rulebook.
 
 ## Project principles
 
@@ -24,8 +24,8 @@ contributors. [AGENTS.md](AGENTS.md) provides agent navigation;
   when a simpler approach cannot solve a real problem.
 - **Keep dependencies at zero, or as close to zero as possible.** Prefer
   built-in browser and Node.js capabilities. Any new dependency needs a clear
-  justification and maintainer approval; follow the
-  [dependency policy](docs/dependencies.md).
+  justification and maintainer approval. For dependency, toolchain, or CI
+  changes, follow the [dependency policy](docs/dependencies.md).
 - **Do not add AI to the extension unless it solves a real user problem.** AI
   is not a feature goal on its own. Using AI to develop and maintain the
   extension is welcome and encouraged; contributors remain responsible for
@@ -44,8 +44,8 @@ users will enable or disable the functionality.
 
 ## Source layout
 
-When moving extension sources or tests, read the
-[extension layout and packaged-path contract](extension/README.md#layout-and-installation).
+For extension source or test moves, packaged-path changes, or manifest changes,
+read the [extension layout and packaged-path contract](extension/README.md#layout-and-installation).
 Search references across the whole repo, including shared test harnesses and
 `extension/sites/test-support.js`.
 
@@ -98,8 +98,8 @@ browsing history, or credentials in issues or test fixtures.
 The Settings page's available-site list and sender/action validation use the catalog.
 Recorded history and CSV remain available even after an integration is removed.
 The build packages registered modules into `sites.js`; unregistered code and
-colocated tests do not ship. See [Site integrations](extension/sites/README.md) for editing,
-removal, failure isolation, and ownership rules.
+colocated tests do not ship. See [Site integrations](extension/sites/README.md)
+for selector changes, editing, removal, failure isolation, and ownership rules.
 
 Tracking support does **not** automatically add whole-site blocking. X and
 LinkedIn have explicit gate support: **Limit & track** enables their gate and
@@ -209,24 +209,11 @@ merges on a branch with an upstream or a matching remote-tracking ref.
 
 ## Review and verify
 
-Review the [coding standards](#coding-standards) against the originating request.
-Finish source writes before dependent checks; do not edit their inputs while
-checks run. Finish all workspace writers before the final integrated check and
-rerun affected checks if their inputs change.
+Follow [Verification](docs/testing.md) for the testing workflow, completion gate,
+and manual release checks.
 
-Follow [Verification](docs/testing.md) for required commands, browser setup,
-completion criteria, bundle equivalence, and manual release checks. Follow the
-[dependency policy](docs/dependencies.md) for supported toolchain majors, setup, and auditing.
-Keep account-specific toolchain provisioning in the agent environment, not
-repository bootstrap scripts.
-
-The browser runtime has no dependencies. Load the generated browser bundle, not the
-source extension directory. Check enabled tracking and actions with the site's
-current UI, disable tracking in an already-open tab, then re-enable it and
-confirm that only new trusted activity counts. Existing history must survive.
-
-Pull requests should include the supported-host/action matrix, automated test
-results, manual checks, and known limitations. Maintainers vet integrations for
-correct classification, narrowly scoped permissions, privacy, accessibility,
-and reliability before shipping them. Never collect text, keystroke values,
-usernames, screenshots, URLs, or post IDs as activity data.
+Pull requests should include automated test results, manual checks, known
+limitations, and the supported-host/action matrix where applicable. Maintainers
+vet integrations for correct classification, narrowly scoped permissions,
+privacy, accessibility, and reliability before shipping them. Never collect
+text, keystroke values, usernames, screenshots, URLs, or post IDs as activity data.
