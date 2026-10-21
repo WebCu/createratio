@@ -32,6 +32,8 @@ jobs:
         run: pnpm audit --audit-level=high
       - name: Check tests and all builds
         run: pnpm check
+      - name: Exercise version preparation and release packaging locally
+        run: pnpm check:release
 
   browser-smoke:
     runs-on: ubuntu-24.04

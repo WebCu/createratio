@@ -23,6 +23,9 @@ missing browsers and failed checks are errors, not successful skips.
 `pnpm verify` runs all three completion commands in order, stopping on the first
 failure and preserving its exit code. Each invocation creates a fresh private
 temporary directory, prints its path, and saves per-stage logs plus `summary.json`.
+The summary records the starting commit, working-tree dirty state, and actual Node
+and pnpm versions. Unavailable Git or package-manager metadata is recorded as
+`null`, not inferred from another checkout.
 Later stages are marked **not-run**, with no log file; output from an earlier run
 is never reused. Keep these artifacts outside Git and remove them when no longer
 needed. Existing browser-failure artifacts remain under `BROWSER_ARTIFACT_DIR`.
@@ -252,6 +255,14 @@ source refusal and tag/commit mismatches. Store API tests substitute HTTP only,
 covering version/pending-submission guards, authentication, validation polling,
 write failures and refusal paths. Those tests do not establish live credentials,
 provider acceptance or publication.
+
+`pnpm check:release` requires a clean committed checkout and exercises the real
+prepare/check/merge/publish/package journey in a disposable repository. It reuses
+installed dependencies, substitutes GitHub CLI and only the approved local Git
+transport, and permits file transport only. Automatic tag following and mirror
+mode are enabled to verify that unrelated tags remain local. Logs and the result
+summary stay in a fresh temporary directory. No store endpoints are called. CI
+runs this separately from `pnpm check` to avoid recursive verification.
 
 Before approving each store deployment, test its exact extracted artifact in the
 relevant browser and complete the manual extension checks below. Verify Chrome

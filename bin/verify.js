@@ -4,10 +4,18 @@ const { mkdtempSync, openSync, closeSync, writeFileSync, writeSync, fstatSync, r
 const { tmpdir, constants } = require('node:os');
 const path = require('node:path');
 
+function commandValue(program, args) {
+  const result = spawnSync(program, args, { encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] });
+  return !result.error && result.status === 0 ? result.stdout.trim() : null;
+}
+
 function runVerification() {
+  const status = commandValue('git', ['status', '--porcelain']);
+  const source = { head: commandValue('git', ['rev-parse', '--verify', 'HEAD']), dirty: status === null ? null : Boolean(status) };
+  const runtime = { node: process.version, pnpm: commandValue('pnpm', ['--version']) };
   const directory = mkdtempSync(path.join(tmpdir(), 'createratio-verify-'));
   const stages = ['check', 'check:browser', 'smoke:browser'].map(name => ({ name, status: 'not-run', log: name.replaceAll(':', '-') + '.log' }));
-  const save = () => writeFileSync(path.join(directory, 'summary.json'), JSON.stringify({ stages }, null, 2) + '\n', { mode: 0o600 });
+  const save = () => writeFileSync(path.join(directory, 'summary.json'), JSON.stringify({ source, runtime, stages }, null, 2) + '\n', { mode: 0o600 });
   console.log(`Verification logs: ${directory}`);
   save();
   let exitCode = 0;
