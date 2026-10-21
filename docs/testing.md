@@ -298,6 +298,13 @@ release checks, not guarantees from unit tests.
 
 ## Website
 
+Website PRs also follow the [SEO workflow](seo.md). `pnpm check` includes built-page
+metadata/canonical checks, sitemap coverage, static site identity/social metadata,
+and crawl-file delivery in source and built previews. Run
+`node --test site/tests/seo.test.js` for the focused loop. The releasing maintainer
+still verifies deployed HTTP responses, headers, and Search Console; local tests
+do not prove indexing or ranking gains.
+
 Verify forward/backward scrolling, narrow and mobile layouts, keyboard navigation,
 skip links, direct anchors, reduced motion, and disabled JavaScript. Primary
 installation links must open the published

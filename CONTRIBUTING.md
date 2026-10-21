@@ -49,6 +49,13 @@ read the [extension layout and packaged-path contract](extension/README.md#layou
 Search references across the whole repo, including shared test harnesses and
 `extension/sites/test-support.js`.
 
+## Website search quality
+
+Website PRs follow the [SEO workflow](docs/seo.md): preserve crawlability and
+metadata, identify the user question for content changes, and use Search Console
+evidence to prioritize and evaluate search-growth work. Automated checks prevent
+technical regressions; a maintainer owns the monthly performance review.
+
 ## Website integrations
 
 CreateRatio's website catalog is maintained through this GitHub project. Users
