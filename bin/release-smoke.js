@@ -23,7 +23,7 @@ function releaseSmoke() {
   const descriptor = fs.openSync(log, 'wx', 0o600);
   fs.mkdirSync(project); fs.mkdirSync(bin);
   const env = { ...process.env };
-  for (const name of Object.keys(env)) if (/^(GH_|GITHUB_|AMO_|CWS_|GOOGLE_)/.test(name)) delete env[name];
+  for (const name of Object.keys(env)) if (/^(GIT_|GH_|GITHUB_|AMO_|CWS_|GOOGLE_)/.test(name)) delete env[name];
   Object.assign(env, {
     CR_RELEASE_SMOKE: '1', CI: '1', GIT_ALLOW_PROTOCOL: 'file', GIT_CONFIG_GLOBAL: os.devNull,
     GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 'Release smoke', GIT_AUTHOR_EMAIL: 'smoke@example.invalid',

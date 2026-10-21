@@ -37,7 +37,10 @@ test('release smoke exposes the failed stage output in CI instead of only a temp
   git(['config', 'commit.gpgsign', 'false']);
   fs.writeFileSync(path.join(cwd, 'package.json'), JSON.stringify({ scripts: { release: 'node -e "console.error(\'smoke-stage-failure\'); process.exit(7)"' } }));
   git(['add', '.']); git(['commit', '-m', 'Failing fixture']);
-  const result = spawnSync(process.execPath, [script], { cwd, env: { ...process.env, CR_RELEASE_SMOKE: '' }, encoding: 'utf8', timeout: 30000 });
+  const index = path.join(cwd, '.git/index');
+  const originalIndex = fs.readFileSync(index);
+  const result = spawnSync(process.execPath, [script], { cwd, env: { ...process.env, CR_RELEASE_SMOKE: '', GIT_INDEX_FILE: index }, encoding: 'utf8', timeout: 30000 });
+  assert.deepEqual(fs.readFileSync(index), originalIndex);
   const logs = result.stdout.match(/Release smoke logs: (.+)/)?.[1];
   assert.ok(logs?.startsWith(path.join(os.tmpdir(), 'createratio-release-smoke-')));
   t.after(() => fs.rmSync(logs, { recursive: true, force: true }));
