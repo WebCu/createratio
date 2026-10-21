@@ -88,6 +88,7 @@ export async function measureResources(bundle, { tabs = 20, cycles = 3, idleMs =
       const initial = await findWorker();
       if (!initial) throw new Error('Worker missing before debugger detachment');
       const awakeMemory = await workerMemory(identity.workerPid);
+      if (awakeMemory.processPresent === false) throw new Error('Attributed worker process is absent while its target is awake; memory evidence is invalid');
       const alarms = await evaluate(browser, browser.worker, '(async () => { const alarms = await chrome.alarms.getAll(); await chrome.alarms.clearAll(); return alarms.map(({ name, scheduledTime }) => ({ name, scheduledTime })); })()');
       const away = await browser.page('about:blank');
       await eventually(() => evaluate(browser, away.session, 'document.hasFocus()'), 'unrelated foreground tab');

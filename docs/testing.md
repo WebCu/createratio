@@ -111,9 +111,11 @@ For resource-sensitive changes:
 CI runs the behavioral regressions through the existing completion commands.
 The hidden-tab test checks messages. `worker-lifecycle.test.js` additionally
 checks actual worker absence and recovery with its debugger detached, and saves
-resource samples to the browser artifact directory. It uses two synthetic tabs
-with creation tracking disabled and scheduled alarms cleared in the disposable
-profile. Its 45-second idle observation is a controlled regression check, not a
+resource samples to the browser artifact directory. It exercises the benchmark
+CLI with two cold copies of the same bundle and two synthetic tabs per profile,
+catching Chrome-cache fingerprint mistakes as well as lifecycle regressions.
+Creation tracking is disabled and scheduled alarms are cleared only in these
+disposable profiles. Each 45-second idle observation is a controlled check, not a
 universal browser shutdown deadline or a test of scheduled access enforcement.
 There is still no numerical memory-budget gate: resource measurements and their
 acceptance remain a contributor and maintainer review gate. A green CI run alone
