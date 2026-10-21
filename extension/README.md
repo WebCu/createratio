@@ -180,11 +180,15 @@ Old Twitter URLs must redirect to X first.
 | Site | Consuming | Creating |
 | --- | --- | --- |
 | X | Home, Explore, Search, other profiles and status pages | Post/reply/quote editors and a focused home composer |
-| LinkedIn | Feed and other personal/company/school profiles | Focused post or comment editors |
+| LinkedIn | Feed and other personal/company/school profiles | Focused post, comment, or direct-message editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
 cannot be identified, profiles default to consuming. Editors take precedence;
 a blank, unfocused composer does not turn the feed into creating time.
+Writing direct messages counts as creating on messaging pages and in chat overlays.
+Reading messages on messaging pages stays neutral; unfocused overlays leave the
+underlying page's classification unchanged. Sending a direct message earns no
+post or comment bonus. Message text is never read or saved.
 
 Only visible, focused documents with trusted input in the last **30 seconds**
 count. Time saves roughly every five seconds and splits at local midnight.
