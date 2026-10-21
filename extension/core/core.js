@@ -11,7 +11,7 @@
   const DELIVERY_LIMITS = { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 };
   function validIntention(value) { return typeof value === 'string' && value.length <= INTENTION_LIMITS.maxLength && value.trim().length >= INTENTION_LIMITS.minLength; }
   function validAccessMinutes(value) { return Number.isInteger(value) && value >= ACCESS_LIMITS.minMinutes && value <= ACCESS_LIMITS.maxMinutes; }
-  const DEFAULT_SETTINGS = { accessMinutes: 5, dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
+  const DEFAULT_SETTINGS = { accessMinutes: 5, dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, scrollFrictionEnabled: false, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
   function isRecord(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function trackingSelection(settings) {
     const selected = isRecord(settings) ? settings.trackedSites : undefined;
@@ -23,7 +23,7 @@
     resolved.dailyTarget = dailyTarget(settings);
     resolved.trackedSites = trackingSelection(settings).filter(site => typeof site === 'string');
     if (!validAccessMinutes(resolved.accessMinutes)) resolved.accessMinutes = DEFAULT_SETTINGS.accessMinutes;
-    for (const key of ['allowAboveGoal', 'intentionHistoryEnabled']) if (typeof resolved[key] !== 'boolean') resolved[key] = DEFAULT_SETTINGS[key];
+    for (const key of ['allowAboveGoal', 'intentionHistoryEnabled', 'scrollFrictionEnabled']) if (typeof resolved[key] !== 'boolean') resolved[key] = DEFAULT_SETTINGS[key];
     delete resolved.nudgeEnabled; delete resolved.nudgeMinutes;
     if (Object.hasOwn(resolved, 'siteOverrides')) resolved.siteOverrides = Object.fromEntries(Object.entries(isRecord(resolved.siteOverrides) ? resolved.siteOverrides : {}).filter(([, preferences]) => isRecord(preferences)).map(([site, preferences]) => {
       const overrides = { ...preferences };

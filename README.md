@@ -13,8 +13,9 @@ Switching away pauses the timer.
 - **A daily creation score:** compares creating time and credit for posts,
   replies, and comments against consuming time. See the
   [measurement rules and limitations](extension/README.md#measurement-and-score).
-- **Optional extras:** track time across websites or save your access
-  intentions. Both features are off by default.
+- **Optional extras:** slow wheel/trackpad scrolling while browsing X and
+  LinkedIn, track time across websites, or save your access intentions.
+  All three are off by default.
 - **Private by default:** no extension account, analytics, telemetry, or activity
   uploads. The landing website uses separate, disclosed analytics.
 

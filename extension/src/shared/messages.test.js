@@ -80,6 +80,15 @@ test('snapshot and ingest acknowledgements are usable without optional delivery 
   }
 });
 
+test('scroll-friction saves require a complete snapshot with a persisted boolean preference', async () => {
+  for (const settings of [{}, { scrollFrictionEnabled: 'true' }, { scrollFrictionEnabled: 1 }, { scrollFrictionEnabled: null }]) {
+    await assert.rejects(client({ ...snapshot, settings }).send({ type: 'scroll-friction-setting' }, 'Not saved.'), { message: 'Not saved.' });
+  }
+  for (const enabled of [true, false]) {
+    const reply = { ...snapshot, settings: { scrollFrictionEnabled: enabled } };
+    assert.equal(await client(reply).send({ type: 'scroll-friction-setting' }, 'Not saved.'), reply);
+  }
+});
 test('storage refreshes distinguish access phases from countdown-only writes', () => {
   const running = { remainingMs: 60000, expiresAt: 100000, date: '2026-10-11', refilledAt: 40000 };
   const notification = (oldValue, newValue) => ({ _access: { oldValue, newValue } });

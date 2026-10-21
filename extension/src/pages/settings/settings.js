@@ -3,7 +3,7 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
-let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, websiteTimeEnabled = false;
+let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; if (message) $('save-status').textContent = ''; }
 function saved(message) { error(); $('save-status').textContent = message; }
 function createAccessField(site) {
@@ -76,6 +76,8 @@ function render(settings, force = '') {
     if (!control) { control = createSite(site); siteControls.set(site.id, control); }
     renderSite(control, settings, force);
   }
+  if (!scrollSettingBusy) $('scroll-friction-enabled').checked = settings.scrollFrictionEnabled;
+  $('scroll-friction-enabled').disabled = scrollSettingBusy;
   if (!goalSettingBusy) $('allow-above-goal').checked = settings.allowAboveGoal;
   $('allow-above-goal').disabled = goalSettingBusy;
   if (!intentionSettingBusy) $('intention-history-enabled').checked = settings.intentionHistoryEnabled;
@@ -129,6 +131,18 @@ async function saveSitePreference(control, group, message) {
   } catch (e) { error(e.message); }
   finally { control.busy.delete(group); render(currentSettings, site + ':' + group); }
 }
+$('scroll-friction-enabled').addEventListener('change', async () => {
+  if (scrollSettingBusy) return;
+  const enabled = $('scroll-friction-enabled').checked;
+  scrollSettingBusy = true; $('scroll-friction-enabled').disabled = true;
+  try {
+    const result = await messages.send({ type: 'scroll-friction-setting', enabled }, 'Unable to save slow scrolling.');
+    render(result.settings);
+    saved(enabled ? 'Slow scrolling enabled. Wheel and trackpad scrolling move half as far while browsing.' : 'Slow scrolling disabled. Native scrolling restored.');
+    await notifyTrackers();
+  } catch (e) { error(e.message); }
+  finally { scrollSettingBusy = false; render(currentSettings); }
+});
 $('website-time-enabled').addEventListener('change', async () => {
   const enabled = $('website-time-enabled').checked;
   websiteSettingBusy = true; $('website-time-enabled').disabled = true;

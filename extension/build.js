@@ -8,7 +8,7 @@ const { FIELDS } = require('./core/core.js');
 const SITE_SCRIPTS = [...sites.map(site => `sites/${site.id}.js`), 'sites/index.js'];
 const ASSETS = [
   'background/background.js', 'background/history.js', 'background/web-time.js', 'background/blocker.js', 'background/message-contracts.js',
-  'content/access-guard.js', 'content/content.js', 'content/dom.js', 'content/route-hook.js',
+  'content/access-guard.js', 'content/content.js', 'content/dom.js', 'content/route-hook.js', 'content/scroll-friction.js',
   'pages/blocked/blocked.html', 'pages/blocked/blocked.css', 'pages/blocked/blocked.js',
   'pages/popup/popup.html', 'pages/popup/popup.js',
   'pages/settings/settings.html', 'pages/settings/settings.js',

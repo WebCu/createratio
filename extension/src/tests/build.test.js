@@ -63,6 +63,8 @@ test('all browser bundles include the exact shared core and every referenced ass
     assert.equal(manifest.content_scripts[2].js.indexOf('sites.js') < manifest.content_scripts[2].js.indexOf('core.js'), true);
     assert.equal(manifest.content_scripts[2].js.indexOf('core.js') < manifest.content_scripts[2].js.indexOf('messages.js'), true);
     assert.equal(manifest.content_scripts[2].js.indexOf('messages.js') < manifest.content_scripts[2].js.indexOf('content.js'), true);
+    assert.ok(manifest.content_scripts[2].js.includes('scroll-friction.js'));
+    assert.ok(manifest.content_scripts[2].js.indexOf('scroll-friction.js') < manifest.content_scripts[2].js.indexOf('content.js'));
     for (const html of [settings, dashboard, popup, blocked]) {
       const pageScripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]);
       assert.ok(pageScripts.includes('messages.js'));

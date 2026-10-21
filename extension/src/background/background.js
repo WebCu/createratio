@@ -64,6 +64,12 @@ async function handle(message, sender) {
     case 'tracking':
       await SiteAccess.handle(message, sender);
       return snapshot();
+    case 'scroll-friction-setting': {
+      contracts.preferences(message, sender);
+      const stored = await extensionAPI.storage.local.get('settings');
+      await extensionAPI.storage.local.set({ settings: { ...stored.settings, scrollFrictionEnabled: message.enabled } });
+      return snapshot();
+    }
     case 'website-time-setting':
       contracts.preferences(message, sender);
       return websiteTime.setEnabled(message.enabled);

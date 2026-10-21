@@ -7,7 +7,7 @@ and local creating-versus-consuming tracking.
 
 - `src/manifest.json`: browser permissions and packaged runtime entry points.
 - `src/background/`: background worker, access blocking, history, and website time.
-- `src/content/`: creation tracker, access guard, route hook, and DOM helpers.
+- `src/content/`: creation tracker, access guard, route hook, DOM helpers, and optional scroll friction.
 - `src/pages/`: popup, Settings, dashboard, and blocked-page HTML, scripts, and page-specific styles.
 - `src/shared/`: shared UI styles, refill animation, and feedback.
 - `src/icons/`: extension icons.
@@ -122,7 +122,7 @@ replacement from a browser restart. Website-time sampling starts fresh.
 - **Settings:** one Default session-time row and one row per vetted site with a
   **Limit & track** switch. Times show **From Default** or **Custom**; **Use Default**
   removes an override. Off disables time editing/reset without losing saved times.
-  Optional above-goal access, Website time, intention saving, exports, and history
+  Optional slow scrolling, above-goal access, Website time, intention saving, exports, and history
   clearing remain separate. Preferences save automatically.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
   and CSV exports.
@@ -164,6 +164,25 @@ optional above-goal access applies. Fresh trusted input is required to measure.
 New vetted integrations start disabled; arbitrary domains or user scripts cannot
 be added from the UI. Integrations without explicit gate support remain
 tracking-only.
+
+### Slow scrolling
+
+**Settings → Slow scrolling** is off by default. When enabled, vertical mouse-wheel
+and trackpad movement scrolls the main page half as far, in either direction,
+without a timer, popup, or queued animation. It applies only to consuming pages
+on enabled sites during timed or above-goal access, using the existing page
+classification below. Turning it off restores native scrolling in open tabs;
+turning a site's Limit & track off also removes its scroll friction.
+
+Editors, messaging routes, nested scroll panels, horizontal gestures, and zoom
+stay native. Keyboard scrolling, touch gestures, and scrollbar dragging are
+unchanged. Line-based wheel input uses a 16-pixel line; page-based input uses the
+viewport height. Physical trackpad feel and native wheel settings vary by browser
+and operating system. No scroll distances or additional activity data are saved.
+
+The tracker owns the optional wheel listener and removes it when the page becomes
+inactive, neutral, creating, disabled, or stopped. Scroll handling adds no timers,
+observers, background messages, or retained DOM references.
 
 ## Measurement and score
 

@@ -74,6 +74,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
       if (message.type === 'access-duration') { settings = C3.updatePreferences(settings, { accessMinutes: message.minutes }, message.site); return { ok: true, access: structuredClone(state.access) }; }
       if (message.type === 'access-goal-setting') settings.allowAboveGoal = message.enabled;
       if (message.type === 'access-history-setting') settings.intentionHistoryEnabled = message.enabled;
+      if (message.type === 'scroll-friction-setting') settings.scrollFrictionEnabled = message.enabled;
       if (message.type === 'access-history-clear') data._intentions = [];
       if (message.type === 'access-history-list') return { ok: true, intentions: structuredClone(data._intentions || []) };
       if (message.type === 'website-time-setting') { enabled = message.enabled; return { ok: true, enabled }; }

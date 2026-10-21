@@ -53,6 +53,9 @@
         case 'access-history-setting':
           if (typeof message.enabled !== 'boolean') throw refuse('Enable or disable intention history');
           break;
+        case 'scroll-friction-setting':
+          if (typeof message.enabled !== 'boolean') throw refuse('Enable or disable scroll friction');
+          break;
         case 'website-time-setting':
           if (typeof message.enabled !== 'boolean') throw refuse('Invalid website tracking setting');
           break;

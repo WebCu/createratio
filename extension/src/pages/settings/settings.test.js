@@ -26,6 +26,58 @@ test('malformed saves restore persisted controls without claiming success or not
   assert.equal(p.nodes['website-time-enabled'].checked, false); assert.equal(p.nodes['website-time-enabled'].disabled, false);
   assert.equal(p.nodes.error.textContent, 'Unable to change website time.'); assert.equal(p.nodes['save-status'].textContent, '');
 });
+test('slow scrolling defaults off, saves independently and restores failed or malformed changes', async () => {
+  const p = settingsPage(); await p.ready();
+  const input = p.nodes['scroll-friction-enabled'];
+  assert.equal(input.checked, false); assert.equal(input.disabled, false);
+  input.checked = true; const saving = input.fire('change'); assert.equal(input.disabled, true);
+  await input.fire('change'); await saving;
+  assert.equal(p.messages.filter(message => message.type === 'scroll-friction-setting').length, 1);
+  assert.equal(input.checked, true); assert.equal(input.disabled, false);
+  assert.equal(p.state.requested, 0);
+  assert.deepEqual(p.notifications, [{ id: 1, type: 'refresh' }, { id: 2, type: 'refresh' }]);
+  assert.deepEqual(p.settings.trackedSites, ['x', 'linkedin']);
+  assert.equal(p.data[C3.localDate()].x.consumeSec, 60);
+  p.fail = true; input.checked = false; await input.fire('change');
+  assert.equal(input.checked, true); assert.equal(input.disabled, false); assert.equal(p.nodes.error.textContent, 'Could not save.');
+  p.fail = false;
+  p.state.replies.set('scroll-friction-setting', { ok: true });
+  input.checked = false; await input.fire('change');
+  assert.equal(input.checked, true); assert.equal(p.nodes['save-status'].textContent, '');
+  assert.equal(p.nodes.error.textContent, 'Unable to save slow scrolling.');
+  p.state.replies.delete('scroll-friction-setting'); input.checked = false; await input.fire('change');
+  assert.equal(input.checked, false); assert.equal(input.disabled, false);
+  p.setSettings({ ...C3.DEFAULT_SETTINGS, scrollFrictionEnabled: true }); p.change(); await p.ready();
+  assert.equal(input.checked, true);
+});
+test('Settings slow-scrolling choice reaches the real worker, survives restart and changes live tracker behavior', async () => {
+  const { activeWorker, worker } = require('../../tests/background-harness.js');
+  const { tracker } = require('../../tests/content-harness.js');
+  const sender = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };
+  async function until(check) {
+    for (let n = 0; n < 200 && !check(); n++) await new Promise(resolve => setImmediate(resolve));
+    assert.ok(check(), 'browser messages finish before assertions');
+  }
+  const w = activeWorker();
+  const p = page('settings', w.data, false, { forward: message => w.send(message, sender) });
+  await until(() => !!p.nodes['track-x']);
+  let replies = 0;
+  const t = await tracker('chrome', { async forward(message) { const result = await w.send(message); replies++; return result; } });
+  await until(() => replies > 0);
+  assert.equal(t.wheel(200).defaultPrevented, false);
+  p.nodes['scroll-friction-enabled'].checked = true;
+  await p.nodes['scroll-friction-enabled'].fire('change'); await t.tick();
+  assert.equal(w.data.settings.scrollFrictionEnabled, true);
+  await until(() => t.listenerCount('wheel') === 2);
+  assert.equal(t.wheel(200).defaultPrevented, true);
+  assert.equal(t.document.scrollingElement.scrollTop, 1100);
+  const restarted = worker(w.data, 'chrome', w.now);
+  assert.equal((await restarted.send({ type: 'snapshot' })).settings.scrollFrictionEnabled, true);
+  p.nodes['scroll-friction-enabled'].checked = false;
+  await p.nodes['scroll-friction-enabled'].fire('change'); await t.tick();
+  await until(() => t.listenerCount('wheel') === 1);
+  assert.equal(t.wheel(200).defaultPrevented, false);
+});
 test('intention history defaults off, toggles independently, and recovers failed saves', async () => {
   const p = settingsPage({ _intentions: [{ site: 'x', reason: 'A saved intention', requestedAt: 1 }] }); await p.ready();
   const input = p.nodes['intention-history-enabled'];

@@ -5,6 +5,8 @@
   const integration = C3Sites.forURL(location.href);
   if (!integration) return;
   const site = integration.id;
+  const scrollFriction = ScrollFriction.create({ document, Element, getComputedStyle });
+  let scrollFrictionEnabled = false;
   const session = crypto.randomUUID();
   let sequence = 0, lastSample = performance.now(), lastInput = -Infinity;
   let enabled = false, mode = 'neutral';
@@ -56,6 +58,7 @@
       if (!['create', 'consume', 'neutral'].includes(mode)) throw new Error('Invalid page classification');
     } catch (error) { pauseIntegration(error); return; }
     wasVisible = document.visibilityState === 'visible'; wasFocused = document.hasFocus();
+    scrollFriction.setEnabled(scrollFrictionEnabled && mode === 'consume' && pageActive && wasVisible && wasFocused);
   }
   function scheduleRefresh() {
     if (refreshTimer === null) refreshTimer = setTimeout(() => { refreshTimer = null; refresh(); }, 150);
@@ -70,6 +73,7 @@
   }
   function pauseIntegration(error) {
     failed = true; enabled = false; adapter = null; mode = 'neutral';
+    scrollFriction.setEnabled(false);
     segments = []; actions = []; outbox = [];
     lastInput = -Infinity; lastSample = performance.now();
     console.warn(`CreateRatio: ${integration.name} integration paused until page reload.`, error.message);
@@ -91,6 +95,7 @@
     const access = result.access[site];
     if (integration.access && !access) throw new Error('No response');
     const nextEnabled = !failed && C3.trackingEnabled(site, result.settings) && (!access || access.enabled !== false && (access.goalAllowed || access.remainingMs > 0));
+    scrollFrictionEnabled = result.settings.scrollFrictionEnabled === true;
     synchronizeTracking(nextEnabled, result.generation ?? null);
     refresh();
   }
@@ -166,7 +171,7 @@
     }
   }, 5000);
   function stop() {
-    stopped = true; clearInterval(interval); clearTimeout(refreshTimer); observer.disconnect();
+    stopped = true; scrollFriction.setEnabled(false); clearInterval(interval); clearTimeout(refreshTimer); observer.disconnect();
   }
   extensionAPI.runtime.onMessage.addListener(message => {
     if (message.type === 'refresh') { refresh(); void pump(); }

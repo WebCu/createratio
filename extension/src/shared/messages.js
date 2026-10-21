@@ -31,6 +31,7 @@
   function snapshot(reply) {
     return core()?.validLocalDate(reply.date) === true && object(reply.day) && object(reply.settings)
       && (reply.settings.trackedSites === undefined || Array.isArray(reply.settings.trackedSites) && reply.settings.trackedSites.every(site => typeof site === 'string'))
+      && (reply.settings.scrollFrictionEnabled === undefined || typeof reply.settings.scrollFrictionEnabled === 'boolean')
       && access(reply.access) && typeof reply.websiteTimeEnabled === 'boolean'
       && (reply.generation == null || typeof reply.generation === 'string');
   }
@@ -54,8 +55,9 @@
       catch (error) { throw new Error(typeof error?.message === 'string' && error.message ? error.message : typeof error === 'string' && error ? error : fallbackMessage); }
       if (!object(reply) || reply.ok !== true && reply.ok !== false) throw new Error(fallbackMessage);
       if (reply.ok === false) throw new Error(typeof reply.error === 'string' && reply.error ? reply.error : fallbackMessage);
-      if (['snapshot', 'ingest', 'tracking', 'clear-history'].includes(message.type) && !snapshot(reply)) throw new Error(fallbackMessage);
+      if (['snapshot', 'ingest', 'tracking', 'clear-history', 'scroll-friction-setting'].includes(message.type) && !snapshot(reply)) throw new Error(fallbackMessage);
       if (['access-status', 'access-begin', 'access-open', 'access-cancel', 'access-end', 'access-duration', 'access-goal-setting'].includes(message.type) && !access(reply.access)) throw new Error(fallbackMessage);
+      if (message.type === 'scroll-friction-setting' && typeof reply.settings.scrollFrictionEnabled !== 'boolean') throw new Error(fallbackMessage);
       if (message.type === 'website-time-setting' && typeof reply.enabled !== 'boolean') throw new Error(fallbackMessage);
       if (message.type === 'history' && !history(reply.days, message.kind)) throw new Error(fallbackMessage);
       if (message.type === 'access-history-list' && !intentions(reply.intentions)) throw new Error(fallbackMessage);

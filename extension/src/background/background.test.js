@@ -508,6 +508,25 @@ test('settings page in a tab can save all preferences but spoofed pages and subf
   assert.deepEqual(w.data.settings.trackedSites, ['linkedin']); assert.equal(w.data._websiteTimeEnabled, true);
 });
 
+test('slow scrolling rejects foreign, content and framed senders and non-boolean preferences', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    const w = worker({}, browser);
+    const settingsPage = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };
+    assert.equal((await w.send({ type: 'snapshot' })).settings.scrollFrictionEnabled, false);
+    for (const enabled of [undefined, null, 1, 'true', [], {}]) {
+      assert.equal((await w.send({ type: 'scroll-friction-setting', enabled }, settingsPage)).ok, false);
+    }
+    for (const sender of [undefined, gate('x'), { ...settingsPage, frameId: 1 }, { ...settingsPage, id: 'other' }, { ...settingsPage, url: 'https://evil.test/settings.html' }]) {
+      assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: true }, sender)).ok, false);
+    }
+    assert.equal(w.data.settings, undefined); assert.deepEqual(w.errors, []);
+    w.failWrites = true;
+    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: true }, settingsPage)).ok, false);
+    assert.equal(w.data.settings, undefined);
+    w.failWrites = false;
+    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: true }, settingsPage)).settings.scrollFrictionEnabled, true);
+  }
+});
 test('fresh profiles track X and LinkedIn by default', async () => {
   const w = worker();
   const result = await w.send({ type: 'snapshot' });
