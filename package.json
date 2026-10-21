@@ -10,6 +10,7 @@
   },
   "scripts": {
     "preview": "node site/dev-server.js",
+    "release": "node bin/release.js",
     "prepare": "node bin/setup-git-hooks.js --if-unconfigured",
     "setup:hooks": "node bin/setup-git-hooks.js",
     "verify:access": "node bin/access-equivalence.js",
