@@ -6,9 +6,13 @@
   const LINE_PIXELS = 16;
   const CONTROLS = 'input,textarea,select,video,audio,[role="textbox"],[role="slider"],[role="listbox"],[role="menu"],[role="dialog"],dialog';
   const SCROLLS = /^(auto|scroll|overlay)$/;
+  const LOCKS_SCROLL = /^(hidden|clip)$/;
   const SIZE_CONTAINER = /(?:^| )(?:size|inline-size)(?: |$)/;
   function hasContainment(style) {
     return style.contain && style.contain !== 'none' || style.contentVisibility && style.contentVisibility !== 'visible' || SIZE_CONTAINER.test(style.containerType);
+  }
+  function bodyOverflowPropagates(rootStyle, bodyStyle) {
+    return rootStyle.overflowX === 'visible' && rootStyle.overflowY === 'visible' && !hasContainment(rootStyle) && !hasContainment(bodyStyle);
   }
   function create({ document, Element, getComputedStyle }) {
     let speed = 1, remainder = 0, lastPosition = null, lastTarget = null;
@@ -20,8 +24,14 @@
       const style = getComputedStyle(node);
       if (!SCROLLS.test(style.overflowY)) return false;
       if (node !== document.body) return true;
-      const rootStyle = getComputedStyle(document.documentElement);
-      return rootStyle.overflowX !== 'visible' || rootStyle.overflowY !== 'visible' || [style, rootStyle].some(hasContainment);
+      return !bodyOverflowPropagates(getComputedStyle(document.documentElement), style);
+    }
+    function viewportLocked(root) {
+      const rootStyle = getComputedStyle(root);
+      if (LOCKS_SCROLL.test(rootStyle.overflowY)) return true;
+      if (root !== document.documentElement || !document.body) return false;
+      const bodyStyle = getComputedStyle(document.body);
+      return bodyOverflowPropagates(rootStyle, bodyStyle) && LOCKS_SCROLL.test(bodyStyle.overflowY);
     }
     function pageSurface(node) {
       return node.clientHeight * 2 >= document.documentElement.clientHeight;
@@ -39,7 +49,7 @@
         if (scrollable(node)) ancestors.push(node);
       }
       let target = root && root.scrollHeight > root.clientHeight ? root : null;
-      if (target && [root, document.body].some(node => node && ['hidden', 'clip'].includes(getComputedStyle(node).overflowY))) target = null;
+      if (target && viewportLocked(root)) target = null;
       if (target) {
         if (ancestors.length) return;
       } else if (ancestors.length === 1 && pageSurface(ancestors[0])) target = ancestors[0];

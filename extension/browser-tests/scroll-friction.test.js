@@ -225,7 +225,13 @@ for (const [label, htmlStyle, bodyStyle, surface, rulesDelayMs = 0] of [
   ['body containment', 'overflow:visible', 'contain:layout', 'body'],
   ['body content visibility', 'overflow:visible', 'content-visibility:auto', 'body'],
   ['body size container after delayed access rules', 'overflow:visible', 'container-type:inline-size', 'body', 1000],
-  ['scroll-state without size containment', 'overflow:visible', 'container-type:scroll-state', 'html']
+  ['scroll-state without size containment', 'overflow:visible', 'container-type:scroll-state', 'html'],
+  ['non-propagated hidden body', 'overflow:auto', 'height:auto;overflow:hidden', 'html'],
+  ['non-propagated clipped body', 'overflow:auto', 'height:auto;overflow:clip', 'html'],
+  ['root containment with hidden body', 'overflow:visible;contain:layout;height:auto', 'height:auto;overflow:hidden', 'html'],
+  ['root containment with clipped body', 'overflow:visible;contain:layout;height:auto', 'height:auto;overflow:clip', 'html'],
+  ['body containment with hidden overflow', 'overflow:visible', 'height:auto;overflow:hidden;contain:layout', 'html'],
+  ['body containment with clipped overflow', 'overflow:visible', 'height:auto;overflow:clip;contain:layout', 'html']
 ]) {
   test(`built body scrolling distinguishes the viewport and preserves tall panels: ${label}`, async () => {
     const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
@@ -261,7 +267,7 @@ for (const [label, htmlStyle, bodyStyle, surface, rulesDelayMs = 0] of [
           } finally { await browser.cdp.send('Runtime.releaseObject', { objectId: result.objectId }, page.session); }
         }, 'friction is active');
         async function wheel(selector, delta, x = 400, y = 400) {
-          await evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop = 1000`);
+          assert.equal(await evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop = 1000; document.querySelector('${selector}').scrollTop`), 1000, 'fixture supports the requested scroll position');
           await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY: delta }, page.session);
           await eventually(() => evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop !== 1000`), 'target scrolls');
           return evaluate(browser, page.session, `(async () => {
@@ -274,12 +280,14 @@ for (const [label, htmlStyle, bodyStyle, surface, rulesDelayMs = 0] of [
             return document.querySelector('${selector}').scrollTop - 1000;
           })()`);
         }
-        for (const delta of [240, -240]) assert.equal(await wheel(surface, delta), delta / 2, 'only the real page surface slows');
+        const movement = { page: [], panel: [] };
+        for (const delta of [240, -240]) movement.page.push(await wheel(surface, delta));
         assert.equal(await evaluate(browser, page.session, `document.querySelector('${surface === 'body' ? 'html' : 'body'}').scrollTop`), 0, 'the other surface stays stationary');
         await evaluate(browser, page.session, 'document.documentElement.scrollTop = 0; document.body.scrollTop = 0');
         await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-        for (const delta of [240, -240]) assert.equal(await wheel('#panel', delta, 100, 100), delta, 'tall panels remain native');
+        for (const delta of [240, -240]) movement.panel.push(await wheel('#panel', delta, 100, 100));
         assert.equal(await evaluate(browser, page.session, `document.querySelector('${surface}').scrollTop`), 0);
+        assert.deepEqual(movement, { page: [120, -120], panel: [240, -240] }, 'only the real page surface slows; tall panels remain native');
         assert.deepEqual(browser.errors, []);
       });
     } finally { await browser.cleanup(); }

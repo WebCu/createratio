@@ -406,8 +406,8 @@ Before a release, verify:
   scroll surface is an inner container, verify it slows even when the document
   has a scroll range but its overflow is hidden or clipped. Panels inside it must
   stay native even above half the viewport height. Cover independently scrolling
-  bodies and body overflow propagated to the viewport, including CSS containment.
-  Keyboard, touch, and scrollbar
+  bodies and both propagated and non-propagated body overflow, including hidden
+  or clipped bodies with auto-overflow or contained roots. Keyboard, touch, and scrollbar
   navigation must stay native. Check the Settings switch and slider with keyboard
   input at narrow widths, with reduced motion and with forced colors. Synthetic Chromium tests do not establish
   physical trackpad feel or Firefox/Edge compatibility.

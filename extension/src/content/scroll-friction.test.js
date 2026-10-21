@@ -70,6 +70,7 @@ test('an app-shell page slows its own surface when the document cannot scroll', 
 test('locked document roots with a scroll range use the inner page surface', () => {
   for (const lock of ['root', 'body']) for (const overflowY of ['hidden', 'clip']) {
     const root = documentScroller(), body = new Element('body');
+    if (lock === 'body') root.overflowY = 'visible';
     (lock === 'root' ? root : body).overflowY = overflowY;
     const workspace = new Element('main', { scrollHeight: 4200, clientHeight: 800, overflowY: 'auto' });
     workspace.scrollTop = 1000;
@@ -171,6 +172,29 @@ test('body overflow propagated to the viewport does not mask document scrolling'
   assert.equal(h.wheel({ deltaY: 240 }).prevented, 1);
   assert.deepEqual(root.moves, [{ top: 120, left: 0 }]);
   assert.deepEqual(body.moves, []);
+});
+
+test('non-propagated hidden and clipped body overflow does not lock document scrolling', () => {
+  for (const overflowY of ['hidden', 'clip']) {
+    const root = documentScroller(), body = new Element('body', { overflowY });
+    const h = setup({ root, body });
+    h.friction.setSpeed(0.5);
+    assert.equal(h.wheel({ deltaY: 240 }).prevented, 1, overflowY);
+    assert.deepEqual(root.moves, [{ top: 120, left: 0 }]);
+    assert.deepEqual(body.moves, []);
+  }
+});
+
+test('a non-propagated body lock does not promote a tall panel inside a scrolling document', () => {
+  for (const overflowY of ['hidden', 'clip']) {
+    const root = documentScroller(), body = new Element('body', { overflowY });
+    const panel = new Element('aside', { scrollHeight: 3000, clientHeight: 500, overflowY: 'auto' });
+    const h = setup({ root, body, chain: [panel] });
+    h.friction.setSpeed(0.5);
+    assert.equal(h.wheel({ deltaY: 240 }).prevented, 0, overflowY);
+    assert.deepEqual(panel.moves, []);
+    assert.deepEqual(root.moves, []);
+  }
 });
 
 test('fractional movement resets on target replacement and speed transitions', () => {
