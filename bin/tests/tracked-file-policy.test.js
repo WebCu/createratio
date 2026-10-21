@@ -10,6 +10,8 @@ test('tracked files exclude root personal agent configuration', () => {
   const files = execFileSync('git', ['ls-files', '--cached', '-z'], {
     cwd: root, encoding: 'utf8', timeout: 10000
   }).split('\0');
-  assert.deepEqual(files.filter(file => file === '.pi' || file.startsWith('.pi/')).sort(), [],
-    'Keep personal agent configuration outside the repository; untrack root .pi paths.');
+  const privatePaths = ['.pi', '.agents/skills', '.claude/skills'];
+  const trackedPrivateFiles = files.filter(file => privatePaths.some(prefix => file === prefix || file.startsWith(`${prefix}/`)));
+  assert.deepEqual(trackedPrivateFiles.sort(), [],
+    'Keep personal agent configuration untracked, including skill directories and compatibility symlinks.');
 });
