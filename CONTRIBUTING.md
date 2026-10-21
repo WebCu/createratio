@@ -49,12 +49,12 @@ read the [extension layout and packaged-path contract](extension/README.md#layou
 Search references across the whole repo, including shared test harnesses and
 `extension/sites/test-support.js`.
 
-## Website search quality
+## Website metadata and crawlability
 
-Website PRs follow the [SEO workflow](docs/seo.md): preserve crawlability and
-metadata, identify the user question for content changes, and use Search Console
-evidence to prioritize and evaluate search-growth work. Automated checks prevent
-technical regressions; a maintainer owns the monthly performance review.
+Website PRs follow the [metadata and crawlability checks](docs/seo.md): preserve
+canonical URLs, descriptive metadata, working links, and crawler access.
+Automated checks cover source and built previews; deployed responses still need
+verification.
 
 ## Website integrations
 

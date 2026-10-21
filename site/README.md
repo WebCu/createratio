@@ -78,17 +78,16 @@ the free extension from any future optional paid service. See the
 [release guide](../docs/chrome-web-store.md); verify both deployed HTTPS URLs
 before release and use the privacy URL in Chrome Web Store.
 
-## Search quality
+## Metadata and crawlability
 
 The homepage includes descriptive search/social metadata and static `WebSite`
 JSON-LD. All public pages declare canonical production URLs. `robots.txt`
 allows crawling and points to `sitemap.xml`, which lists the canonical pages.
 Both files ship in the build and work in local previews.
 
-Follow the [SEO workflow](../docs/seo.md) for PR checks, post-deployment
-verification, Search Console setup, and monthly evidence-driven improvements.
-Technical SEO regressions are covered by `site/tests/seo.test.js` in PR CI;
-search performance still needs live measurement.
+Follow the [metadata and crawlability checks](../docs/seo.md) for PR and
+post-deployment verification. `site/tests/seo.test.js` covers metadata and
+crawl-file regressions in PR CI; deployed responses still need verification.
 
 ## Analytics
 
