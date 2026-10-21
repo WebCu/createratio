@@ -4,25 +4,12 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 test('agents discover site-specific actions and complete the existing access UI through accessibility names', async () => {
-  const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
+  const { launch, evaluate, eventually, withFailureArtifacts, accessibilityNodes, findByRole, clickByRole } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   const inspect = (page, source) => evaluate(browser, page.session, source);
-  const nodes = async page => (await browser.cdp.send('Accessibility.getFullAXTree', {}, page.session)).nodes.filter(node => !node.ignored);
-  const find = async (page, role, name) => {
-    const matches = (await nodes(page)).filter(node => node.role?.value === role && node.name?.value.trim().replace(/\s+/g, ' ') === name);
-    assert.equal(matches.length, 1, `one ${role} named ${name}`);
-    return matches[0];
-  };
-  const clickNamed = async (page, name) => {
-    await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
-    const node = await find(page, 'button', name);
-    await browser.cdp.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: node.backendDOMNodeId }, page.session);
-    const { model } = await browser.cdp.send('DOM.getBoxModel', { backendNodeId: node.backendDOMNodeId }, page.session);
-    const x = model.content.filter((_, index) => index % 2 === 0).reduce((a, b) => a + b) / 4;
-    const y = model.content.filter((_, index) => index % 2 === 1).reduce((a, b) => a + b) / 4;
-    await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 }, page.session);
-    await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }, page.session);
-  };
+  const nodes = page => accessibilityNodes(browser, page);
+  const find = (page, role, name) => findByRole(browser, page, role, name);
+  const clickNamed = (page, name) => clickByRole(browser, page, 'button', name);
   try {
     await withFailureArtifacts(browser, 'agent accessibility journey', async () => {
       const popup = await browser.page(browser.origin + '/popup.html');
