@@ -185,9 +185,13 @@ sites during timed or above-goal access, using the existing page classification
 below. Turning a site's Limit & track off also removes its scroll friction.
 
 Editors, messaging routes, nested scroll panels, horizontal gestures, and zoom
-stay native. Keyboard scrolling, touch gestures, and scrollbar dragging are
-unchanged. Line-based wheel input uses a 16-pixel line; page-based input uses the
-viewport height. Physical trackpad feel and native wheel settings vary by browser
+stay native. Pages that lock document scrolling and scroll an inner container
+instead — LinkedIn's feed is one — have that container treated as the page
+surface when it fills at least half the viewport, so resistance applies there
+instead of silently doing nothing; smaller scrollable boxes are panels and stay
+native. Keyboard scrolling, touch gestures, and scrollbar dragging are
+unchanged. Line-based wheel input uses a 16-pixel line; page-based input uses
+the height of the surface being scrolled. Physical trackpad feel and native wheel settings vary by browser
 and operating system. No scroll distances or additional activity data are saved.
 
 The tracker owns the optional wheel listener and removes it when the page becomes

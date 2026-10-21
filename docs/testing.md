@@ -299,7 +299,10 @@ Before a release, verify:
   Saved zero resolves to Off with 50% ready for re-enabling. At Off or Limit & track
   Off, already-open tabs scroll natively. Verify real mouse wheels and trackpads,
   both directions, fractional movement, zoom, horizontal gestures, nested panels,
-  editors, messaging, route changes, and page focus. Keyboard, touch, and scrollbar
+  editors, messaging, route changes, and page focus. On app-shell pages whose only
+  scroll surface is an inner container (LinkedIn's feed), verify the container
+  scrolls at the configured resistance and that panels inside it stay native.
+  Keyboard, touch, and scrollbar
   navigation must stay native. Check the Settings switch and slider with keyboard
   input at narrow widths, with reduced motion and with forced colors. Synthetic Chromium tests do not establish
   physical trackpad feel or Firefox/Edge compatibility.
