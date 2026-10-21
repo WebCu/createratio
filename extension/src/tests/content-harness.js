@@ -13,7 +13,7 @@ async function tracker(browser = 'chrome', options = {}) {
   function listen(type, fn) { (events[type] ||= []).push(fn); }
   const elements = [], warnings = [];
   const url = options.url || 'https://x.com/home';
-  const fixture = C.siteForURL(url) === 'linkedin' ? linkedinFixture({ url, listen }) : xFixture({ url, action: options.action, listen });
+  const fixture = C.siteForURL(url) === 'linkedin' ? linkedinFixture({ url, message: options.message, listen }) : xFixture({ url, action: options.action, listen });
   const doc = fixture.document, location = fixture.location;
   doc.hasFocus = () => focused;
   doc.createElement = () => { const node = new Element([], '', listen); elements.push(node); return node; };

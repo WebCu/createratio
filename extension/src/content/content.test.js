@@ -240,6 +240,47 @@ test('X ignores plain/newline Enter, composition, repeated and unrelated shortcu
   assert.equal(t.packets.flatMap(p => p.actions).length, 0);
 });
 
+test('LinkedIn DM writing records creation time without post or comment credit and stops when unfocused', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const path of ['/messaging/thread/synthetic-thread/', '/feed/']) {
+      const url = 'https://www.linkedin.com' + path;
+      const t = await tracker(browser, { url, message: true });
+      t.route(url, true); t.input(); t.setNow(5000); await t.tick();
+      assert.equal(seconds(t, 'create'), 5, `${browser} ${path}`);
+      assert.equal(seconds(t, 'consume'), 0);
+      t.event('keydown', { isTrusted: true, key: 'Enter', target: t.editor });
+      t.event('click', { isTrusted: true, target: t.button }); await t.tick();
+      assert.deepEqual(t.packets.flatMap(p => p.actions), []);
+      t.route(url, false); t.setNow(10000); await t.tick();
+      assert.equal(seconds(t, 'create'), 5, 'reading must not earn creation time');
+      assert.equal(seconds(t, 'consume'), path === '/feed/' ? 5 : 0);
+      t.route(url, true); t.input(); t.setNow(15000); await t.tick();
+      assert.equal(seconds(t, 'create'), 10, 'returning to the editor resumes creation');
+    }
+  }
+});
+test('LinkedIn DM writing retains idle, trusted-input, focus, visibility and access protections', async () => {
+  const url = 'https://www.linkedin.com/messaging/thread/synthetic-thread/';
+  const t = await tracker('chrome', { url, message: true });
+  t.route(url, true); t.input(false); t.setNow(5000); await t.tick();
+  assert.equal(seconds(t, 'create'), 0);
+  t.input();
+  for (let n = 10000; n <= 40000; n += 5000) { t.setNow(n); await t.tick(); }
+  assert.equal(seconds(t, 'create'), 30);
+  t.input(); t.focus(false); t.setNow(45000); await t.tick();
+  assert.equal(seconds(t, 'create'), 30);
+  t.focus(true); t.visible(false); t.setNow(50000); await t.tick();
+  assert.equal(seconds(t, 'create'), 30);
+  for (const snapshot of [
+    { day: {}, settings: C.DEFAULT_SETTINGS, access: { linkedin: { enabled: true, remainingMs: 0 } } },
+    { day: {}, settings: { ...C.DEFAULT_SETTINGS, trackedSites: [] } }
+  ]) {
+    const blocked = await tracker('chrome', { url, message: true, snapshot });
+    blocked.route(url, true); blocked.input(); blocked.setNow(5000); await blocked.tick();
+    assert.deepEqual(blocked.packets, [], 'blocked and disabled sites cannot record DMs');
+  }
+});
+
 test('LinkedIn Enter submission records a comment and deduplicates a generated click', async () => {
   const t = await linkedinTracker();
   t.event('keydown', { isTrusted: true, key: 'Enter', target: t.editor });

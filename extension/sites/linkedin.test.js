@@ -64,6 +64,36 @@ test('LinkedIn adapter owns editor precedence, own profiles, and neutral routes'
     f.location.href = 'https://www.linkedin.com' + path; assert.equal(f.adapter.mode(), 'neutral');
   }
 });
+test('focused direct-message editors create on messaging routes and in feed or profile overlays', () => {
+  for (const path of ['/messaging/', '/messaging/thread/synthetic-thread/', '/feed/', '/in/another/']) {
+    const f = linkedinFixture({ url: 'https://www.linkedin.com' + path, message: true });
+    const reading = path.startsWith('/messaging/') ? 'neutral' : 'consume';
+    assert.equal(f.adapter.mode(), reading);
+    f.document.activeElement = f.editor;
+    assert.equal(f.adapter.mode(), 'create', path);
+    f.document.activeElement = f.editor.append(new Element());
+    assert.equal(f.adapter.mode(), 'create', 'nested message editor focus');
+    f.document.activeElement = f.button;
+    assert.equal(f.adapter.mode(), reading, 'the send button is not a writing editor');
+    assert.equal(f.adapter.action(click(f.button)), null);
+    assert.equal(submit(f), null, 'sending a DM is not a post or comment');
+  }
+});
+test('message selectors require editable, visible, focused message fields', () => {
+  const f = linkedinFixture({ url: 'https://www.linkedin.com/messaging/thread/synthetic-thread/', message: true });
+  f.document.activeElement = f.editor;
+  for (const selector of ['.msg-form__contenteditable[contenteditable="true"]', '.msg-form [contenteditable="true"]']) {
+    f.editor.selectors = new Set([selector]);
+    assert.equal(f.adapter.mode(), 'create', selector);
+  }
+  f.editor.style.display = 'none'; assert.equal(f.adapter.mode(), 'neutral');
+  f.editor.style.display = 'block'; f.editor.style.visibility = 'hidden'; assert.equal(f.adapter.mode(), 'neutral');
+  f.editor.style.visibility = 'visible'; f.editor.isConnected = false; assert.equal(f.adapter.mode(), 'neutral');
+  f.editor.isConnected = true; f.editor.selectors = new Set(['.msg-form__contenteditable', '[contenteditable="false"]']);
+  assert.equal(f.adapter.mode(), 'neutral', 'read-only message field');
+  f.editor.selectors = new Set(['[role="textbox"][contenteditable="true"]']);
+  assert.equal(f.adapter.mode(), 'neutral', 'unrelated editable textbox');
+});
 test('LinkedIn adapter recognizes positive light labels without counting undo interactions', () => {
   const f = linkedinFixture();
   for (const [text, action] of [['Save', 'bookmarks'], ['Guardar', 'bookmarks'], ['Repost', 'reposts'], ['Republicar', 'reposts']]) {
