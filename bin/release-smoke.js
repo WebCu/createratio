@@ -82,6 +82,9 @@ function releaseSmoke() {
     }
     fs.writeFileSync(path.join(directory, 'summary.json'), JSON.stringify({ source: head, version, status: 'passed', fetchPolicy: 'loopback-only' }, null, 2) + '\n', { mode: 0o600 });
     console.log('PASS real version preparation/checks, local merge/tag publication and archive checksums; no store requests.');
+  } catch (error) {
+    console.error(fs.readFileSync(log, 'utf8').split('\n').slice(-50).join('\n'));
+    throw error;
   } finally { fs.closeSync(descriptor); }
 }
 
