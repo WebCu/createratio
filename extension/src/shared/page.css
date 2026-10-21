@@ -65,6 +65,13 @@
 .extension-page .feedback a { font-size: 15px; }
 .extension-page .feedback p { font-size: 12px; margin-top: 8px; }
 
+.policy-rules { margin: 16px 0 24px; padding-left: 20px; font-size: 13px; color: var(--muted); }
+.policy-rules li + li { margin-top: 12px; }
+.policy-details { margin-top: 24px; font-size: 13px; color: var(--muted); }
+.policy-details summary { color: var(--violet); font-weight: 600; cursor: pointer; padding: 10px 0; }
+.policy-details summary:focus-visible { outline: 3px solid var(--violet); outline-offset: 3px; }
+.policy-details .policy-rules { margin-top: 12px; margin-bottom: 0; }
+
 .site-settings { list-style: none; margin: 28px 0 24px; padding: 0; }
 .site-preferences { padding: 24px 0; border-bottom: 1px solid var(--line); }
 .site-preferences:last-child { border-bottom: 0; }
@@ -142,7 +149,13 @@
   .dashboard-page .goal { min-width: 80px; padding-left: 16px; }
   .dashboard-page .view-nav button { font-size: 12px; padding: 12px 6px; }
   .dashboard-page .sites { font-size: 12px; }
-  .dashboard-page .sites th { font-size: 11px; }
+  .dashboard-page .sites th { font-size: 12px; }
+  .dashboard-page #chart, .dashboard-page .history .legend { display: none; }
+  .dashboard-page .chart-data { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: normal; }
+  .dashboard-page #chart-table { table-layout: fixed; }
+  .dashboard-page #chart-table caption { text-align: left; color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .dashboard-page #chart-table th:first-child { width: 40%; }
+  .dashboard-page #chart-table td { font-variant-numeric: tabular-nums; }
   .dashboard-page .sites td, .dashboard-page .sites th { padding-left: 10px; }
   .dashboard-page .minutes { gap: 16px; }
   .dashboard-page .minutes > div { display: grid; grid-template-columns: 7px minmax(0, 1fr); gap: 6px 8px; }

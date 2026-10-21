@@ -15,7 +15,7 @@ header, footer { display: flex; align-items: center; justify-content: space-betw
 header { padding-top: 32px; padding-bottom: 32px; }
 header > span { color: var(--muted); font-size: 14px; }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--ink); font-size: 20px; font-weight: 700; text-decoration: none; letter-spacing: -.5px; }
-.brand small { display: block; font-size: 10px; line-height: 1.45; font-weight: 400; letter-spacing: 0; color: var(--muted); margin-top: 4px; }
+.brand small { display: block; font-size: 12px; line-height: 1.45; font-weight: 400; letter-spacing: 0; color: var(--muted); margin-top: 4px; }
 header nav { display: flex; gap: 24px; font-size: 14px; }
 header nav a { color: var(--muted); text-decoration: none; }
 .footer-links { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; }
@@ -25,9 +25,7 @@ main { margin-top: 56px; margin-bottom: 80px; display: grid; grid-template-colum
 .intro, .access { min-width: 0; }
 .state { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); margin: 0 0 24px; }
 .state > span[aria-hidden] { height: 8px; width: 8px; border-radius: 50%; background: var(--violet); }
-h1 { font-size: clamp(40px, 4.4vw, 64px); line-height: 1.1; letter-spacing: -.045em; margin: 0 0 28px; font-weight: 750; overflow-wrap: break-word; }
-.block-code { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 20px; }
-.local-error { font-size: 12px; color: var(--muted); margin: 16px 0 0; }
+h1 { font-size: clamp(40px, 4.4vw, 64px); line-height: 1.1; letter-spacing: -.04em; margin: 0 0 28px; font-weight: 750; overflow-wrap: break-word; text-wrap: balance; }
 .description { color: var(--muted); margin: 0; font-size: 17px; }
 .steps { padding-left: 24px; margin: 32px 0; font-size: 16px; }
 .steps li + li { margin-top: 12px; }
@@ -46,7 +44,7 @@ button { width: 100%; border: 1px solid var(--violet); border-radius: 7px; backg
 button:hover:not(:disabled) { background: #4e3498; }
 .secondary:hover:not(:disabled) { background: #ece8fa; color: var(--ink); }
 button:disabled { opacity: .45; cursor: default; }
-button:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid var(--violet); outline-offset: 4px; }
+button:focus-visible, textarea:focus-visible, a:focus-visible, h2[tabindex="-1"]:focus { outline: 3px solid var(--violet); outline-offset: 4px; }
 textarea:disabled { opacity: .5; }
 .clock { text-align: center; font-size: 64px; letter-spacing: -3px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; margin: 32px 0 24px; }
 progress { appearance: none; display: block; width: 100%; height: 4px; border: 0; background: var(--line); border-radius: 2px; }
@@ -69,10 +67,18 @@ footer { border-top: 1px solid var(--line); padding-top: 28px; padding-bottom: 3
 
 @media (max-width: 480px) {
   header, main, footer { padding-left: 24px; padding-right: 24px; }
-  header { flex-wrap: wrap; gap: 12px; padding-top: 24px; padding-bottom: 24px; }
-  header nav { width: 100%; margin-top: 12px; }
-  main { margin-top: 24px; }
-  .description { font-size: 16px; }
+  header { flex-wrap: wrap; gap: 12px; padding-top: 16px; padding-bottom: 16px; }
+  header nav { width: 100%; }
+  main { margin-top: 16px; gap: 24px; }
+  .state { margin-bottom: 12px; }
+  h1 { font-size: 32px; line-height: 1.15; margin-bottom: 16px; }
+  .description { font-size: 16px; line-height: 1.5; }
+  .steps { margin: 16px 0; font-size: 14px; }
+  .steps li + li { margin-top: 4px; }
+  .boundary { margin-top: 16px; line-height: 1.5; }
+  .access { padding-top: 24px; }
+  .hint { margin: 8px 0 16px; }
+  textarea { min-height: 128px; padding: 12px; }
   label, h2 { font-size: 22px; }
 }
 
