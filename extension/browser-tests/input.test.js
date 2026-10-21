@@ -3,8 +3,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-test('trusted input follows a late scroll update instead of clicking the adjacent cancel button', async () => {
-  const { launch, evaluate, eventually, click, withFailureArtifacts } = await import('./chromium.mjs');
+test('trusted input follows a late scroll update instead of clicking the adjacent cancel button', async t => {
+  const { launch, evaluate, eventually, click, clickByRole, withFailureArtifacts } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   try {
     await withFailureArtifacts(browser, 'late scroll input regression', async () => {
@@ -27,10 +27,44 @@ test('trusted input follows a late scroll update instead of clicking the adjacen
             document.querySelector('#result').textContent = event.isTrusted ? event.target.id : 'untrusted';
           });
         </script>`;
+      for (const mode of ['selector', 'accessible name']) {
+        await t.test(mode, () => withFailureArtifacts(browser, `late scroll ${mode}`, async () => {
+          const page = await browser.page('data:text/html,' + encodeURIComponent(html));
+          await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#open")'), 'late scroll fixture ready');
+          if (mode === 'selector') await click(browser, page, '#open');
+          else await clickByRole(browser, page, 'button', 'Open');
+          assert.equal(await evaluate(browser, page.session, 'document.querySelector("#result").textContent'), 'open');
+        }));
+      }
+    });
+  } finally { await browser.cleanup(); }
+});
+
+test('accessible lookup normalizes names, excludes hidden controls, and refuses ambiguous actions', async () => {
+  const { launch, evaluate, eventually, accessibilityNodes, findByRole, clickByRole, withFailureArtifacts } = await import('./chromium.mjs');
+  const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+  try {
+    await withFailureArtifacts(browser, 'accessible lookup boundaries', async () => {
+      const html = `<!doctype html><title>Accessible controls fixture</title>
+        <button id="open">  Open   session <span aria-hidden="true">↓</span></button>
+        <button hidden>Open session</button>
+        <button hidden>Hidden only</button>
+        <button disabled>Unavailable</button>
+        <output id="result"></output>
+        <script>document.addEventListener('click', event => { document.querySelector('#result').textContent = event.isTrusted ? event.target.id : 'untrusted'; });</script>`;
       const page = await browser.page('data:text/html,' + encodeURIComponent(html));
-      await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#open")'), 'late scroll fixture ready');
-      await click(browser, page, '#open');
+      await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#open")'), 'accessible fixture ready');
+      const open = await findByRole(browser, page, 'button', 'Open session');
+      assert.equal(open.role.value, 'button');
+      assert.equal((await accessibilityNodes(browser, page)).some(node => node.name?.value === 'Hidden only'), false);
+      await assert.rejects(findByRole(browser, page, 'button', 'Hidden only'), /found 0/);
+      const disabled = await findByRole(browser, page, 'button', 'Unavailable');
+      assert.equal(disabled.properties.find(property => property.name === 'disabled').value.value, true);
+      await clickByRole(browser, page, 'button', 'Open session');
       assert.equal(await evaluate(browser, page.session, 'document.querySelector("#result").textContent'), 'open');
+      await evaluate(browser, page.session, 'document.body.append(document.querySelector("#open").cloneNode(true)); document.querySelector("#result").textContent = ""');
+      await assert.rejects(clickByRole(browser, page, 'button', 'Open session'), /found 2/);
+      assert.equal(await evaluate(browser, page.session, 'document.querySelector("#result").textContent'), '');
     });
   } finally { await browser.cleanup(); }
 });
