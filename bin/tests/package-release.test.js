@@ -25,7 +25,7 @@ function files(directory, prefix = '') {
 test('release packages contain only browser bundles and source reproduces the exact Firefox files', t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-release-package-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  for (const file of ['package.json', 'LICENSE', '.node-version', 'extension/package.json', 'extension/build.js']) {
+  for (const file of ['package.json', 'LICENSE', '.node-version', 'extension/package.json', 'extension/build.js', 'bin/package-release.js', 'bin/release.js']) {
     fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
     fs.copyFileSync(path.join(root, file), path.join(directory, file));
   }
@@ -63,10 +63,18 @@ test('release packages contain only browser bundles and source reproduces the ex
   command('git', ['tag', '--annotate', `v${version}`, '--message', 'Annotated release fixture'], directory, env);
   const tagObject = command('git', ['rev-parse', `v${version}`], directory, env);
   assert.notEqual(tagObject, commit);
-  const result = spawnSync(process.execPath, [script], {
-    cwd: directory, env: { ...env, GITHUB_REF_NAME: `v${version}`, GITHUB_SHA: tagObject }, encoding: 'utf8', timeout: 30000
+  const workflow = fs.readFileSync(path.join(root, '.github/workflows/release-chrome.yml'), 'utf8');
+  const packagingRun = workflow.match(/run: \|\n(          node bin\/package-release\.js\n(?:          [^\n]*\n)*)/)?.[1];
+  assert.ok(packagingRun);
+  const summary = path.join(directory, 'step-summary.md');
+  const result = spawnSync('bash', ['-e', '-c', packagingRun.replace(/^ {10}/gm, '')], {
+    cwd: directory, env: {
+      ...env, GITHUB_REF_NAME: `v${version}`, GITHUB_SHA: tagObject, GITHUB_STEP_SUMMARY: summary,
+      GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'WebCu/createratio'
+    }, encoding: 'utf8', timeout: 30000
   });
   assert.equal(result.status, 0, result.stderr);
+  assert.ok(fs.readFileSync(summary, 'utf8').includes(`https://github.com/WebCu/createratio/blob/${commit}/docs/testing.md#store-integration-acceptance`));
   const dist = path.join(directory, 'dist');
   const checksums = fs.readFileSync(path.join(dist, 'SHA256SUMS'), 'utf8').trim().split('\n');
   assert.equal(checksums.length, 3);

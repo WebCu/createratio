@@ -102,6 +102,57 @@ test('a merged version PR can be published without manually editing or choosing 
   assert.equal(repo.git('status', '--porcelain'), '');
 });
 
+test('preparation pushes only its branch despite automatic tag and mirror settings', t => {
+  for (const mirror of [false, true]) {
+    const repo = repository(t);
+    repo.git('push', 'origin', 'HEAD:refs/heads/retained-remote');
+    repo.git('tag', '--annotate', 'v9.9.9', '--message', 'Unrelated release');
+    repo.git('branch', 'unrelated-work');
+    repo.git('config', 'push.followTags', 'true');
+    repo.git('config', 'remote.origin.mirror', String(mirror));
+    repo.git('config', '--add', 'remote.origin.push', 'refs/tags/v9.9.9:refs/tags/v9.9.9');
+    const result = repo.run(['prepare', 'patch']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(repo.git('--git-dir', repo.remote, 'for-each-ref', '--format=%(refname)').split('\n').sort(), [
+      'refs/heads/main', 'refs/heads/release/v0.0.2', 'refs/heads/retained-remote'
+    ]);
+    assert.equal(repo.git('tag', '--list'), 'v9.9.9');
+    assert.equal(repo.git('config', '--get', 'remote.origin.mirror'), String(mirror));
+    assert.equal(repo.git('config', '--get', 'push.followTags'), 'true');
+  }
+});
+
+test('publication pushes only its matching tag despite automatic tag and mirror settings', t => {
+  for (const mirror of [false, true]) {
+    const repo = repository(t);
+    repo.git('push', 'origin', 'HEAD:refs/heads/retained-remote');
+    repo.git('tag', '--annotate', 'v9.9.9', '--message', 'Unrelated release');
+    repo.git('branch', 'unrelated-work');
+    repo.git('config', 'push.followTags', 'true');
+    repo.git('config', 'remote.origin.mirror', String(mirror));
+    repo.git('config', '--add', 'remote.origin.push', 'refs/heads/unrelated-work:refs/heads/unrelated-work');
+    const result = repo.run(['publish']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(repo.git('--git-dir', repo.remote, 'for-each-ref', '--format=%(refname)').split('\n').sort(), [
+      'refs/heads/main', 'refs/heads/retained-remote', 'refs/tags/v0.0.1'
+    ]);
+    assert.equal(repo.git('tag', '--list'), 'v0.0.1\nv9.9.9');
+    assert.equal(repo.git('config', '--get', 'remote.origin.mirror'), String(mirror));
+    assert.equal(repo.git('config', '--get', 'push.followTags'), 'true');
+  }
+});
+
+test('a same-named local tag cannot replace or block the prepared branch push', t => {
+  const repo = repository(t);
+  repo.git('tag', '--annotate', 'release/v0.0.2', '--message', 'Same-named local tag');
+  const result = repo.run(['prepare', 'patch']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(repo.git('--git-dir', repo.remote, 'for-each-ref', '--format=%(refname)').split('\n').sort(), [
+    'refs/heads/main', 'refs/heads/release/v0.0.2'
+  ]);
+  assert.equal(repo.git('tag', '--list'), 'release/v0.0.2');
+});
+
 test('minor and major preparation keep the shared version synchronized', t => {
   for (const [increment, expected] of [['minor', '0.1.0'], ['major', '1.0.0']]) {
     const repo = repository(t);

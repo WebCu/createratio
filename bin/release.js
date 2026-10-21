@@ -94,7 +94,7 @@ function prepare(increment) {
   git('commit', '-m', `Release ${version}`);
   git('pull', '--rebase', '--ff-only', 'origin', 'main');
   requireOfficialOrigin();
-  git('push', '--set-upstream', 'origin', branch);
+  git('-c', 'remote.origin.mirror=false', 'push', '--no-follow-tags', '--set-upstream', 'origin', `refs/heads/${branch}:refs/heads/${branch}`);
   const body = `## Summary\n\nPrepare version ${version} for Chrome and Firefox. All three version fields are updated together.\n\n## Evidence\n\n- pnpm check passed.\n- Store submission reruns CI and requires separate approval after the tag is pushed.\n\n## Merge Danger\n\n**Door:** two-way\n\nMerging updates source versions only; it does not push a release tag.\n\n**Blast Radius:** releases\n\nAfter merge, run pnpm release publish from clean, current main to trigger store submissions.\n`;
   process.stdout.write(run('gh', ['pr', 'create', '--repo', 'WebCu/createratio', '--base', 'main', '--head', branch, '--title', `Release ${version}`, '--body', body]) + '\n');
 }
@@ -115,7 +115,7 @@ function publish() {
     git('tag', '--annotate', tag, '--message', `Release ${version}`);
   }
   requireOfficialOrigin();
-  git('push', 'origin', `refs/tags/${tag}`);
+  git('-c', 'remote.origin.mirror=false', 'push', '--no-follow-tags', 'origin', `refs/tags/${tag}:refs/tags/${tag}`);
   process.stdout.write(`Triggered ${tag} for Chrome and Firefox. Review the packages and approve each store job in GitHub Actions.\n`);
 }
 

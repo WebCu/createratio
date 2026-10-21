@@ -55,6 +55,8 @@ jobs:
           node bin/package-release.js
           cat dist/release.txt >> "$GITHUB_STEP_SUMMARY"
           cat dist/SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+          printf '\n## Human validation required\n\n' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Keep each store approval pending until the pre-submission checks in the [manual acceptance checklist](%s/%s/blob/%s/docs/testing.md#store-integration-acceptance) are complete for these exact artifacts. CI does not establish live authentication, Firefox behavior or store acceptance.\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - name: Keep the exact package for approval and audit (v7.0.2)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:

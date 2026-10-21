@@ -23,6 +23,10 @@ updates only `package.json`, `extension/package.json` and
 `extension/src/manifest.json`, runs `pnpm check`, commits and pushes the branch,
 and opens a version PR. It does not merge the PR, create a tag or submit to stores.
 The website package has a separate lifecycle and is not version-bumped.
+Preparation pushes only its fully qualified branch ref. Both commands disable
+implicit tag following and mirror pushes for that invocation, regardless of Git
+configuration; unrelated local tags and branches are not published. Git settings
+and hooks are left intact.
 
 Each component is numeric, without leading zeroes, and at most 65535 to satisfy
 Chrome's version format. The new version must also exceed previous store uploads;
@@ -45,7 +49,8 @@ This command requires clean `main` matching `origin/main`, validates all three
 version fields, and pushes an annotated matching `vVERSION` tag. It does not need
 store credentials on your machine. It refuses remote tags that already exist or
 local tags pointing at a different commit; it never force-pushes or moves tags.
-A matching local tag left by a failed push can be reused.
+A matching local tag left by a failed push can be reused. Publication pushes only
+the fully qualified ref for that version, not other local tags.
 
 Open **Actions → Release browser extensions**. The workflow retains its filename
 `.github/workflows/release-chrome.yml` because Chrome's federated authentication
@@ -60,9 +65,14 @@ The workflow runs the reusable CI, then builds only the two store bundles. Its
   Firefox reproduction instructions, not website assets or credential files;
 - `SHA256SUMS` and `release.txt`, recording archive hashes, tag and source commit.
 
-Download and inspect the exact packages, test disposable extracted copies, and
-approve the `chrome-web-store` and `firefox-addons` deployments. Both jobs verify
-checksums and use the retained files without rebuilding. Chrome uses its existing
+## Human validation gate
+
+Keep the `chrome-web-store` and `firefox-addons` approvals pending until the
+pre-submission checks in [store-integration acceptance](testing.md#store-integration-acceptance)
+are complete for the exact artifacts. The package job links that checklist in its
+Actions summary alongside the commit and hashes. Approve each store separately;
+CI and secret-name checks do not establish live authentication or Firefox behavior.
+Both jobs verify checksums and use the retained files without rebuilding. Chrome uses its existing
 short-lived Google token; Firefox reads its environment secrets only in the
 submission step and signs short-lived Mozilla JWTs. Neither job depends on the
 other store's submission result.
