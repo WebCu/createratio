@@ -12,15 +12,11 @@ function render(navigator) {
   const groups = Array.from({ length: 2 }, () => {
     const links = ['chrome', 'firefox'].map(browser => ({
       dataset: { browser },
-      classes: new Set(),
-      classList: { toggle(name, enabled) { if (enabled) this.owner.add(name); else this.owner.delete(name); } }
+      hidden: false
     }));
-    for (const link of links) link.classList.owner = link.classes;
     return {
       links,
-      querySelector(selector) { return this.links.find(link => selector === `[data-browser="${link.dataset.browser}"]`); },
-      querySelectorAll() { return this.links; },
-      prepend(link) { this.links = [link, ...this.links.filter(other => other !== link)]; }
+      querySelectorAll() { return this.links; }
     };
   });
   const notes = Array.from({ length: 2 }, () => ({ hidden: true, textContent: '' }));
@@ -40,13 +36,10 @@ for (const [browser, navigator] of [
   ['chrome', { userAgent: chrome }],
   ['chrome', { userAgent: chrome, userAgentData: { brands: [{ brand: 'Google Chrome' }], mobile: false } }]
 ]) {
-  test(`desktop ${browser} gets the first, prominent install option and matching instructions`, () => {
+  test(`desktop ${browser} shows only its install button and matching instructions`, () => {
     const page = render(navigator);
     for (const group of page.groups) {
-      assert.equal(group.links.length, 2, 'both browser choices remain available');
-      assert.equal(group.links[0].dataset.browser, browser);
-      assert.equal(group.links[0].classes.has('button-secondary'), false);
-      assert.equal(group.links[1].classes.has('button-secondary'), true);
+      assert.deepEqual(group.links.filter(link => !link.hidden).map(link => link.dataset.browser), [browser]);
     }
     for (const note of page.notes) {
       assert.equal(note.hidden, false);
@@ -74,7 +67,7 @@ for (const [name, navigator] of [
     const page = render(navigator);
     for (const group of page.groups) {
       assert.deepEqual(group.links.map(link => link.dataset.browser), ['chrome', 'firefox']);
-      assert.ok(group.links.every(link => link.classes.size === 0));
+      assert.ok(group.links.every(link => !link.hidden));
     }
     assert.ok(page.notes.every(note => note.hidden));
   });

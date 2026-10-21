@@ -11,11 +11,12 @@ and [Firefox Add-ons listing](https://addons.mozilla.org/en-US/firefox/addon/cre
 without requiring JavaScript. Source instructions remain under **Build from source**;
 Edge is a development build, not a published store release.
 
-For recognized desktop Chrome and Firefox, `browser-install.js` puts the matching
-store link first, emphasizes it, and opens its installation instructions. Both
-links remain visible. Mobile, unrecognized browsers, and disabled JavaScript keep
-the neutral choices. Detection uses the browser's reported identity, not a
-capability guarantee; browsers that disguise themselves can be misidentified.
+For recognized desktop Chrome and Firefox, `browser-install.js` shows only the
+matching install button and opens its installation instructions. Other store links
+remain available in the installation instructions. Mobile, unrecognized browsers,
+and disabled JavaScript show both install buttons. Detection uses the browser's
+reported identity, not a capability guarantee; browsers that disguise themselves
+can be misidentified.
 Browser identity is neither stored nor sent; detection calls no external services.
 
 ## Preview

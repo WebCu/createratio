@@ -18,11 +18,8 @@
   if (!browser) return;
 
   for (const actions of document.querySelectorAll('[data-install-actions]')) {
-    const preferred = actions.querySelector(`[data-browser="${browser}"]`);
-    if (!preferred) continue;
-    actions.prepend(preferred);
     for (const link of actions.querySelectorAll('[data-browser]')) {
-      link.classList.toggle('button-secondary', link !== preferred);
+      link.hidden = link.dataset.browser !== browser;
     }
   }
   for (const note of document.querySelectorAll('[data-browser-note]')) {
