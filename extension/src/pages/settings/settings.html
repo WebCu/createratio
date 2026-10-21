@@ -28,6 +28,16 @@
         </ul>
       </details>
     </section>
+    <section class="preference" aria-labelledby="scroll-friction-title">
+      <div class="preference-heading"><label for="scroll-friction-enabled"><strong id="scroll-friction-title">Slow scrolling</strong><small>Choose how much effort each scroll takes.</small></label><input id="scroll-friction-enabled" type="checkbox" role="switch" disabled aria-describedby="scroll-friction-note"></div>
+      <div id="scroll-resistance" class="scroll-resistance" data-enabled="false">
+        <div class="scroll-resistance-heading"><label for="scroll-friction-strength">Scroll resistance</label><output id="scroll-friction-value" for="scroll-friction-strength" aria-hidden="true">50%</output></div>
+        <input id="scroll-friction-strength" type="range" disabled aria-describedby="scroll-friction-effect">
+        <div class="scroll-resistance-scale" aria-hidden="true"><span>Light</span><span>Heavy</span></div>
+        <p id="scroll-friction-effect">Page moves half as far when enabled.</p>
+      </div>
+      <p id="scroll-friction-note" class="preference-note">On by default at 50%. Turn off for normal scrolling. Slows browsing pages on X and LinkedIn during access, with Limit &amp; track on. Editors, messages and nested panels stay native. Keyboard, touch, scrollbar dragging and zoom are unchanged. No pauses or popups.</p>
+    </section>
     <section class="preference" aria-labelledby="goal-access-title">
       <div class="preference-heading"><label for="allow-above-goal"><strong id="goal-access-title">Allow sites while above the daily goal</strong><small>Skip the intention, wait and timer while today’s score is above your current daily target.</small></label><input id="allow-above-goal" type="checkbox" role="switch" disabled aria-labelledby="goal-access-title" aria-describedby="goal-access-note"></div>
       <p id="goal-access-note" class="preference-note">Off by default. For sites with Limit &amp; track on, this is an exception to timed access: creation-score tracking continues while above the goal. At or below the target, or on a new day, they block unless a timed session still has time. Sites with Limit &amp; track off always stay unrestricted and untracked.</p>

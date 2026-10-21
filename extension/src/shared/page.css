@@ -93,6 +93,30 @@
 .site-field-source button { border: 0; background: transparent; padding: 0; min-height: 24px; color: var(--violet); font: 600 12px system-ui; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .site-field-source button:disabled { cursor: default; }
 
+.scroll-resistance { --scroll-accent: var(--violet); margin-top: 24px; padding: 20px 24px; border-radius: 12px; background: #f0edf7; }
+.scroll-resistance[data-enabled=false] { --scroll-accent: var(--consume); }
+.scroll-resistance-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.scroll-resistance-heading label { font-size: 14px; font-weight: 600; }
+.scroll-resistance-heading output { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--scroll-accent); }
+.scroll-resistance input[type=range] { --scroll-fill: 0%; appearance: none; display: block; width: 100%; height: 44px; margin: 8px 0 0; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.scroll-resistance input[type=range]:disabled { cursor: default; }
+.scroll-resistance input[type=range]:focus-visible { outline: none; }
+.scroll-resistance input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px #f0edf7, 0 0 0 6px var(--violet); }
+.scroll-resistance input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px #f0edf7, 0 0 0 6px var(--violet); }
+.scroll-resistance input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 8px; background: linear-gradient(to right, var(--scroll-accent) var(--scroll-fill), var(--control-line) var(--scroll-fill)); }
+.scroll-resistance input[type=range]::-webkit-slider-thumb { appearance: none; width: 24px; height: 24px; margin-top: -8px; border: 3px solid var(--scroll-accent); border-radius: 50%; background: var(--paper); }
+.scroll-resistance input[type=range]::-moz-range-track { height: 8px; border-radius: 8px; background: linear-gradient(to right, var(--scroll-accent) var(--scroll-fill), var(--control-line) var(--scroll-fill)); }
+.scroll-resistance input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border: 3px solid var(--scroll-accent); border-radius: 50%; background: var(--paper); }
+.scroll-resistance-scale { display: flex; justify-content: space-between; gap: 16px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.scroll-resistance p { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
+@media (forced-colors: active) {
+  .scroll-resistance input[type=range] { appearance: auto; }
+  .scroll-resistance input[type=range]::-webkit-slider-thumb { appearance: auto; }
+  .scroll-resistance input[type=range]:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
+  #scroll-friction-enabled { appearance: auto; }
+  #scroll-friction-enabled::before { content: none; }
+}
+
 .dashboard-page .view-nav { margin-bottom: 28px; }
 .dashboard-page .view-nav button { font-size: 14px; padding: 12px; }
 .dashboard-page .section-label { margin: 24px 0 14px; gap: 16px; }

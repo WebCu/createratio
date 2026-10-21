@@ -508,6 +508,59 @@ test('settings page in a tab can save all preferences but spoofed pages and subf
   assert.deepEqual(w.data.settings.trackedSites, ['linkedin']); assert.equal(w.data._websiteTimeEnabled, true);
 });
 
+test('slow scrolling rejects foreign, content and framed senders and non-boolean preferences', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    const w = worker({}, browser);
+    const settingsPage = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };
+    assert.equal((await w.send({ type: 'snapshot' })).settings.scrollFrictionEnabled, true);
+    for (const enabled of [undefined, null, 1, 'true', [], {}]) {
+      assert.equal((await w.send({ type: 'scroll-friction-setting', enabled }, settingsPage)).ok, false);
+    }
+    for (const sender of [undefined, gate('x'), { ...settingsPage, frameId: 1 }, { ...settingsPage, id: 'other' }, { ...settingsPage, url: 'https://evil.test/settings.html' }]) {
+      assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false }, sender)).ok, false);
+    }
+    assert.equal(w.data.settings, undefined); assert.deepEqual(w.errors, []);
+    w.failWrites = true;
+    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false }, settingsPage)).ok, false);
+    assert.equal(w.data.settings, undefined);
+    w.failWrites = false;
+    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false }, settingsPage)).settings.scrollFrictionEnabled, false);
+  }
+});
+test('resistance saves validate atomically, preserve history and survive boolean-only toggles and restart', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    const date = C.localDate();
+    const data = { settings: { scrollFrictionEnabled: true, scrollFrictionStrength: 75 }, [date]: { x: { consumeSec: 30 } } };
+    const w = worker(data, browser);
+    for (const strength of [null, '50', true, 0, -5, 5, 25, 45, 99, 100, 1, 50.5, NaN, Infinity, [], {}]) {
+      assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false, strength }, popupSender)).ok, false);
+      assert.equal(data.settings.scrollFrictionEnabled, true); assert.equal(data.settings.scrollFrictionStrength, 75);
+    }
+    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false }, popupSender)).settings.scrollFrictionStrength, 75);
+    for (const strength of [50, 75, 90, 95]) {
+      assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: true, strength }, popupSender)).settings.scrollFrictionStrength, strength);
+    }
+    const restarted = worker(data, browser, w.now);
+    assert.equal((await restarted.send({ type: 'snapshot' })).settings.scrollFrictionStrength, 95);
+    assert.equal(data[date].x.consumeSec, 30);
+    assert.deepEqual(w.errors, []);
+  }
+});
+test('saved zero resistance stays Off until enabled with a valid strength, including boolean-only commands', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    const settings = { scrollFrictionEnabled: true, scrollFrictionStrength: 0, accessMinutes: 12, nudgeEnabled: false };
+    const data = { settings: { ...settings } }, w = worker(data, browser);
+    const restored = (await w.send({ type: 'snapshot' })).settings;
+    assert.equal(restored.scrollFrictionEnabled, false); assert.equal(restored.scrollFrictionStrength, 50);
+    assert.deepEqual(data.settings, settings);
+    const enabled = await w.send({ type: 'scroll-friction-setting', enabled: true }, popupSender);
+    assert.equal(enabled.ok, true); assert.equal(enabled.settings.scrollFrictionEnabled, true); assert.equal(enabled.settings.scrollFrictionStrength, 50);
+    assert.deepEqual(data.settings, { ...settings, scrollFrictionStrength: 50 });
+    const restarted = worker(data, browser, w.now);
+    const result = (await restarted.send({ type: 'snapshot' })).settings;
+    assert.equal(result.scrollFrictionEnabled, true); assert.equal(result.scrollFrictionStrength, 50);
+  }
+});
 test('fresh profiles track X and LinkedIn by default', async () => {
   const w = worker();
   const result = await w.send({ type: 'snapshot' });

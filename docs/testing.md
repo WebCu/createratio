@@ -126,6 +126,35 @@ There is no automated memory-budget gate: browser memory measurements and their
 acceptance remain a required contributor and maintainer review gate. A green CI
 run alone does not satisfy this section.
 
+### Scroll-friction resource comparison
+
+Build baseline and candidate Chrome bundles in separate directories, then run:
+
+```sh
+node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-document.json document
+node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-app-shell.json app-shell
+node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-body.json body
+```
+
+This uses the same disposable Chromium runner and sandbox settings as the browser
+journeys. Each layout alternates three runs per build with eight synthetic site
+tabs, 30 preference/SPA-route cycles, 100 measured trusted wheel inputs, and six
+seconds hidden. The app-shell fixture locks a document that still has a scroll
+range and scrolls a fixed inner container instead. The body fixture scrolls the
+body independently inside a locked root. Before timing, 61 additional wheel
+inputs exercise initial handling, every re-enable, and 30 DOM replacements
+(including the body element itself in that workload). Assertions verify distance
+scaling survives those transitions and DOM-node/listener counts do not accumulate.
+It waits for the foreground wheel listener to match each preference before
+sampling. It records bundle bytes, wheel listeners, GC-retained active-page isolate
+heap and DOM counters, an uninjected fixture control, and page script/task/layout
+durations. The active isolate measurement is not total browser RAM or a sum across
+tabs. CDP wheel-input
+elapsed time includes browser dispatch/acknowledgement overhead; it is not user
+input latency. Idle request counts do not prove worker shutdown. Compare medians
+and ranges, check lifecycle growth, and apply the resource review gate above.
+Keep the resulting JSON outside Git.
+
 ## Reference tracer bullets
 
 The first two examples deepen existing features rather than add functionality:
@@ -378,6 +407,25 @@ Before a release, verify:
   budget or pending wait, unless optional above-goal access applies.
 - Midnight refills use each site's override or current inherited Default. Off
   cancels refills; above-goal access never re-enables measurement on Off sites.
+- Slow scrolling starts on at 50% resistance when no choice is saved. Existing
+  Off choices and valid strengths must survive upgrades and restarts. The slider
+  adjusts resistance from 50–95% in five-point steps; even Light halves movement.
+  Saved positive strengths below 50% resolve to 50% without enabling an Off choice.
+  Verify drag previews do not save until release, keyboard adjustments retain
+  focus, fast changes retain only the latest pending choice, failures restore
+  confirmed values, and reloading or toggling Off preserves the chosen strength.
+  Saved zero resolves to Off with 50% ready for re-enabling. At Off or Limit & track
+  Off, already-open tabs scroll natively. Verify real mouse wheels and trackpads,
+  both directions, fractional movement, zoom, horizontal gestures, nested panels,
+  editors, messaging, route changes, and page focus. On app-shell pages whose only
+  scroll surface is an inner container, verify it slows even when the document
+  has a scroll range but its overflow is hidden or clipped. Panels inside it must
+  stay native even above half the viewport height. Cover independently scrolling
+  bodies and both propagated and non-propagated body overflow, including hidden
+  or clipped bodies with auto-overflow or contained roots. Keyboard, touch, and scrollbar
+  navigation must stay native. Check the Settings switch and slider with keyboard
+  input at narrow widths, with reduced motion and with forced colors. Synthetic Chromium tests do not establish
+  physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
 - Idle, focus, navigation, midnight, and sleep/wake boundaries do not backfill time.

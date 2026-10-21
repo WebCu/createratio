@@ -59,6 +59,49 @@ test('daily target resolves the current setting with safe defaults for legacy or
   }
 });
 
+test('scroll friction defaults on without replacing saved choices or resistance', () => {
+  for (const settings of [undefined, {}, { accessMinutes: 12 }]) {
+    assert.equal(C.settingsSnapshot(settings).scrollFrictionEnabled, true);
+    assert.equal(C.settingsSnapshot(settings).scrollFrictionStrength, 50);
+  }
+  for (const enabled of [false, true]) for (const strength of [50, 75, 90, 95]) {
+    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
+    for (const resolved of [C.settingsSnapshot(settings), C.updatePreferences(settings, { accessMinutes: 12 })]) {
+      assert.equal(resolved.scrollFrictionEnabled, enabled);
+      assert.equal(resolved.scrollFrictionStrength, strength);
+    }
+    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
+  }
+});
+test('saved zero resistance resolves to Off without mutating preferences', () => {
+  for (const enabled of [undefined, false, true]) {
+    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: 0 };
+    for (const saved of [settings, C.updatePreferences(settings, { accessMinutes: 12 })]) {
+      const resolved = C.settingsSnapshot(saved);
+      assert.equal(resolved.scrollFrictionEnabled, false); assert.equal(resolved.scrollFrictionStrength, 50);
+    }
+    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: 0 });
+  }
+});
+test('saved strengths below the new minimum resolve to 50% without enabling an Off choice', () => {
+  for (const enabled of [false, true]) for (const strength of [5, 25, 45]) {
+    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
+    const resolved = C.settingsSnapshot(settings);
+    assert.equal(resolved.scrollFrictionEnabled, enabled); assert.equal(resolved.scrollFrictionStrength, 50);
+    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
+  }
+});
+test('scroll resistance accepts only 50–95% in five-point steps', () => {
+  assert.equal(C.settingsSnapshot({ scrollFrictionEnabled: true }).scrollFrictionStrength, 50);
+  for (const strength of [50, 55, 75, 90, 95]) {
+    assert.equal(C.validScrollFrictionStrength(strength), true);
+    assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, strength);
+  }
+  for (const strength of [undefined, null, false, true, '75', 0, -5, 5, 25, 45, 49, 96, 99, 100, 1, 50.5, NaN, Infinity, [], {}]) {
+    assert.equal(C.validScrollFrictionStrength(strength), false);
+    assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, 50);
+  }
+});
 test('access minutes require a numeric whole number within the access limits', () => {
   assert.deepEqual(C.ACCESS_LIMITS, { minMinutes: 1, maxMinutes: 240 });
   for (const value of [1, 5, 120, 240]) assert.equal(C.validAccessMinutes(value), true);

@@ -44,13 +44,152 @@ function scrollAttempt(t, type = 'wheel', extra = {}) {
   t.event(type, { isTrusted: true, target: {}, key: 'PageDown', preventDefault() { prevented = true; }, ...extra });
   return prevented;
 }
-test('creation tracking never intercepts scrolling or shows retired reminders', async () => {
+test('default scroll friction halves wheel distance on both consuming sites', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const url of ['https://x.com/home', 'https://www.linkedin.com/feed/']) {
+      const t = await tracker(browser, { url, snapshot: { day: {}, settings: {} } });
+      assert.equal(t.wheel(200).defaultPrevented, true);
+      assert.equal(t.document.scrollingElement.scrollTop, 1100);
+      assert.equal(t.wheel(-100).defaultPrevented, true);
+      assert.equal(t.document.scrollingElement.scrollTop, 1050);
+    }
+  }
+});
+test('positive resistance changes live without accumulating listeners and saved zero stays Off', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const url of ['https://x.com/home', 'https://www.linkedin.com/feed/']) {
+      const t = await tracker(browser, { url, snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
+      for (const [strength, distance] of [[95, 10], [75, 50], [90, 20], [50, 100]]) {
+        t.setSnapshot({ day: {}, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: strength } }); await t.tick();
+        t.document.scrollingElement.scrollTop = 1000;
+        assert.equal(t.wheel(200).defaultPrevented, true);
+        assert.equal(t.document.scrollingElement.scrollTop, 1000 + distance);
+        assert.equal(t.listenerCount('wheel'), 2);
+      }
+      t.setSnapshot({ day: {}, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: 0 } }); await t.tick();
+      assert.equal(t.wheel(200).defaultPrevented, false);
+      assert.equal(t.listenerCount('wheel'), 1);
+    }
+  }
+});
+test('scroll friction handles pixel, line, page and fractional wheel deltas without queuing motion', async () => {
+  const t = await tracker('chrome', { snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
+  const root = t.document.scrollingElement;
+  t.wheel(3, { deltaMode: 1 }); assert.equal(root.scrollTop, 1024);
+  t.wheel(1, { deltaMode: 2 }); assert.equal(root.scrollTop, 1524);
+  for (let i = 0; i < 10; i++) t.wheel(0.5);
+  assert.equal(root.scrollTop, 1526);
+  t.wheel(-2); assert.equal(root.scrollTop, 1525);
+  root.scrollTop = 2000; t.wheel(1); assert.equal(root.scrollTop, 2000);
+  t.wheel(1); assert.equal(root.scrollTop, 2001);
+  const before = root.scrollTop;
+  await t.tick(); assert.equal(root.scrollTop, before, 'no delayed movement');
+});
+test('scroll friction preserves controls, nested panels, zoom and horizontal gestures', async () => {
+  const t = await tracker('chrome', { snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
+  const root = t.document.scrollingElement;
+  for (const extra of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { deltaX: 400 }, { isTrusted: false }, { cancelable: false }, { deltaMode: 3 }]) {
+    assert.equal(t.wheel(200, extra).defaultPrevented, false);
+  }
+  t.wheel(200, { defaultPrevented: true });
+  for (const selector of ['input', 'textarea', 'select', 'video', '[role="textbox"]', '[role="dialog"]']) {
+    assert.equal(t.wheel(200, { target: new Element([selector]) }).defaultPrevented, false);
+  }
+  const editor = new Element(); editor.isContentEditable = true;
+  assert.equal(t.wheel(200, { target: editor }).defaultPrevented, false);
+  t.document.activeElement = editor;
+  assert.equal(t.wheel(200).defaultPrevented, false);
+  t.document.activeElement = t.document.body;
+  const panel = new Element(); Object.assign(panel, { scrollHeight: 500, clientHeight: 100 }); panel.style.overflowY = 'auto';
+  const child = panel.append(new Element());
+  assert.equal(t.wheel(200, { target: child }).defaultPrevented, false);
+  panel.scrollTop = 400;
+  assert.equal(t.wheel(200, { target: child }).defaultPrevented, false, 'nested panel boundaries keep native scroll chaining');
+  const carousel = new Element(); Object.assign(carousel, { scrollWidth: 500, clientWidth: 100 }); carousel.style.overflowX = 'auto';
+  assert.equal(t.wheel(200, { deltaX: 100, target: carousel }).defaultPrevented, false);
+  for (const node of [root, t.document.body]) {
+    node.style.overflowY = 'hidden';
+    assert.equal(t.wheel(200).defaultPrevented, false);
+    node.style.overflowY = 'visible';
+  }
+  assert.equal(root.scrollTop, 1000);
+  t.wheel(200, { deltaX: 10 }); assert.equal(root.scrollTop, 1100); assert.equal(root.scrollLeft, 10);
+});
+test('scroll friction leaves page edges, keyboard and touch navigation native', async () => {
+  const t = await tracker('chrome', { snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
+  const root = t.document.scrollingElement;
+  root.scrollTop = 0; assert.equal(t.wheel(-200).defaultPrevented, false);
+  root.scrollTop = root.scrollHeight - root.clientHeight; assert.equal(t.wheel(200).defaultPrevented, false);
+  for (const type of ['touchmove', 'keydown']) assert.equal(scrollAttempt(t, type), false);
+});
+test('scroll friction respects Off, follows access and releases its listener across document lifetimes', async () => {
+  const snapshot = { day: {}, settings: { scrollFrictionEnabled: true } };
+  const messages = [];
+  const t = await tracker('chrome', { snapshot, reply(message, result) { messages.push(message.type); return result; } });
+  const nativeListeners = t.listenerCount('wheel') - 1;
+  const before = messages.length;
+  for (let i = 0; i < 100; i++) t.wheel(10);
+  assert.equal(messages.length, before, 'wheel handling does not request background work');
+  for (let i = 0; i < 30; i++) {
+    t.route('https://x.com/compose/post', true); assert.equal(t.listenerCount('wheel'), nativeListeners);
+    t.route('https://x.com/home', false); assert.equal(t.listenerCount('wheel'), nativeListeners + 1);
+    t.visible(false); assert.equal(t.listenerCount('wheel'), nativeListeners);
+    t.visible(true); assert.equal(t.listenerCount('wheel'), nativeListeners + 1);
+    t.focus(false); assert.equal(t.listenerCount('wheel'), nativeListeners);
+    t.focus(true); assert.equal(t.listenerCount('wheel'), nativeListeners + 1);
+    t.event('pagehide', { persisted: true }); assert.equal(t.listenerCount('wheel'), nativeListeners);
+    t.event('pageshow', { persisted: true }); assert.equal(t.listenerCount('wheel'), nativeListeners + 1);
+  }
+  await t.tick();
+  for (const disabled of [
+    { ...snapshot, settings: { scrollFrictionEnabled: false } },
+    { ...snapshot, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: 0 } },
+    { ...snapshot, settings: { scrollFrictionEnabled: true, trackedSites: [] } },
+    { ...snapshot, access: { x: { remainingMs: 0 } } }
+  ]) {
+    t.setSnapshot(disabled); await t.tick();
+    assert.equal(t.listenerCount('wheel'), nativeListeners);
+    assert.equal(t.wheel(200).defaultPrevented, false);
+    t.setSnapshot(snapshot); await t.tick();
+    assert.equal(t.listenerCount('wheel'), nativeListeners + 1);
+  }
+  t.setSnapshot({ ...snapshot, access: { x: { remainingMs: 0, goalAllowed: true } } }); await t.tick();
+  assert.equal(t.wheel(200).defaultPrevented, true);
+});
+test('scroll friction leaves messaging and creating modes native on both sites', async () => {
+  for (const [url, messageURL] of [['https://x.com/home', 'https://x.com/messages'], ['https://www.linkedin.com/feed/', 'https://www.linkedin.com/messaging/']]) {
+    const t = await tracker('chrome', { url, snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
+    t.route(url, true); assert.equal(t.wheel(200).defaultPrevented, false);
+    t.route(messageURL, false); assert.equal(t.wheel(200).defaultPrevented, false);
+    t.route(url, false); assert.equal(t.wheel(200).defaultPrevented, true);
+  }
+});
+test('invalidated extension contexts and failed adapters restore native scrolling', async () => {
+  let invalidated = false;
+  const t = await tracker('chrome', { snapshot: { day: {}, settings: { scrollFrictionEnabled: true } }, reply(_, result) {
+    if (invalidated) throw new Error('Extension context invalidated');
+    return result;
+  } });
+  invalidated = true; await t.tick();
+  assert.equal(t.wheel(200).defaultPrevented, false);
+  assert.equal(t.listenerCount('wheel'), 1);
+  let broken = false;
+  const integration = { ...integrations.get('x'), create() { return { mode() { if (broken) throw new Error('Unsupported DOM'); return 'consume'; }, action() { return null; } }; } };
+  const failed = await tracker('chrome', { integration, snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
+  assert.equal(failed.wheel(200).defaultPrevented, true);
+  broken = true; failed.route('https://x.com/explore', false);
+  assert.equal(failed.wheel(200).defaultPrevented, false);
+  assert.equal(failed.listenerCount('wheel'), 1);
+});
+test('retired reminders do not pause scroll friction or affect writing', async () => {
   const t = await tracker('chrome', { snapshot: overdueSnapshot() }); await t.tick();
   assert.equal(t.elements.some(node => node.id === 'c3-nudge' && !node.removed), false);
-  for (const type of ['wheel', 'touchmove', 'keydown']) assert.equal(scrollAttempt(t, type), false);
+  assert.equal(t.wheel(200).defaultPrevented, true);
+  assert.equal(t.document.scrollingElement.scrollTop, 1100);
+  for (const type of ['touchmove', 'keydown']) assert.equal(scrollAttempt(t, type), false);
   assert.equal(t.elements.some(node => node.id === 'c3-scroll-lock'), false);
   t.route('https://x.com/home', true);
-  assert.equal(scrollAttempt(t), false, 'drafting remains usable during an access session');
+  assert.equal(t.wheel(200).defaultPrevented, false, 'drafting remains usable during an access session');
 });
 
 test('saved nudge overrides remain inert while both sites continue creation tracking', async () => {

@@ -16,7 +16,7 @@
   "content_scripts": [
     { "matches": [], "js": ["sites.js", "messages.js", "access-guard.js"], "run_at": "document_start" },
     { "matches": [], "js": ["route-hook.js"], "run_at": "document_start", "world": "MAIN" },
-    { "matches": [], "js": ["sites.js", "core.js", "messages.js", "dom.js", "content.js"], "run_at": "document_idle" }
+    { "matches": [], "js": ["sites.js", "core.js", "messages.js", "dom.js", "scroll-friction.js", "content.js"], "run_at": "document_idle" }
   ],
   "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'" }
 }
