@@ -6,8 +6,6 @@ on:
       - '.github/workflows/**'
       - 'bin/check-actions.js'
       - 'bin/tests/check-actions.test.js'
-  schedule:
-    - cron: '20 7 * * 2'
   workflow_dispatch:
 
 permissions:

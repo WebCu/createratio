@@ -1,6 +1,10 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { copyFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { auditActions, fetchManifest } = require('../check-actions.js');
 
 const sha = 'a'.repeat(40);
@@ -72,4 +76,26 @@ test('manifest downloads support subpaths and action.yaml without swallowing ser
   ]);
   await assert.rejects(fetchManifest(action, async () => new Response('', { status: 503 })), /HTTP 503/);
   await assert.rejects(fetchManifest(action, async () => new Response('', { status: 404 })), /manifest not found/);
+});
+
+test('the CLI rejects an invalid workflow with a failing exit code and succeeds after correction', t => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'createratio-action-audit-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const script = path.join(directory, 'bin/check-actions.js');
+  const workflows = path.join(directory, '.github/workflows');
+  mkdirSync(path.dirname(script), { recursive: true });
+  mkdirSync(workflows, { recursive: true });
+  copyFileSync(path.resolve(__dirname, '../check-actions.js'), script);
+  const file = path.join(workflows, 'ci.yml');
+  const source = 'name: Fixture\non: workflow_dispatch\njobs:\n  check:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@v1\n';
+  writeFileSync(file, source);
+  const rejected = spawnSync(process.execPath, [script], { cwd: directory, encoding: 'utf8', timeout: 5000 });
+  assert.ifError(rejected.error);
+  assert.equal(rejected.status, 1, rejected.stderr);
+  assert.match(rejected.stderr, /ci\.yml: pin actions\/checkout@v1 to a full commit SHA/);
+  writeFileSync(file, source.replace('uses: actions/checkout@v1', 'run: node --version'));
+  const accepted = spawnSync(process.execPath, [script], { cwd: directory, encoding: 'utf8', timeout: 5000 });
+  assert.ifError(accepted.error);
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.match(accepted.stdout, /Action runtime audit passed/);
 });

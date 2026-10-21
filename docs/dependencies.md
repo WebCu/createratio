@@ -10,7 +10,9 @@ and Node.js capabilities.
 - Use stable Node.js 24.x and pnpm 12.x. The `engines` ranges in `package.json`
   and workspace `engineStrict` setting reject other majors during installation,
   while accepting minor and patch updates. `.node-version` selects Node.js 24
-  for compatible version managers.
+  for compatible version managers. Stay on Node.js 24 until a newer major reaches
+  LTS and a maintainer explicitly approves the upgrade. GitHub Actions' internal
+  runtimes are separate from the project's Node.js version.
 - CI and website deployment pin matching versions within those majors in
   workflow files. Contributors do not need to match the exact minor or patch.
 - Install pnpm using the [official instructions](https://pnpm.io/installation).
@@ -49,7 +51,7 @@ Review upstream release notes, integrity, and the full diff, then run CI before 
 manifests, requiring full commit SHAs and JavaScript action runtimes on Node.js 24
 or newer. It rejects `ubuntu-latest`; non-JavaScript actions require a separate
 runtime audit.
-The audit runs for workflow/audit pull requests, weekly, and on manual dispatch.
+The audit runs for workflow/audit pull requests and on manual dispatch.
 It requires network access and fails if an upstream manifest cannot be verified;
 `pnpm check` keeps its tests offline.
 

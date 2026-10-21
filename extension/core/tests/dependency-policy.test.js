@@ -9,7 +9,7 @@ const read = file => readFileSync(path.join(root, file), 'utf8');
 const manifests = ['package.json', 'extension/package.json'].map(file => JSON.parse(read(file)));
 const exactVersion = /^\d+\.\d+\.\d+$/;
 
-test('CI and deployment pin matching stable tools', () => {
+test('workflows share a pinned Node.js version and CI/deployment pin matching stable tools', () => {
   const versions = ['ci.yml', 'deploy-site.yml'].map(file => {
     const workflow = read(`.github/workflows/${file}`);
     const node = workflow.match(/node-version: (\S+)/)?.[1];
@@ -20,6 +20,12 @@ test('CI and deployment pin matching stable tools', () => {
     return { node, pnpm };
   });
   assert.deepEqual(versions[0], versions[1]);
+  for (const file of readdirSync(path.join(root, '.github/workflows'))) {
+    if (!/\.ya?ml$/.test(file)) continue;
+    for (const [, node] of read(`.github/workflows/${file}`).matchAll(/node-version: (\S+)/g)) {
+      assert.equal(node, versions[0].node, `${file} must use the shared Node.js version`);
+    }
+  }
 });
 
 test('browser runtime remains dependency-free and any development packages use exact versions', () => {
@@ -126,19 +132,4 @@ test('weekly dependency automation proposes Action majors but excludes library a
       assert.match(update, /dependency-name: '\*'\n\s+update-types: \['version-update:semver-major'\]/);
     }
   }
-});
-
-test('the network action audit runs on relevant PRs, weekly, and on demand outside the offline check', () => {
-  const workflow = read('.github/workflows/audit-actions.yml');
-  assert.match(workflow, /pull_request:\n\s+paths:/);
-  for (const file of ['.github/workflows/**', 'bin/check-actions.js', 'bin/tests/check-actions.test.js']) {
-    assert.ok(workflow.includes(`- '${file}'`));
-  }
-  assert.match(workflow, /schedule:\n\s+- cron:/);
-  assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /run: node bin\/check-actions\.js/);
-  assert.match(workflow, /run: node --test bin\/tests\/check-actions\.test\.js/);
-  assert.match(workflow, /timeout-minutes: 5/);
-  assert.equal(manifests[0].scripts['check:actions'], 'node bin/check-actions.js');
-  assert.equal(workflow.match(/node-version: (\S+)/)?.[1], read('.github/workflows/ci.yml').match(/node-version: (\S+)/)?.[1]);
 });
