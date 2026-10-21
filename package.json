@@ -13,6 +13,7 @@
     "prepare": "node bin/setup-git-hooks.js --if-unconfigured",
     "setup:hooks": "node bin/setup-git-hooks.js",
     "verify:access": "node bin/access-equivalence.js",
+    "benchmark:resources": "node bin/benchmark-resources.mjs",
     "smoke:browser": "pnpm build:chrome && python3 -m unittest discover -s bin/tests -p test_browser_smoke.py && python3 bin/browser-smoke.py",
     "check:syntax": "node bin/check-syntax.js",
     "check": "pnpm check:syntax && pnpm test && pnpm build && pnpm build:site",
