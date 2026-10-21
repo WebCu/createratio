@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
-const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, utimesSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 
@@ -33,12 +33,12 @@ console.error('fixture stderr: ' + stage);
 if (process.env.FAIL_AT === 'signal:' + stage) process.kill(process.pid, 'SIGTERM');
 if (stage === process.env.FAIL_AT) process.exit(7);
 `, { mode: 0o755 });
-  return failAt => {
+  return (failAt, overrides = {}) => {
     const callLog = path.join(directory, 'calls');
     writeFileSync(callLog, '');
     const result = spawnSync(process.execPath, [script], {
       cwd: project, encoding: 'utf8',
-      env: { ...process.env, PATH: repository ? directory + path.delimiter + process.env.PATH : directory, TMPDIR: directory, CALL_LOG: callLog, FAIL_AT: failAt || '' }
+      env: { ...process.env, PATH: repository ? directory + path.delimiter + process.env.PATH : directory, TMPDIR: directory, CALL_LOG: callLog, FAIL_AT: failAt || '', ...overrides }
     });
     assert.ok(result.stdout.includes('Verification logs: '), result.stderr);
     const output = result.stdout.match(/^Verification logs: (.+)$/m)[1];
@@ -54,6 +54,19 @@ test('verification records the actual commit, working-tree state and tool versio
   assert.deepEqual(clean.summary.runtime, { node: process.version, pnpm: '12.11.2' });
   writeFileSync(path.join(clean.cwd, 'source.txt'), 'modified');
   assert.deepEqual(run().summary.source, { head, dirty: true });
+});
+
+test('verification provenance reads leave a stale caller index byte-for-byte unchanged', t => {
+  const run = workspace(t, { repository: true });
+  const first = run();
+  const index = path.join(first.cwd, '.git/index');
+  const original = readFileSync(index);
+  const changedTime = new Date(Date.now() + 2000);
+  utimesSync(path.join(first.cwd, 'source.txt'), changedTime, changedTime);
+  const second = run(undefined, { GIT_OPTIONAL_LOCKS: '1' });
+  assert.equal(second.status, 0, second.stderr);
+  assert.deepEqual(readFileSync(index), original);
+  assert.deepEqual(second.summary.source, first.summary.source);
 });
 
 test('unavailable provenance is explicit rather than inferred from another checkout', t => {

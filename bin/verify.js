@@ -10,8 +10,8 @@ function commandValue(program, args) {
 }
 
 function runVerification() {
-  const status = commandValue('git', ['status', '--porcelain']);
-  const source = { head: commandValue('git', ['rev-parse', '--verify', 'HEAD']), dirty: status === null ? null : Boolean(status) };
+  const status = commandValue('git', ['--no-optional-locks', 'status', '--porcelain']);
+  const source = { head: commandValue('git', ['--no-optional-locks', 'rev-parse', '--verify', 'HEAD']), dirty: status === null ? null : Boolean(status) };
   const runtime = { node: process.version, pnpm: commandValue('pnpm', ['--version']) };
   const directory = mkdtempSync(path.join(tmpdir(), 'createratio-verify-'));
   const stages = ['check', 'check:browser', 'smoke:browser'].map(name => ({ name, status: 'not-run', log: name.replaceAll(':', '-') + '.log' }));

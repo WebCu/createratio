@@ -25,7 +25,9 @@ failure and preserving its exit code. Each invocation creates a fresh private
 temporary directory, prints its path, and saves per-stage logs plus `summary.json`.
 The summary records the starting commit, working-tree dirty state, and actual Node
 and pnpm versions. Unavailable Git or package-manager metadata is recorded as
-`null`, not inferred from another checkout.
+`null`, not inferred from another checkout. Metadata and release-smoke preflight
+Git reads disable optional locks so stat-cache refreshes cannot rewrite the
+caller's index.
 Later stages are marked **not-run**, with no log file; output from an earlier run
 is never reused. Keep these artifacts outside Git and remove them when no longer
 needed. Existing browser-failure artifacts remain under `BROWSER_ARTIFACT_DIR`.
@@ -261,7 +263,9 @@ checkout. It exercises the real prepare/check/merge/publish/package journey in a
 installed dependencies, substitutes GitHub CLI and only the approved local Git
 transport, and permits file transport only. Automatic tag following and mirror
 mode are enabled to verify that unrelated tags remain local. Logs and the result
-summary stay in a fresh temporary directory. No store endpoints are called. CI
+summary stay in a fresh temporary directory. Native fetch permits only loopback
+hosts and rejects every redirect, including caller-requested redirect following;
+requests and string URLs use the same restriction. No store endpoints are called. CI
 runs this separately from `pnpm check` to avoid recursive verification.
 
 Before approving each store deployment, test its exact extracted artifact in the

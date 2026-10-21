@@ -8,7 +8,7 @@ function releaseSmoke() {
   if (process.env.CR_RELEASE_SMOKE === '1') throw new Error('Release smoke cannot run recursively inside its own checks.');
   const source = process.cwd();
   function git(...args) {
-    const result = spawnSync('git', args, { cwd: source, encoding: 'utf8', timeout: 10000 });
+    const result = spawnSync('git', ['--no-optional-locks', ...args], { cwd: source, encoding: 'utf8', timeout: 10000 });
     if (result.status !== 0) throw new Error('Release smoke requires a Git checkout.');
     return result.stdout.trim();
   }
@@ -63,7 +63,7 @@ function releaseSmoke() {
     run('git', ['config', 'remote.origin.mirror', 'true']);
     fs.writeFileSync(path.join(bin, 'gh'), `#!${process.execPath}\nconst args = process.argv.slice(2);\nif (args.join(' ') === 'auth status --hostname github.com') process.exit(0);\nif (args[0] === 'pr' && args[1] === 'create') process.exit(0);\nprocess.exit(1);\n`, { mode: 0o700 });
     const transport = path.join(directory, 'transport.cjs');
-    fs.writeFileSync(transport, `const cp = require('node:child_process');\nconst spawn = cp.spawnSync;\nconst nativeFetch = globalThis.fetch;\nglobalThis.fetch = async (url, options) => {\n  const host = new URL(url instanceof Request ? url.url : url).hostname;\n  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) throw new Error('Release smoke blocks external fetch requests.');\n  return nativeFetch(url, options);\n};\ncp.spawnSync = (program, args, options) => {\n  const result = spawn(program, args, options);\n  if (program === 'git' && args[0] === 'remote' && args[1] === 'get-url' && result.status === 0) result.stdout = result.stdout.split('\\n').map(url => url === ${JSON.stringify(`file://${remote}`)} ? 'https://github.com/WebCu/createratio.git' : url).join('\\n');\n  return result;\n};\n`);
+    fs.writeFileSync(transport, `const cp = require('node:child_process');\nconst spawn = cp.spawnSync;\nconst nativeFetch = globalThis.fetch;\nglobalThis.fetch = async (url, options) => {\n  const host = new URL(url instanceof Request ? url.url : url).hostname;\n  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) throw new Error('Release smoke blocks external fetch requests.');\n  return nativeFetch(url, { ...options, redirect: 'error' });\n};\ncp.spawnSync = (program, args, options) => {\n  const result = spawn(program, args, options);\n  if (program === 'git' && args[0] === 'remote' && args[1] === 'get-url' && result.status === 0) result.stdout = result.stdout.split('\\n').map(url => url === ${JSON.stringify(`file://${remote}`)} ? 'https://github.com/WebCu/createratio.git' : url).join('\\n');\n  return result;\n};\n`);
     env.PATH = bin + path.delimiter + process.env.PATH;
     env.NODE_OPTIONS = `--require=${JSON.stringify(transport)}`;
     run('pnpm', ['release', 'prepare', 'patch']);
