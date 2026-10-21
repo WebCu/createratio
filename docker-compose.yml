@@ -20,6 +20,7 @@ services:
       - ./site/terms.html:/srv/www/terms.html:ro
       - ./site/styles.css:/srv/www/styles.css:ro
       - ./site/arrival.js:/srv/www/arrival.js:ro
+      - ./site/browser-install.js:/srv/www/browser-install.js:ro
       - ./site/analytics.js:/srv/www/analytics.js:ro
       - ./site/favicon.svg:/srv/www/favicon.svg:ro
       - ./LICENSE:/srv/www/LICENSE:ro

@@ -8,6 +8,7 @@
   <title>CreateRatio - Create &gt; Consume</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <script src="browser-install.js" defer></script>
   <script src="arrival.js" defer></script>
   <script type="module" src="analytics.js"></script>
 </head>
@@ -49,11 +50,13 @@
           <p class="intro">This is your space. Make something of it.</p>
           <h1 id="hero-title">Create more.<br>Consume less.</h1>
           <p class="description">X and LinkedIn are blocked by default. Write an intention, wait 60 seconds, then start a session. It defaults to five active-tab minutes; change the duration in Settings. Time pauses when you switch away. Track active creating versus consuming with a simple daily score.</p>
-          <div class="actions">
-            <a class="button" href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Add to Chrome</a>
+          <div class="actions" data-install-actions>
+            <a class="button" data-browser="chrome" href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Add to Chrome</a>
+            <a class="button" data-browser="firefox" href="https://addons.mozilla.org/en-US/firefox/addon/createratio/">Add to Firefox</a>
             <a class="text-link" href="#install">Other browsers &amp; source</a>
           </div>
-          <p class="availability">Free and open source. Available on the Chrome Web Store.</p>
+          <p class="browser-note" data-browser-note hidden></p>
+          <p class="availability">Free and open source. Available for Chrome and Firefox.</p>
         </div>
 
         <figure class="example" aria-label="Illustrative day: 48 minutes creating, 32 minutes consuming, two posts, and a score of 1.63.">
@@ -80,15 +83,27 @@
       <section class="install" id="install" aria-labelledby="install-title">
         <div class="install-copy">
           <h2 id="install-title">Start with a small extension.</h2>
-          <p>Get CreateRatio from the Chrome Web Store. No developer tools needed. Save your X and LinkedIn drafts before installing: existing tabs are redirected to the access gate.</p>
-          <a class="button" href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Add to Chrome</a>
+          <p>Get CreateRatio from the Chrome Web Store or Firefox Add-ons. No developer tools needed. Save your X and LinkedIn drafts before installing: existing tabs are redirected to the access gate.</p>
+          <div class="actions" data-install-actions>
+            <a class="button" data-browser="chrome" href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Add to Chrome</a>
+            <a class="button" data-browser="firefox" href="https://addons.mozilla.org/en-US/firefox/addon/createratio/">Add to Firefox</a>
+          </div>
+          <p class="browser-note" data-browser-note hidden></p>
         </div>
         <div class="install-steps">
-          <details open>
+          <details open data-install-browser="chrome">
             <summary>Install in Chrome</summary>
             <ol>
               <li>Open the <a href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Chrome Web Store listing</a> and choose <strong>Add to Chrome</strong>.</li>
               <li>Confirm the installation, then pin CreateRatio from Chrome’s extensions menu.</li>
+              <li>Visit X or LinkedIn to set an intention and start your first session. Adjust access limits in Settings.</li>
+            </ol>
+          </details>
+          <details data-install-browser="firefox">
+            <summary>Install in Firefox</summary>
+            <ol>
+              <li>Open the <a href="https://addons.mozilla.org/en-US/firefox/addon/createratio/">Firefox Add-ons listing</a> and choose <strong>Add to Firefox</strong>.</li>
+              <li>Confirm the installation.</li>
               <li>Visit X or LinkedIn to set an intention and start your first session. Adjust access limits in Settings.</li>
             </ol>
           </details>
@@ -103,7 +118,7 @@ pnpm build</code></pre>
               <li><strong>Chrome 111+ or Edge:</strong> open <code>chrome://extensions</code> or <code>edge://extensions</code>, enable <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select <code>dist/chrome</code> or <code>dist/edge</code>.</li>
               <li><strong>Firefox 140+:</strong> open <code>about:debugging#/runtime/this-firefox</code>, choose <strong>Load Temporary Add-on</strong>, select <code>dist/firefox/manifest.json</code>, then refresh your X and LinkedIn tabs.</li>
             </ol>
-            <p>The temporary Firefox install is removed when Firefox restarts. Edge and Firefox are development builds, not store releases; live validation is still outstanding.</p>
+            <p>The temporary Firefox source install is removed when Firefox restarts; use the Firefox Add-ons listing above for a permanent installation. Edge is available as a development build, not a store release.</p>
             <p><a href="https://github.com/WebCu/createratio/blob/main/extension/README.md">Read the full installation guide</a></p>
           </details>
         </div>

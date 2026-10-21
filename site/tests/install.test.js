@@ -6,16 +6,18 @@ const path = require('node:path');
 const os = require('node:os');
 const { buildSite } = require('../build.js');
 
-const listing = 'https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk';
+const listings = [
+  ['https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk', 'Add to Chrome'],
+  ['https://addons.mozilla.org/en-US/firefox/addon/createratio/', 'Add to Firefox']
+];
 
 function verifyInstallation(html) {
   const hero = html.split('<section class="hero"')[1].split('</section>')[0];
   const install = html.split('<section class="install"')[1].split('</section>')[0];
   for (const section of [hero, install]) {
-    const button = section.match(/<a class="button" href="([^"]+)">([^<]+)<\/a>/);
-    assert.ok(button, 'installation has a plain link that works without JavaScript');
-    assert.equal(button[1], listing);
-    assert.equal(button[2], 'Add to Chrome');
+    const buttons = [...section.matchAll(/<a class="button" data-browser="(?:chrome|firefox)" href="([^"]+)">([^<]+)<\/a>/g)];
+    assert.deepEqual(buttons.map(([, href, label]) => [href, label]), listings,
+      'installation has plain Chrome and Firefox links that work without JavaScript');
   }
   assert.match(hero, /href="#install">Other browsers &amp; source<\/a>/);
   assert.match(install, /Save (?:any |your )?X and LinkedIn drafts before installing/);
@@ -25,14 +27,20 @@ function verifyInstallation(html) {
     assert.ok(install.includes(bundle), bundle);
   }
   assert.match(install, /Firefox.*removed when Firefox restarts/s);
-  assert.match(install, /Edge and Firefox.*not store releases/s);
+  const firefoxInstructions = install.split('<summary>Install in Firefox</summary>')[1]?.split('</details>')[0];
+  assert.ok(firefoxInstructions, 'Firefox store installation has its own instructions');
+  assert.ok(firefoxInstructions.includes(`href="${listings[1][0]}"`));
   assert.doesNotMatch(html, /For now, install from source|Install from source<\/a>/);
 }
 
-test('the source and built landing page offer the published Chrome listing with source alternatives', t => {
+test('the source and built landing page offer Chrome and Firefox listings with source alternatives', t => {
   verifyInstallation(fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8'));
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-install-'));
   t.after(() => fs.rmSync(output, { recursive: true, force: true }));
   buildSite(output);
-  verifyInstallation(fs.readFileSync(path.join(output, 'index.html'), 'utf8'));
+  const html = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
+  verifyInstallation(html);
+  assert.match(html, /<script src="browser-install\.js" defer><\/script>/);
+  assert.equal(fs.readFileSync(path.join(output, 'browser-install.js'), 'utf8'),
+    fs.readFileSync(path.join(__dirname, '../browser-install.js'), 'utf8'));
 });
