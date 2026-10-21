@@ -36,10 +36,12 @@ function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
   const waiting = !active && access.readyAt > 0 && access.requestExpiresAt > now;
+  $('request').setAttribute('aria-label', 'Request access to ' + access.name);
   $('session-step').textContent = `Open a ${access.sessionMinutes}-minute session.`;
   $('heading').textContent = active ? `${access.name} is open.` : blockedLine;
   $('access-steps').hidden = active;
-  $('state-text').textContent = access.goalAllowed ? 'Above your daily goal' : active ? 'Temporary access' : 'Blocked by default';
+  const stateText = access.goalAllowed ? 'Above your daily goal' : active ? 'Temporary access' : 'Blocked by default';
+  if ($('state-text').textContent !== stateText) $('state-text').textContent = stateText;
   $('description').textContent = access.goalAllowed ? `${access.name} is open while today’s creation score is above your current daily target. No intention, wait or timer needed.` : active ? `Time counts only in the active tab of a focused browser window. When time runs out, all ${access.name} tabs return to this page.` : `${access.name} is paused. Set an intention, take a minute, then open a timed session.`;
   document.title = `${access.name} ${active ? 'session' : 'blocked'} - CreateRatio`;
   $('request').hidden = active || waiting;

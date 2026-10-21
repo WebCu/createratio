@@ -221,7 +221,9 @@ operating-system sleep/wake behavior. Keep those release checks manual.
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
 JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it. `pnpm check` runs it before tests and builds.
 The pre-commit hook checks staged whitespace, including newly added files.
-`pnpm check` rejects Git-tracked root `.pi` configuration, even if force-added while ignored; ignored or untracked personal files remain allowed.
+`pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
+paths, including skill-directory symlinks and files force-added while ignored.
+Ignored or untracked personal files remain allowed.
 
 To print a verification log without swallowing its exit code, including an
 expected failing test:

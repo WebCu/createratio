@@ -127,6 +127,24 @@ replacement from a browser restart. Website-time sampling starts fresh.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
   and CSV exports.
 
+### Browser agents and accessibility
+
+Browser agents use the same UI as people; there is no public agent API or
+external messaging bridge. Tools must support installed extension pages.
+Open CreateRatio from the extensions menu; use **Open dashboard** or **Settings**
+for full pages rather than hard-coding an installation-specific extension ID.
+
+Site-access buttons have site-specific accessible names and describe the current
+state. Settings expose native switches and labeled session-time fields;
+dashboard views expose pressed states and hide inactive panels. The access gate
+exposes its form, intention requirements, waiting/active regions, and disabled
+confirmation state. Use roles and names, not row positions. Check save status or
+errors after actions. All intention, wait, and explicit confirmation rules remain.
+
+The public [AI and browser-agent guide](https://createratio.com/llms.txt) covers
+these workflows and consent boundaries. Reading this guide does not grant an
+agent permission to change settings, export private data, or bypass access gates.
+
 ### Site access
 
 X, Twitter aliases, and LinkedIn, including subdomains, are blocked on HTTP and
