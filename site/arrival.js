@@ -24,14 +24,10 @@
     automaticFrame = 0;
   }
 
-  function scrollThroughOpening() {
+  function scrollThroughOpening(event) {
+    if (!enabled || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
     stopAutomaticScroll();
-    clearTimeout(hintTimer);
-    scrollHint.hidden = true;
-    if (!enabled) {
-      window.scrollTo({ top: space.getBoundingClientRect().top + window.scrollY, behavior: 'instant' });
-      return;
-    }
     const from = window.scrollY;
     const to = start + distance;
     if (from >= to) return;
@@ -42,6 +38,7 @@
       window.scrollTo({ top: from + (to - from) * eased, behavior: 'instant' });
       schedule();
       automaticFrame = progress < 1 ? requestAnimationFrame(step) : 0;
+      if (progress === 1) document.getElementById('main')?.focus({ preventScroll: true });
     }
     automaticFrame = requestAnimationFrame(step);
   }
@@ -90,17 +87,7 @@
     }
   }
 
-  const hintTimer = scrollHint && window.scrollY <= 0 ? setTimeout(() => {
-    if (window.scrollY <= 0) scrollHint.hidden = false;
-  }, 8000) : null;
-
-  window.addEventListener('scroll', () => {
-    if (scrollHint && window.scrollY > 0) {
-      clearTimeout(hintTimer);
-      scrollHint.hidden = true;
-    }
-    schedule();
-  }, { passive: true });
+  window.addEventListener('scroll', schedule, { passive: true });
   if (scrollHint) scrollHint.addEventListener('click', scrollThroughOpening);
   for (const name of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
     window.addEventListener(name, stopAutomaticScroll, { passive: true });

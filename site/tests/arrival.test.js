@@ -7,71 +7,36 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../arrival.js'), 'utf8');
 
-test('the opening has an accessible scroll button that starts hidden', () => {
+test('the opening has a native continuation to existing content without JavaScript', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const opening = html.match(/<section class="arrival"[\s\S]*?<\/section>/);
   assert.ok(opening);
-  assert.match(opening[0], /<button type="button" class="scroll-hint" hidden>/);
-  assert.match(opening[0], /<span>Scroll down<\/span>/);
+  const continuation = opening[0].match(/<a class="scroll-hint" href="#([^"]+)"[^>]*>/);
+  assert.ok(continuation);
+  assert.doesNotMatch(continuation[0], /hidden/);
+  assert.match(html, new RegExp(`id="${continuation[1]}"`));
+  assert.match(opening[0], /<span>[^<]+<\/span>/);
   assert.match(opening[0], /<svg[^>]+aria-hidden="true"/);
   assert.match(opening[0], /<div class="distractions" aria-hidden="true">/);
 });
 
-test('the scroll cue appears only after eight seconds without scrolling down', () => {
-  const h = harness();
-  assert.equal(h.scrollHint.hidden, true);
-  h.advance(7999);
-  assert.equal(h.scrollHint.hidden, true);
-  h.advance(1);
-  assert.equal(h.scrollHint.hidden, false);
-  assert.equal(h.scrolls.length, 0);
-});
-
-test('scrolling before the delay cancels the cue, even after returning to the top', () => {
-  const h = harness();
-  h.advance(4000);
-  h.scroll(1);
-  assert.equal(h.timers.size, 0);
-  h.scroll(0);
-  h.advance(8000);
-  assert.equal(h.scrollHint.hidden, true);
-});
-
-test('scrolling after the cue appears dismisses it permanently', () => {
-  const h = harness();
-  h.advance(8000);
-  h.scroll(1);
-  assert.equal(h.scrollHint.hidden, true);
-  h.scroll(0);
-  h.advance(8000);
-  assert.equal(h.scrollHint.hidden, true);
-});
-
-test('restored scroll positions and direct anchors do not show the cue', () => {
-  const restored = harness({ scrollY: 100 });
-  assert.equal(restored.timers.size, 0);
-  restored.scroll(0);
-  restored.advance(8000);
-  assert.equal(restored.scrollHint.hidden, true);
-  const linked = harness({ hash: '#install' });
-  linked.flush();
-  linked.advance(8000);
-  assert.equal(linked.scrollHint.hidden, true);
-});
-
-test('the static opening retains the cue without requiring animated masks', () => {
-  for (const options of [{ reduced: true }, { supportsMask: false }]) {
+test('continuation is immediately available without a discovery timer, including on return', () => {
+  for (const options of [{}, { reduced: true }, { supportsMask: false }, { scrollY: 100 }]) {
     const h = harness(options);
-    h.advance(8000);
     assert.equal(h.scrollHint.hidden, false);
-    h.scroll(10);
-    assert.equal(h.scrollHint.hidden, true);
+    assert.equal(h.timers.size, 0);
+    h.advance(8000);
+    h.scroll(100);
+    h.scroll(0);
+    assert.equal(h.scrollHint.hidden, false);
+    assert.equal(h.timers.size, 0);
+    assert.equal(h.scrolls.length, 0);
   }
 });
 
 test('the scroll cue animations respect reduced motion', () => {
   const css = fs.readFileSync(path.join(__dirname, '../styles.css'), 'utf8');
-  assert.match(css, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.scroll-hint:not\(\[hidden\]\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.scroll-hint\s*\{/);
 });
 
 test('hover wiggle is limited to opening distractions, not the stats card', () => {
@@ -83,13 +48,13 @@ test('hover wiggle is limited to opening distractions, not the stats card', () =
 test('clicking the cue slowly reveals the homepage and stops at the end of the opening', () => {
   const h = harness();
   h.flush();
-  h.advance(8000);
-  h.clickHint();
+  assert.equal(h.clickHint().defaultPrevented, true);
   h.step(700);
   assert.ok(h.window.scrollY > 0 && h.window.scrollY < 144);
-  assert.equal(h.scrollHint.hidden, true);
+  assert.equal(h.scrollHint.hidden, false);
   h.step(700);
   assert.equal(h.window.scrollY, 144);
+  assert.equal(h.focusCalls.length, 0);
   h.step(0);
   assert.ok(parseFloat(h.properties.get('--aperture')) > 400);
   h.step(1400);
@@ -97,6 +62,8 @@ test('clicking the cue slowly reveals the homepage and stops at the end of the o
   assert.equal(h.window.scrollY, 288);
   assert.ok(h.arrivalClasses.has('is-open'));
   assert.equal(h.frames.size, 0);
+  assert.equal(h.focusCalls.length, 1);
+  assert.equal(h.focusCalls[0].preventScroll, true);
 });
 
 test('manual input interrupts the automatic scroll without blocking native input', () => {
@@ -110,6 +77,7 @@ test('manual input interrupts the automatic scroll without blocking native input
     h.step(2800);
     assert.equal(h.window.scrollY, position, name);
     assert.equal(h.frames.size, 0);
+    assert.equal(h.focusCalls.length, 0);
   }
 });
 
@@ -124,15 +92,28 @@ test('resize or a reduced-motion change stops an automatic scroll', () => {
     h.step(2800);
     assert.equal(h.window.scrollY, position);
     assert.equal(h.frames.size, 0);
+    assert.equal(h.focusCalls.length, 0);
   }
 });
 
-test('the static opening scroll button reveals the homepage without animation', () => {
+test('static and reduced-motion continuation keep native anchor navigation', () => {
   for (const options of [{ reduced: true }, { supportsMask: false }]) {
     const h = harness(options);
-    h.clickHint();
-    assert.equal(h.window.scrollY, 800);
-    assert.equal(h.scrolls[0].behavior, 'instant');
+    assert.equal(h.clickHint().defaultPrevented, false);
+    assert.equal(h.scrolls.length, 0);
+    assert.equal(h.frames.size, 0);
+    assert.equal(h.focusCalls.length, 0);
+  }
+});
+
+test('modified and non-primary clicks keep native link behavior without starting a reveal', () => {
+  for (const click of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
+    const h = harness();
+    h.flush();
+    assert.equal(h.clickHint(click).defaultPrevented, false);
+    h.step(2800);
+    assert.equal(h.focusCalls.length, 0);
+    assert.equal(h.scrolls.length, 0);
     assert.equal(h.frames.size, 0);
   }
 });
@@ -144,7 +125,7 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
   let nextTimer = 1;
   const hintEvents = {};
   const scrollHint = {
-    hidden: true,
+    hidden: false,
     addEventListener(name, fn) { hintEvents[name] = fn; }
   };
   const windowEvents = {};
@@ -178,7 +159,7 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
   const stage = { offsetHeight: 900 };
   const pageLink = {};
   const space = {
-    contains: target => target === pageLink,
+    contains: target => target === pageLink || target === main,
     getBoundingClientRect: () => ({ top: 800 - window.scrollY })
   };
   const anchorCalls = [];
@@ -189,10 +170,15 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
       windowEvents.scroll.fn();
     }
   };
+  const focusCalls = [];
+  const main = {
+    scrollIntoView: anchor.scrollIntoView,
+    focus(options) { focusCalls.push(options); documentEvents.focusin({ target: main }); }
+  };
   const document = {
     documentElement: { classList: classList(classes) },
     querySelector: selector => ({ '.arrival': arrival, '.arrival-stage': stage, '#your-space': space, '.scroll-hint': scrollHint })[selector],
-    getElementById: id => id === 'install' ? anchor : null,
+    getElementById: id => id === 'main' ? main : ['install', 'your-space'].includes(id) ? anchor : null,
     addEventListener(name, fn) { documentEvents[name] = fn; }
   };
   vm.runInNewContext(source, {
@@ -212,8 +198,12 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
   function scroll(top) { window.scrollY = top; windowEvents.scroll.fn(); }
   return {
     frames, windowEvents, documentEvents, classes, arrivalClasses, properties,
-    scrolls, window, arrival, stage, pageLink, anchorCalls, flush, scroll, scrollHint, timers,
-    clickHint() { hintEvents.click(); },
+    scrolls, window, arrival, stage, pageLink, anchorCalls, focusCalls, flush, scroll, scrollHint, timers,
+    clickHint(options = {}) {
+      const event = { button: 0, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...options };
+      hintEvents.click(event);
+      return event;
+    },
     step(milliseconds) {
       now += milliseconds;
       const pending = [...frames.values()];
@@ -258,6 +248,7 @@ test('a short native scroll opens the page, and scrolling back restores the open
   h.flush();
   assert.equal(h.arrivalClasses.has('is-open'), false);
   assert.equal(h.properties.get('--thought-opacity'), '1');
+  assert.equal(h.focusCalls.length, 0);
 });
 
 test('scroll updates are coalesced into one animation frame', () => {
@@ -319,10 +310,16 @@ test('resize remeasures the scroll distance and aperture', () => {
   assert.ok(parseFloat(h.properties.get('--aperture')) > Math.hypot(390, 600) / 2);
 });
 
-test('direct installation links survive the enhanced layout', () => {
-  const h = harness({ hash: '#install' });
-  h.flush();
-  assert.equal(h.anchorCalls.length, 1);
-  assert.equal(h.anchorCalls[0].behavior, 'instant');
-  assert.ok(h.arrivalClasses.has('is-open'));
+test('direct content and installation anchors survive enhanced and static layouts', () => {
+  for (const hash of ['#install', '#main', '#your-space']) {
+    for (const options of [{}, { reduced: true }, { supportsMask: false }]) {
+      const h = harness({ hash, ...options });
+      h.flush();
+      assert.equal(h.anchorCalls.length, 1);
+      assert.equal(h.anchorCalls[0].behavior, 'instant');
+      assert.equal(h.focusCalls.length, 0);
+      assert.equal(h.timers.size, 0);
+      if (!options.reduced && options.supportsMask !== false) assert.ok(h.arrivalClasses.has('is-open'));
+    }
+  }
 });
