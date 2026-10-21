@@ -15,6 +15,8 @@ async function injectedBytes(bundle) {
   return sizes.reduce((total, size) => total + size, 0);
 }
 async function run(bundle, variant, repetition) {
+  const manifest = JSON.parse(await readFile(resolve(bundle, 'manifest.json'), 'utf8'));
+  const hasFriction = manifest.content_scripts.some(entry => entry.js.includes('scroll-friction.js'));
   const browser = await launch(resolve(bundle));
   try {
     return await withFailureArtifacts(browser, `${variant} scroll resource profile ${repetition}`, async () => {
@@ -57,7 +59,8 @@ async function run(bundle, variant, repetition) {
       await eventually(() => contexts.has(active.session), 'creation tracker injected');
       await evaluate(browser, browser.worker, 'serialized(() => Promise.resolve())');
       const frames = () => evaluate(browser, active.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-      await frames();
+      const settled = enabled => eventually(async () => (await wheelListeners(active)).filter(listener => !listener.passive).length === Number(hasFriction && enabled), 'active tracker applies the scrolling preference');
+      await frames(); await settled(true);
       const checkpoints = [{ cycle: 0, ...await sample(active), wheelListeners: await wheelListeners(active) }];
       for (let cycle = 1; cycle <= cycles; cycle++) {
         for (const enabled of [false, true]) {
@@ -72,7 +75,7 @@ async function run(bundle, variant, repetition) {
             const route = enabled ? i % 2 ? '/feed/' : '/home' : i % 2 ? '/messaging/' : '/messages';
             await evaluate(browser, page.session, `history.pushState({}, '', ${JSON.stringify(route)})`);
           }
-          await frames();
+          await frames(); await settled(enabled);
         }
         if (cycle === 10 || cycle === cycles) checkpoints.push({ cycle, ...await sample(active), wheelListeners: await wheelListeners(active) });
       }
@@ -98,7 +101,7 @@ async function run(bundle, variant, repetition) {
       assert.equal(idle.after, idle.before, 'hidden trackers must not add periodic snapshot requests');
       assert.equal(inactiveListeners.filter(listener => !listener.passive).length, 0, 'hidden documents release scroll friction');
       const counts = checkpoints.map(checkpoint => checkpoint.wheelListeners.length);
-      assert.ok(counts.every(count => count === counts[0]), 'lifecycle cycles must not accumulate wheel listeners');
+      assert.ok(counts.every(count => count === counts[0]), `lifecycle cycles must not accumulate wheel listeners: ${counts.join(', ')}`);
       return {
         variant, repetition, browser: (await browser.cdp.send('Browser.getVersion')).product, injectedBytes: await injectedBytes(bundle),
         controlHeap, checkpoints, afterWheel, inactiveListeners, idleRequests: idle.after - idle.before,

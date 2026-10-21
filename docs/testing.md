@@ -125,7 +125,8 @@ node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scrol
 This uses the same disposable Chromium runner and sandbox settings as the browser
 journeys. It alternates three runs per build with eight synthetic site tabs,
 30 preference/SPA-route cycles, 100 trusted wheel inputs, and six seconds hidden.
-It records bundle bytes, wheel listeners, GC-retained active-page isolate heap,
+It waits for the foreground wheel listener to match each preference before
+sampling. It records bundle bytes, wheel listeners, GC-retained active-page isolate heap,
 an uninjected fixture control, and page script/task/layout durations. The active
 isolate measurement is not total browser RAM or a sum across tabs. CDP wheel-input
 elapsed time includes browser dispatch/acknowledgement overhead; it is not user
