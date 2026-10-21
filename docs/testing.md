@@ -109,10 +109,57 @@ For resource-sensitive changes:
    acceptance gate incomplete.
 
 CI runs the behavioral regressions through the existing completion commands.
-The hidden-tab test checks messages, not actual worker termination or RAM use.
-There is no automated memory-budget gate: browser memory measurements and their
-acceptance remain a required contributor and maintainer review gate. A green CI
-run alone does not satisfy this section.
+The hidden-tab test checks messages. `worker-lifecycle.test.js` additionally
+checks actual worker absence and recovery with its debugger detached, and saves
+resource samples to the browser artifact directory. It exercises the benchmark
+CLI with two cold copies of the same bundle and two synthetic tabs per profile,
+catching Chrome-cache fingerprint mistakes as well as lifecycle regressions.
+Creation tracking is disabled and scheduled alarms are cleared only in these
+disposable profiles. Each 45-second idle observation is a controlled check, not a
+universal browser shutdown deadline or a test of scheduled access enforcement.
+There is still no numerical memory-budget gate: resource measurements and their
+acceptance remain a contributor and maintainer review gate. A green CI run alone
+does not satisfy that review.
+
+### Reproducible resource comparison
+
+Build baseline and candidate Chrome bundles into separate directories; keep
+both unchanged while measuring. For example, use a detached temporary worktree
+at the chosen baseline and run its supported install/build commands there. Then:
+
+```sh
+pnpm build:chrome
+pnpm benchmark:resources --baseline /tmp/baseline/dist/chrome \
+  --candidate "$PWD/dist/chrome" --output /tmp/createratio-resources.json
+```
+
+This uses the browser setup below and only built-in Node APIs. Defaults are
+three runs per build, twenty offline X fixtures, three navigation cycles, and a
+45-second idle observation. `--runs`, `--tabs`, `--cycles`, and `--idle-ms` can
+select a documented workload; one-run checks are smoke tests, not the repeated
+evidence required above. Increase `BROWSER_TIMEOUT_MS` for larger workloads.
+
+Each run uses a fresh profile; build order alternates between repetitions.
+Worker User Timing marks identify its renderer, with page marks as negative
+controls. Idle sampling uses browser-level target metadata and OS memory reads,
+not worker evaluation. Returning must wake a new worker and serve saved settings.
+The controlled fixture disables creation tracking and clears scheduled alarms;
+it does not exercise legitimate pending deliveries or scheduled enforcement.
+
+The JSON records bundle fingerprints, environment, workload, per-cycle post-GC
+page-target heap, worker presence, Linux worker-renderer PSS/private KiB, and
+median/range comparisons. Bundle fingerprints exclude Chrome's generated root
+`_metadata` cache, not source rules or scripts. Page heap includes the synthetic page and co-resident
+contexts; it is not summed into an extension-wide total. Unsupported process
+memory is `null`, never a fabricated zero. A replacement worker during idle is
+not assigned the original renderer's memory. No CPU or battery saving is inferred.
+
+Choose a new output filename for each comparison: existing evidence is never
+overwritten. Reports are atomically updated and marked incomplete until all
+runs and bundle/version checks finish. Keep these raw reports outside Git.
+A nonzero exit or an incomplete report is not a passing comparison. The runner
+fails on candidate lifecycle regression; numerical memory increases still need
+review against the agreed tolerance, not an arbitrary hard-coded MiB ceiling.
 
 ## Reference tracer bullets
 
