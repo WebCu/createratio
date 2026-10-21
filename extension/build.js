@@ -12,7 +12,7 @@ const ASSETS = [
   'pages/blocked/blocked.html', 'pages/blocked/blocked.css', 'pages/blocked/blocked.js',
   'pages/popup/popup.html', 'pages/popup/popup.js',
   'pages/settings/settings.html', 'pages/settings/settings.js',
-  'pages/dashboard/dashboard.html', 'pages/dashboard/dashboard.js',
+  'pages/dashboard/dashboard.html', 'pages/dashboard/dashboard.js', 'pages/dashboard/report.js',
   'shared/refill.css', 'shared/refill.js', 'shared/feedback.js', 'shared/messages.js', 'shared/popup.css', 'shared/page.css',
   'icons/icon16.png', 'icons/icon32.png', 'icons/icon48.png', 'icons/icon128.png'
 ];

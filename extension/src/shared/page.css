@@ -123,6 +123,14 @@
 .dashboard-page .website-sites td:first-child { max-width: none; }
 .dashboard-page .measurement-note { padding-top: 24px; border-top: 1px solid var(--line); margin-top: 32px; }
 
+.report-export { border-top: 1px solid var(--line); padding-top: 28px; margin-top: 32px; }
+.report-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+.report-controls label { font-weight: 600; }
+.report-controls select, .report-controls button { min-height: 44px; border: 1px solid var(--control-line); border-radius: 6px; padding: 10px 12px; font: inherit; }
+.report-controls select { max-width: 100%; background: #fff; color: var(--ink); }
+.report-controls button { background: var(--violet); border-color: var(--violet); color: #fff; font-weight: 600; cursor: pointer; }
+.report-export .save-status { margin: 12px 0 0; }
+
 .intention-list { list-style: none; padding: 0; margin: 28px 0; }
 .intention-list li { padding: 24px 0; border-top: 1px solid var(--line); }
 .intention-list li div { font-size: 12px; color: var(--muted); }

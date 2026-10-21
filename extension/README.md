@@ -125,7 +125,7 @@ replacement from a browser restart. Website-time sampling starts fresh.
   Optional above-goal access, Website time, intention saving, exports, and history
   clearing remain separate. Preferences save automatically.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
-  and CSV exports.
+  readable daily/seven-day reports, and CSV exports.
 
 ### Site access
 
@@ -254,6 +254,16 @@ future dates. A shared **4 MiB history budget** and browser quota recovery can
 remove oldest whole non-today days sooner, including temporarily ahead-dated
 days. If today's records alone cannot fit, saving reports an error instead of
 deleting today's history. Settings and access boundaries are not pruned.
+
+**Dashboard → Creation score → Download report** exports a self-contained HTML
+report for **Today** or **Last 7 days (including today)**, using local calendar
+dates. Reports include creation/consumption totals, actions, site and daily
+breakdowns, and a score calculated from the period's combined totals. Open the
+file offline in a browser to review, print, or save as PDF. Today is partial;
+missing or cleared days show zero. Reports exclude website time and saved
+intentions. Downloaded files contain activity data; share them deliberately.
+Existing CSV exports still cover retained history independently of the report
+period.
 
 Activity CSV includes retained dates, site IDs, seconds, action counts, and
 per-site scores, including history from disabled or removed integrations.

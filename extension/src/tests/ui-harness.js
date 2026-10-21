@@ -17,7 +17,8 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
   }
   const PageDate = options.now ? Clock : Date;
   const core = options.now ? { ...C3, localDate: (date = new PageDate()) => C3.localDate(date), recentDates: (count = 7, now = new PageDate()) => C3.recentDates(count, now) } : C3;
-  const intervals = {}, saved = new Map();
+  const intervals = {}, timeouts = new Map(), revokedURLs = [], saved = new Map();
+  let timeoutID = 0;
   let settings = { ...C3.DEFAULT_SETTINGS, ...data.settings }, changed, interval;
   const messageWaits = new Map();
   const state = { permission: true, requested: 0, removed: 0, messages: [], notifications: [], fail: false, failSnapshot: false, optionsOpened: 0, tabs: [], downloads: [], access: {}, confirm: true, confirmations: [], storageReads: [], snapshotChanges: false, replies: new Map(), rejections: new Map() };
@@ -38,6 +39,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
   }
   const nodes = Object.fromEntries([...fs.readFileSync(path.join(__dirname, `../pages/${name}/${name}.html`), 'utf8').matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
   if (nodes['website-range']) { nodes['website-range'].value = 'month'; nodes['websites-panel'].hidden = true; }
+  if (nodes['report-range']) nodes['report-range'].value = 'today';
   if (nodes.chart) nodes.chart.append(new Element(), new Element());
   if (name === 'blocked') {
     for (const id of ['waiting', 'active', 'error']) nodes[id].hidden = true;
@@ -86,12 +88,13 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
   };
   const document = { activeElement: null, getElementById: id => nodes[id], createElement: () => new Element(), createElementNS: () => new Element(), body: new Element() };
   const blobs = [];
-  const context = vm.createContext({ C3: core, C3Sites, WebTime, chrome: api, document, console, Blob, URL: class extends URL { static createObjectURL(blob) { blobs.push(blob); return 'blob:test'; } static revokeObjectURL() {} }, URLSearchParams,
+  const context = vm.createContext({ C3: core, C3Sites, WebTime, chrome: api, document, console, Blob, URL: class extends URL { static createObjectURL(blob) { blobs.push(blob); return 'blob:test/' + blobs.length; } static revokeObjectURL(url) { revokedURLs.push(url); } }, URLSearchParams,
     location: { search: '?site=' + (options.site || 'x'), replace(url) { state.redirects.push(url); } },
     localStorage: { getItem(key) { return saved.get(key) ?? null; }, setItem(key, value) { saved.set(key, String(value)); } }, addEventListener() {},
-    confirm(message) { state.confirmations.push(message); return state.confirm; }, setInterval(fn, ms) { interval = fn; intervals[ms] = fn; }, setTimeout() {}, clearTimeout() {}, Date: PageDate });
+    confirm(message) { state.confirmations.push(message); return state.confirm; }, setInterval(fn, ms) { interval = fn; intervals[ms] = fn; }, setTimeout(fn, ms) { const id = ++timeoutID; timeouts.set(id, { fn, ms }); return id; }, clearTimeout(id) { timeouts.delete(id); }, Date: PageDate });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/messages.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/refill.js'), 'utf8'), context);
+  if (name === 'dashboard') vm.runInContext(fs.readFileSync(path.join(__dirname, '../pages/dashboard/report.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, `../pages/${name}/${name}.js`), 'utf8'), context);
   const ready = async () => { await new Promise(resolve => setImmediate(resolve)); };
   return { nodes, elements: nodes, state, document, data, blobs, messages: state.messages, notifications: state.notifications,
@@ -101,6 +104,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
       messageWaits.set(type, new Promise(resolve => { release = resolve; }));
       return release;
     },
+    timeouts, revokedURLs, runTimeout(id) { const pending = timeouts.get(id); timeouts.delete(id); pending.fn(); },
     ready, flush: ready, set fail(value) { state.fail = value; }, get settings() { return structuredClone(settings); }, setSettings(value) { settings = value; }, setDay(value) { data[C3.localDate()] = value; },
     change(changes = { settings: { newValue: structuredClone(settings) } }, area = 'local') { changed(changes, area); }, refresh() { interval(); }, timer(ms) { intervals[ms](); },
     toggle(site, active) { const input = nodes['track-' + site]; input.checked = active; input.fire('change'); return input; }

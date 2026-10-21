@@ -92,6 +92,66 @@ test('dashboard exports both existing CSV formats without changing recorded hist
   assert.match(await p.blobs[0].text(), /consume/); assert.match(await p.blobs[1].text(), /example\.com/); assert.deepEqual(p.data, data);
   for (const blob of p.blobs) assert.equal((await blob.text()).includes('Private intention text'), false);
 });
+test('dashboard downloads daily and weekly readable reports without changing history or exporting intentions', async () => {
+  const today = C3.localDate(), first = C3.recentDates()[0], older = C3.recentDates(8)[0];
+  const data = { [today]: { x: { createSec: 60, consumeSec: 120, posts: 1 } }, [first]: { retired: { createSec: 120 } }, [older]: { older: { createSec: 99999 } }, _intentions: [{ reason: 'Private intention text', site: 'x', requestedAt: 1 }] };
+  const before = structuredClone(data), p = dashboard(data); await p.ready();
+  p.nodes['report-range'].value = 'today';
+  await p.nodes['report-export'].fire('click');
+  assert.deepEqual(p.messages.at(-1), { type: 'history', kind: 'ratio', range: 'today' });
+  assert.equal(p.state.downloads[0].filename, `CreateRatio-report-${today}.html`);
+  assert.equal(p.blobs[0].type, 'text/html;charset=utf-8');
+  const daily = await p.blobs[0].text();
+  assert.match(daily, /<dt>Creating<\/dt><dd>1\.0m<\/dd>/);
+  assert.match(daily, /<dt>Period creation score<\/dt><dd>1\.50<\/dd>/);
+  assert.equal(daily.includes(first), false);
+  p.nodes['report-range'].value = 'week';
+  await p.nodes['report-export'].fire('click');
+  assert.deepEqual(p.messages.at(-1), { type: 'history', kind: 'ratio', range: 'week' });
+  assert.equal(p.state.downloads[1].filename, `CreateRatio-report-${first}-to-${today}.html`);
+  const weekly = await p.blobs[1].text();
+  assert.match(weekly, /<dt>Creating<\/dt><dd>3\.0m<\/dd>/);
+  assert.match(weekly, /retired \(unavailable\)/);
+  assert.equal(weekly.includes(older), false);
+  for (const blob of p.blobs) assert.equal((await blob.text()).includes('Private intention text'), false);
+  assert.deepEqual(p.data, before);
+  assert.equal(p.nodes['report-export'].disabled, false);
+});
+test('report export prevents duplicate requests and recovers after loading failures', async () => {
+  const p = dashboard(); await p.ready(); p.nodes['report-range'].value = 'today';
+  const release = p.holdMessage('history'), before = p.messages.length;
+  const exporting = p.nodes['report-export'].fire('click');
+  assert.equal(p.nodes['report-export'].disabled, true);
+  await p.nodes['report-export'].fire('click');
+  assert.equal(p.messages.length, before + 1);
+  release(); await exporting;
+  p.state.replies.set('history', { ok: true });
+  await p.nodes['report-export'].fire('click');
+  assert.equal(p.blobs.length, 1);
+  assert.equal(p.nodes.error.textContent, 'Unable to export report.');
+  assert.equal(p.nodes['report-export'].disabled, false);
+  p.state.replies.delete('history');
+  p.state.rejections.set('history', new Error('Worker disconnected.'));
+  await p.nodes['report-export'].fire('click');
+  assert.equal(p.blobs.length, 1);
+  assert.equal(p.nodes.error.textContent, 'Worker disconnected.');
+  p.state.rejections.delete('history');
+  await p.nodes['report-export'].fire('click');
+  assert.equal(p.blobs.length, 2);
+  assert.equal(p.nodes.error.hidden, true);
+});
+test('repeated report downloads retain only one temporary URL and release it after ten seconds', async () => {
+  const p = dashboard(); await p.ready();
+  for (let i = 0; i < 5; i++) {
+    await p.nodes['report-export'].fire('click');
+    assert.equal(p.timeouts.size, 1);
+    assert.equal(p.revokedURLs.length, i);
+    assert.equal([...p.timeouts.values()][0].ms, 10000);
+  }
+  p.runTimeout([...p.timeouts.keys()][0]);
+  assert.equal(p.timeouts.size, 0);
+  assert.deepEqual(p.revokedURLs, p.state.downloads.map(download => download.url));
+});
 test('dashboard distinguishes creation-score measurements from all-site browsing time', () => {
   const html = fs.readFileSync(path.join(__dirname, 'dashboard.html'), 'utf8');
   assert.match(html, /id="ratio-view"[^>]*>Creation score/); assert.match(html, /id="websites-view"[^>]*>Website time/);

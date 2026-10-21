@@ -3,6 +3,7 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
+let reportURL = null, reportTimer = null;
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function svgElement(tag, attrs = {}, text) {
@@ -135,6 +136,24 @@ async function exportHistory(kind) {
     setTimeout(() => URL.revokeObjectURL(url), 10000); error();
   } catch (e) { error(e.message); }
 }
+$('report-export').addEventListener('click', async () => {
+  const button = $('report-export');
+  if (button.disabled) return;
+  const range = $('report-range').value;
+  button.disabled = true; $('report-status').textContent = '';
+  try {
+    const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to export report.');
+    const report = CreationReport.create(data.days, range);
+    clearTimeout(reportTimer);
+    if (reportURL) URL.revokeObjectURL(reportURL);
+    reportURL = URL.createObjectURL(new Blob([report.html], { type: 'text/html;charset=utf-8' }));
+    reportTimer = setTimeout(() => { URL.revokeObjectURL(reportURL); reportURL = null; reportTimer = null; }, 10000);
+    const link = document.createElement('a'); link.href = reportURL;
+    link.download = report.filename; document.body.append(link); link.click(); link.remove();
+    error(); $('report-status').textContent = 'Report download started. Open the HTML file to review, print, or save as PDF.';
+  } catch (e) { error(e.message); }
+  finally { button.disabled = false; }
+});
 $('website-export').addEventListener('click', () => exportHistory('websites'));
 $('export').addEventListener('click', () => exportHistory('ratio'));
 extensionAPI.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
