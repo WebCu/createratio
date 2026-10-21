@@ -48,7 +48,7 @@ test('the website build ships only public assets and the licensed official track
   const tracker = files.find(name => /^plausible-[a-f0-9]{12}\.js$/.test(name));
   assert.ok(analytics);
   assert.ok(tracker);
-  assert.deepEqual(files, ['LICENSE', analytics, 'arrival.js', 'favicon.svg', 'index.html',
+  assert.deepEqual(files, ['LICENSE', analytics, 'arrival.js', 'browser-install.js', 'favicon.svg', 'index.html',
     'plausible-MIT.txt', tracker, 'privacy.html', 'terms.html', 'styles.css'].sort());
   for (const page of ['privacy.html', 'terms.html']) {
     const legal = fs.readFileSync(path.join(output, page), 'utf8');

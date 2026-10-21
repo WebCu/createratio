@@ -38,6 +38,7 @@ test('preview serves every public asset with its MIME type and no caching', asyn
     ['/terms.html', 'site/terms.html', 'text/html'],
     ['/styles.css', 'site/styles.css', 'text/css'],
     ['/arrival.js', 'site/arrival.js', 'text/javascript'],
+    ['/browser-install.js', 'site/browser-install.js', 'text/javascript'],
     ['/analytics.js', 'site/analytics.js', 'text/javascript'],
     ['/favicon.svg', 'site/favicon.svg', 'image/svg+xml'],
     ['/LICENSE', 'LICENSE', 'text/plain']

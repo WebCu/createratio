@@ -30,8 +30,11 @@ site's Limit & track switch is turned off.
 Choose **Add to Chrome**, confirm installation, then pin CreateRatio from Chrome's
 extensions menu. No build tools or Developer mode are needed.
 
-For Chrome development builds, Edge, or Firefox, use the source instructions below.
-Edge and Firefox do not have published store releases.
+[**Add to Firefox from Firefox Add-ons**](https://addons.mozilla.org/en-US/firefox/addon/createratio/).
+Choose **Add to Firefox** and confirm installation.
+
+For development builds or Edge, use the source instructions below.
+Edge does not have a published store release.
 
 ## Build and install
 
@@ -58,7 +61,7 @@ pnpm build
 Load generated bundles, not source directories. After rebuilding, reload the
 extension in the browser's extensions manager. Individual builds are available
 through `pnpm build:chrome`, `pnpm build:edge`, and `pnpm build:firefox`.
-Edge and Firefox bundles are build targets, not yet live-browser-validated releases.
+Source-built Edge and Firefox bundles have not yet been live-browser validated.
 
 See the [extension guide](extension/README.md) for settings, permissions,
 measurement rules, and limitations.

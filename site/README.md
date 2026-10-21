@@ -6,9 +6,18 @@ Website analytics are separate from the analytics-free browser extension.
 ## Installation links
 
 The hero and installation section link directly to the
-[published Chrome Web Store listing](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk),
+[Chrome Web Store listing](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk)
+and [Firefox Add-ons listing](https://addons.mozilla.org/en-US/firefox/addon/createratio/),
 without requiring JavaScript. Source instructions remain under **Build from source**;
-Edge and Firefox are development builds, not published store releases.
+Edge is a development build, not a published store release.
+
+For recognized desktop Chrome and Firefox, `browser-install.js` shows only the
+matching install button and opens its installation instructions. Other store links
+remain available in the installation instructions. Mobile, unrecognized browsers,
+and disabled JavaScript show both install buttons. Detection uses the browser's
+reported identity, not a capability guarantee; browsers that disguise themselves
+can be misidentified.
+Browser identity is neither stored nor sent; detection calls no external services.
 
 ## Preview
 
