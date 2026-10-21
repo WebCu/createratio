@@ -312,23 +312,58 @@ export async function evaluate(browser, session, expression) {
   return result.result.value;
 }
 
+export async function accessibilityNodes(browser, page) {
+  const { nodes } = await browser.cdp.send('Accessibility.getFullAXTree', {}, page.session);
+  return nodes.filter(node => !node.ignored);
+}
+
+export async function findByRole(browser, page, role, name) {
+  const normalize = value => (value || '').trim().replace(/\s+/g, ' ');
+  const matches = (await accessibilityNodes(browser, page)).filter(node => node.role?.value === role && normalize(node.name?.value) === normalize(name));
+  if (matches.length !== 1) throw Object.assign(new Error(`Expected one ${role} named ${name}; found ${matches.length}`), { fatal: matches.length > 1 });
+  return matches[0];
+}
+
 export async function click(browser, page, selector) {
+  return clickElement(browser, page, async () => {
+    const { result } = await browser.cdp.send('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(selector)})` }, page.session);
+    return result;
+  }, selector);
+}
+
+export async function clickByRole(browser, page, role, name) {
+  return clickElement(browser, page, async () => {
+    const node = await findByRole(browser, page, role, name);
+    const { object } = await browser.cdp.send('DOM.resolveNode', { backendNodeId: node.backendDOMNodeId }, page.session);
+    return object;
+  }, `${role} named ${name}`);
+}
+
+async function clickElement(browser, page, locate, description) {
   await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
-  const point = await eventually(() => evaluate(browser, page.session, `(async () => {
-    const element = document.querySelector(${JSON.stringify(selector)});
-    if (!element || element.disabled || !element.getClientRects().length) return false;
-    element.scrollIntoView({ block: 'center', behavior: 'instant' });
-    const before = element.getBoundingClientRect();
-    await new Promise(requestAnimationFrame);
-    await new Promise(requestAnimationFrame);
-    const rect = element.getBoundingClientRect();
-    if (!element.isConnected || element.disabled || !rect.width || !rect.height) return false;
-    if (['x', 'y', 'width', 'height'].some(key => before[key] !== rect[key])) return false;
-    const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-    const hit = document.elementFromPoint(point.x, point.y);
-    return hit === element || element.contains(hit) ? point : false;
-  })()`), `stable clickable ${selector}`);
-  browser.events?.push({ type: 'input-request', details: { selector, point }, session: page.session, at: Date.now() });
+  const point = await eventually(async () => {
+    const { objectId } = await locate();
+    if (!objectId) return false;
+    try {
+      const result = await browser.cdp.send('Runtime.callFunctionOn', { objectId, awaitPromise: true, returnByValue: true, functionDeclaration: `async function() {
+        const element = this;
+        if (element.disabled || element.getAttribute('aria-disabled') === 'true' || !element.getClientRects().length) return false;
+        element.scrollIntoView({ block: 'center', behavior: 'instant' });
+        const before = element.getBoundingClientRect();
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+        const rect = element.getBoundingClientRect();
+        if (!element.isConnected || element.disabled || element.getAttribute('aria-disabled') === 'true' || !rect.width || !rect.height) return false;
+        if (['x', 'y', 'width', 'height'].some(key => before[key] !== rect[key])) return false;
+        const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+        const hit = document.elementFromPoint(point.x, point.y);
+        return hit === element || element.contains(hit) ? point : false;
+      }` }, page.session);
+      if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
+      return result.result.value;
+    } finally { await browser.cdp.send('Runtime.releaseObject', { objectId }, page.session).catch(() => {}); }
+  }, `stable clickable ${description}`);
+  browser.events?.push({ type: 'input-request', details: { selector: description, point }, session: page.session, at: Date.now() });
   await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point }, page.session);
   await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point }, page.session);
   await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point }, page.session);
