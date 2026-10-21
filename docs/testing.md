@@ -288,7 +288,8 @@ Before a release, verify:
   budget or pending wait, unless optional above-goal access applies.
 - Midnight refills use each site's override or current inherited Default. Off
   cancels refills; above-goal access never re-enables measurement on Off sites.
-- Slow scrolling starts off and preserves a 50% default resistance. The slider
+- Slow scrolling starts on at 50% resistance when no choice is saved. Existing
+  Off choices and chosen strengths must survive upgrades and restarts. The slider
   adjusts resistance from 0–90% in five-point steps. Verify drag previews do not
   save until release, keyboard adjustments retain focus, fast changes retain only
   the latest pending choice, failures restore confirmed values, and reloading or

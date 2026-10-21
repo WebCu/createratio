@@ -122,8 +122,8 @@ replacement from a browser restart. Website-time sampling starts fresh.
 - **Settings:** one Default session-time row and one row per vetted site with a
   **Limit & track** switch. Times show **From Default** or **Custom**; **Use Default**
   removes an override. Off disables time editing/reset without losing saved times.
-  Optional slow scrolling, above-goal access, Website time, intention saving, exports, and history
-  clearing remain separate. Preferences save automatically.
+  Slow scrolling, above-goal access, Website time, intention saving, exports, and
+  history clearing remain separate. Preferences save automatically.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
   and CSV exports.
 
@@ -167,7 +167,8 @@ tracking-only.
 
 ### Slow scrolling
 
-**Settings → Slow scrolling** is off by default. Its **Scroll resistance** slider
+**Settings → Slow scrolling** is on by default at **50% resistance**. Saved Off
+choices and chosen strengths are preserved. Its **Scroll resistance** slider
 ranges from **0% (Natural)** to **90% (Heavy)** in five-point steps. Higher resistance
 means less vertical page movement for the same wheel or trackpad gesture, in
 either direction. The default **50%** moves the page half as far; **75%** moves it

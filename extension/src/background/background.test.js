@@ -512,19 +512,19 @@ test('slow scrolling rejects foreign, content and framed senders and non-boolean
   for (const browser of ['chrome', 'browser']) {
     const w = worker({}, browser);
     const settingsPage = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };
-    assert.equal((await w.send({ type: 'snapshot' })).settings.scrollFrictionEnabled, false);
+    assert.equal((await w.send({ type: 'snapshot' })).settings.scrollFrictionEnabled, true);
     for (const enabled of [undefined, null, 1, 'true', [], {}]) {
       assert.equal((await w.send({ type: 'scroll-friction-setting', enabled }, settingsPage)).ok, false);
     }
     for (const sender of [undefined, gate('x'), { ...settingsPage, frameId: 1 }, { ...settingsPage, id: 'other' }, { ...settingsPage, url: 'https://evil.test/settings.html' }]) {
-      assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: true }, sender)).ok, false);
+      assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false }, sender)).ok, false);
     }
     assert.equal(w.data.settings, undefined); assert.deepEqual(w.errors, []);
     w.failWrites = true;
-    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: true }, settingsPage)).ok, false);
+    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false }, settingsPage)).ok, false);
     assert.equal(w.data.settings, undefined);
     w.failWrites = false;
-    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: true }, settingsPage)).settings.scrollFrictionEnabled, true);
+    assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false }, settingsPage)).settings.scrollFrictionEnabled, false);
   }
 });
 test('resistance saves validate atomically, preserve history and survive boolean-only toggles and restart', async () => {

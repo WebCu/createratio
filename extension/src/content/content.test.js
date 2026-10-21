@@ -44,10 +44,10 @@ function scrollAttempt(t, type = 'wheel', extra = {}) {
   t.event(type, { isTrusted: true, target: {}, key: 'PageDown', preventDefault() { prevented = true; }, ...extra });
   return prevented;
 }
-test('opt-in scroll friction halves wheel distance on both consuming sites', async () => {
+test('default scroll friction halves wheel distance on both consuming sites', async () => {
   for (const browser of ['chrome', 'browser']) {
     for (const url of ['https://x.com/home', 'https://www.linkedin.com/feed/']) {
-      const t = await tracker(browser, { url, snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
+      const t = await tracker(browser, { url, snapshot: { day: {}, settings: {} } });
       assert.equal(t.wheel(200).defaultPrevented, true);
       assert.equal(t.document.scrollingElement.scrollTop, 1100);
       assert.equal(t.wheel(-100).defaultPrevented, true);
@@ -122,7 +122,7 @@ test('scroll friction leaves page edges, keyboard and touch navigation native', 
   root.scrollTop = root.scrollHeight - root.clientHeight; assert.equal(t.wheel(200).defaultPrevented, false);
   for (const type of ['touchmove', 'keydown']) assert.equal(scrollAttempt(t, type), false);
 });
-test('scroll friction is opt-in, follows access and releases its listener across document lifetimes', async () => {
+test('scroll friction respects Off, follows access and releases its listener across document lifetimes', async () => {
   const snapshot = { day: {}, settings: { scrollFrictionEnabled: true } };
   const messages = [];
   const t = await tracker('chrome', { snapshot, reply(message, result) { messages.push(message.type); return result; } });
@@ -142,8 +142,8 @@ test('scroll friction is opt-in, follows access and releases its listener across
   }
   await t.tick();
   for (const disabled of [
-    { ...snapshot, settings: {} },
-    { ...snapshot, settings: { scrollFrictionEnabled: 'true' } },
+    { ...snapshot, settings: { scrollFrictionEnabled: false } },
+    { ...snapshot, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: 0 } },
     { ...snapshot, settings: { scrollFrictionEnabled: true, trackedSites: [] } },
     { ...snapshot, access: { x: { remainingMs: 0 } } }
   ]) {
@@ -181,13 +181,15 @@ test('invalidated extension contexts and failed adapters restore native scrollin
   assert.equal(failed.wheel(200).defaultPrevented, false);
   assert.equal(failed.listenerCount('wheel'), 1);
 });
-test('default creation tracking never intercepts scrolling or shows retired reminders', async () => {
+test('retired reminders do not pause scroll friction or affect writing', async () => {
   const t = await tracker('chrome', { snapshot: overdueSnapshot() }); await t.tick();
   assert.equal(t.elements.some(node => node.id === 'c3-nudge' && !node.removed), false);
-  for (const type of ['wheel', 'touchmove', 'keydown']) assert.equal(scrollAttempt(t, type), false);
+  assert.equal(t.wheel(200).defaultPrevented, true);
+  assert.equal(t.document.scrollingElement.scrollTop, 1100);
+  for (const type of ['touchmove', 'keydown']) assert.equal(scrollAttempt(t, type), false);
   assert.equal(t.elements.some(node => node.id === 'c3-scroll-lock'), false);
   t.route('https://x.com/home', true);
-  assert.equal(scrollAttempt(t), false, 'drafting remains usable during an access session');
+  assert.equal(t.wheel(200).defaultPrevented, false, 'drafting remains usable during an access session');
 });
 
 test('saved nudge overrides remain inert while both sites continue creation tracking', async () => {

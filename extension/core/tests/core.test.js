@@ -59,9 +59,22 @@ test('daily target resolves the current setting with safe defaults for legacy or
   }
 });
 
+test('scroll friction defaults on without replacing saved choices or resistance', () => {
+  for (const settings of [undefined, {}, { accessMinutes: 12 }]) {
+    assert.equal(C.settingsSnapshot(settings).scrollFrictionEnabled, true);
+    assert.equal(C.settingsSnapshot(settings).scrollFrictionStrength, 50);
+  }
+  for (const enabled of [false, true]) for (const strength of [0, 25, 50, 90]) {
+    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
+    for (const resolved of [C.settingsSnapshot(settings), C.updatePreferences(settings, { accessMinutes: 12 })]) {
+      assert.equal(resolved.scrollFrictionEnabled, enabled);
+      assert.equal(resolved.scrollFrictionStrength, strength);
+    }
+    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
+  }
+});
 test('scroll resistance preserves legacy half-speed defaults and accepts only safe step-aligned percentages', () => {
   assert.equal(C.settingsSnapshot({ scrollFrictionEnabled: true }).scrollFrictionStrength, 50);
-  assert.equal(C.settingsSnapshot().scrollFrictionEnabled, false);
   for (const strength of [0, 5, 25, 50, 75, 90]) {
     assert.equal(C.validScrollFrictionStrength(strength), true);
     assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, strength);

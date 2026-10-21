@@ -15,7 +15,7 @@ Keep [AGENTS.md](AGENTS.md) as an entry point, not a second rulebook.
   data.
 - **Speed and lightness.** CreateRatio should feel instant and use minimal
   memory, CPU, and battery. Tracking must not slow down browsing. Intentional
-  pauses support deliberate choices; software delays do not.
+  friction supports deliberate choices; software delays do not.
 - **Free and sustainable.** Our browser extensions and their future
   improvements stay free and open source. Donations and optional paid products
   or services may fund the project, without weakening the free extensions or
@@ -34,9 +34,10 @@ Keep [AGENTS.md](AGENTS.md) as an entry point, not a second rulebook.
   real user pain point it solves. Consider whether it can replace an existing
   feature instead of adding another one. Prefer improving what already exists
   when that solves the problem.
-- **Keep users in control.** Users must always be able to choose whether to
-  enable or disable a feature. New functionality must not be forced on them.
-  No forced accounts or artificial lock-in.
+- **Opinionated defaults, user control.** Build for the maintainer's own
+  create-more workflow first. Intentional friction can be on by default; users
+  can tune or disable it. Preserve saved choices. No forced accounts or
+  artificial lock-in.
 
 For feature proposals, explain the user pain point, why the simplest existing
 solution is insufficient, whether an existing feature can be removed, and how

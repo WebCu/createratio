@@ -13,13 +13,13 @@ for (const [site, url, messagesURL, editor] of [
     try {
       await withFailureArtifacts(browser, `${site} slow-scrolling journey`, async () => {
         await evaluate(browser, browser.worker, `(async () => {
-          await chrome.storage.local.set({ settings: { ...C3.DEFAULT_SETTINGS }, _access: { ${site}: { remainingMs: 300000, date: C3.localDate() } } });
+          await chrome.storage.local.set({ ...${JSON.stringify(site === 'x' ? {} : { settings: { accessMinutes: 12 } })}, _access: { ${site}: { remainingMs: 300000, date: C3.localDate() } } });
           globalThis.resistanceSaves = 0;
           chrome.runtime.onMessage.addListener(message => { if (message.type === 'scroll-friction-setting') resistanceSaves++; });
         })()`);
         const settings = await browser.page(browser.origin + '/settings.html');
         await eventually(() => evaluate(browser, settings.session, '!document.querySelector("#scroll-friction-enabled")?.disabled'), 'Settings loaded');
-        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), false);
+        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), true);
         const contexts = new Map();
         browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
           if (context.origin === browser.origin) contexts.set(session, context.id);
@@ -49,7 +49,14 @@ for (const [site, url, messagesURL, editor] of [
             return document.scrollingElement.scrollTop - 1000;
           })()`);
         }
-        assert.equal(await wheel(240), 240, 'default wheel scrolling is native');
+        await eventually(listenerEnabled, 'default friction attaches without a saved choice');
+        assert.equal(await wheel(240), 120, 'default wheel scrolling moves half as far');
+        assert.equal(await evaluate(browser, browser.worker, 'resistanceSaves'), 0);
+        await click(browser, settings, '#scroll-friction-enabled');
+        await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#save-status").textContent.includes("disabled")'), 'explicit Off saved');
+        await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
+        await eventually(async () => !await listenerEnabled(), 'explicit Off releases friction');
+        assert.equal(await wheel(240), 240, 'explicit Off restores native scrolling');
         await click(browser, settings, '#scroll-friction-enabled');
         await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked && document.querySelector("#save-status").textContent.includes("saved at 50%")'), 'slow scrolling saved');
         await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
@@ -112,6 +119,10 @@ for (const [site, url, messagesURL, editor] of [
         await eventually(() => evaluate(browser, settings.session, '!document.querySelector("#scroll-friction-enabled").checked && document.querySelector("#save-status").textContent.includes("disabled")'), 'native scrolling saved');
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").disabled'), true);
+        await browser.cdp.send('Page.reload', {}, settings.session);
+        await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled")?.disabled === false'), 'saved preference restored after reload');
+        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), false);
+        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
         await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
         await eventually(async () => !await listenerEnabled(), 'disabling removes the slow listener');
         assert.equal(await wheel(240), 240);
