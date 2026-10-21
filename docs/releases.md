@@ -47,9 +47,10 @@ pnpm release publish
 
 This command requires clean `main` matching `origin/main`, validates all three
 version fields, and pushes an annotated matching `vVERSION` tag. It does not need
-store credentials on your machine. It refuses remote tags that already exist or
-local tags pointing at a different commit; it never force-pushes or moves tags.
-A matching local tag left by a failed push can be reused. Publication pushes only
+store credentials on your machine. It refuses remote tags that already exist,
+local lightweight tags, and local tags pointing at a different commit; it never
+force-pushes, replaces or moves tags. Only an annotated local tag pointing at the
+current commit, such as one left by a failed push, can be reused. Publication pushes only
 the fully qualified ref for that version, not other local tags.
 
 Open **Actions → Release browser extensions**. The workflow retains its filename

@@ -108,7 +108,11 @@ function publish() {
     throw new Error('This tag already exists remotely. Retry a failed store job in Actions; never move a release tag.');
   }
   if (git('tag', '--list', tag)) {
-    if (git('rev-parse', `${tag}^{commit}`) !== git('rev-parse', 'HEAD')) {
+    const ref = `refs/tags/${tag}`;
+    if (git('cat-file', '-t', ref) !== 'tag') {
+      throw new Error('The existing local release tag must be annotated; refusing to replace or publish it.');
+    }
+    if (git('rev-parse', `${ref}^{commit}`) !== git('rev-parse', 'HEAD')) {
       throw new Error('The local tag points to another commit; refusing to move it.');
     }
   } else {

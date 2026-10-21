@@ -271,6 +271,42 @@ test('publish pushes an annotated matching tag without changing versions or crea
   assert.deepEqual(repo.calls(), []);
 });
 
+test('publish refuses an existing lightweight tag without replacing or pushing it', t => {
+  const repo = repository(t);
+  repo.git('tag', 'v0.0.1');
+  const original = repo.git('rev-parse', 'refs/tags/v0.0.1');
+  const result = repo.run(['publish']);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /annotated/i);
+  assert.equal(repo.git('cat-file', '-t', 'refs/tags/v0.0.1'), 'commit');
+  assert.equal(repo.git('rev-parse', 'refs/tags/v0.0.1'), original);
+  assert.equal(repo.git('ls-remote', '--tags', 'origin'), '');
+  assert.equal(repo.git('status', '--porcelain'), '');
+});
+
+test('existing annotated-tag validation uses the tag namespace, not a same-named branch', t => {
+  for (const matchingTag of [true, false]) {
+    const repo = repository(t);
+    const initial = repo.git('rev-parse', 'HEAD');
+    fs.writeFileSync(path.join(repo.checkout, 'advance.txt'), 'New main');
+    repo.git('add', '.'); repo.git('commit', '-m', 'Advance main'); repo.git('push', 'origin', 'main');
+    const head = repo.git('rev-parse', 'HEAD');
+    repo.git('tag', '--annotate', 'v0.0.1', matchingTag ? head : initial, '--message', 'Existing annotated tag');
+    repo.git('branch', 'v0.0.1', matchingTag ? initial : head);
+    const original = repo.git('rev-parse', 'refs/tags/v0.0.1');
+    const result = repo.run(['publish']);
+    assert.equal(repo.git('rev-parse', 'refs/tags/v0.0.1'), original);
+    if (matchingTag) {
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(repo.git('--git-dir', repo.remote, 'rev-parse', 'refs/tags/v0.0.1'), original);
+    } else {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /another commit/);
+      assert.equal(repo.git('ls-remote', '--tags', 'origin'), '');
+    }
+  }
+});
+
 test('publish reuses a matching local tag after a failed push but never moves or republishes tags', t => {
   const repo = repository(t);
   const hook = path.join(repo.remote, 'hooks/pre-receive');
