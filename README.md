@@ -119,8 +119,12 @@ for Docker previews, analytics, and static builds.
 
 See the [Chrome Web Store release guide](docs/chrome-web-store.md) for packaging,
 permission justifications, privacy disclosures, and manual release checks.
+Push a matching `vMAJOR.MINOR.PATCH` tag on a commit in `main` history to run CI,
+package Chrome, and request store-release approval. After approval, GitHub Actions
+submits the package for Google review and publication on approval. This requires
+the one-time infrastructure and publisher setup in the guide.
 Keep the deployed `/privacy.html`, `/terms.html`, and store disclosures current
-when releasing updates. Store submission and publication remain manual.
+when releasing updates.
 
 ## License
 
