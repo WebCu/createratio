@@ -14,6 +14,7 @@ for (const [site, url, messagesURL, editor] of [
       await withFailureArtifacts(browser, `${site} slow-scrolling journey`, async () => {
         await evaluate(browser, browser.worker, `(async () => {
           await chrome.storage.local.set({ ...${JSON.stringify(site === 'x' ? {} : { settings: { accessMinutes: 12 } })}, _access: { ${site}: { remainingMs: 300000, date: C3.localDate() } } });
+          await SiteAccess.reconcile();
           globalThis.resistanceSaves = 0;
           chrome.runtime.onMessage.addListener(message => { if (message.type === 'scroll-friction-setting') resistanceSaves++; });
         })()`);
@@ -170,6 +171,7 @@ for (const [label, lock, overflow, panelHeight] of [
         });
         await evaluate(browser, browser.worker, `(async () => {
           await chrome.storage.local.set({ settings: { accessMinutes: 12 }, _access: { linkedin: { remainingMs: 300000, date: C3.localDate() } } });
+          await SiteAccess.reconcile();
         })()`);
         const page = await browser.page('https://www.linkedin.com/feed/');
         await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
@@ -215,14 +217,14 @@ for (const [label, lock, overflow, panelHeight] of [
   });
 }
 
-for (const [label, htmlStyle, bodyStyle, surface] of [
+for (const [label, htmlStyle, bodyStyle, surface, rulesDelayMs = 0] of [
   ['independent body', 'overflow:hidden', '', 'body'],
   ['one clipped root axis', 'overflow-x:clip;overflow-y:visible', '', 'body'],
   ['viewport-propagated body', 'overflow:visible', '', 'html'],
   ['root containment', 'overflow:visible;contain:layout', '', 'body'],
   ['body containment', 'overflow:visible', 'contain:layout', 'body'],
   ['body content visibility', 'overflow:visible', 'content-visibility:auto', 'body'],
-  ['body size container', 'overflow:visible', 'container-type:inline-size', 'body'],
+  ['body size container after delayed access rules', 'overflow:visible', 'container-type:inline-size', 'body', 1000],
   ['scroll-state without size containment', 'overflow:visible', 'container-type:scroll-state', 'html']
 ]) {
   test(`built body scrolling distinguishes the viewport and preserves tall panels: ${label}`, async () => {
@@ -234,7 +236,17 @@ for (const [label, htmlStyle, bodyStyle, surface] of [
         browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
           if (context.origin === browser.origin) contexts.set(session, context.id);
         });
-        await evaluate(browser, browser.worker, `chrome.storage.local.set({ _access: { linkedin: { remainingMs: 300000, date: C3.localDate() } } })`);
+        if (rulesDelayMs) await evaluate(browser, browser.worker, `(() => {
+          const update = chrome.declarativeNetRequest.updateSessionRules.bind(chrome.declarativeNetRequest);
+          chrome.declarativeNetRequest.updateSessionRules = async options => {
+            await new Promise(resolve => setTimeout(resolve, ${rulesDelayMs}));
+            return update(options);
+          };
+        })()`);
+        await evaluate(browser, browser.worker, `(async () => {
+          await chrome.storage.local.set({ _access: { linkedin: { remainingMs: 300000, date: C3.localDate() } } });
+          await SiteAccess.reconcile();
+        })()`);
         const page = await browser.page('https://www.linkedin.com/feed/');
         await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
         await browser.cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, page.session);
