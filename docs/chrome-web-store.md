@@ -6,26 +6,16 @@ Use this guide to verify and release updates to that listing.
 
 ## Tagged releases
 
-`.github/workflows/release-chrome.yml` runs on pushed `vMAJOR.MINOR.PATCH`
-tags. The tagged commit must belong to `main` history. The tag must match
-`package.json`, `extension/package.json`, and `extension/src/manifest.json`.
-Use numeric components from 0 through 65535, without leading zeroes or prerelease
-suffixes. Each upload must have a version newer than the published package.
+Use the shared [Chrome and Firefox release workflow](releases.md) to prepare a
+version PR and push its tag after merge. The workflow retains its existing
+`.github/workflows/release-chrome.yml` filename for Google's federated trust,
+but builds both store packages and submits them in independent approval jobs.
 
-After merging the version change and completing the manual checks below:
-
-```sh
-git tag v0.0.2 <merged-commit>
-git push origin v0.0.2
-```
-
-The workflow runs the full reusable CI, including both browser checks, then
-builds and archives only `dist/chrome`. Its `chrome-store-package` artifact
-contains the exact ZIP, SHA-256 checksum, tag, and source commit for 30 days.
-Download that artifact and inspect an extracted QA copy before approving the
-`chrome-web-store` environment. Approval confirms the manual release checklist,
-including current store disclosures and deployed legal pages. Approval does not
-replace those checks.
+Download the `browser-store-packages` artifact and inspect an extracted copy of
+`createratio-chrome.zip` before approving `chrome-web-store`. The artifact also
+contains Firefox and reviewer-source archives, checksums, tag and source commit.
+Approval confirms the manual release checklist, including current store
+disclosures and deployed legal pages. Approval does not replace those checks.
 
 After approval, the job verifies the checksum, exchanges GitHub OIDC for a
 short-lived Google token, uploads the archive, waits for upload processing, and

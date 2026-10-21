@@ -120,12 +120,13 @@ for Docker previews, analytics, and static builds.
 
 ## Release
 
-See the [Chrome Web Store release guide](docs/chrome-web-store.md) for packaging,
-permission justifications, privacy disclosures, and manual release checks.
-Push a matching `vMAJOR.MINOR.PATCH` tag on a commit in `main` history to run CI,
-package Chrome, and request store-release approval. After approval, GitHub Actions
-submits the package for Google review and publication on approval. This requires
-the one-time infrastructure and publisher setup in the guide.
+Use `pnpm release prepare patch` from clean, current `main` to synchronize the
+extension versions and open a version PR. After merging that PR, run
+`pnpm release publish` from updated `main` to push the matching tag.
+GitHub Actions tests and packages Chrome and Firefox, then requests separate
+store approvals before submitting each package. Stores control their own review
+and publication timing. See the [release guide](docs/releases.md) for setup,
+manual checks, package inspection and recovery.
 Keep the deployed `/privacy.html`, `/terms.html`, and store disclosures current
 when releasing updates.
 
