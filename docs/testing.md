@@ -290,8 +290,9 @@ Before a release, verify:
 - Midnight refills use each site's override or current inherited Default. Off
   cancels refills; above-goal access never re-enables measurement on Off sites.
 - Slow scrolling starts on at 50% resistance when no choice is saved. Existing
-  Off choices and chosen strengths must survive upgrades and restarts. The slider
-  adjusts resistance from 5–90% in five-point steps; even Light adds resistance.
+  Off choices and valid strengths must survive upgrades and restarts. The slider
+  adjusts resistance from 50–95% in five-point steps; even Light halves movement.
+  Saved positive strengths below 50% resolve to 50% without enabling an Off choice.
   Verify drag previews do not save until release, keyboard adjustments retain
   focus, fast changes retain only the latest pending choice, failures restore
   confirmed values, and reloading or toggling Off preserves the chosen strength.

@@ -64,7 +64,7 @@ test('scroll friction defaults on without replacing saved choices or resistance'
     assert.equal(C.settingsSnapshot(settings).scrollFrictionEnabled, true);
     assert.equal(C.settingsSnapshot(settings).scrollFrictionStrength, 50);
   }
-  for (const enabled of [false, true]) for (const strength of [5, 25, 50, 90]) {
+  for (const enabled of [false, true]) for (const strength of [50, 75, 90, 95]) {
     const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
     for (const resolved of [C.settingsSnapshot(settings), C.updatePreferences(settings, { accessMinutes: 12 })]) {
       assert.equal(resolved.scrollFrictionEnabled, enabled);
@@ -83,13 +83,21 @@ test('saved zero resistance resolves to Off without mutating preferences', () =>
     assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: 0 });
   }
 });
-test('scroll resistance preserves half-speed defaults and accepts only positive step-aligned percentages', () => {
+test('saved strengths below the new minimum resolve to 50% without enabling an Off choice', () => {
+  for (const enabled of [false, true]) for (const strength of [5, 25, 45]) {
+    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
+    const resolved = C.settingsSnapshot(settings);
+    assert.equal(resolved.scrollFrictionEnabled, enabled); assert.equal(resolved.scrollFrictionStrength, 50);
+    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
+  }
+});
+test('scroll resistance accepts only 50–95% in five-point steps', () => {
   assert.equal(C.settingsSnapshot({ scrollFrictionEnabled: true }).scrollFrictionStrength, 50);
-  for (const strength of [5, 25, 50, 75, 90]) {
+  for (const strength of [50, 55, 75, 90, 95]) {
     assert.equal(C.validScrollFrictionStrength(strength), true);
     assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, strength);
   }
-  for (const strength of [undefined, null, false, true, '75', 0, -5, 95, 100, 1, 50.5, NaN, Infinity, [], {}]) {
+  for (const strength of [undefined, null, false, true, '75', 0, -5, 5, 25, 45, 49, 96, 99, 100, 1, 50.5, NaN, Infinity, [], {}]) {
     assert.equal(C.validScrollFrictionStrength(strength), false);
     assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, 50);
   }

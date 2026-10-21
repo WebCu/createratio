@@ -532,16 +532,16 @@ test('resistance saves validate atomically, preserve history and survive boolean
     const date = C.localDate();
     const data = { settings: { scrollFrictionEnabled: true, scrollFrictionStrength: 75 }, [date]: { x: { consumeSec: 30 } } };
     const w = worker(data, browser);
-    for (const strength of [null, '50', true, 0, -5, 95, 100, 1, 50.5, NaN, Infinity, [], {}]) {
+    for (const strength of [null, '50', true, 0, -5, 5, 25, 45, 99, 100, 1, 50.5, NaN, Infinity, [], {}]) {
       assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false, strength }, popupSender)).ok, false);
       assert.equal(data.settings.scrollFrictionEnabled, true); assert.equal(data.settings.scrollFrictionStrength, 75);
     }
     assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: false }, popupSender)).settings.scrollFrictionStrength, 75);
-    for (const strength of [5, 25, 50, 90]) {
+    for (const strength of [50, 75, 90, 95]) {
       assert.equal((await w.send({ type: 'scroll-friction-setting', enabled: true, strength }, popupSender)).settings.scrollFrictionStrength, strength);
     }
     const restarted = worker(data, browser, w.now);
-    assert.equal((await restarted.send({ type: 'snapshot' })).settings.scrollFrictionStrength, 90);
+    assert.equal((await restarted.send({ type: 'snapshot' })).settings.scrollFrictionStrength, 95);
     assert.equal(data[date].x.consumeSec, 30);
     assert.deepEqual(w.errors, []);
   }

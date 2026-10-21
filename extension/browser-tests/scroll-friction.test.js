@@ -73,7 +73,7 @@ for (const [site, url, messagesURL, editor] of [
         }
         await click(browser, settings, 'label[for="scroll-friction-strength"]');
         const range = await evaluate(browser, settings.session, '(() => { const input = document.querySelector("#scroll-friction-strength"); return { ...input.getBoundingClientRect().toJSON(), min: Number(input.min), max: Number(input.max) }; })()');
-        assert.equal(range.min, 5); assert.equal(range.max, 90);
+        assert.equal(range.min, 50); assert.equal(range.max, 95);
         const sliderX = strength => range.x + 12 + (range.width - 24) * (strength - range.min) / (range.max - range.min);
         const start = { x: sliderX(50), y: range.y + range.height / 2 };
         const saves = await evaluate(browser, browser.worker, 'resistanceSaves');
@@ -89,8 +89,7 @@ for (const [site, url, messagesURL, editor] of [
         assert.equal(await evaluate(browser, browser.worker, 'resistanceSaves'), saves + 1);
         assert.equal(await wheel(240), 48);
         for (const [keys, strength, distance] of [
-          [['End'], 90, 24], [['ArrowLeft', 'ArrowLeft', 'ArrowLeft'], 75, 60], [['Home', 'ArrowLeft'], 5, 228],
-          [Array(9).fill('ArrowRight'), 50, 120]
+          [['End'], 95, 12], [Array(4).fill('ArrowLeft'), 75, 60], [['Home', 'ArrowLeft'], 50, 120]
         ]) {
           await click(browser, settings, 'label[for="scroll-friction-strength"]');
           for (const key of keys) {

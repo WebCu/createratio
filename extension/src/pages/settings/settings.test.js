@@ -63,15 +63,15 @@ test('resistance previews locally during a drag and commits once without losing 
   const p = settingsPage({ settings: { scrollFrictionEnabled: true } }); await p.ready();
   const slider = p.nodes['scroll-friction-strength'];
   assert.equal(slider.value, 50); assert.equal(slider.disabled, false);
-  assert.equal(slider.min, 5); assert.equal(slider.max, 90); assert.equal(slider.step, 5);
+  assert.equal(slider.min, 50); assert.equal(slider.max, 95); assert.equal(slider.step, 5);
   slider.focus(); const before = p.messages.length;
-  for (let i = 0; i < 100; i++) { slider.value = String((i % 18 + 1) * 5); await slider.fire('input'); }
+  for (let i = 0; i < 100; i++) { slider.value = String(50 + i % 10 * 5); await slider.fire('input'); }
   slider.value = '80'; await slider.fire('input');
   assert.equal(p.messages.length, before, 'input previews do not send messages');
   assert.equal(p.nodes['scroll-friction-value'].textContent, '80%');
   assert.match(slider.attributes['aria-valuetext'], /80% resistance, 20%/);
   assert.match(p.nodes['scroll-friction-effect'].textContent, /20%/);
-  p.setSettings({ ...C3.DEFAULT_SETTINGS, scrollFrictionEnabled: true, scrollFrictionStrength: 25 }); p.change(); await p.ready();
+  p.setSettings({ ...C3.DEFAULT_SETTINGS, scrollFrictionEnabled: true, scrollFrictionStrength: 60 }); p.change(); await p.ready();
   assert.equal(slider.value, '80'); assert.equal(p.document.activeElement, slider);
   await slider.fire('change');
   assert.deepEqual(p.messages.filter(message => message.type === 'scroll-friction-setting'), [{ type: 'scroll-friction-setting', enabled: true, strength: 80 }]);
@@ -88,14 +88,14 @@ test('resistance keeps at most one in-flight save and one latest choice while co
   const release = p.holdMessage('scroll-friction-setting');
   slider.value = '75'; await slider.fire('input'); const first = slider.fire('change');
   assert.equal(slider.disabled, false); assert.equal(p.document.activeElement, slider);
-  for (let i = 0; i < 100; i++) { slider.value = String((i % 18 + 1) * 5); await slider.fire('input'); await slider.fire('change'); }
-  slider.value = '90'; await slider.fire('input'); await slider.fire('change');
+  for (let i = 0; i < 100; i++) { slider.value = String(50 + i % 10 * 5); await slider.fire('input'); await slider.fire('change'); }
+  slider.value = '95'; await slider.fire('input'); await slider.fire('change');
   assert.equal(slider.style['--scroll-fill'], '100%');
   assert.equal(p.messages.filter(message => message.type === 'scroll-friction-setting').length, 1);
-  assert.equal(p.nodes['scroll-friction-value'].textContent, '90%');
+  assert.equal(p.nodes['scroll-friction-value'].textContent, '95%');
   release(); await first;
-  assert.deepEqual(p.messages.filter(message => message.type === 'scroll-friction-setting').map(message => message.strength), [75, 90]);
-  assert.equal(p.settings.scrollFrictionStrength, 90); assert.equal(slider.value, 90);
+  assert.deepEqual(p.messages.filter(message => message.type === 'scroll-friction-setting').map(message => message.strength), [75, 95]);
+  assert.equal(p.settings.scrollFrictionStrength, 95); assert.equal(slider.value, 95);
   assert.equal(p.document.activeElement, slider);
   assert.deepEqual(p.notifications, [{ id: 1, type: 'refresh' }, { id: 2, type: 'refresh' }]);
 });
@@ -108,17 +108,17 @@ test('failed resistance saves roll back to the confirmed value and malformed suc
   assert.equal(p.document.activeElement, slider);
   p.fail = false;
   const original = p.messages.length;
-  for (const value of ['0', '77']) {
+  for (const value of ['0', '5', '25', '45', '77', '99']) {
     slider.value = value; await slider.fire('change');
     assert.equal(p.messages.length, original); assert.equal(slider.value, 75);
   }
   p.state.replies.set('scroll-friction-setting', { ok: true });
-  slider.value = '25'; await slider.fire('input'); await slider.fire('change');
+  slider.value = '60'; await slider.fire('input'); await slider.fire('change');
   assert.equal(slider.value, 75); assert.equal(p.nodes['save-status'].textContent, '');
   assert.equal(p.nodes.error.textContent, 'Unable to save slow scrolling.');
   p.state.replies.delete('scroll-friction-setting');
-  slider.value = '5'; await slider.fire('input'); await slider.fire('change');
-  assert.equal(p.settings.scrollFrictionStrength, 5); assert.match(p.nodes['scroll-friction-effect'].textContent, /95%/);
+  slider.value = '50'; await slider.fire('input'); await slider.fire('change');
+  assert.equal(p.settings.scrollFrictionStrength, 50); assert.match(p.nodes['scroll-friction-effect'].textContent, /50%/);
   assert.equal(slider.style['--scroll-fill'], '0%');
 });
 test('Settings slow-scrolling choice reaches the real worker, survives restart and changes live tracker behavior', async () => {

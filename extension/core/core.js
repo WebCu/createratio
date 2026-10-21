@@ -8,7 +8,7 @@
   const SITES = integrations.sites;
   const ACCESS_LIMITS = { minMinutes: 1, maxMinutes: 240 };
   const INTENTION_LIMITS = { minLength: 20, maxLength: 280 };
-  const SCROLL_FRICTION_LIMITS = { minStrength: 5, maxStrength: 90, step: 5 };
+  const SCROLL_FRICTION_LIMITS = { minStrength: 50, maxStrength: 95, step: 5 };
   const DELIVERY_LIMITS = { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 };
   function validIntention(value) { return typeof value === 'string' && value.length <= INTENTION_LIMITS.maxLength && value.trim().length >= INTENTION_LIMITS.minLength; }
   function validAccessMinutes(value) { return Number.isInteger(value) && value >= ACCESS_LIMITS.minMinutes && value <= ACCESS_LIMITS.maxMinutes; }

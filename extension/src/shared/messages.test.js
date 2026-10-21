@@ -91,12 +91,14 @@ test('scroll-friction saves require a complete snapshot with a persisted boolean
 });
 test('resistance acknowledgements require a validated persisted strength when the command supplies one', async () => {
   const command = { type: 'scroll-friction-setting', enabled: true, strength: 75 };
-  for (const strength of [undefined, null, '75', 0, -5, 100, 77, 75.5]) {
+  for (const strength of [undefined, null, '75', 0, -5, 5, 25, 45, 99, 100, 77, 75.5]) {
     const reply = { ...snapshot, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: strength } };
     await assert.rejects(client(reply).send(command, 'Not saved.'), { message: 'Not saved.' });
   }
-  const reply = { ...snapshot, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: 75 } };
-  assert.equal(await client(reply).send(command, 'Not saved.'), reply);
+  for (const strength of [50, 75, 95]) {
+    const reply = { ...snapshot, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: strength } };
+    assert.equal(await client(reply).send({ ...command, strength }, 'Not saved.'), reply);
+  }
 });
 test('storage refreshes distinguish access phases from countdown-only writes', () => {
   const running = { remainingMs: 60000, expiresAt: 100000, date: '2026-10-11', refilledAt: 40000 };

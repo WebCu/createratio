@@ -59,8 +59,9 @@ invalid durations, targets, booleans, and overrides without mutating storage;
 an invalid override inherits Default.
 
 `validScrollFrictionStrength` and `SCROLL_FRICTION_LIMITS` share the slider's
-5–90% resistance bounds and five-point steps with command receivers. Missing or
-invalid restored strength resolves to 50% without rewriting saved preferences.
+50–95% resistance bounds and five-point steps with command receivers. Missing or
+invalid restored strength, including older positive values below 50%, resolves
+to 50% without rewriting saved preferences.
 Slow scrolling defaults on when no choice is saved; saved Off choices are kept.
 A saved zero resolves to Off and 50% strength without rewriting storage. New
 commands require positive resistance; native scrolling uses the Off switch.

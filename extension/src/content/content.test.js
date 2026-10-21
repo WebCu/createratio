@@ -59,7 +59,7 @@ test('positive resistance changes live without accumulating listeners and saved 
   for (const browser of ['chrome', 'browser']) {
     for (const url of ['https://x.com/home', 'https://www.linkedin.com/feed/']) {
       const t = await tracker(browser, { url, snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
-      for (const [strength, distance] of [[5, 190], [75, 50], [25, 150], [90, 20], [50, 100]]) {
+      for (const [strength, distance] of [[95, 10], [75, 50], [90, 20], [50, 100]]) {
         t.setSnapshot({ day: {}, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: strength } }); await t.tick();
         t.document.scrollingElement.scrollTop = 1000;
         assert.equal(t.wheel(200).defaultPrevented, true);
