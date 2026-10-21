@@ -36,7 +36,7 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
       };
       await preview();
       const drawings = await inspect(page, `(() => {
-        const cases = [{ createSec: 4800, consumeSec: 3600, posts: 9 }, { createSec: 120, consumeSec: 1200, replies: 1 }, {}, { createSec: 604800, consumeSec: 86399, posts: 999, replies: 999, comments: 999 }];
+        const cases = [{ createSec: 4800, consumeSec: 3600, posts: 9 }, { createSec: 120, consumeSec: 1200, replies: 1 }, {}, { createSec: 604800, consumeSec: 86399, posts: 999, replies: 999, comments: 999 }, { consumeSec: 300 }, { posts: 1 }];
         return cases.map(stats => {
           const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'), paint = ctx.fillText.bind(ctx), bounds = [];
           ctx.fillText = function(value, x, y, maxWidth) {
@@ -45,8 +45,16 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
             return paint(value, x, y, maxWidth);
           };
           SocialCard.draw(canvas, SocialCard.create({ [C3.localDate()]: { x: stats } }, 'week'));
+          const bars = [[314, [195, 177, 232]], [886, [223, 212, 241]]].map(([x, color]) => {
+            const pixels = ctx.getImageData(x, 600, 1, 140).data;
+            let height = 0;
+            for (let i = 0; i < pixels.length; i += 4) if (color.every((channel, index) => pixels[i + index] === channel)) height++;
+            return height;
+          });
+          const largest = Math.max(stats.createSec || 0, stats.consumeSec || 0, 1);
           canvas.width = 0; canvas.height = 0;
           return {
+            bars, expectedBars: [140 * (stats.createSec || 0) / largest, 140 * (stats.consumeSec || 0) / largest],
             outside: bounds.filter(rect => rect.left < 48 || rect.right > 1152 || rect.top < 48 || rect.bottom > 1152),
             overlaps: bounds.flatMap((a, index) => bounds.slice(index + 1).filter(b => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).map(b => [a.text, b.text]))
           };
@@ -55,16 +63,19 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
       for (const drawing of drawings) {
         assert.deepEqual(drawing.outside, [], 'card text stays within its safe area');
         assert.deepEqual(drawing.overlaps, [], 'real, empty and large-number text never overlaps');
+        drawing.bars.forEach((height, index) => assert.ok(Math.abs(height - drawing.expectedBars[index]) < 2, 'drawn bars reflect raw time, not action credits'));
       }
       const daily = await inspect(page, 'document.querySelector("#share-caption").value');
       assert.match(daily, /Today so far: 30m creating · 40m consuming · 4 posts\/replies\/comments/);
-      assert.match(daily, /A little creating counts, too/);
+      assert.match(daily, /Made room for creating/);
       assert.match(daily, /https:\/\/createratio\.com\//);
       await inspect(page, 'document.querySelector("#report-range").value = "week"; document.querySelector("#report-range").dispatchEvent(new Event("change"))');
       assert.equal(await inspect(page, 'document.querySelector("#share-result").hidden && document.querySelector("#share-download").disabled && liveShareURLs.size === 0'), true);
       await preview();
       const caption = await inspect(page, 'document.querySelector("#share-caption").value');
-      assert.match(caption, /More making\. Less scrolling\./);
+      assert.match(caption, /Made room for creating\./);
+      assert.match(caption, /approximate/);
+      assert.match(caption, /Create > Consume/);
       assert.match(caption, /Last 7 days: 80m creating · 60m consuming · 9 posts\/replies\/comments/);
       assert.match(caption, /Creation score: 1\.63/);
       assert.doesNotMatch(caption, /Synthetic|private\.example|private intention|linkedin|x\.com|older|99999/);
