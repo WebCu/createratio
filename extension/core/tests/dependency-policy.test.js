@@ -115,11 +115,30 @@ test('browser verification is a bounded CI job using a pinned, verified browser 
   assert.doesNotMatch(browserJob, /continue-on-error:|\|\| true/);
 });
 
-test('weekly dependency automation excludes automatic major upgrades', () => {
+test('weekly dependency automation proposes Action majors but excludes library and image majors', () => {
   const updates = read('.github/dependabot.yml').split('  - package-ecosystem: ').slice(1);
   assert.deepEqual(updates.map(update => update.split('\n')[0]), ['npm', 'github-actions', 'docker-compose']);
   for (const update of updates) {
     assert.match(update, /interval: weekly/);
-    assert.match(update, /dependency-name: '\*'\n\s+update-types: \['version-update:semver-major'\]/);
+    if (update.startsWith('github-actions\n')) {
+      assert.doesNotMatch(update, /ignore:/);
+    } else {
+      assert.match(update, /dependency-name: '\*'\n\s+update-types: \['version-update:semver-major'\]/);
+    }
   }
+});
+
+test('the network action audit runs on relevant PRs, weekly, and on demand outside the offline check', () => {
+  const workflow = read('.github/workflows/audit-actions.yml');
+  assert.match(workflow, /pull_request:\n\s+paths:/);
+  for (const file of ['.github/workflows/**', 'bin/check-actions.js', 'bin/tests/check-actions.test.js']) {
+    assert.ok(workflow.includes(`- '${file}'`));
+  }
+  assert.match(workflow, /schedule:\n\s+- cron:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /run: node bin\/check-actions\.js/);
+  assert.match(workflow, /run: node --test bin\/tests\/check-actions\.test\.js/);
+  assert.match(workflow, /timeout-minutes: 5/);
+  assert.equal(manifests[0].scripts['check:actions'], 'node bin/check-actions.js');
+  assert.equal(workflow.match(/node-version: (\S+)/)?.[1], read('.github/workflows/ci.yml').match(/node-version: (\S+)/)?.[1]);
 });

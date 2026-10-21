@@ -1,0 +1,32 @@
+name: Audit action runtimes
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'bin/check-actions.js'
+      - 'bin/tests/check-actions.test.js'
+  schedule:
+    - cron: '20 7 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (v7.0.1)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up pinned Node.js (v7.1.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.21.0
+      - name: Check the runtime audit
+        run: node --test bin/tests/check-actions.test.js
+      - name: Audit pinned upstream action manifests
+        run: node bin/check-actions.js

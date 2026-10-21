@@ -40,8 +40,18 @@ major versions, and require a **24-hour** minimum release age. Do not add releas
 exclusions, prereleases, library dependency version ranges, or
 Git/private-registry dependencies.
 
-Dependabot checks dependencies, Actions, and Compose images weekly. Major upgrades
-require a separate maintainer decision; there is no automatic merge. Review
-upstream release notes, integrity, and the full diff, then run CI before merging.
+Dependabot checks dependencies, Actions, and Compose images weekly. Action major
+updates are proposed for review; library and Compose major updates remain excluded.
+Major upgrades require a separate maintainer decision; there is no automatic merge.
+Review upstream release notes, integrity, and the full diff, then run CI before merging.
+
+`pnpm check:actions` audits directly referenced actions against their pinned upstream
+manifests, requiring full commit SHAs and JavaScript action runtimes on Node.js 24
+or newer. It rejects `ubuntu-latest`; non-JavaScript actions require a separate
+runtime audit.
+The audit runs for workflow/audit pull requests, weekly, and on manual dispatch.
+It requires network access and fails if an upstream manifest cannot be verified;
+`pnpm check` keeps its tests offline.
+
 The package audit does not cover the Node.js runtime or container image; check
 upstream security advisories as well.
