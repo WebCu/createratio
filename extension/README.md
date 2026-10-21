@@ -28,9 +28,10 @@ explicit build asset list excludes tests and harnesses.
 [Install the published Chrome extension from the Chrome Web Store](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk).
 Save X and LinkedIn drafts before installing; existing tabs redirect to the
 access gate.
-For development builds or Edge/Firefox, follow the
+[Install the published Firefox add-on](https://addons.mozilla.org/en-US/firefox/addon/createratio/).
+For development builds or Edge, follow the
 [build and installation instructions](../README.md#build-and-install).
-Edge and Firefox do not have published store releases.
+Edge does not have a published store release.
 The standalone website lives separately in `../site/`.
 
 ## Runtime structure

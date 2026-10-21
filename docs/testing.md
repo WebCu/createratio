@@ -206,6 +206,28 @@ tail -n 40 /tmp/createratio-check.log
 exit "$status"
 ```
 
+## Release automation
+
+`pnpm check` includes release-command, package-reproduction and store-submission
+tests. These tests additionally require Git, `zip` and `unzip` on PATH. Release
+command tests use disposable real Git repositories and local remotes; GitHub CLI
+and local-check subprocesses are substituted at their external boundaries. They
+never push to the actual repository or publish a store version.
+
+The package test extracts the generated reviewer-source archive, rebuilds Firefox
+with the real build script, and compares every generated file against the packaged
+bundle. It also checks archive contents, checksums, stale-output removal, dirty
+source refusal and tag/commit mismatches. Store API tests substitute HTTP only,
+covering version/pending-submission guards, authentication, validation polling,
+write failures and refusal paths. Those tests do not establish live credentials,
+provider acceptance or publication.
+
+Before approving each store deployment, test its exact extracted artifact in the
+relevant browser and complete the manual extension checks below. Verify Chrome
+and Firefox submission results separately. A successful job reports submission;
+each store controls review, signing and public availability. See
+[releases](releases.md) for commands, approval and recovery.
+
 ## Refactor equivalence
 
 Build the same browser at the baseline and candidate revisions into separate
