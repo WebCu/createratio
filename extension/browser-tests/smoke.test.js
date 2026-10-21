@@ -18,6 +18,20 @@ test('built Chromium extension: access gates and history controls', async t => {
   const text = (page, selector) => inspect(page, `document.querySelector(${JSON.stringify(selector)})?.textContent`);
   const expectText = (page, selector, expected) => eventually(async () => await text(page, selector) === expected, `${selector} displays ${expected}`);
   const journey = (name, run) => t.test(name, () => withFailureArtifacts(browser, name, run));
+  const focused = page => inspect(page, '({ id: document.activeElement.id, tag: document.activeElement.tagName, hasFocus: document.hasFocus() })');
+  const key = async (page, key, code, windowsVirtualKeyCode) => {
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode, ...(key === 'Enter' ? { text: '\r' } : {}) }, page.session);
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode }, page.session);
+  };
+  const tabTo = async (page, id) => {
+    await cdp.send('Target.activateTarget', { targetId: page.targetId });
+    await eventually(async () => (await focused(page)).hasFocus, 'keyboard page focus');
+    for (let count = 0; count < 12; count++) {
+      if ((await focused(page)).id === id) return;
+      await key(page, 'Tab', 'Tab', 9);
+    }
+    assert.fail(`Keyboard could not reach ${id}: ${JSON.stringify(await focused(page))}`);
+  };
   try {
     const version = await cdp.send('Browser.getVersion');
     assert.match(version.product, /Chrom(e|ium)\//);
@@ -30,31 +44,45 @@ test('built Chromium extension: access gates and history controls', async t => {
       const page = await browser.page('https://x.com/home');
       await atGate(page);
       assert.equal(browser.documents.length, 0, 'DNR redirects before any synthetic X document is served');
-      await click(browser, page, '#reason');
+      assert.equal((await focused(page)).tag, 'BODY', 'initial loading must not steal focus');
+      await tabTo(page, 'reason');
       await cdp.send('Input.insertText', { text: 'Review the synthetic launch plan, then leave.' }, page.session);
       assert.equal(await inspect(page, 'document.querySelector("#reason").value'), 'Review the synthetic launch plan, then leave.');
-      await click(browser, page, '#begin');
+      await tabTo(page, 'begin'); await key(page, 'Enter', 'Enter', 13);
       await eventually(() => visible(page, '#waiting'), 'waiting UI');
+      await eventually(() => inspect(page, '!document.querySelector("#cancel").disabled'), 'begin acknowledged');
+      assert.deepEqual(await focused(page), { id: 'waiting-title', tag: 'H2', hasFocus: true });
+      await tabTo(page, 'cancel'); await key(page, 'Enter', 'Enter', 13);
+      await eventually(() => inspect(page, '!document.querySelector("#request").hidden && !document.querySelector("#reason").disabled'), 'cancel acknowledged and intention enabled');
+      assert.equal((await focused(page)).id, 'reason');
+      assert.equal(await inspect(page, 'document.querySelector("#reason").value'), '');
+      await cdp.send('Input.insertText', { text: 'Review the synthetic launch plan, then leave.' }, page.session);
+      await tabTo(page, 'begin'); await key(page, 'Enter', 'Enter', 13);
+      await eventually(() => visible(page, '#waiting'), 'second waiting UI');
+      await eventually(() => inspect(page, '!document.querySelector("#cancel").disabled'), 'second begin acknowledged');
+      assert.equal((await focused(page)).id, 'waiting-title');
       const started = await storage();
       const request = started._access.x;
-      assert.equal(started._intentions[0].reason, 'Review the synthetic launch plan, then leave.');
-      assert.equal(request.readyAt - started._intentions[0].requestedAt, 60000, 'real access-begin creates a full 60-second wait');
+      assert.equal(started._intentions.at(-1).reason, 'Review the synthetic launch plan, then leave.');
+      assert.equal(request.readyAt - started._intentions.at(-1).requestedAt, 60000, 'real access-begin creates a full 60-second wait');
       assert.equal(request.requestExpiresAt - request.readyAt, 600000);
       assert.equal(await inspect(page, 'document.querySelector("#open").disabled'), true);
       await cdp.send('Page.reload', {}, page.session);
       await eventually(() => visible(page, '#waiting'), 'waiting survives reload');
       assert.equal((await storage())._access.x.readyAt, request.readyAt);
+      assert.equal((await focused(page)).tag, 'BODY', 'restoring a wait on load must not move focus');
+      await tabTo(page, 'cancel');
       await browser.setTime(request.readyAt - 5000);
       await eventually(() => inspect(page, 'document.querySelector("#clock").textContent !== "1:00" && document.querySelector("#open").disabled'), 'clock advances but access is still disabled before readiness');
       assert.equal(await inspect(page, 'document.querySelector("#open").disabled'), true);
       await browser.setTime(request.readyAt + 100);
       await eventually(() => inspect(page, '!document.querySelector("#open").disabled'), 'explicit confirmation becomes available');
-      assert.equal(await text(page, '#wait-status'), 'Ready when you are. Confirm to start your session.');
+      assert.equal((await focused(page)).id, 'cancel', 'countdown, refresh and readiness must preserve the chosen control');
       const probe = await browser.page('https://www.twitter.com/home');
       await atGate(probe);
       assert.equal(browser.documents.length, 0, 'waiting alone still blocks X and its alias');
       await cdp.send('Target.activateTarget', { targetId: page.targetId });
-      await click(browser, page, '#open');
+      await tabTo(page, 'open'); await key(page, 'Enter', 'Enter', 13);
       await eventually(() => inspect(page, 'location.href === "https://x.com/home" && !!document.querySelector("#synthetic-site")'), 'explicit confirmation opens the intercepted real-host page');
       assert.deepEqual(browser.documents, ['https://x.com/home']);
       const running = await eventually(async () => {
@@ -80,6 +108,19 @@ test('built Chromium extension: access gates and history controls', async t => {
       assert.equal(browser.documents.length, served, 'manual end removes DNR allow rule, not just the currently open tab');
       await expectText(popup, '.access-row button', 'Request access');
       console.log('Access tracer: DNR block → 60-second clock → explicit trusted confirm → synthetic X → paused budget → trusted manual end → DNR block');
+    });
+    await journey('keyboard ending an active session restores the intention without load-time focus stealing', async () => {
+      const page = await browser.page(browser.origin + '/blocked.html?site=x');
+      await atGate(page);
+      const date = await inspect(page, 'new Date().toLocaleDateString("en-CA")');
+      await evaluate(browser, browser.worker, `chrome.storage.local.set({ _access: { x: { remainingMs: 60000, expiresAt: 0, date: ${JSON.stringify(date)} } } })`);
+      await eventually(() => visible(page, '#active'), 'synthetic active session appears after storage refresh');
+      assert.equal((await focused(page)).tag, 'BODY', 'storage refresh must not move focus');
+      await tabTo(page, 'end'); await key(page, 'Enter', 'Enter', 13);
+      await eventually(() => inspect(page, '!document.querySelector("#request").hidden && !document.querySelector("#reason").disabled'), 'end acknowledged and intention enabled');
+      assert.equal((await focused(page)).id, 'reason');
+      assert.equal(await inspect(page, 'document.querySelector("#reason").value'), '');
+      assert.equal((await storage())._access.x, undefined);
     });
     await journey('controlled active budget expiry redirects and reblocks', async () => {
       const popup = await browser.page(browser.origin + '/popup.html');

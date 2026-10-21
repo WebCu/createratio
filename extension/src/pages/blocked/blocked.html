@@ -11,23 +11,21 @@
   <main>
     <section class="intro" aria-labelledby="heading">
       <p class="state"><span aria-hidden="true"></span><span id="state-text">Blocked by default</span></p>
-      <p class="block-code" id="block-code">400 · Too much taking</p>
-      <h1 id="heading">Time to go touch grass.</h1>
-      <p class="description" id="description">This site is blocked. If you need it, make a little space between the impulse and the visit.</p>
-      <ol id="access-steps" class="steps"><li>Say what you’re here to do.</li><li>Wait one minute.</li><li id="session-step">Open a timed session.</li></ol>
+      <h1 id="heading">The feed can wait. You’ve got this.</h1>
+      <p class="description" id="description">Set an intention, take the full minute, then choose whether to open the site.</p>
+      <ol id="access-steps" class="steps"><li>Set an intention.</li><li>Pause for one minute.</li><li id="session-step">Open a timed session.</li></ol>
       <p class="boundary">The whole site blocks again when time runs out. Save any drafts before your session ends.</p>
-      <p id="connection-note" class="local-error">A local connection block, not a server-issued HTTP error.</p>
     </section>
     <section class="access" aria-label="Request temporary access">
       <form id="request">
         <label for="reason">What do you need to do?</label>
         <p class="hint" id="reason-hint">Be specific. Checking your intention history preference…</p>
         <textarea id="reason" name="reason" rows="4" required aria-describedby="reason-hint" placeholder="For example: reply to Alex about our launch, then leave." disabled></textarea>
-        <p class="requirement">At least 20 characters. No quick unlock.</p>
+        <p class="requirement">20–280 characters. A little clarity, then a full minute to pause.</p>
         <button id="begin" type="submit" disabled>Start the 60-second wait</button>
       </form>
       <div id="waiting" hidden>
-        <h2>A minute to reconsider.</h2>
+        <h2 id="waiting-title" tabindex="-1">A little breathing room.</h2>
         <p>Access is still blocked. You can leave this page while the timer runs.</p>
         <div class="clock" id="clock" aria-label="Time remaining">1:00</div>
         <progress id="progress" max="60" value="0" aria-label="Waiting period completed"></progress>
@@ -36,7 +34,7 @@
         <button class="secondary" id="cancel">Keep it blocked</button>
       </div>
       <div id="active" hidden>
-        <h2>Your session is open.</h2>
+        <h2 id="active-title" tabindex="-1">Your session is open.</h2>
         <div id="active-countdown" class="refill-target"><p id="active-time"></p></div>
         <button id="return">Return to the site</button>
         <button class="secondary" id="end">End session and block again</button>
