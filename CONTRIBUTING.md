@@ -49,6 +49,13 @@ read the [extension layout and packaged-path contract](extension/README.md#layou
 Search references across the whole repo, including shared test harnesses and
 `extension/sites/test-support.js`.
 
+## Website metadata and crawlability
+
+Website PRs follow the [metadata and crawlability checks](docs/seo.md): preserve
+canonical URLs, descriptive metadata, working links, and crawler access.
+Automated checks cover source and built previews; deployed responses still need
+verification.
+
 ## Website integrations
 
 CreateRatio's website catalog is maintained through this GitHub project. Users
