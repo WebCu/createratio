@@ -18,6 +18,9 @@ services:
       - ./site/index.html:/srv/www/index.html:ro
       - ./site/privacy.html:/srv/www/privacy.html:ro
       - ./site/terms.html:/srv/www/terms.html:ro
+      - ./site/llms.txt:/srv/www/llms.txt:ro
+      - ./site/robots.txt:/srv/www/robots.txt:ro
+      - ./site/sitemap.xml:/srv/www/sitemap.xml:ro
       - ./site/styles.css:/srv/www/styles.css:ro
       - ./site/arrival.js:/srv/www/arrival.js:ro
       - ./site/browser-install.js:/srv/www/browser-install.js:ro

@@ -183,14 +183,19 @@ test('freshness binds the tested SHA and step-scoped token after file preparatio
   assert.equal(steps.filter(step => /^          GITHUB_TOKEN:/m.test(step)).length, 1);
 });
 
-test('public legal policies ship through both website deployment and local preview', () => {
+test('public legal policies ship through both website deployment and local preview', t => {
   const compose = readFileSync(path.join(__dirname, '../../../docker-compose.yml'), 'utf8');
   const homepage = readFileSync(path.join(__dirname, '../../../site/index.html'), 'utf8');
-  const siteBuild = readFileSync(path.join(__dirname, '../../../site/build.js'), 'utf8');
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-public-assets-'));
+  t.after(() => fs.rmSync(output, { recursive: true, force: true }));
+  require('../../../site/build.js').buildSite(output);
   assert.match(workflow, /run: node site\/build\.js/);
   assert.match(workflow, /cp dist\/site\/\*/);
   assert.ok(workflow.indexOf('run: node site/build.js') < workflow.indexOf('cp dist/site/*'));
-  assert.match(siteBuild, /for \(const name of \['privacy\.html', 'terms\.html', 'styles\.css', 'arrival\.js', 'browser-install\.js', 'favicon\.svg'\]\)/);
+  for (const name of ['privacy.html', 'terms.html', 'llms.txt', 'robots.txt', 'sitemap.xml']) {
+    assert.equal(readFileSync(path.join(output, name), 'utf8'), readFileSync(path.join(__dirname, '../../../site', name), 'utf8'));
+    assert.ok(compose.includes(`./site/${name}:/srv/www/${name}:ro`));
+  }
   assert.match(compose, /\.\/site\/browser-install\.js:\/srv\/www\/browser-install\.js:ro/);
   for (const page of ['privacy', 'terms']) {
     assert.match(compose, new RegExp(`\\./site/${page}\\.html:/srv/www/${page}\\.html:ro`));

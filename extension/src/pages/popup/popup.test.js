@@ -31,12 +31,17 @@ test('popup shows active and paused budgets and retains request/end access actio
   p.change(); await p.ready(); const rows = p.nodes['access-sites'].children;
   assert.equal(rows[0].children[0].children[1].textContent, '4:40 left · paused');
   assert.equal(rows[0].children[1].textContent, 'End session');
+  assert.equal(rows[0].attributes['aria-label'], 'X access');
+  assert.equal(rows[0].children[1].attributes['aria-label'], 'End session for X');
+  assert.equal(rows[0].children[1].attributes['aria-describedby'], rows[0].children[0].children[1].id);
+  assert.equal(rows[1].children[1].attributes['aria-label'], 'Request access to LinkedIn');
   await rows[1].children[1].fire('click'); assert.equal(p.state.tabs[0].url, 'chrome-extension://test/blocked.html?site=linkedin');
   p.refresh(); await p.ready();
   assert.equal(p.nodes['access-sites'].children[0].children[1], rows[0].children[1], 'refresh preserves keyboard focus on the access button');
   await rows[0].children[1].fire('click');
   assert.deepEqual(p.messages.find(m => m.type === 'access-end'), { type: 'access-end', site: 'x' });
   assert.equal(p.nodes['access-sites'].children[0].children[1].textContent, 'Request access');
+  assert.equal(rows[0].children[1].attributes['aria-label'], 'Request access to X');
   p.state.access.x = accessState('x', { remainingMs: 60000, expiresAt: Date.now() + 60000 }); p.change(); await p.ready();
   assert.doesNotMatch(p.nodes['access-sites'].children[0].children[0].children[1].textContent, /paused/);
 });
@@ -44,6 +49,7 @@ test('popup opens Off sites directly without requesting a session', async () => 
   const p = page('popup'); await p.ready(); p.state.access = { x: accessState('x', { enabled: false }) }; p.change(); await p.ready();
   const row = p.nodes['access-sites'].children[0];
   assert.equal(row.children[0].children[1].textContent, 'Limit & track off'); assert.equal(row.children[1].textContent, 'Open site');
+  assert.equal(row.children[1].attributes['aria-label'], 'Open site: X');
   await row.children[1].fire('click'); assert.equal(p.state.tabs[0].url, 'https://x.com/home'); assert.ok(p.messages.every(message => message.type === 'snapshot'));
 });
 test('popup opens a goal-allowed site directly rather than offering request or end session', async () => {
@@ -51,6 +57,7 @@ test('popup opens a goal-allowed site directly rather than offering request or e
   p.state.access = { x: accessState('x', { goalAllowed: true }) };
   p.change(); await p.ready(); const row = p.nodes['access-sites'].children[0];
   assert.equal(row.children[0].children[1].textContent, 'Open · above daily goal');
+  assert.equal(row.children[1].attributes['aria-label'], 'Open site: X');
   assert.equal(row.children[1].textContent, 'Open site');
   await row.children[1].fire('click'); assert.equal(p.state.tabs[0].url, 'https://x.com/home');
   assert.equal(p.messages.some(m => m.type === 'access-end'), false);
