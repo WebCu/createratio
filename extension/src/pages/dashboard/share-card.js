@@ -15,11 +15,11 @@
     const creating = time(total.createSec), consuming = time(total.consumeSec), score = C3.score(total).toFixed(2);
     const label = range === 'today' ? 'Today so far' : 'Last 7 days';
     const period = first === last ? last : `${first} – ${last}`;
-    const caption = `${headline.join(' ')}\n\n${label}: ${creating} creating · ${consuming} consuming · ${contributions} posts/replies/comments.\nCreation score: ${score} (approximate; includes action credits). Tracked sites only.\n\nCreate > Consume. Free and open source: ${URL}`;
+    const caption = `${headline.join(' ')}\n\n${label}: ${creating} creating · ${consuming} consuming · ${contributions} detected post/reply/comment actions.\nCreation score: ${score} (approximate; includes action credits). Tracked sites only.\n\nCreate > Consume. Free and open source: ${URL}`;
     return { headline, creating, consuming, contributions, score, label, period, url: URL, caption,
       creatingShare: total.createSec / Math.max(1, total.createSec + total.consumeSec),
       consumingShare: total.consumeSec / Math.max(1, total.createSec + total.consumeSec),
-      description: `${headline.join(' ')} ${label}, ${period}. ${creating} creating, ${consuming} consuming. ${contributions} posts, replies and comments. Approximate creation score ${score}, including action credits. Tracked sites only. CreateRatio: ${URL}`,
+      description: `${headline.join(' ')} ${label}, ${period}. ${creating} creating, ${consuming} consuming. ${contributions} detected post, reply and comment actions, not confirmed publications. Approximate creation score ${score}, including action credits. Tracked sites only. CreateRatio: ${URL}`,
       filename: `CreateRatio-share-${first}${first === last ? '' : '-to-' + last}.png` };
   }
   function draw(canvas, card) {
@@ -44,8 +44,12 @@
     text('CreateRatio', 146, 106, 36, ink, 700, 430);
     text(card.label, 1128, 85, 28, muted, 600, 480, 'right');
     text(card.period, 1128, 124, 24, muted, 500, 480, 'right');
-    text(card.headline[0], 72, 249, 88, ink, 700);
-    text(card.headline[1], 72, 349, 88, ink, 700);
+    text(card.headline[0], 72, 249, 88, ink, 700, 684);
+    text(card.headline[1], 72, 349, 88, ink, 700, 684);
+    box(808, 172, 320, 212, violet, 24);
+    text(card.score, 968, 276, 100, '#ffffff', 700, 272, 'center');
+    text('creation score', 968, 322, 28, '#ffffff', 500, 272, 'center');
+    text('approximate', 968, 358, 24, '#ffffff', 500, 272, 'center');
     box(48, 408, 1104, 530, '#f0ecf9', 28);
     text(card.creating, 88, 522, 88, ink, 700, 452);
     text(card.consuming, 660, 522, 88, ink, 700, 452);
@@ -58,10 +62,8 @@
       if (height > 0) box(x, 740 - height, 452, height, color, Math.min(12, height / 2));
     }
     text(card.contributions, 88, 814, 52, ink, 700, 480);
-    text('posts, replies & comments', 90, 858, 29, muted, 500, 478);
-    text(card.score, 660, 814, 52, ink, 700, 452);
-    text('creation score', 664, 858, 29, muted, 500, 448);
-    text('Approximate score; +2m per post, reply or comment.', 88, 908, 26, muted, 500, 1024);
+    text('detected post / reply / comment actions', 90, 858, 29, muted, 500, 1022);
+    text('Approximate score; +2m per detected submission.', 88, 908, 26, muted, 500, 1024);
     text('Tracked sites only. Time is rounded. Today is partial.', 72, 989, 26, muted);
     text('Create > Consume', 72, 1046, 34, violet, 700);
     text('createratio.com', 72, 1128, 46, violet, 700, 500);

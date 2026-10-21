@@ -41,10 +41,11 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
           const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'), paint = ctx.fillText.bind(ctx), bounds = [];
           ctx.fillText = function(value, x, y, maxWidth) {
             const metrics = this.measureText(value), scale = Math.min(1, maxWidth / Math.max(1, metrics.width));
-            bounds.push({ text: String(value), left: x - metrics.actualBoundingBoxLeft * scale, right: x + metrics.actualBoundingBoxRight * scale, top: y - metrics.actualBoundingBoxAscent, bottom: y + metrics.actualBoundingBoxDescent });
+            bounds.push({ text: String(value), size: parseFloat(this.font.match(/[0-9.]+px/)[0]), left: x - metrics.actualBoundingBoxLeft * scale, right: x + metrics.actualBoundingBoxRight * scale, top: y - metrics.actualBoundingBoxAscent, bottom: y + metrics.actualBoundingBoxDescent });
             return paint(value, x, y, maxWidth);
           };
-          SocialCard.draw(canvas, SocialCard.create({ [C3.localDate()]: { x: stats } }, 'week'));
+          const card = SocialCard.create({ [C3.localDate()]: { x: stats } }, 'week');
+          SocialCard.draw(canvas, card);
           const bars = [[314, [195, 177, 232]], [886, [223, 212, 241]]].map(([x, color]) => {
             const pixels = ctx.getImageData(x, 600, 1, 140).data;
             let height = 0;
@@ -54,6 +55,7 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
           const largest = Math.max(stats.createSec || 0, stats.consumeSec || 0, 1);
           canvas.width = 0; canvas.height = 0;
           return {
+            scores: bounds.filter(rect => rect.text === card.score),
             bars, expectedBars: [140 * (stats.createSec || 0) / largest, 140 * (stats.consumeSec || 0) / largest],
             outside: bounds.filter(rect => rect.left < 48 || rect.right > 1152 || rect.top < 48 || rect.bottom > 1152),
             overlaps: bounds.flatMap((a, index) => bounds.slice(index + 1).filter(b => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).map(b => [a.text, b.text]))
@@ -63,10 +65,13 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
       for (const drawing of drawings) {
         assert.deepEqual(drawing.outside, [], 'card text stays within its safe area');
         assert.deepEqual(drawing.overlaps, [], 'real, empty and large-number text never overlaps');
+        assert.equal(drawing.scores.length, 1, 'the score has a single clear focus');
+        assert.ok(drawing.scores[0].left > 800 && drawing.scores[0].top < 300, 'the score anchors the top-right block');
+        assert.ok(drawing.scores[0].size >= 64, 'the score is prominent at feed size for representative values');
         drawing.bars.forEach((height, index) => assert.ok(Math.abs(height - drawing.expectedBars[index]) < 2, 'drawn bars reflect raw time, not action credits'));
       }
       const daily = await inspect(page, 'document.querySelector("#share-caption").value');
-      assert.match(daily, /Today so far: 30m creating · 40m consuming · 4 posts\/replies\/comments/);
+      assert.match(daily, /Today so far: 30m creating · 40m consuming · 4 detected post\/reply\/comment actions/);
       assert.match(daily, /Made room for creating/);
       assert.match(daily, /https:\/\/createratio\.com\//);
       await inspect(page, 'document.querySelector("#report-range").value = "week"; document.querySelector("#report-range").dispatchEvent(new Event("change"))');
@@ -76,7 +81,7 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
       assert.match(caption, /Made room for creating\./);
       assert.match(caption, /approximate/);
       assert.match(caption, /Create > Consume/);
-      assert.match(caption, /Last 7 days: 80m creating · 60m consuming · 9 posts\/replies\/comments/);
+      assert.match(caption, /Last 7 days: 80m creating · 60m consuming · 9 detected post\/reply\/comment actions/);
       assert.match(caption, /Creation score: 1\.63/);
       assert.doesNotMatch(caption, /Synthetic|private\.example|private intention|linkedin|x\.com|older|99999/);
       assert.equal(await inspect(page, 'document.documentElement.scrollWidth <= innerWidth'), true);

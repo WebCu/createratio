@@ -259,8 +259,10 @@ PNG for **Today** or **Last 7 days (including today)**. Review the preview,
 choose **Download PNG**, then attach it to a social post. **Copy caption** copies
 the matching summary with a clickable `https://createratio.com/` link; if clipboard
 access fails, the caption is selected for manual copying. The card includes
-CreateRatio branding, rounded creating/consuming time, posts/replies/comments,
-and the creation score with its action-credit caveat. Headlines never infer a
+CreateRatio branding, rounded creating/consuming time, and detected
+post/reply/comment actions. Its approximate creation score is highlighted in the
+top right, with an action-credit caveat. Action counts are submission detections,
+not confirmed publications; failed submissions and site changes can affect them. Headlines never infer a
 trend from a single period or treat action credits as creating time. Cards and
 captions exclude site names, website time, and saved intentions. No data is
 uploaded and nothing is posted automatically. Changing the period or clearing
