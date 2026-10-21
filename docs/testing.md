@@ -307,6 +307,13 @@ Source installation links must point to the current repository; Edge
 instructions must not imply a published store release. Distinguish temporary
 Firefox source installs from the permanent store installation.
 
+Check that reported desktop Chrome and Firefox identities make the matching
+store link first and prominent in both sections and open the matching instructions.
+Both store links must remain available. Mobile, Safari, Edge, other recognized
+Chromium variants, unknown identities, and disabled or blocked JavaScript must
+retain neutral choices. Report user-agent emulation separately from native-browser
+installation checks; detection is best-effort, not a compatibility guarantee.
+
 Local and non-production hosts must not load analytics. Check that production
 analytics failures do not break the page and that distributed license notices
 are present. Verify `/privacy.html` and `/terms.html` in source and built

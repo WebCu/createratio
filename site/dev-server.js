@@ -11,6 +11,7 @@ const assets = {
   '/terms.html': { filename: 'terms.html', contentType: 'text/html; charset=utf-8' },
   '/styles.css': { filename: 'styles.css', contentType: 'text/css; charset=utf-8' },
   '/arrival.js': { filename: 'arrival.js', contentType: 'text/javascript; charset=utf-8' },
+  '/browser-install.js': { filename: 'browser-install.js', contentType: 'text/javascript; charset=utf-8' },
   '/analytics.js': { filename: 'analytics.js', contentType: 'text/javascript; charset=utf-8' },
   '/favicon.svg': { filename: 'favicon.svg', contentType: 'image/svg+xml' },
   '/LICENSE': { filename: 'LICENSE', contentType: 'text/plain; charset=utf-8' }

@@ -15,7 +15,7 @@ function verifyInstallation(html) {
   const hero = html.split('<section class="hero"')[1].split('</section>')[0];
   const install = html.split('<section class="install"')[1].split('</section>')[0];
   for (const section of [hero, install]) {
-    const buttons = [...section.matchAll(/<a class="button" href="([^"]+)">([^<]+)<\/a>/g)];
+    const buttons = [...section.matchAll(/<a class="button" data-browser="(?:chrome|firefox)" href="([^"]+)">([^<]+)<\/a>/g)];
     assert.deepEqual(buttons.map(([, href, label]) => [href, label]), listings,
       'installation has plain Chrome and Firefox links that work without JavaScript');
   }
@@ -38,5 +38,9 @@ test('the source and built landing page offer Chrome and Firefox listings with s
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-install-'));
   t.after(() => fs.rmSync(output, { recursive: true, force: true }));
   buildSite(output);
-  verifyInstallation(fs.readFileSync(path.join(output, 'index.html'), 'utf8'));
+  const html = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
+  verifyInstallation(html);
+  assert.match(html, /<script src="browser-install\.js" defer><\/script>/);
+  assert.equal(fs.readFileSync(path.join(output, 'browser-install.js'), 'utf8'),
+    fs.readFileSync(path.join(__dirname, '../browser-install.js'), 'utf8'));
 });

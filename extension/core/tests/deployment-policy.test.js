@@ -190,7 +190,8 @@ test('public legal policies ship through both website deployment and local previ
   assert.match(workflow, /run: node site\/build\.js/);
   assert.match(workflow, /cp dist\/site\/\*/);
   assert.ok(workflow.indexOf('run: node site/build.js') < workflow.indexOf('cp dist/site/*'));
-  assert.match(siteBuild, /for \(const name of \['privacy\.html', 'terms\.html', 'styles\.css', 'arrival\.js', 'favicon\.svg'\]\)/);
+  assert.match(siteBuild, /for \(const name of \['privacy\.html', 'terms\.html', 'styles\.css', 'arrival\.js', 'browser-install\.js', 'favicon\.svg'\]\)/);
+  assert.match(compose, /\.\/site\/browser-install\.js:\/srv\/www\/browser-install\.js:ro/);
   for (const page of ['privacy', 'terms']) {
     assert.match(compose, new RegExp(`\\./site/${page}\\.html:/srv/www/${page}\\.html:ro`));
     assert.match(homepage, new RegExp(`href="${page}\\.html"`));
