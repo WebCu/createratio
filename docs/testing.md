@@ -20,6 +20,13 @@ the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;
 missing browsers and failed checks are errors, not successful skips.
 
+`pnpm verify` runs all three completion commands in order, stopping on the first
+failure and preserving its exit code. Each invocation creates a fresh private
+temporary directory, prints its path, and saves per-stage logs plus `summary.json`.
+Later stages are marked **not-run**, with no log file; output from an earlier run
+is never reused. Keep these artifacts outside Git and remove them when no longer
+needed. Existing browser-failure artifacts remain under `BROWSER_ARTIFACT_DIR`.
+
 ## Strategy and completion
 
 Use a testing-trophy shape, not fixed test percentages:
@@ -203,6 +210,19 @@ waiting for painted, stable geometry and a matching hit target before dispatch.
 The tests shift `Date` in pages and the worker to check the 60-second wait and
 expiry without minute-long sleeps; native timers and monotonic time remain real.
 
+Use `findByRole(browser, page, role, name)` and `clickByRole(...)` from
+`extension/browser-tests/chromium.mjs` for accessibility-driven journeys. Names
+normalize whitespace, hidden nodes are excluded, and duplicate matches fail rather
+than choosing a row. Both role/name and selector clicks share painted geometry,
+disabled-state, hit-target, and trusted-input handling. Inspect new-tab results
+with `Target.getTargets`; the runner does not enable target-discovery events.
+
+Run HTML/CSS audits against generated pages such as `dist/chrome/settings.html`
+after `pnpm build:chrome`. Source HTML references the flat packaged layout, so
+shared stylesheets intentionally do not resolve beside `extension/src/pages/`.
+Audit the built assets rather than treating missing source-relative CSS as a
+product defect.
+
 Failed journeys save browser version, page/worker clocks, URLs, DOM, screenshots,
 console/exception events, requested/actual trusted input targets, access state,
 alarms, and session rules before profile cleanup. Startup failures and watchdog
@@ -228,12 +248,13 @@ The pre-commit hook checks staged whitespace, including newly added files.
 paths, including skill-directory symlinks and files force-added while ignored.
 Ignored or untracked personal files remain allowed.
 
-To print a verification log without swallowing its exit code, including an
-expected failing test:
+For a focused command, use a new log directory and retain the exit code:
 
 ```sh
-if pnpm check > /tmp/createratio-check.log 2>&1; then status=0; else status=$?; fi
-tail -n 40 /tmp/createratio-check.log
+logs=$(mktemp -d "${TMPDIR:-/tmp}/createratio-check.XXXXXX")
+if pnpm check > "$logs/check.log" 2>&1; then status=0; else status=$?; fi
+printf 'Verification log: %s\n' "$logs/check.log"
+tail -n 40 "$logs/check.log"
 exit "$status"
 ```
 
