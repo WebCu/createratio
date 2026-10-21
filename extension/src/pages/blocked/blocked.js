@@ -7,13 +7,13 @@ $('reason').minLength = C3.INTENTION_LIMITS.minLength;
 $('reason').maxLength = C3.INTENTION_LIMITS.maxLength;
 let access, busy = false, refreshing = false;
 const blockedLines = [
-  'Time to go touch grass.',
-  'Make rather than take.',
-  'Your thumb deserves a day off.',
+  'The feed can wait. You’ve got this.',
+  'Your next idea called. It wants a minute.',
+  'Give your scrolling thumb a breather.',
   'The feed will survive without you.',
   'Plot twist: go make something.',
-  'You have reached the end of the internet. For now.',
-  'Less doom. More doing.',
+  'A little less feed. A little more you.',
+  'Big ideas start with a little space.',
   'Go give the real world a like.'
 ];
 function nextBlockedLine() {
@@ -38,12 +38,9 @@ function render() {
   const waiting = !active && access.readyAt > 0 && access.requestExpiresAt > now;
   $('session-step').textContent = `Open a ${access.sessionMinutes}-minute session.`;
   $('heading').textContent = active ? `${access.name} is open.` : blockedLine;
-  $('block-code').hidden = active;
   $('access-steps').hidden = active;
-  $('connection-note').hidden = active;
-  $('block-code').textContent = '400 · Too much taking';
   $('state-text').textContent = access.goalAllowed ? 'Above your daily goal' : active ? 'Temporary access' : 'Blocked by default';
-  $('description').textContent = access.goalAllowed ? `${access.name} is open while today’s creation score is above your current daily target. No intention, wait or timer needed.` : active ? `Time counts only in the active tab of a focused browser window. When time runs out, all ${access.name} tabs return to this page.` : `${access.name} connections are blocked by CreateRatio. Step away, or write an intention and take the full pause before a new visit.`;
+  $('description').textContent = access.goalAllowed ? `${access.name} is open while today’s creation score is above your current daily target. No intention, wait or timer needed.` : active ? `Time counts only in the active tab of a focused browser window. When time runs out, all ${access.name} tabs return to this page.` : `${access.name} is paused. Set an intention, take a minute, then open a timed session.`;
   document.title = `${access.name} ${active ? 'session' : 'blocked'} - CreateRatio`;
   $('request').hidden = active || waiting;
   $('waiting').hidden = !waiting;
@@ -76,16 +73,23 @@ async function send(type, extra = {}) {
 async function action(type, extra = {}, navigate = false) {
   if (busy) return;
   const previousRefill = access?.refilledAt || 0;
+  const previousFocus = document.activeElement;
+  const restoreFocus = target => {
+    if (document.activeElement === previousFocus || document.activeElement === document.body) target?.focus();
+  };
+  let focusTarget = previousFocus;
   busy = true; render();
   try {
     await send(type, extra); error(); render();
+    focusTarget = type === 'access-begin' && !$('waiting').hidden ? $('waiting-title') : (type === 'access-cancel' || type === 'access-end') && !$('request').hidden ? $('reason') : null;
     if (navigate && (access.enabled === false || access.goalAllowed || access.remainingMs > 0)) {
+      if (!$('active').hidden) restoreFocus($('active-title'));
       if (access.enabled !== false && !access.goalAllowed && type === 'access-open' && access.refilledAt && access.refilledAt !== previousRefill) await RefillAnimation.waitForFill($('active-countdown'));
       location.replace(access.home);
     }
     if (type === 'access-cancel' || type === 'access-end') $('reason').value = '';
   } catch (e) { error(e.message); }
-  finally { busy = false; render(); }
+  finally { busy = false; render(); restoreFocus(focusTarget); }
 }
 async function refresh() {
   if (busy || refreshing) return;

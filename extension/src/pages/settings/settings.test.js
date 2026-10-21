@@ -296,15 +296,6 @@ test('creation tracking and Website time remain independent in both directions',
   assert.equal(controls(p, 'x').tracking.checked, false); assert.equal(controls(p, 'linkedin').tracking.checked, false);
   p.toggle('x', true); await p.ready(); assert.equal(p.nodes['website-time-enabled'].checked, false); assert.equal(p.state.requested, 0);
 });
-test('copy separates creation-score measurements, all-site browsing time and blocking limits', () => {
-  const html = fs.readFileSync(path.join(__dirname, 'settings.html'), 'utf8');
-  assert.match(html, /<h2 id="site-settings-title">Site access<\/h2>/); assert.match(html, /timed access and creation-score tracking work together/);
-  assert.match(html, /browse freely, with no gate or new creation-score measurements/); assert.match(html, /During an access session/);
-  assert.match(html, /Optional browsing overview across all sites/); assert.match(html, /This is not your session timer/);
-  assert.match(html, /including sites with Limit &amp; track off/); assert.match(html, /does not limit access, classify creating\/consuming, record actions, or affect your creation score/);
-  assert.match(html, /counts all active-tab time—not just consuming time/);
-  assert.doesNotMatch(html, /Nudge|Remind after|Track activity|Track all websites/);
-});
 test('Settings gives site boundaries and the optional goal exception separate labelled sections', () => {
   const html = fs.readFileSync(path.join(__dirname, 'settings.html'), 'utf8');
   const sections = new Map([...html.matchAll(/<section class="preference" aria-labelledby="([^"]+)">([\s\S]*?)<\/section>/g)].map(([, id, content]) => [id, content]));

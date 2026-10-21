@@ -11,10 +11,22 @@
   <main>
     <div class="page-heading"><h1>Settings</h1><p>Set your boundaries once. Keep the popup for quick visits.</p></div>
     <section class="preference" aria-labelledby="site-settings-title">
-      <h2 id="site-settings-title">Site access</h2><p>Turn on <strong>Limit &amp; track</strong> for a site to give each visit a boundary. During an access session, creating/consuming time and actions contribute to your creation score. When session time runs out, the site blocks.</p>
+      <h2 id="site-settings-title">Site access</h2>
+      <ul class="policy-rules">
+        <li><strong>On:</strong> timed access plus creation-score tracking of creating/consuming time and actions. Each new session needs an intention and 60-second wait; the site blocks when time runs out.</li>
+        <li><strong>Off:</strong> free access; no gate, wait, timer or new creation-score measurements. Keeps history and saved duration; cancels the current budget, pending wait and refill. Turning On starts fresh unless above-goal access applies.</li>
+        <li><strong>Shared active time:</strong> all tabs for a site share one budget. All active-tab time counts, not just consuming. Switching away pauses it.</li>
+      </ul>
       <ul id="site-settings" class="site-settings"><li>Loading settings…</li></ul>
-      <p class="preference-note"><strong>On:</strong> timed access and creation-score tracking work together. Each new session requires an intention and the 60-second wait. <strong>Off:</strong> browse freely, with no gate or new creation-score measurements. Your history is kept.</p>
-      <p class="preference-note">Session time counts all active-tab time—not just consuming time. Switching away pauses it; all tabs for the site share the same time. Changes apply to new sessions and daily refills at local midnight. Unused or exhausted session budgets refill once per day; manually ending a session or turning Off cancels its refill. From Default means the time follows your Default value.</p>
+      <details class="policy-details">
+        <summary>Session times, Default and daily refills</summary>
+        <ul class="policy-rules">
+          <li><strong>From Default</strong> follows the Default time. A <strong>Custom</strong> time stays unchanged when Default changes; <strong>Use Default</strong> removes that override.</li>
+          <li>Time changes apply to new sessions and midnight refills, not the current budget.</li>
+          <li>At local midnight, unused or exhausted session budgets refill to the configured duration once per day, without accumulating. Sites you have never opened stay blocked.</li>
+          <li>Manually ending a session or turning Off cancels its daily refill.</li>
+        </ul>
+      </details>
     </section>
     <section class="preference" aria-labelledby="scroll-friction-title">
       <div class="preference-heading"><label for="scroll-friction-enabled"><strong id="scroll-friction-title">Slow scrolling</strong><small>Choose how much effort each scroll takes.</small></label><input id="scroll-friction-enabled" type="checkbox" role="switch" disabled aria-describedby="scroll-friction-note"></div>

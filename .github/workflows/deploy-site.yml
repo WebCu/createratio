@@ -17,7 +17,7 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: production
     concurrency:
@@ -32,8 +32,8 @@ jobs:
       AWS_S3_BUCKET: ${{ vars.AWS_S3_BUCKET }}
       AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
     steps:
-      - name: Checkout (v4.4.0)
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Checkout (v7.0.1)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
@@ -73,8 +73,8 @@ jobs:
               exit 1
             fi
           done
-      - name: Authenticate with AWS using OIDC (v4.3.1)
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+      - name: Authenticate with AWS using OIDC (v6.3.0)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
         if: steps.freshness.outputs.publish == 'true'
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}

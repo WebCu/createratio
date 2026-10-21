@@ -146,7 +146,6 @@ without accumulating. Never-opened sites stay blocked; manually ending a session
 cancels its daily refill.
 
 **Save drafts before expiry:** open tabs redirect to the local blocked page.
-Its “400” message is presentation, not a server-issued error.
 
 Optional **Allow sites while above the daily goal** skips gates and timers only
 while today's aggregate score is strictly above the current daily target
