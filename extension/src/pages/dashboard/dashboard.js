@@ -3,7 +3,7 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
-let reportURL = null, reportTimer = null, shareURL = null, shareCard = null, shareVersion = 0;
+let reportURL = null, reportTimer = null, shareURL = null, shareCard = null, shareVersion = 0, reportVersion = 0;
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function svgElement(tag, attrs = {}, text) {
@@ -192,11 +192,12 @@ $('share-copy').addEventListener('click', async () => {
 $('report-export').addEventListener('click', async () => {
   const button = $('report-export');
   if (button.disabled) return;
-  const range = $('report-range').value;
+  const range = $('report-range').value, version = reportVersion;
   button.disabled = true; $('report-status').textContent = '';
   try {
     const now = new Date(), date = C3.localDate(now);
     const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to export report.');
+    if (version !== reportVersion) throw new Error('History changed while loading. Please try again.');
     if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
     const report = CreationReport.create(data.days, range, now);
     clearTimeout(reportTimer);
@@ -212,7 +213,7 @@ $('report-export').addEventListener('click', async () => {
 $('website-export').addEventListener('click', () => exportHistory('websites'));
 $('export').addEventListener('click', () => exportHistory('ratio'));
 extensionAPI.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && Object.hasOwn(changes, '_historyGeneration')) clearShareCard();
+  if (area === 'local' && Object.hasOwn(changes, '_historyGeneration')) { reportVersion++; clearShareCard(); }
   if (RuntimeMessages.shouldRefresh(changes, area)) void refresh();
 });
 setInterval(refresh, 5000);

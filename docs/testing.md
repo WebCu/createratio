@@ -287,8 +287,9 @@ Before a release, verify:
   narrow layouts, keyboard selection, removed integrations, and that neither
   website time nor saved intentions appear. A local-date change during either
   PNG or HTML history loading must show a retry message without generating an
-  artifact; retry must use the new period. Activity and website CSV exports
-  remain unchanged.
+  artifact; retry must use the new period. A history reset during HTML history
+  loading must also block the pre-reset response; retry must export only the
+  remaining history. Activity and website CSV exports remain unchanged.
 - Activity and website CSV exports work. Confirmed clearing removes histories,
   cancellation preserves them, and settings/access boundaries stay unchanged.
   Pending measurements from open tabs or failed deliveries cannot restore cleared

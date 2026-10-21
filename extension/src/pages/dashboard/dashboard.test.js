@@ -152,6 +152,29 @@ test('a same-day delayed report keeps the date captured when export started', as
   assert.equal(p.blobs.length, 1);
   assert.ok((await p.blobs[0].text()).includes(`Generated locally on ${new Date(started).toLocaleString()}.`));
 });
+for (const range of ['today', 'week']) {
+  test(`${range} report rejects a pre-reset history reply and retry exports only cleared history`, async () => {
+    const now = new Date(2026, 5, 15, 12).getTime(), today = C3.localDate(new Date(now));
+    const data = { [today]: { x: { createSec: 180, consumeSec: 60, posts: 1 } } };
+    const p = page('dashboard', data, false, { now: () => now }); await p.ready();
+    p.nodes['report-range'].value = range;
+    p.state.replies.set('history', { ok: true, days: structuredClone(data) });
+    const release = p.holdMessage('history');
+    const exporting = p.nodes['report-export'].fire('click');
+    delete data[today];
+    p.change({ _historyGeneration: { oldValue: 'before-clear', newValue: 'after-clear' } });
+    await p.ready(); release(); await exporting;
+    assert.equal(p.blobs.length, 0, 'cleared activity must never become an HTML download');
+    assert.deepEqual(p.state.downloads, []);
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    assert.equal(p.nodes['report-export'].disabled, false);
+    p.state.replies.delete('history');
+    await p.nodes['report-export'].fire('click');
+    assert.equal(p.blobs.length, 1);
+    assert.match(await p.blobs[0].text(), /<dt>Creating<\/dt><dd>0\.0m<\/dd>/);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+}
 test('report export prevents duplicate requests and recovers after loading failures', async () => {
   const p = dashboard(); await p.ready(); p.nodes['report-range'].value = 'today';
   const release = p.holdMessage('history'), before = p.messages.length;
