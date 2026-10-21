@@ -184,20 +184,25 @@ sites during timed or above-goal access, using the existing page classification
 below. Turning a site's Limit & track off also removes its scroll friction.
 
 Editors, messaging routes, nested scroll panels, horizontal gestures, and zoom
-stay native. Pages that lock document scrolling and scroll an inner container
-instead — LinkedIn's feed is one — have that container treated as the page
-surface when it fills at least half the viewport, so resistance applies there
-instead of silently doing nothing; smaller scrollable boxes are panels and stay
-native. Keyboard scrolling, touch gestures, and scrollbar dragging are
-unchanged. Line-based wheel input uses a 16-pixel line; page-based input uses
-the height of the surface being scrolled. Physical trackpad feel and native wheel settings vary by browser
-and operating system. No scroll distances or additional activity data are saved.
+stay native. When the document cannot scroll, including when its overflow is
+hidden or clipped, an inner container becomes the page surface only if it is the
+sole scrollable ancestor under the pointer and fills at least half the viewport
+height. Panels inside another scrollable container stay native regardless of
+height; a lone smaller panel stays native too. Keyboard scrolling, touch gestures,
+and scrollbar dragging are unchanged. Line-based wheel input uses a 16-pixel
+line; page-based input uses the height of the surface being scrolled. Physical
+trackpad feel and native wheel settings vary by browser and operating system.
+No scroll distances or additional activity data are saved.
 
 The tracker owns the optional wheel listener and removes it when the page becomes
 inactive, neutral, creating, disabled, or stopped. Scroll handling adds no timers,
-observers, background messages, or retained DOM references. Settings previews do
-not send messages. Committed adjustments keep at most one in-flight save and one
-replaceable latest choice; they do not queue every intermediate slider value.
+observers or background messages. It retains at most one last-target DOM reference
+for fractional movement. Handling another surface replaces that reference; an
+actual speed change clears it, including switching Off or tracker deactivation.
+A removed surface and its subtree can remain retained until one of those events.
+Settings previews do not send messages. Committed adjustments keep at most one
+in-flight save and one replaceable latest choice; they do not queue every
+intermediate slider value.
 
 ## Measurement and score
 

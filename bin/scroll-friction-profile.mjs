@@ -3,9 +3,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { launch, evaluate, eventually, withFailureArtifacts } from '../extension/browser-tests/chromium.mjs';
 
-const [baseline, candidate, output] = process.argv.slice(2);
-if (!baseline || !candidate || !output) throw new Error('Usage: node bin/scroll-friction-profile.mjs BASELINE_BUNDLE CANDIDATE_BUNDLE OUTPUT_JSON');
-const fixture = '<style>body{margin:0;min-height:20000px}</style><h1>Synthetic scroll workload</h1>';
+const [baseline, candidate, output, layout = 'document'] = process.argv.slice(2);
+if (!baseline || !candidate || !output || !['document', 'app-shell'].includes(layout)) throw new Error('Usage: node bin/scroll-friction-profile.mjs BASELINE_BUNDLE CANDIDATE_BUNDLE OUTPUT_JSON [document|app-shell]');
+const fixture = layout === 'app-shell'
+  ? '<style>html,body{margin:0;height:100%;overflow:hidden}body{min-height:20000px}main{position:fixed;inset:0;overflow:auto}</style><main id="profile-surface"><h1>Synthetic app shell</h1><div style="height:20000px">Synthetic feed</div></main>'
+  : '<style>body{margin:0;min-height:20000px}</style><h1>Synthetic scroll workload</h1>';
+const surface = layout === 'app-shell' ? 'document.querySelector("#profile-surface")' : 'document.scrollingElement';
 const tabCount = 8, cycles = 30, wheelEvents = 100, idleMs = 6000;
 
 async function injectedBytes(bundle) {
@@ -19,23 +22,26 @@ async function run(bundle, variant, repetition) {
   const hasFriction = manifest.content_scripts.some(entry => entry.js.includes('scroll-friction.js'));
   const browser = await launch(resolve(bundle));
   try {
-    return await withFailureArtifacts(browser, `${variant} scroll resource profile ${repetition}`, async () => {
+    return await withFailureArtifacts(browser, `${variant} ${layout} scroll resource profile ${repetition}`, async () => {
       const contexts = new Map();
       browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
         if (context.origin === browser.origin) contexts.set(session, context.id);
       });
       await evaluate(browser, browser.worker, `(async () => {
-        await chrome.storage.local.set({ settings: { ...C3.DEFAULT_SETTINGS, scrollFrictionEnabled: true }, _access: {
+        await chrome.storage.local.set({ settings: { ...C3.DEFAULT_SETTINGS, scrollFrictionEnabled: true, scrollFrictionStrength: 50 }, _access: {
           x: { remainingMs: 300000, date: C3.localDate() }, linkedin: { remainingMs: 300000, date: C3.localDate() }
         } });
         await SiteAccess.reconcile();
         globalThis.profileRequests = 0;
         chrome.runtime.onMessage.addListener((message, sender) => { if (sender.tab && message.type === 'snapshot') profileRequests++; });
       })()`);
+      async function replaceSurface(page) {
+        await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(fixture)}; ${surface}.scrollTop = 1000`);
+      }
       async function prepare(url) {
         const page = await browser.page(url);
         await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete"'), 'profile document ready');
-        await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(fixture)}; scrollTo(0, 1000)`);
+        await replaceSurface(page);
         return page;
       }
       async function sample(page) {
@@ -61,6 +67,23 @@ async function run(bundle, variant, repetition) {
       const frames = () => evaluate(browser, active.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
       const settled = enabled => eventually(async () => (await wheelListeners(active)).filter(listener => !listener.passive).length === Number(hasFriction && enabled), 'active tracker applies the scrolling preference');
       await frames(); await settled(true);
+      async function handledWheel() {
+        const before = await evaluate(browser, active.session, `${surface}.scrollTop`);
+        await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 400, y: 400, deltaX: 0, deltaY: 80 }, active.session);
+        await eventually(() => evaluate(browser, active.session, `${surface}.scrollTop !== ${before}`), 'profile surface moves');
+        return evaluate(browser, active.session, `(async () => {
+          let previous = -1, stable = 0;
+          for (let frame = 0; frame < 120 && stable < 5; frame++) {
+            await new Promise(requestAnimationFrame);
+            const next = ${surface}.scrollTop;
+            stable = next === previous ? stable + 1 : 0; previous = next;
+          }
+          return ${surface}.scrollTop - ${before};
+        })()`);
+      }
+      const wheelDistance = await handledWheel();
+      assert.ok([40, 80].includes(wheelDistance), 'profile input must move half or the full native distance');
+      if (variant === 'candidate' && hasFriction) assert.equal(wheelDistance, 40, 'candidate slows the measured surface at 50%');
       const checkpoints = [{ cycle: 0, ...await sample(active), wheelListeners: await wheelListeners(active) }];
       for (let cycle = 1; cycle <= cycles; cycle++) {
         for (const enabled of [false, true]) {
@@ -77,6 +100,10 @@ async function run(bundle, variant, repetition) {
           }
           await frames(); await settled(enabled);
         }
+        assert.equal(await handledWheel(), wheelDistance, 'resistance survives preference and route cycles');
+        await replaceSurface(active);
+        await frames();
+        assert.equal(await handledWheel(), wheelDistance, 'resistance follows a replacement surface');
         if (cycle === 10 || cycle === cycles) checkpoints.push({ cycle, ...await sample(active), wheelListeners: await wheelListeners(active) });
       }
       await browser.cdp.send('Performance.enable', {}, active.session);
@@ -103,14 +130,14 @@ async function run(bundle, variant, repetition) {
       const counts = checkpoints.map(checkpoint => checkpoint.wheelListeners.length);
       assert.ok(counts.every(count => count === counts[0]), `lifecycle cycles must not accumulate wheel listeners: ${counts.join(', ')}`);
       return {
-        variant, repetition, browser: (await browser.cdp.send('Browser.getVersion')).product, injectedBytes: await injectedBytes(bundle),
+        variant, repetition, layout, wheelDistance, browser: (await browser.cdp.send('Browser.getVersion')).product, injectedBytes: await injectedBytes(bundle),
         controlHeap, checkpoints, afterWheel, inactiveListeners, idleRequests: idle.after - idle.before,
         workload: { elapsedMs, scriptMs: (after.ScriptDuration - before.ScriptDuration) * 1000, taskMs: (after.TaskDuration - before.TaskDuration) * 1000, layoutMs: (after.LayoutDuration - before.LayoutDuration) * 1000 }
       };
     });
   } finally { await browser.cleanup(); }
 }
-const report = { environment: { node: process.version, platform: process.platform, architecture: process.arch }, tabCount, cycles, wheelEvents, idleMs, runs: [] };
+const report = { environment: { node: process.version, platform: process.platform, architecture: process.arch }, layout, tabCount, cycles, lifecycleWheelEvents: cycles * 2 + 1, wheelEvents, idleMs, runs: [] };
 for (let repetition = 1; repetition <= 3; repetition++) {
   const order = repetition % 2 ? [['baseline', baseline], ['candidate', candidate]] : [['candidate', candidate], ['baseline', baseline]];
   for (const [variant, bundle] of order) {

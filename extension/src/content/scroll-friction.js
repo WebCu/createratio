@@ -14,9 +14,6 @@
     function scrollable(node) {
       return node.scrollHeight > node.clientHeight && SCROLLS.test(getComputedStyle(node).overflowY);
     }
-    // App-shell pages lock the document and scroll an inner container instead.
-    // That container is the page surface only when it fills at least half the
-    // viewport; smaller boxes are nested panels and keep native scrolling.
     function pageSurface(node) {
       return node.clientHeight * 2 >= document.documentElement.clientHeight;
     }
@@ -33,10 +30,10 @@
         if (scrollable(node)) ancestors.push(node);
       }
       let target = root && root.scrollHeight > root.clientHeight ? root : null;
+      if (target && [root, document.body].some(node => node && ['hidden', 'clip'].includes(getComputedStyle(node).overflowY))) target = null;
       if (target) {
         if (ancestors.length) return;
-        if ([root, document.body].some(node => node && ['hidden', 'clip'].includes(getComputedStyle(node).overflowY))) target = null;
-      } else if (ancestors.length && pageSurface(ancestors[0])) target = ancestors[0];
+      } else if (ancestors.length === 1 && pageSurface(ancestors[0])) target = ancestors[0];
       if (!target) return;
       const unit = event.deltaMode === 0 ? 1 : event.deltaMode === 1 ? LINE_PIXELS : event.deltaMode === 2 ? target.clientHeight : 0;
       if (!unit) return;

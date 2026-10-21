@@ -67,18 +67,33 @@ test('an app-shell page slows its own surface when the document cannot scroll', 
   assert.deepEqual(root.moves, []);
 });
 
-test('nested panels keep native scrolling, with or without a document scroll range', () => {
+test('locked document roots with a scroll range use the inner page surface', () => {
+  for (const lock of ['root', 'body']) for (const overflowY of ['hidden', 'clip']) {
+    const root = documentScroller(), body = new Element('body');
+    (lock === 'root' ? root : body).overflowY = overflowY;
+    const workspace = new Element('main', { scrollHeight: 4200, clientHeight: 800, overflowY: 'auto' });
+    workspace.scrollTop = 1000;
+    const h = setup({ root, body, chain: [workspace] });
+    h.friction.setSpeed(0.5);
+    for (const deltaY of [240, -240]) assert.equal(h.wheel({ deltaY }).prevented, 1, `${lock} ${overflowY}`);
+    assert.deepEqual(workspace.moves.map(move => move.top), [120, -120]);
+    assert.deepEqual(root.moves, []);
+  }
+});
+
+test('nested panels keep native scrolling regardless of height, position or document scroll range', () => {
   const scenarios = [
     ['document scrolls', () => ({ root: documentScroller(), body: new Element('body'), pane: null, viewport: 800 })],
     ['app shell', () => ({ ...appShell(), pane: new Element('main', { scrollHeight: 4200, clientHeight: 520, overflowY: 'auto' }) })]
   ];
-  for (const [label, build] of scenarios) {
+  for (const [label, build] of scenarios) for (const height of [200, 500]) for (const position of [0, 1000, 2000 - height]) for (const deltaY of [240, -240]) {
     const { root, body, pane, viewport } = build();
-    const panel = new Element('aside', { scrollHeight: 2000, clientHeight: 200, overflowY: 'auto' });
+    const panel = new Element('aside', { scrollHeight: 2000, clientHeight: height, overflowY: 'auto' });
+    panel.scrollTop = position;
     const h = setup({ root, body, chain: pane ? [panel, pane] : [panel], viewport });
     h.friction.setSpeed(0.5);
-    const event = h.wheel({ deltaY: 240 });
-    assert.equal(event.prevented, 0, label);
+    const event = h.wheel({ deltaY });
+    assert.equal(event.prevented, 0, `${label}, height ${height}, position ${position}, delta ${deltaY}`);
     assert.deepEqual(panel.moves, [], label);
     assert.deepEqual(root.moves, [], label);
     assert.deepEqual(pane?.moves || [], [], label);
@@ -132,6 +147,27 @@ test('fractional movement accumulates on the promoted surface', () => {
   h.wheel({ deltaY: 3 });
   assert.deepEqual(workspace.moves.map(move => move.top), [1, 2]);
   assert.equal(workspace.scrollTop, 303);
+});
+
+test('fractional movement resets on target replacement and speed transitions', () => {
+  const { root, body, viewport } = appShell();
+  const workspace = new Element('main', { scrollHeight: 4200, clientHeight: 520, overflowY: 'auto' });
+  workspace.scrollTop = 300;
+  const h = setup({ root, body, chain: [workspace], viewport });
+  h.friction.setSpeed(0.5);
+  h.wheel({ deltaY: 3 });
+  const replacement = new Element('main', { scrollHeight: 4200, clientHeight: 520, overflowY: 'auto' });
+  replacement.scrollTop = workspace.scrollTop;
+  const gesture = { deltaY: 3, composedPath: () => [replacement, body, h.documentElement] };
+  h.wheel(gesture);
+  h.friction.setSpeed(0.25);
+  h.wheel(gesture);
+  h.friction.setSpeed(1);
+  assert.equal(h.document.listener, null);
+  h.friction.setSpeed(0.5);
+  h.wheel(gesture);
+  assert.deepEqual(workspace.moves.map(move => move.top), [1]);
+  assert.deepEqual(replacement.moves.map(move => move.top), [1, 0, 1]);
 });
 
 test('wheel input stays untouched while resistance is off', () => {

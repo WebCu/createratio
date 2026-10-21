@@ -119,16 +119,22 @@ run alone does not satisfy this section.
 Build baseline and candidate Chrome bundles in separate directories, then run:
 
 ```sh
-node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-resources.json
+node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-document.json document
+node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-app-shell.json app-shell
 ```
 
 This uses the same disposable Chromium runner and sandbox settings as the browser
-journeys. It alternates three runs per build with eight synthetic site tabs,
-30 preference/SPA-route cycles, 100 trusted wheel inputs, and six seconds hidden.
+journeys. Each layout alternates three runs per build with eight synthetic site
+tabs, 30 preference/SPA-route cycles, 100 measured trusted wheel inputs, and six
+seconds hidden. The app-shell fixture locks a document that still has a scroll
+range and scrolls a fixed inner container instead. Before timing, 61 additional
+wheel inputs exercise initial handling, every re-enable, and 30 active surface
+replacements; assertions verify distance scaling survives those transitions.
 It waits for the foreground wheel listener to match each preference before
-sampling. It records bundle bytes, wheel listeners, GC-retained active-page isolate heap,
-an uninjected fixture control, and page script/task/layout durations. The active
-isolate measurement is not total browser RAM or a sum across tabs. CDP wheel-input
+sampling. It records bundle bytes, wheel listeners, GC-retained active-page isolate
+heap and DOM counters, an uninjected fixture control, and page script/task/layout
+durations. The active isolate measurement is not total browser RAM or a sum across
+tabs. CDP wheel-input
 elapsed time includes browser dispatch/acknowledgement overhead; it is not user
 input latency. Idle request counts do not prove worker shutdown. Compare medians
 and ranges, check lifecycle growth, and apply the resource review gate above.
@@ -300,9 +306,9 @@ Before a release, verify:
   Off, already-open tabs scroll natively. Verify real mouse wheels and trackpads,
   both directions, fractional movement, zoom, horizontal gestures, nested panels,
   editors, messaging, route changes, and page focus. On app-shell pages whose only
-  scroll surface is an inner container (LinkedIn's feed), verify the container
-  scrolls at the configured resistance and that panels inside it stay native.
-  Keyboard, touch, and scrollbar
+  scroll surface is an inner container, verify it slows even when the document
+  has a scroll range but its overflow is hidden or clipped. Panels inside it must
+  stay native even above half the viewport height. Keyboard, touch, and scrollbar
   navigation must stay native. Check the Settings switch and slider with keyboard
   input at narrow widths, with reduced motion and with forced colors. Synthetic Chromium tests do not establish
   physical trackpad feel or Firefox/Edge compatibility.

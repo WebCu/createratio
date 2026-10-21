@@ -148,45 +148,66 @@ for (const [site, url, messagesURL, editor] of [
   });
 }
 
-test('built slow scrolling slows an app-shell page whose document cannot scroll', async () => {
-  const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
-  const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
-  try {
-    await withFailureArtifacts(browser, 'app-shell slow-scrolling journey', async () => {
-      await evaluate(browser, browser.worker, `(async () => {
-        await chrome.storage.local.set({ settings: { accessMinutes: 12 }, _access: { linkedin: { remainingMs: 300000, date: C3.localDate() } } });
-      })()`);
-      const page = await browser.page('https://www.linkedin.com/feed/');
-      await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
-      await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify('<style>html,body{margin:0;height:100%;overflow:hidden}#workspace{position:fixed;inset:0;overflow:auto}#panel{height:120px;width:200px;margin:20px;overflow:auto;border:1px solid #ccc}</style><main id="workspace"><h1>Synthetic app shell</h1><div id="panel"><div style="height:4000px">Nested panel</div></div><div style="height:20000px">Feed</div></main>')}`);
-      async function settled(selector) {
-        return evaluate(browser, page.session, `(async () => {
-          let previous = -1, stable = 0;
-          for (let frame = 0; frame < 120 && stable < 5; frame++) {
-            await new Promise(requestAnimationFrame);
-            const next = document.querySelector('${selector}').scrollTop;
-            stable = next === previous ? stable + 1 : 0; previous = next;
-          }
-          return document.querySelector('${selector}').scrollTop;
+for (const [label, lock, overflow, panelHeight] of [
+  ['no document scroll range', null, null, 120],
+  ['tall nested panel', null, null, 500],
+  ['hidden root with a scroll range', 'html', 'hidden', 120],
+  ['clipped root with a scroll range', 'html', 'clip', 120],
+  ['hidden body with a scroll range', 'body', 'hidden', 120],
+  ['clipped body with a scroll range', 'body', 'clip', 120]
+]) {
+  test(`built app-shell slow scrolling preserves native panels: ${label}`, async () => {
+    const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
+    const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+    try {
+      await withFailureArtifacts(browser, `app-shell scrolling: ${label}`, async () => {
+        const contexts = new Map();
+        browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
+          if (context.origin === browser.origin) contexts.set(session, context.id);
+        });
+        await evaluate(browser, browser.worker, `(async () => {
+          await chrome.storage.local.set({ settings: { accessMinutes: 12 }, _access: { linkedin: { remainingMs: 300000, date: C3.localDate() } } });
         })()`);
-      }
-      async function wheelAt(selector, delta) {
-        await evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop = 1000`);
-        const point = await evaluate(browser, page.session, `(() => { const r = document.querySelector('${selector}').getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
-        await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: delta }, page.session);
-        await eventually(() => evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop !== 1000`), `${selector} moves`);
-        return (await settled(selector)) - 1000;
-      }
-      assert.equal(await eventually(async () => { const distance = await wheelAt('#workspace', 240); return distance === 120 ? distance : undefined; }, 'app-shell surface slows to half distance'), 120, 'the inner page surface scrolls half as far');
-      assert.equal(await wheelAt('#workspace', -240), -120, 'both directions slow down');
-      await evaluate(browser, page.session, `document.querySelector('#workspace').scrollTop = 0`);
-      await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-      const panelPoint = await evaluate(browser, page.session, `(() => { const p = document.querySelector('#panel'); p.scrollTop = 0; const r = p.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
-      const surfaceBefore = await evaluate(browser, page.session, `document.querySelector('#workspace').scrollTop`);
-      await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...panelPoint, deltaX: 0, deltaY: 240 }, page.session);
-      await eventually(() => evaluate(browser, page.session, `document.querySelector('#panel').scrollTop === 240`), 'nested panel keeps native distance inside the app shell');
-      assert.equal(await evaluate(browser, page.session, `document.querySelector('#workspace').scrollTop`), surfaceBefore, 'the page surface does not move for a nested panel');
-      assert.deepEqual(browser.errors, []);
-    });
-  } finally { await browser.cleanup(); }
-});
+        const page = await browser.page('https://www.linkedin.com/feed/');
+        await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
+        await browser.cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, page.session);
+        const rootStyle = lock ? `html,body{overflow:visible}body{min-height:20000px}${lock}{overflow:${overflow}}` : '';
+        const fixture = `<style>html,body{margin:0;height:100%;overflow:hidden}${rootStyle}#workspace{position:fixed;inset:0;overflow:auto}#panel{height:${panelHeight}px;width:200px;margin:20px;overflow:auto;border:1px solid #ccc}</style><main id="workspace"><h1>Synthetic app shell</h1><div id="panel"><div style="height:4000px">Nested panel</div></div><div style="height:20000px">Feed</div></main>`;
+        await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(fixture)}`);
+        assert.equal(await evaluate(browser, page.session, 'document.scrollingElement.scrollHeight > document.scrollingElement.clientHeight'), Boolean(lock));
+        if (lock) assert.equal(await evaluate(browser, page.session, `getComputedStyle(document.querySelector('${lock}')).overflowY`), overflow);
+        await eventually(async () => {
+          if (!contexts.has(page.session)) return false;
+          const { result } = await browser.cdp.send('Runtime.evaluate', { expression: 'document', contextId: contexts.get(page.session) }, page.session);
+          try {
+            const { listeners } = await browser.cdp.send('DOMDebugger.getEventListeners', { objectId: result.objectId }, page.session);
+            return listeners.some(listener => listener.type === 'wheel' && !listener.passive);
+          } finally { await browser.cdp.send('Runtime.releaseObject', { objectId: result.objectId }, page.session); }
+        }, 'scroll friction is active before input');
+        async function wheelAt(selector, delta) {
+          await evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop = 1000`);
+          const point = await evaluate(browser, page.session, `(() => { const r = document.querySelector('${selector}').getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+          await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: delta }, page.session);
+          await eventually(() => evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop !== 1000`), `${selector} moves`);
+          return evaluate(browser, page.session, `(async () => {
+            let previous = -1, stable = 0;
+            for (let frame = 0; frame < 120 && stable < 5; frame++) {
+              await new Promise(requestAnimationFrame);
+              const next = document.querySelector('${selector}').scrollTop;
+              stable = next === previous ? stable + 1 : 0; previous = next;
+            }
+            return document.querySelector('${selector}').scrollTop - 1000;
+          })()`);
+        }
+        assert.equal(await wheelAt('#workspace', 240), 120, 'the inner page surface scrolls half as far');
+        assert.equal(await wheelAt('#workspace', -240), -120, 'both directions slow down');
+        assert.equal(await evaluate(browser, page.session, 'document.scrollingElement.scrollTop'), 0, 'the locked document does not move');
+        await evaluate(browser, page.session, `document.querySelector('#workspace').scrollTop = 0`);
+        await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+        for (const delta of [240, -240]) assert.equal(await wheelAt('#panel', delta), delta, 'nested panels keep native distance regardless of height');
+        assert.equal(await evaluate(browser, page.session, `document.querySelector('#workspace').scrollTop`), 0, 'the page surface does not move for a nested panel');
+        assert.deepEqual(browser.errors, []);
+      });
+    } finally { await browser.cleanup(); }
+  });
+}
