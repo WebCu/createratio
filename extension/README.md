@@ -169,11 +169,12 @@ tracking-only.
 
 **Settings → Slow scrolling** is on by default at **50% resistance**. Saved Off
 choices and chosen strengths are preserved. Its **Scroll resistance** slider
-ranges from **0% (Natural)** to **90% (Heavy)** in five-point steps. Higher resistance
+ranges from **5% (Light)** to **90% (Heavy)** in five-point steps. Higher resistance
 means less vertical page movement for the same wheel or trackpad gesture, in
 either direction. The default **50%** moves the page half as far; **75%** moves it
-a quarter as far. **0%** restores native scrolling; the maximum still allows
-movement. Turning the switch off remembers your strength for next time.
+a quarter as far. Every enabled strength adds resistance; the maximum still
+allows movement. Turn the switch off for native scrolling; it remembers your
+strength for next time. A saved zero resolves to Off with 50% ready for re-enabling.
 
 The percentage and distance preview update while dragging; the preference saves
 when you release the slider or use its keyboard controls. It applies to open tabs

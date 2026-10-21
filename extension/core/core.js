@@ -8,7 +8,7 @@
   const SITES = integrations.sites;
   const ACCESS_LIMITS = { minMinutes: 1, maxMinutes: 240 };
   const INTENTION_LIMITS = { minLength: 20, maxLength: 280 };
-  const SCROLL_FRICTION_LIMITS = { minStrength: 0, maxStrength: 90, step: 5 };
+  const SCROLL_FRICTION_LIMITS = { minStrength: 5, maxStrength: 90, step: 5 };
   const DELIVERY_LIMITS = { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 };
   function validIntention(value) { return typeof value === 'string' && value.length <= INTENTION_LIMITS.maxLength && value.trim().length >= INTENTION_LIMITS.minLength; }
   function validAccessMinutes(value) { return Number.isInteger(value) && value >= ACCESS_LIMITS.minMinutes && value <= ACCESS_LIMITS.maxMinutes; }
@@ -25,6 +25,7 @@
     resolved.dailyTarget = dailyTarget(settings);
     resolved.trackedSites = trackingSelection(settings).filter(site => typeof site === 'string');
     if (!validAccessMinutes(resolved.accessMinutes)) resolved.accessMinutes = DEFAULT_SETTINGS.accessMinutes;
+    if (resolved.scrollFrictionStrength === 0) resolved.scrollFrictionEnabled = false;
     if (!validScrollFrictionStrength(resolved.scrollFrictionStrength)) resolved.scrollFrictionStrength = DEFAULT_SETTINGS.scrollFrictionStrength;
     for (const key of ['allowAboveGoal', 'intentionHistoryEnabled', 'scrollFrictionEnabled']) if (typeof resolved[key] !== 'boolean') resolved[key] = DEFAULT_SETTINGS[key];
     delete resolved.nudgeEnabled; delete resolved.nudgeMinutes;

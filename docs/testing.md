@@ -290,12 +290,13 @@ Before a release, verify:
   cancels refills; above-goal access never re-enables measurement on Off sites.
 - Slow scrolling starts on at 50% resistance when no choice is saved. Existing
   Off choices and chosen strengths must survive upgrades and restarts. The slider
-  adjusts resistance from 0–90% in five-point steps. Verify drag previews do not
-  save until release, keyboard adjustments retain focus, fast changes retain only
-  the latest pending choice, failures restore confirmed values, and reloading or
-  toggling Off preserves the chosen strength. At 0%, Off, or Limit & track Off,
-  already-open tabs scroll natively. Verify real mouse wheels and trackpads, both
-  directions, fractional movement, zoom, horizontal gestures, nested panels,
+  adjusts resistance from 5–90% in five-point steps; even Light adds resistance.
+  Verify drag previews do not save until release, keyboard adjustments retain
+  focus, fast changes retain only the latest pending choice, failures restore
+  confirmed values, and reloading or toggling Off preserves the chosen strength.
+  Saved zero resolves to Off with 50% ready for re-enabling. At Off or Limit & track
+  Off, already-open tabs scroll natively. Verify real mouse wheels and trackpads,
+  both directions, fractional movement, zoom, horizontal gestures, nested panels,
   editors, messaging, route changes, and page focus. Keyboard, touch, and scrollbar
   navigation must stay native. Check the Settings switch and slider with keyboard
   input at narrow widths, with reduced motion and with forced colors. Synthetic Chromium tests do not establish

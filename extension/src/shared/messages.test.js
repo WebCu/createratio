@@ -91,7 +91,7 @@ test('scroll-friction saves require a complete snapshot with a persisted boolean
 });
 test('resistance acknowledgements require a validated persisted strength when the command supplies one', async () => {
   const command = { type: 'scroll-friction-setting', enabled: true, strength: 75 };
-  for (const strength of [undefined, null, '75', -5, 100, 77, 75.5]) {
+  for (const strength of [undefined, null, '75', 0, -5, 100, 77, 75.5]) {
     const reply = { ...snapshot, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: strength } };
     await assert.rejects(client(reply).send(command, 'Not saved.'), { message: 'Not saved.' });
   }

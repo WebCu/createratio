@@ -68,7 +68,7 @@ async function handle(message, sender) {
       contracts.preferences(message, sender);
       const stored = await extensionAPI.storage.local.get('settings');
       await extensionAPI.storage.local.set({ settings: { ...stored.settings, scrollFrictionEnabled: message.enabled,
-        ...(message.strength === undefined ? {} : { scrollFrictionStrength: message.strength }) } });
+        scrollFrictionStrength: message.strength ?? C3.settingsSnapshot(stored.settings).scrollFrictionStrength } });
       return snapshot();
     }
     case 'website-time-setting':

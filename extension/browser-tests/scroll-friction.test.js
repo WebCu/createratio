@@ -68,27 +68,29 @@ for (const [site, url, messagesURL, editor] of [
           assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => data.settings.scrollFrictionStrength)'), strength);
           assert.equal(await evaluate(browser, settings.session, 'document.activeElement.id'), 'scroll-friction-strength');
           await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
-          await eventually(async () => await listenerEnabled() === (strength > 0), 'correct wheel listener after strength change');
+          await eventually(listenerEnabled, 'every enabled strength keeps the friction listener');
           await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
         }
         await click(browser, settings, 'label[for="scroll-friction-strength"]');
-        const range = await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").getBoundingClientRect().toJSON()');
-        const start = { x: range.x + 12 + (range.width - 24) * 50 / 90, y: range.y + range.height / 2 };
+        const range = await evaluate(browser, settings.session, '(() => { const input = document.querySelector("#scroll-friction-strength"); return { ...input.getBoundingClientRect().toJSON(), min: Number(input.min), max: Number(input.max) }; })()');
+        assert.equal(range.min, 5); assert.equal(range.max, 90);
+        const sliderX = strength => range.x + 12 + (range.width - 24) * (strength - range.min) / (range.max - range.min);
+        const start = { x: sliderX(50), y: range.y + range.height / 2 };
         const saves = await evaluate(browser, browser.worker, 'resistanceSaves');
         await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...start }, settings.session);
         await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...start }, settings.session);
         for (const strength of [55, 60, 65, 70, 75, 80]) {
-          await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', button: 'left', buttons: 1, x: range.x + 12 + (range.width - 24) * strength / 90, y: start.y }, settings.session);
+          await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', button: 'left', buttons: 1, x: sliderX(strength), y: start.y }, settings.session);
         }
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-value").textContent'), '80%');
         assert.equal(await evaluate(browser, browser.worker, 'resistanceSaves'), saves, 'drag previews do not write preferences');
-        await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: range.x + 12 + (range.width - 24) * 80 / 90, y: start.y }, settings.session);
+        await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: sliderX(80), y: start.y }, settings.session);
         await strengthSaved(80);
         assert.equal(await evaluate(browser, browser.worker, 'resistanceSaves'), saves + 1);
         assert.equal(await wheel(240), 48);
         for (const [keys, strength, distance] of [
-          [['End'], 90, 24], [['ArrowLeft', 'ArrowLeft', 'ArrowLeft'], 75, 60], [['Home'], 0, 240],
-          [Array(10).fill('ArrowRight'), 50, 120]
+          [['End'], 90, 24], [['ArrowLeft', 'ArrowLeft', 'ArrowLeft'], 75, 60], [['Home', 'ArrowLeft'], 5, 228],
+          [Array(9).fill('ArrowRight'), 50, 120]
         ]) {
           await click(browser, settings, 'label[for="scroll-friction-strength"]');
           for (const key of keys) {
@@ -126,6 +128,21 @@ for (const [site, url, messagesURL, editor] of [
         await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
         await eventually(async () => !await listenerEnabled(), 'disabling removes the slow listener');
         assert.equal(await wheel(240), 240);
+        await evaluate(browser, browser.worker, `(async () => {
+          const { settings } = await chrome.storage.local.get('settings');
+          await chrome.storage.local.set({ settings: { ...settings, scrollFrictionEnabled: true, scrollFrictionStrength: 0 } });
+        })()`);
+        await browser.cdp.send('Page.reload', {}, settings.session);
+        await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled")?.disabled === false'), 'saved zero restored');
+        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), false);
+        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
+        assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => data.settings.scrollFrictionStrength)'), 0);
+        await click(browser, settings, '#scroll-friction-enabled');
+        await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#save-status").textContent.includes("saved at 50%")'), 'enabling replaces saved zero with a positive strength');
+        assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => data.settings.scrollFrictionStrength)'), 50);
+        await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
+        await eventually(listenerEnabled, 're-enabled stored-zero preference adds friction');
+        assert.equal(await wheel(240), 120);
         assert.deepEqual(browser.errors, []);
       });
     } finally { await browser.cleanup(); }

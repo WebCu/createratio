@@ -77,7 +77,8 @@ function renderScroll(settings) {
   }
   toggle.disabled = false; slider.disabled = !toggle.checked;
   const strength = Number(slider.value), distance = 100 - strength;
-  slider.style.setProperty('--scroll-fill', `${strength / C3.SCROLL_FRICTION_LIMITS.maxStrength * 100}%`);
+  const { minStrength, maxStrength } = C3.SCROLL_FRICTION_LIMITS;
+  slider.style.setProperty('--scroll-fill', `${(strength - minStrength) / (maxStrength - minStrength) * 100}%`);
   slider.setAttribute('aria-valuetext', `${strength}% resistance, ${distance}% of normal scroll distance`);
   $('scroll-resistance').setAttribute('data-enabled', String(toggle.checked));
   $('scroll-friction-value').textContent = `${strength}%`;
