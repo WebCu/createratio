@@ -55,6 +55,7 @@
           break;
         case 'scroll-friction-setting':
           if (typeof message.enabled !== 'boolean') throw refuse('Enable or disable scroll friction');
+          if (message.strength !== undefined && !core.validScrollFrictionStrength(message.strength)) throw refuse(`Choose scroll resistance from ${core.SCROLL_FRICTION_LIMITS.minStrength}–${core.SCROLL_FRICTION_LIMITS.maxStrength}% in steps of ${core.SCROLL_FRICTION_LIMITS.step}`);
           break;
         case 'website-time-setting':
           if (typeof message.enabled !== 'boolean') throw refuse('Invalid website tracking setting');

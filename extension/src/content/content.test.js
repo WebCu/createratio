@@ -55,6 +55,23 @@ test('opt-in scroll friction halves wheel distance on both consuming sites', asy
     }
   }
 });
+test('scroll resistance changes live without accumulating listeners and zero restores native input', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const url of ['https://x.com/home', 'https://www.linkedin.com/feed/']) {
+      const t = await tracker(browser, { url, snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
+      for (const [strength, distance] of [[75, 50], [25, 150], [90, 20], [50, 100]]) {
+        t.setSnapshot({ day: {}, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: strength } }); await t.tick();
+        t.document.scrollingElement.scrollTop = 1000;
+        assert.equal(t.wheel(200).defaultPrevented, true);
+        assert.equal(t.document.scrollingElement.scrollTop, 1000 + distance);
+        assert.equal(t.listenerCount('wheel'), 2);
+      }
+      t.setSnapshot({ day: {}, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: 0 } }); await t.tick();
+      assert.equal(t.wheel(200).defaultPrevented, false);
+      assert.equal(t.listenerCount('wheel'), 1);
+    }
+  }
+});
 test('scroll friction handles pixel, line, page and fractional wheel deltas without queuing motion', async () => {
   const t = await tracker('chrome', { snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
   const root = t.document.scrollingElement;

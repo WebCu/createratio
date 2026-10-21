@@ -4,6 +4,7 @@ const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
 let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
+let scrollEditing = false, scrollPending = null, scrollSaving = null;
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; if (message) $('save-status').textContent = ''; }
 function saved(message) { error(); $('save-status').textContent = message; }
 function createAccessField(site) {
@@ -68,6 +69,20 @@ function renderSite(control, settings, force) {
     control.tracking.disabled = switching; control.trackingStatus.textContent = control.tracking.checked ? 'On' : 'Off';
   }
 }
+function renderScroll(settings) {
+  const toggle = $('scroll-friction-enabled'), slider = $('scroll-friction-strength');
+  if (!scrollSettingBusy && !scrollEditing) {
+    toggle.checked = settings.scrollFrictionEnabled;
+    slider.value = settings.scrollFrictionStrength ?? C3.DEFAULT_SETTINGS.scrollFrictionStrength;
+  }
+  toggle.disabled = false; slider.disabled = !toggle.checked;
+  const strength = Number(slider.value), distance = 100 - strength;
+  slider.style.setProperty('--scroll-fill', `${strength / C3.SCROLL_FRICTION_LIMITS.maxStrength * 100}%`);
+  slider.setAttribute('aria-valuetext', `${strength}% resistance, ${distance}% of normal scroll distance`);
+  $('scroll-resistance').setAttribute('data-enabled', String(toggle.checked));
+  $('scroll-friction-value').textContent = `${strength}%`;
+  $('scroll-friction-effect').textContent = `Page moves ${distance}% as far${toggle.checked ? '' : ' when enabled'}.`;
+}
 function render(settings, force = '') {
   currentSettings = settings;
   if (!siteControls.size) $('site-settings').replaceChildren();
@@ -76,8 +91,7 @@ function render(settings, force = '') {
     if (!control) { control = createSite(site); siteControls.set(site.id, control); }
     renderSite(control, settings, force);
   }
-  if (!scrollSettingBusy) $('scroll-friction-enabled').checked = settings.scrollFrictionEnabled;
-  $('scroll-friction-enabled').disabled = scrollSettingBusy;
+  renderScroll(settings);
   if (!goalSettingBusy) $('allow-above-goal').checked = settings.allowAboveGoal;
   $('allow-above-goal').disabled = goalSettingBusy;
   if (!intentionSettingBusy) $('intention-history-enabled').checked = settings.intentionHistoryEnabled;
@@ -131,18 +145,36 @@ async function saveSitePreference(control, group, message) {
   } catch (e) { error(e.message); }
   finally { control.busy.delete(group); render(currentSettings, site + ':' + group); }
 }
-$('scroll-friction-enabled').addEventListener('change', async () => {
-  if (scrollSettingBusy) return;
-  const enabled = $('scroll-friction-enabled').checked;
-  scrollSettingBusy = true; $('scroll-friction-enabled').disabled = true;
+async function saveScrollSettings() {
+  const choice = { enabled: $('scroll-friction-enabled').checked, strength: Number($('scroll-friction-strength').value) };
+  scrollEditing = false;
+  $('save-status').textContent = '';
+  if (!C3.validScrollFrictionStrength(choice.strength)) { error('Choose a valid scroll resistance.'); renderScroll(currentSettings); return; }
+  scrollPending = scrollSaving?.enabled === choice.enabled && scrollSaving?.strength === choice.strength ? null : choice;
+  if (scrollSettingBusy) { renderScroll(currentSettings); return; }
+  scrollSettingBusy = true; renderScroll(currentSettings);
   try {
-    const result = await messages.send({ type: 'scroll-friction-setting', enabled }, 'Unable to save slow scrolling.');
-    render(result.settings);
-    saved(enabled ? 'Slow scrolling enabled. Wheel and trackpad scrolling move half as far while browsing.' : 'Slow scrolling disabled. Native scrolling restored.');
-    await notifyTrackers();
-  } catch (e) { error(e.message); }
-  finally { scrollSettingBusy = false; render(currentSettings); }
-});
+    while (scrollPending) {
+      scrollSaving = scrollPending; scrollPending = null;
+      try {
+        const result = await messages.send({ type: 'scroll-friction-setting', ...scrollSaving }, 'Unable to save slow scrolling.');
+        render(result.settings);
+        if (!scrollPending) {
+          await notifyTrackers();
+          if (!scrollPending) saved(scrollSaving.enabled ? `Scroll resistance saved at ${scrollSaving.strength}%.` : 'Slow scrolling disabled. Your resistance setting is kept.');
+        }
+      } catch (e) { error(e.message); }
+    }
+  } finally { scrollSettingBusy = false; scrollSaving = null; renderScroll(currentSettings); }
+}
+const scrollSlider = $('scroll-friction-strength');
+scrollSlider.min = C3.SCROLL_FRICTION_LIMITS.minStrength;
+scrollSlider.max = C3.SCROLL_FRICTION_LIMITS.maxStrength;
+scrollSlider.step = C3.SCROLL_FRICTION_LIMITS.step;
+scrollSlider.addEventListener('input', () => { scrollEditing = true; renderScroll(currentSettings); });
+scrollSlider.addEventListener('change', saveScrollSettings);
+scrollSlider.addEventListener('blur', () => { scrollEditing = false; renderScroll(currentSettings); });
+$('scroll-friction-enabled').addEventListener('change', saveScrollSettings);
 $('website-time-enabled').addEventListener('change', async () => {
   const enabled = $('website-time-enabled').checked;
   websiteSettingBusy = true; $('website-time-enabled').disabled = true;

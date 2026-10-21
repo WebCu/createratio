@@ -67,7 +67,8 @@ async function handle(message, sender) {
     case 'scroll-friction-setting': {
       contracts.preferences(message, sender);
       const stored = await extensionAPI.storage.local.get('settings');
-      await extensionAPI.storage.local.set({ settings: { ...stored.settings, scrollFrictionEnabled: message.enabled } });
+      await extensionAPI.storage.local.set({ settings: { ...stored.settings, scrollFrictionEnabled: message.enabled,
+        ...(message.strength === undefined ? {} : { scrollFrictionStrength: message.strength }) } });
       return snapshot();
     }
     case 'website-time-setting':

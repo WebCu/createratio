@@ -3,10 +3,10 @@
   else root.ScrollFriction = factory();
 })(globalThis, function () {
   'use strict';
-  const SPEED = 0.5, LINE_PIXELS = 16;
+  const LINE_PIXELS = 16;
   const CONTROLS = 'input,textarea,select,video,audio,[role="textbox"],[role="slider"],[role="listbox"],[role="menu"],[role="dialog"],dialog';
   function create({ document, Element, getComputedStyle }) {
-    let enabled = false, remainder = 0, lastPosition = null;
+    let speed = 1, remainder = 0, lastPosition = null;
     function protectedElement(node) {
       return node instanceof Element && (node.isContentEditable || node.matches(CONTROLS));
     }
@@ -29,19 +29,22 @@
       const before = root.scrollTop, delta = event.deltaY * unit;
       if (delta < 0 && before <= 0 || delta > 0 && before >= root.scrollHeight - root.clientHeight) { remainder = 0; return; }
       if (before !== lastPosition || Math.sign(delta) !== Math.sign(remainder)) remainder = 0;
-      const distance = delta * SPEED + remainder, wholePixels = Math.trunc(distance);
+      const distance = delta * speed + remainder, wholePixels = Math.trunc(distance);
       event.preventDefault();
       root.scrollBy({ top: wholePixels, left: event.deltaX * unit, behavior: 'instant' });
       remainder = distance - wholePixels;
       lastPosition = root.scrollTop;
     }
-    function setEnabled(value) {
-      if (enabled === value) return;
-      enabled = value; remainder = 0; lastPosition = null;
-      if (enabled) document.addEventListener('wheel', onWheel, { passive: false });
+    function setSpeed(value) {
+      const next = Number.isFinite(value) && value > 0 && value < 1 ? value : 1;
+      if (speed === next) return;
+      const wasSlowed = speed < 1;
+      speed = next; remainder = 0; lastPosition = null;
+      if (wasSlowed === (speed < 1)) return;
+      if (speed < 1) document.addEventListener('wheel', onWheel, { passive: false });
       else document.removeEventListener('wheel', onWheel);
     }
-    return { setEnabled };
+    return { setSpeed };
   }
   return { create };
 });

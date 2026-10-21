@@ -32,6 +32,7 @@
     return core()?.validLocalDate(reply.date) === true && object(reply.day) && object(reply.settings)
       && (reply.settings.trackedSites === undefined || Array.isArray(reply.settings.trackedSites) && reply.settings.trackedSites.every(site => typeof site === 'string'))
       && (reply.settings.scrollFrictionEnabled === undefined || typeof reply.settings.scrollFrictionEnabled === 'boolean')
+      && (reply.settings.scrollFrictionStrength === undefined || core()?.validScrollFrictionStrength(reply.settings.scrollFrictionStrength) === true)
       && access(reply.access) && typeof reply.websiteTimeEnabled === 'boolean'
       && (reply.generation == null || typeof reply.generation === 'string');
   }
@@ -57,7 +58,8 @@
       if (reply.ok === false) throw new Error(typeof reply.error === 'string' && reply.error ? reply.error : fallbackMessage);
       if (['snapshot', 'ingest', 'tracking', 'clear-history', 'scroll-friction-setting'].includes(message.type) && !snapshot(reply)) throw new Error(fallbackMessage);
       if (['access-status', 'access-begin', 'access-open', 'access-cancel', 'access-end', 'access-duration', 'access-goal-setting'].includes(message.type) && !access(reply.access)) throw new Error(fallbackMessage);
-      if (message.type === 'scroll-friction-setting' && typeof reply.settings.scrollFrictionEnabled !== 'boolean') throw new Error(fallbackMessage);
+      if (message.type === 'scroll-friction-setting' && (typeof reply.settings.scrollFrictionEnabled !== 'boolean'
+        || message.strength !== undefined && core()?.validScrollFrictionStrength(reply.settings.scrollFrictionStrength) !== true)) throw new Error(fallbackMessage);
       if (message.type === 'website-time-setting' && typeof reply.enabled !== 'boolean') throw new Error(fallbackMessage);
       if (message.type === 'history' && !history(reply.days, message.kind)) throw new Error(fallbackMessage);
       if (message.type === 'access-history-list' && !intentions(reply.intentions)) throw new Error(fallbackMessage);

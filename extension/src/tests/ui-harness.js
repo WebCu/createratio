@@ -22,7 +22,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
   const messageWaits = new Map();
   const state = { permission: true, requested: 0, removed: 0, messages: [], notifications: [], fail: false, failSnapshot: false, optionsOpened: 0, tabs: [], downloads: [], access: {}, confirm: true, confirmations: [], storageReads: [], snapshotChanges: false, replies: new Map(), rejections: new Map() };
   class Element {
-    constructor() { this.children = []; this.listeners = {}; this.hidden = false; this.disabled = false; this.style = {}; this.attributes = {}; this.value = ''; this.checked = false; this.textContent = ''; }
+    constructor() { this.children = []; this.listeners = {}; this.hidden = false; this.disabled = false; this.style = { setProperty(key, value) { this[key] = String(value); } }; this.attributes = {}; this.value = ''; this.checked = false; this.textContent = ''; }
     addEventListener(type, fn) { this.listeners[type] = fn; }
     append(...children) { for (const node of children) { node.parent = this; this.children.push(node); if (node.id) nodes[node.id] = node; } }
     replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
@@ -74,7 +74,10 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
       if (message.type === 'access-duration') { settings = C3.updatePreferences(settings, { accessMinutes: message.minutes }, message.site); return { ok: true, access: structuredClone(state.access) }; }
       if (message.type === 'access-goal-setting') settings.allowAboveGoal = message.enabled;
       if (message.type === 'access-history-setting') settings.intentionHistoryEnabled = message.enabled;
-      if (message.type === 'scroll-friction-setting') settings.scrollFrictionEnabled = message.enabled;
+      if (message.type === 'scroll-friction-setting') {
+        settings.scrollFrictionEnabled = message.enabled;
+        if (message.strength !== undefined) settings.scrollFrictionStrength = message.strength;
+      }
       if (message.type === 'access-history-clear') data._intentions = [];
       if (message.type === 'access-history-list') return { ok: true, intentions: structuredClone(data._intentions || []) };
       if (message.type === 'website-time-setting') { enabled = message.enabled; return { ok: true, enabled }; }

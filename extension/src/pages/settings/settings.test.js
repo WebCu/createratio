@@ -30,7 +30,7 @@ test('slow scrolling defaults off, saves independently and restores failed or ma
   const p = settingsPage(); await p.ready();
   const input = p.nodes['scroll-friction-enabled'];
   assert.equal(input.checked, false); assert.equal(input.disabled, false);
-  input.checked = true; const saving = input.fire('change'); assert.equal(input.disabled, true);
+  input.checked = true; const saving = input.fire('change'); assert.equal(input.disabled, false);
   await input.fire('change'); await saving;
   assert.equal(p.messages.filter(message => message.type === 'scroll-friction-setting').length, 1);
   assert.equal(input.checked, true); assert.equal(input.disabled, false);
@@ -49,6 +49,63 @@ test('slow scrolling defaults off, saves independently and restores failed or ma
   assert.equal(input.checked, false); assert.equal(input.disabled, false);
   p.setSettings({ ...C3.DEFAULT_SETTINGS, scrollFrictionEnabled: true }); p.change(); await p.ready();
   assert.equal(input.checked, true);
+});
+test('resistance previews locally during a drag and commits once without losing the draft to refresh', async () => {
+  const p = settingsPage({ settings: { scrollFrictionEnabled: true } }); await p.ready();
+  const slider = p.nodes['scroll-friction-strength'];
+  assert.equal(slider.value, 50); assert.equal(slider.disabled, false);
+  assert.equal(slider.min, 0); assert.equal(slider.max, 90); assert.equal(slider.step, 5);
+  slider.focus(); const before = p.messages.length;
+  for (let i = 0; i < 100; i++) { slider.value = String(i % 19 * 5); await slider.fire('input'); }
+  slider.value = '80'; await slider.fire('input');
+  assert.equal(p.messages.length, before, 'input previews do not send messages');
+  assert.equal(p.nodes['scroll-friction-value'].textContent, '80%');
+  assert.match(slider.attributes['aria-valuetext'], /80% resistance, 20%/);
+  assert.match(p.nodes['scroll-friction-effect'].textContent, /20%/);
+  p.setSettings({ ...C3.DEFAULT_SETTINGS, scrollFrictionEnabled: true, scrollFrictionStrength: 25 }); p.change(); await p.ready();
+  assert.equal(slider.value, '80'); assert.equal(p.document.activeElement, slider);
+  await slider.fire('change');
+  assert.deepEqual(p.messages.filter(message => message.type === 'scroll-friction-setting'), [{ type: 'scroll-friction-setting', enabled: true, strength: 80 }]);
+  assert.equal(slider.value, 80); assert.equal(p.settings.scrollFrictionStrength, 80);
+  assert.equal(p.document.activeElement, slider);
+  p.nodes['scroll-friction-enabled'].checked = false; await p.nodes['scroll-friction-enabled'].fire('change');
+  assert.equal(slider.disabled, true); assert.equal(slider.value, 80);
+  p.nodes['scroll-friction-enabled'].checked = true; await p.nodes['scroll-friction-enabled'].fire('change');
+  assert.equal(slider.disabled, false); assert.equal(slider.value, 80);
+});
+test('resistance keeps at most one in-flight save and one latest choice while controls stay responsive', async () => {
+  const p = settingsPage({ settings: { scrollFrictionEnabled: true } }); await p.ready();
+  const slider = p.nodes['scroll-friction-strength']; slider.focus();
+  const release = p.holdMessage('scroll-friction-setting');
+  slider.value = '75'; await slider.fire('input'); const first = slider.fire('change');
+  assert.equal(slider.disabled, false); assert.equal(p.document.activeElement, slider);
+  for (let i = 0; i < 100; i++) { slider.value = String(i % 19 * 5); await slider.fire('input'); await slider.fire('change'); }
+  slider.value = '90'; await slider.fire('input'); await slider.fire('change');
+  assert.equal(p.messages.filter(message => message.type === 'scroll-friction-setting').length, 1);
+  assert.equal(p.nodes['scroll-friction-value'].textContent, '90%');
+  release(); await first;
+  assert.deepEqual(p.messages.filter(message => message.type === 'scroll-friction-setting').map(message => message.strength), [75, 90]);
+  assert.equal(p.settings.scrollFrictionStrength, 90); assert.equal(slider.value, 90);
+  assert.equal(p.document.activeElement, slider);
+  assert.deepEqual(p.notifications, [{ id: 1, type: 'refresh' }, { id: 2, type: 'refresh' }]);
+});
+test('failed resistance saves roll back to the confirmed value and malformed successes do not claim a save', async () => {
+  const p = settingsPage({ settings: { scrollFrictionEnabled: true, scrollFrictionStrength: 75 } }); await p.ready();
+  const slider = p.nodes['scroll-friction-strength']; slider.focus();
+  p.fail = true; slider.value = '90'; await slider.fire('input'); await slider.fire('change');
+  assert.equal(slider.value, 75); assert.match(p.nodes['scroll-friction-effect'].textContent, /25%/);
+  assert.equal(p.nodes.error.textContent, 'Could not save.'); assert.equal(slider.disabled, false);
+  assert.equal(p.document.activeElement, slider);
+  p.fail = false;
+  const original = p.messages.length; slider.value = '77'; await slider.fire('change');
+  assert.equal(p.messages.length, original); assert.equal(slider.value, 75);
+  p.state.replies.set('scroll-friction-setting', { ok: true });
+  slider.value = '25'; await slider.fire('input'); await slider.fire('change');
+  assert.equal(slider.value, 75); assert.equal(p.nodes['save-status'].textContent, '');
+  assert.equal(p.nodes.error.textContent, 'Unable to save slow scrolling.');
+  p.state.replies.delete('scroll-friction-setting');
+  slider.value = '0'; await slider.fire('input'); await slider.fire('change');
+  assert.equal(p.settings.scrollFrictionStrength, 0); assert.match(p.nodes['scroll-friction-effect'].textContent, /100%/);
 });
 test('Settings slow-scrolling choice reaches the real worker, survives restart and changes live tracker behavior', async () => {
   const { activeWorker, worker } = require('../../tests/background-harness.js');

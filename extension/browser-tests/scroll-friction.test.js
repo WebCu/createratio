@@ -14,6 +14,8 @@ for (const [site, url, messagesURL, editor] of [
       await withFailureArtifacts(browser, `${site} slow-scrolling journey`, async () => {
         await evaluate(browser, browser.worker, `(async () => {
           await chrome.storage.local.set({ settings: { ...C3.DEFAULT_SETTINGS }, _access: { ${site}: { remainingMs: 300000, date: C3.localDate() } } });
+          globalThis.resistanceSaves = 0;
+          chrome.runtime.onMessage.addListener(message => { if (message.type === 'scroll-friction-setting') resistanceSaves++; });
         })()`);
         const settings = await browser.page(browser.origin + '/settings.html');
         await eventually(() => evaluate(browser, settings.session, '!document.querySelector("#scroll-friction-enabled")?.disabled'), 'Settings loaded');
@@ -49,11 +51,47 @@ for (const [site, url, messagesURL, editor] of [
         }
         assert.equal(await wheel(240), 240, 'default wheel scrolling is native');
         await click(browser, settings, '#scroll-friction-enabled');
-        await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked && !document.querySelector("#scroll-friction-enabled").disabled'), 'slow scrolling saved');
+        await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked && document.querySelector("#save-status").textContent.includes("saved at 50%")'), 'slow scrolling saved');
         await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
         await eventually(listenerEnabled, 'foreground tracker attaches slow scrolling');
         assert.equal(await wheel(240), 120);
         assert.equal(await wheel(-240), -120);
+        async function strengthSaved(strength) {
+          await eventually(() => evaluate(browser, settings.session, `document.querySelector('#scroll-friction-strength').value === '${strength}' && document.querySelector('#save-status').textContent.includes('saved at ${strength}%')`), 'resistance acknowledged and trackers notified');
+          assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => data.settings.scrollFrictionStrength)'), strength);
+          assert.equal(await evaluate(browser, settings.session, 'document.activeElement.id'), 'scroll-friction-strength');
+          await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
+          await eventually(async () => await listenerEnabled() === (strength > 0), 'correct wheel listener after strength change');
+          await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+        }
+        await click(browser, settings, 'label[for="scroll-friction-strength"]');
+        const range = await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").getBoundingClientRect().toJSON()');
+        const start = { x: range.x + 12 + (range.width - 24) * 50 / 90, y: range.y + range.height / 2 };
+        const saves = await evaluate(browser, browser.worker, 'resistanceSaves');
+        await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...start }, settings.session);
+        await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...start }, settings.session);
+        for (const strength of [55, 60, 65, 70, 75, 80]) {
+          await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', button: 'left', buttons: 1, x: range.x + 12 + (range.width - 24) * strength / 90, y: start.y }, settings.session);
+        }
+        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-value").textContent'), '80%');
+        assert.equal(await evaluate(browser, browser.worker, 'resistanceSaves'), saves, 'drag previews do not write preferences');
+        await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: range.x + 12 + (range.width - 24) * 80 / 90, y: start.y }, settings.session);
+        await strengthSaved(80);
+        assert.equal(await evaluate(browser, browser.worker, 'resistanceSaves'), saves + 1);
+        assert.equal(await wheel(240), 48);
+        for (const [keys, strength, distance] of [
+          [['End'], 90, 24], [['ArrowLeft', 'ArrowLeft', 'ArrowLeft'], 75, 60], [['Home'], 0, 240],
+          [Array(10).fill('ArrowRight'), 50, 120]
+        ]) {
+          await click(browser, settings, 'label[for="scroll-friction-strength"]');
+          for (const key of keys) {
+            const code = { End: 35, Home: 36, ArrowLeft: 37, ArrowRight: 39 }[key];
+            await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: code }, settings.session);
+            await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: code }, settings.session);
+          }
+          await strengthSaved(strength);
+          assert.equal(await wheel(240), distance);
+        }
         await evaluate(browser, page.session, 'document.querySelector("#panel").scrollTop = 0');
         const point = await evaluate(browser, page.session, '(() => { const r = document.querySelector("#panel").getBoundingClientRect(); return { x: r.x + 30, y: r.y + 30 }; })()');
         const position = await evaluate(browser, page.session, 'scrollY');
@@ -71,7 +109,9 @@ for (const [site, url, messagesURL, editor] of [
         await evaluate(browser, page.session, `history.pushState({}, '', ${JSON.stringify(new URL(url).pathname)})`);
         await eventually(listenerEnabled, 'returning to the feed restores slow scrolling');
         await click(browser, settings, '#scroll-friction-enabled');
-        await eventually(() => evaluate(browser, settings.session, '!document.querySelector("#scroll-friction-enabled").checked && !document.querySelector("#scroll-friction-enabled").disabled'), 'native scrolling saved');
+        await eventually(() => evaluate(browser, settings.session, '!document.querySelector("#scroll-friction-enabled").checked && document.querySelector("#save-status").textContent.includes("disabled")'), 'native scrolling saved');
+        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
+        assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").disabled'), true);
         await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
         await eventually(async () => !await listenerEnabled(), 'disabling removes the slow listener');
         assert.equal(await wheel(240), 240);

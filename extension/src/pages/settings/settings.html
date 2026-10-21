@@ -17,7 +17,13 @@
       <p class="preference-note">Session time counts all active-tab time—not just consuming time. Switching away pauses it; all tabs for the site share the same time. Changes apply to new sessions and daily refills at local midnight. Unused or exhausted session budgets refill once per day; manually ending a session or turning Off cancels its refill. From Default means the time follows your Default value.</p>
     </section>
     <section class="preference" aria-labelledby="scroll-friction-title">
-      <div class="preference-heading"><label for="scroll-friction-enabled"><strong id="scroll-friction-title">Slow scrolling</strong><small>Make wheel and trackpad scrolling move half as far.</small></label><input id="scroll-friction-enabled" type="checkbox" role="switch" disabled aria-describedby="scroll-friction-note"></div>
+      <div class="preference-heading"><label for="scroll-friction-enabled"><strong id="scroll-friction-title">Slow scrolling</strong><small>Choose how much effort each scroll takes.</small></label><input id="scroll-friction-enabled" type="checkbox" role="switch" disabled aria-describedby="scroll-friction-note"></div>
+      <div id="scroll-resistance" class="scroll-resistance" data-enabled="false">
+        <div class="scroll-resistance-heading"><label for="scroll-friction-strength">Scroll resistance</label><output id="scroll-friction-value" for="scroll-friction-strength" aria-hidden="true">50%</output></div>
+        <input id="scroll-friction-strength" type="range" disabled aria-describedby="scroll-friction-effect">
+        <div class="scroll-resistance-scale" aria-hidden="true"><span>Natural</span><span>Heavy</span></div>
+        <p id="scroll-friction-effect">Page moves half as far when enabled.</p>
+      </div>
       <p id="scroll-friction-note" class="preference-note">Off by default. Slows browsing pages on X and LinkedIn during access, with Limit &amp; track on. Editors, messages and nested panels stay native. Keyboard, touch, scrollbar dragging and zoom are unchanged. No pauses or popups.</p>
     </section>
     <section class="preference" aria-labelledby="goal-access-title">

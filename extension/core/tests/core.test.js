@@ -59,6 +59,18 @@ test('daily target resolves the current setting with safe defaults for legacy or
   }
 });
 
+test('scroll resistance preserves legacy half-speed defaults and accepts only safe step-aligned percentages', () => {
+  assert.equal(C.settingsSnapshot({ scrollFrictionEnabled: true }).scrollFrictionStrength, 50);
+  assert.equal(C.settingsSnapshot().scrollFrictionEnabled, false);
+  for (const strength of [0, 5, 25, 50, 75, 90]) {
+    assert.equal(C.validScrollFrictionStrength(strength), true);
+    assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, strength);
+  }
+  for (const strength of [undefined, null, false, true, '75', -5, 95, 100, 1, 50.5, NaN, Infinity, [], {}]) {
+    assert.equal(C.validScrollFrictionStrength(strength), false);
+    assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, 50);
+  }
+});
 test('access minutes require a numeric whole number within the access limits', () => {
   assert.deepEqual(C.ACCESS_LIMITS, { minMinutes: 1, maxMinutes: 240 });
   for (const value of [1, 5, 120, 240]) assert.equal(C.validAccessMinutes(value), true);

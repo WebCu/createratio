@@ -58,6 +58,11 @@ retired nudge preferences without deleting the saved values. Snapshots normalize
 invalid durations, targets, booleans, and overrides without mutating storage;
 an invalid override inherits Default.
 
+`validScrollFrictionStrength` and `SCROLL_FRICTION_LIMITS` share the slider's
+0–90% resistance bounds and five-point steps with command receivers. Missing or
+invalid restored strength resolves to 50% without rewriting saved preferences.
+Slow scrolling remains opt-in; setting zero resistance leaves scrolling native.
+
 `validAccessMinutes`, `validIntention`, and their exported limits supply the same
 rules to forms and receivers. Intentions use a trimmed minimum but a raw maximum;
 new commands never coerce values. `validLocalDate` rejects impossible calendar

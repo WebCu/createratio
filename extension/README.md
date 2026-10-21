@@ -167,12 +167,19 @@ tracking-only.
 
 ### Slow scrolling
 
-**Settings → Slow scrolling** is off by default. When enabled, vertical mouse-wheel
-and trackpad movement scrolls the main page half as far, in either direction,
-without a timer, popup, or queued animation. It applies only to consuming pages
-on enabled sites during timed or above-goal access, using the existing page
-classification below. Turning it off restores native scrolling in open tabs;
-turning a site's Limit & track off also removes its scroll friction.
+**Settings → Slow scrolling** is off by default. Its **Scroll resistance** slider
+ranges from **0% (Natural)** to **90% (Heavy)** in five-point steps. Higher resistance
+means less vertical page movement for the same wheel or trackpad gesture, in
+either direction. The default **50%** moves the page half as far; **75%** moves it
+a quarter as far. **0%** restores native scrolling; the maximum still allows
+movement. Turning the switch off remembers your strength for next time.
+
+The percentage and distance preview update while dragging; the preference saves
+when you release the slider or use its keyboard controls. It applies to open tabs
+without a reload. Changes replace only a cached scroll multiplier, without a
+timer, popup, or queued animation. It applies only to consuming pages on enabled
+sites during timed or above-goal access, using the existing page classification
+below. Turning a site's Limit & track off also removes its scroll friction.
 
 Editors, messaging routes, nested scroll panels, horizontal gestures, and zoom
 stay native. Keyboard scrolling, touch gestures, and scrollbar dragging are
@@ -182,7 +189,9 @@ and operating system. No scroll distances or additional activity data are saved.
 
 The tracker owns the optional wheel listener and removes it when the page becomes
 inactive, neutral, creating, disabled, or stopped. Scroll handling adds no timers,
-observers, background messages, or retained DOM references.
+observers, background messages, or retained DOM references. Settings previews do
+not send messages. Committed adjustments keep at most one in-flight save and one
+replaceable latest choice; they do not queue every intermediate slider value.
 
 ## Measurement and score
 

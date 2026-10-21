@@ -288,13 +288,16 @@ Before a release, verify:
   budget or pending wait, unless optional above-goal access applies.
 - Midnight refills use each site's override or current inherited Default. Off
   cancels refills; above-goal access never re-enables measurement on Off sites.
-- Slow scrolling starts off. Enabling it halves vertical wheel/trackpad movement
-  on consuming pages during access; disabling it or Limit & track restores native
-  scrolling in already-open tabs. Verify real mouse wheels and trackpads, both
+- Slow scrolling starts off and preserves a 50% default resistance. The slider
+  adjusts resistance from 0–90% in five-point steps. Verify drag previews do not
+  save until release, keyboard adjustments retain focus, fast changes retain only
+  the latest pending choice, failures restore confirmed values, and reloading or
+  toggling Off preserves the chosen strength. At 0%, Off, or Limit & track Off,
+  already-open tabs scroll natively. Verify real mouse wheels and trackpads, both
   directions, fractional movement, zoom, horizontal gestures, nested panels,
   editors, messaging, route changes, and page focus. Keyboard, touch, and scrollbar
-  navigation must stay native. Check the Settings switch with keyboard input at
-  narrow widths and with reduced motion. Synthetic Chromium tests do not establish
+  navigation must stay native. Check the Settings switch and slider with keyboard
+  input at narrow widths, with reduced motion and with forced colors. Synthetic Chromium tests do not establish
   physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
