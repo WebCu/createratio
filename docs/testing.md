@@ -256,8 +256,8 @@ covering version/pending-submission guards, authentication, validation polling,
 write failures and refusal paths. Those tests do not establish live credentials,
 provider acceptance or publication.
 
-`pnpm check:release` requires a clean committed checkout and exercises the real
-prepare/check/merge/publish/package journey in a disposable repository. It reuses
+`pnpm check:release` requires Git, `tar`, `zip`, `unzip` and a clean committed
+checkout. It exercises the real prepare/check/merge/publish/package journey in a disposable repository. It reuses
 installed dependencies, substitutes GitHub CLI and only the approved local Git
 transport, and permits file transport only. Automatic tag following and mirror
 mode are enabled to verify that unrelated tags remain local. Logs and the result
