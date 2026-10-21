@@ -301,9 +301,11 @@ release checks, not guarantees from unit tests.
 Verify forward/backward scrolling, narrow and mobile layouts, keyboard navigation,
 skip links, direct anchors, reduced motion, and disabled JavaScript. Primary
 installation links must open the published
-[Chrome Web Store listing](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk).
-Source installation links must point to the current repository; Edge and Firefox
-instructions must not imply published store releases.
+[Chrome Web Store listing](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk)
+and [Firefox Add-ons listing](https://addons.mozilla.org/en-US/firefox/addon/createratio/).
+Source installation links must point to the current repository; Edge
+instructions must not imply a published store release. Distinguish temporary
+Firefox source installs from the permanent store installation.
 
 Local and non-production hosts must not load analytics. Check that production
 analytics failures do not break the page and that distributed license notices
