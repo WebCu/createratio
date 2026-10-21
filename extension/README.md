@@ -286,9 +286,11 @@ Headlines never infer a trend from a single period or treat action credits as
 creating time. Cards and
 captions exclude site names, website time, and saved intentions. No data is
 uploaded and nothing is posted automatically. Changing the period or clearing
-history discards the preview. At most one preview URL and one temporary drawing
-canvas are retained per dashboard; a replaced URL is revoked and the canvas is
-released after encoding. Closing the dashboard releases its preview. If the local
+history discards the preview. Each dashboard reuses one 1200 × 1200 canvas for
+previewing and PNG encoding, retaining one PNG URL only for downloading. The
+preview does not decode that URL into another image. Replacement, clearing, or
+encoding failure revokes the previous URL and resets the canvas dimensions;
+closing the dashboard releases both. If the local
 date changes while history is loading, PNG and HTML exports stop with a retry
 message instead of mixing periods. Explicit Clear history has a separate reset
 marker, so ordinary receipt-window rollover preserves ready and pending export

@@ -60,7 +60,7 @@ test('daily and weekly exports reject history selected before midnight and recov
         const period = range === 'today' ? '2027-01-01' : '2026-12-26-to-2027-01-01';
         const minutes = range === 'today' ? '3m' : '4m';
         if (kind === 'share') {
-          await eventually(() => inspect(page, '!document.querySelector("#share-result").hidden && document.querySelector("#share-preview").complete && document.querySelector("#share-preview").naturalWidth === 1200'), 'retry produces a PNG preview');
+          await eventually(() => inspect(page, '!document.querySelector("#share-result").hidden && !document.querySelector("#share-create").disabled && document.querySelector("#share-preview").width === 1200 && document.querySelector("#share-preview").height === 1200'), 'retry produces a PNG preview');
           const caption = await inspect(page, 'document.querySelector("#share-caption").value');
           assert.ok(caption.includes(`${minutes} creating`));
           await click(browser, page, '#share-download');

@@ -373,6 +373,9 @@ Before a release, verify:
   size. Captions include the public CreateRatio link but no site names or private
   details. Check clipboard success/denial, PNG encoding failure, stale requests,
   repeated preview cleanup, and preview removal on period changes/history resets.
+  The canvas preview must match downloaded PNG pixels, retain only one drawing
+  surface, avoid decoding PNG URLs, and release its backing dimensions on clearing
+  or encoding failure. Include changing totals when repeating previews.
   Ready and pending PNG previews and pending HTML exports must survive normal
   receipt-window rollover; only an explicit history reset invalidates them.
   Sharing is manual and never opens a posting flow automatically.

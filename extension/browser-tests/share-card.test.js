@@ -32,7 +32,7 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
       })()`);
       const preview = async () => {
         await click(browser, page, '#share-create');
-        await eventually(() => inspect(page, '!document.querySelector("#share-result").hidden && document.querySelector("#share-preview").complete && document.querySelector("#share-preview").naturalWidth === 1200'), 'real PNG preview ready');
+        await eventually(() => inspect(page, '!document.querySelector("#share-result").hidden && !document.querySelector("#share-create").disabled && document.querySelector("#share-preview").width === 1200 && document.querySelector("#share-preview").height === 1200'), 'real PNG preview ready');
       };
       await preview();
       const drawings = await inspect(page, `(() => {
@@ -96,6 +96,16 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
         const png = await readFile(path.join(browser.directory, download.guid));
         assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
         assert.equal(png.readUInt32BE(16), 1200); assert.equal(png.readUInt32BE(20), 1200);
+        assert.equal(await inspect(page, `(async () => {
+          const bytes = Uint8Array.from(atob(${JSON.stringify(png.toString('base64'))}), value => value.charCodeAt(0));
+          const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+          const canvas = new OffscreenCanvas(1200, 1200);
+          try {
+            const ctx = canvas.getContext('2d'); ctx.drawImage(bitmap, 0, 0);
+            const digest = async pixels => [...new Uint8Array(await crypto.subtle.digest('SHA-256', pixels))].join(',');
+            return await digest(ctx.getImageData(0, 0, 1200, 1200).data) === await digest(document.querySelector('#share-preview').getContext('2d').getImageData(0, 0, 1200, 1200).data);
+          } finally { bitmap.close(); canvas.width = 0; canvas.height = 0; }
+        })()`), true, 'downloaded PNG pixels exactly match the visible preview');
         if (process.env.SHARE_PREVIEW_PATH) await writeFile(process.env.SHARE_PREVIEW_PATH, png);
       } finally { removeBegin(); removeProgress(); }
       await click(browser, page, '#share-copy');
@@ -108,7 +118,7 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
       await inspect(page, 'HTMLCanvasElement.prototype.toBlob = function(callback) { callback(null); }');
       await click(browser, page, '#share-create');
       await eventually(() => inspect(page, 'document.querySelector("#error").textContent.includes("Unable to create the PNG")'), 'PNG failure is actionable');
-      assert.equal(await inspect(page, 'document.querySelector("#share-result").hidden && liveShareURLs.size === 0 && !document.querySelector("#share-create").disabled'), true);
+      assert.equal(await inspect(page, 'document.querySelector("#share-result").hidden && liveShareURLs.size === 0 && !document.querySelector("#share-create").disabled && document.querySelector("#share-preview").width === 0 && document.querySelector("#share-preview").height === 0'), true);
       await cdp.send('Page.reload', {}, page.session);
       await eventually(() => inspect(page, 'document.querySelector("#score")?.textContent === "0.95"'), 'reload after encoder failure');
       await preview();
@@ -130,7 +140,7 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
       const settings = await browser.page(browser.origin + '/settings.html');
       await eventually(() => inspect(settings, '!!document.querySelector("#clear-history")'), 'Settings clear control loaded');
       assert.equal((await inspect(settings, 'chrome.runtime.sendMessage({ type: "clear-history" })')).ok, true);
-      await eventually(() => inspect(page, 'document.querySelector("#share-result").hidden && document.querySelector("#share-download").disabled && !document.querySelector("#share-preview").hasAttribute("src")'), 'clear history discards the retained preview');
+      await eventually(() => inspect(page, 'document.querySelector("#share-result").hidden && document.querySelector("#share-download").disabled && document.querySelector("#share-preview").width === 0 && document.querySelector("#share-preview").height === 0'), 'clear history discards the retained preview');
       assert.deepEqual(browser.errors, []);
     });
   } finally { await browser.cleanup(); }

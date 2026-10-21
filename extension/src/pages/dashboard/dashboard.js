@@ -140,7 +140,8 @@ function clearShareCard() {
   shareVersion++;
   if (shareURL) URL.revokeObjectURL(shareURL);
   shareURL = null; shareCard = null;
-  $('share-preview').removeAttribute('src'); $('share-preview').alt = '';
+  $('share-preview').width = 0; $('share-preview').height = 0;
+  $('share-preview').removeAttribute('aria-label');
   $('share-result').hidden = true; $('share-caption').value = '';
   $('share-download').disabled = true; $('share-copy').disabled = true;
   $('share-status').textContent = '';
@@ -157,18 +158,16 @@ $('share-create').addEventListener('click', async () => {
     const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to create share card.');
     if (version !== shareVersion) return;
     if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
-    const card = SocialCard.create(data.days, range, now), canvas = document.createElement('canvas');
-    try {
-      SocialCard.draw(canvas, card);
-      const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Unable to create the PNG. Try the detailed report.')), 'image/png'));
-      if (version !== shareVersion) return;
-      shareURL = URL.createObjectURL(blob); shareCard = card;
-      $('share-preview').src = shareURL; $('share-preview').alt = card.description;
-      $('share-caption').value = card.caption; $('share-result').hidden = false;
-      $('share-download').disabled = false; $('share-copy').disabled = false;
-      error(); $('share-status').textContent = 'Your card is ready. Review it before sharing.';
-    } finally { canvas.width = 0; canvas.height = 0; }
-  } catch (e) { if (version === shareVersion) error(e.message); }
+    const card = SocialCard.create(data.days, range, now), canvas = $('share-preview');
+    SocialCard.draw(canvas, card);
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Unable to create the PNG. Try the detailed report.')), 'image/png'));
+    if (version !== shareVersion) return;
+    shareURL = URL.createObjectURL(blob); shareCard = card;
+    canvas.setAttribute('aria-label', card.description);
+    $('share-caption').value = card.caption; $('share-result').hidden = false;
+    $('share-download').disabled = false; $('share-copy').disabled = false;
+    error(); $('share-status').textContent = 'Your card is ready. Review it before sharing.';
+  } catch (e) { if (version === shareVersion) { clearShareCard(); error(e.message); } }
   finally { button.disabled = false; }
 });
 $('share-download').addEventListener('click', () => {
