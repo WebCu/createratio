@@ -213,7 +213,7 @@ $('report-export').addEventListener('click', async () => {
 $('website-export').addEventListener('click', () => exportHistory('websites'));
 $('export').addEventListener('click', () => exportHistory('ratio'));
 extensionAPI.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && Object.hasOwn(changes, '_historyGeneration')) { reportVersion++; clearShareCard(); }
+  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) { reportVersion++; clearShareCard(); }
   if (RuntimeMessages.shouldRefresh(changes, area)) void refresh();
 });
 setInterval(refresh, 5000);

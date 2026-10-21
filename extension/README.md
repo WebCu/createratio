@@ -289,7 +289,9 @@ history discards the preview. At most one preview URL and one temporary drawing
 canvas are retained per dashboard; a replaced URL is revoked and the canvas is
 released after encoding. Closing the dashboard releases its preview. If the local
 date changes while history is loading, PNG and HTML exports stop with a retry
-message instead of mixing periods.
+message instead of mixing periods. Explicit Clear history has a separate reset
+marker, so ordinary receipt-window rollover preserves ready and pending export
+snapshots.
 
 **Download detailed report (HTML)** exports a self-contained printable report
 for the same period, using local calendar dates. Reports include

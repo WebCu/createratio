@@ -281,6 +281,8 @@ Before a release, verify:
   size. Captions include the public CreateRatio link but no site names or private
   details. Check clipboard success/denial, PNG encoding failure, stale requests,
   repeated preview cleanup, and preview removal on period changes/history resets.
+  Ready and pending PNG previews and pending HTML exports must survive normal
+  receipt-window rollover; only an explicit history reset invalidates them.
   Sharing is manual and never opens a posting flow automatically.
 - Daily and last-seven-day HTML reports download with the selected local dates,
   match dashboard totals, and print/save as PDF offline. Check empty history,

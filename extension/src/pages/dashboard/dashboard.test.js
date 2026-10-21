@@ -162,7 +162,7 @@ for (const range of ['today', 'week']) {
     const release = p.holdMessage('history');
     const exporting = p.nodes['report-export'].fire('click');
     delete data[today];
-    p.change({ _historyGeneration: { oldValue: 'before-clear', newValue: 'after-clear' } });
+    p.change({ _historyGeneration: { oldValue: 'before-clear', newValue: 'after-clear' }, _historyReset: { oldValue: false, newValue: true } });
     await p.ready(); release(); await exporting;
     assert.equal(p.blobs.length, 0, 'cleared activity must never become an HTML download');
     assert.deepEqual(p.state.downloads, []);
@@ -175,6 +175,16 @@ for (const range of ['today', 'week']) {
     assert.equal(p.nodes.error.hidden, true);
   });
 }
+test('receipt-window rollover does not cancel an in-flight HTML snapshot', async () => {
+  const now = new Date(2026, 5, 15, 12).getTime(), today = C3.localDate(new Date(now));
+  const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
+  p.state.replies.set('history', { ok: true, days: { [today]: { x: { createSec: 180 } } } });
+  const release = p.holdMessage('history'), exporting = p.nodes['report-export'].fire('click');
+  p.change({ _historyGeneration: { oldValue: 'before-rollover', newValue: 'after-rollover' }, _receipts: { newValue: ['new-packet'] } });
+  await p.ready(); release(); await exporting;
+  assert.equal(p.blobs.length, 1);
+  assert.match(await p.blobs[0].text(), /<dt>Creating<\/dt><dd>3\.0m<\/dd>/);
+});
 test('report export prevents duplicate requests and recovers after loading failures', async () => {
   const p = dashboard(); await p.ready(); p.nodes['report-range'].value = 'today';
   const release = p.holdMessage('history'), before = p.messages.length;
