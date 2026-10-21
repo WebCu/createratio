@@ -274,6 +274,12 @@ Before a release, verify:
 - Idle, focus, navigation, midnight, and sleep/wake boundaries do not backfill time.
 - All-website permission denial leaves tracking off; opt-in records only focused
   domain/time totals; disabling removes permissions and preserves totals.
+- Daily and last-seven-day share-card previews match recorded totals, download
+  real 1200 × 1200 PNGs, and have readable branding and time/score caveats at feed
+  size. Captions include the public CreateRatio link but no site names or private
+  details. Check clipboard success/denial, PNG encoding failure, stale requests,
+  repeated preview cleanup, and preview removal on period changes/history resets.
+  Sharing is manual and never opens a posting flow automatically.
 - Daily and last-seven-day HTML reports download with the selected local dates,
   match dashboard totals, and print/save as PDF offline. Check empty history,
   narrow layouts, keyboard selection, removed integrations, and that neither

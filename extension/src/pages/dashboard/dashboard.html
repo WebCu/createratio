@@ -45,9 +45,18 @@
     <p class="quote-note">Quotes: <b id="quotes">0</b> <span>(included in posts)</span></p>
     <section class="history"><div class="section-label"><h2>The last 7 days</h2><span>Active minutes</span></div><svg id="chart" viewBox="0 0 352 142" role="img" aria-labelledby="chart-title chart-desc"><title id="chart-title">Creating and consuming over seven days</title><desc id="chart-desc">Loading daily totals.</desc></svg><div class="sr-only"><table id="chart-table"><caption>Seven-day active minutes</caption><thead><tr><th scope="col">Date</th><th scope="col">Create minutes</th><th scope="col">Consume minutes</th></tr></thead><tbody></tbody></table></div><div class="legend"><span><i class="dot create"></i>Creating</span><span><i class="dot consume"></i>Consuming</span></div></section>
     <section class="report-export" aria-labelledby="report-title">
-      <h2 id="report-title">Take a moment to review</h2>
-      <p class="website-note" id="report-help">Download a creation report with totals, actions, and daily and site breakdowns. Open it in your browser to print or save as PDF. No website time or saved intentions included.</p>
-      <div class="report-controls"><label for="report-range">Report period</label><select id="report-range"><option value="today">Today</option><option value="week">Last 7 days (including today)</option></select><button id="report-export" type="button" aria-describedby="report-help">Download report</button></div>
+      <h2 id="report-title">Share a little intention</h2>
+      <p class="website-note" id="report-help">A square social card about creating more, not competing. Preview your totals before sharing. No site names, website time, or saved intentions appear on the card.</p>
+      <div class="report-controls"><label for="report-range">Period</label><select id="report-range"><option value="today">Today</option><option value="week">Last 7 days (including today)</option></select><button id="share-create" type="button" aria-describedby="report-help">Preview share card</button></div>
+      <div id="share-result" class="share-result" hidden>
+        <img id="share-preview" class="share-preview" width="1200" height="1200" alt="">
+        <p class="website-note">This is a snapshot of recorded creation tracking. Download the image, then attach it to your post. Include the caption so people can click through to CreateRatio. Nothing is posted automatically.</p>
+        <label for="share-caption">Suggested caption</label>
+        <textarea id="share-caption" rows="7" readonly></textarea>
+        <div class="report-controls"><button id="share-download" type="button" disabled>Download PNG</button><button id="share-copy" type="button" class="secondary" disabled>Copy caption</button></div>
+      </div>
+      <p id="share-status" class="save-status" role="status"></p>
+      <button id="report-export" class="website-export" type="button">Download detailed report (HTML)</button>
       <p id="report-status" class="save-status" role="status"></p>
     </section>
     <p class="website-note measurement-note">Limit &amp; track measures creating/consuming and actions on vetted sites only, during access sessions or optional above-goal access. Website time is a separate browsing overview; the two must not be added together.</p>
@@ -55,6 +64,6 @@
     <p id="error" role="alert" hidden></p>
   </main>
   <footer><span>Private by design. No account needed.</span><button id="export" disabled>Export CSV <span aria-hidden="true">↓</span></button></footer>
-  <script src="sites.js"></script><script src="core.js"></script><script src="web-time.js"></script><script src="messages.js"></script><script src="report.js"></script><script src="dashboard.js"></script>
+  <script src="sites.js"></script><script src="core.js"></script><script src="web-time.js"></script><script src="messages.js"></script><script src="report.js"></script><script src="share-card.js"></script><script src="dashboard.js"></script>
 </body>
 </html>

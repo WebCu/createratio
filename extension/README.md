@@ -125,7 +125,7 @@ replacement from a browser restart. Website-time sampling starts fresh.
   Optional above-goal access, Website time, intention saving, exports, and history
   clearing remain separate. Preferences save automatically.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
-  readable daily/seven-day reports, and CSV exports.
+  shareable daily/seven-day PNG cards, detailed reports, and CSV exports.
 
 ### Site access
 
@@ -255,10 +255,24 @@ remove oldest whole non-today days sooner, including temporarily ahead-dated
 days. If today's records alone cannot fit, saving reports an error instead of
 deleting today's history. Settings and access boundaries are not pruned.
 
-**Dashboard → Creation score → Download report** exports a self-contained HTML
-report for **Today** or **Last 7 days (including today)**, using local calendar
-dates. Reports include creation/consumption totals, actions, site and daily
-breakdowns, and a score calculated from the period's combined totals. Open the
+**Dashboard → Creation score → Preview share card** creates a local 1200 × 1200
+PNG for **Today** or **Last 7 days (including today)**. Review the preview,
+choose **Download PNG**, then attach it to a social post. **Copy caption** copies
+the matching summary with a clickable `https://createratio.com/` link; if clipboard
+access fails, the caption is selected for manual copying. The card includes
+CreateRatio branding, rounded creating/consuming time, posts/replies/comments,
+and the creation score with its action-credit caveat. Headlines never infer a
+trend from a single period or treat action credits as creating time. Cards and
+captions exclude site names, website time, and saved intentions. No data is
+uploaded and nothing is posted automatically. Changing the period or clearing
+history discards the preview. At most one preview URL and one temporary drawing
+canvas are retained per dashboard; a replaced URL is revoked and the canvas is
+released after encoding. Closing the dashboard releases its preview.
+
+**Download detailed report (HTML)** exports a self-contained printable report
+for the same period, using local calendar dates. Reports include
+creation/consumption totals, actions, site and daily breakdowns, and a score
+calculated from the period's combined totals. Open the
 file offline in a browser to review, print, or save as PDF. Today is partial;
 missing or cleared days show zero. Reports exclude website time and saved
 intentions. Downloaded files contain activity data; share them deliberately.

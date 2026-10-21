@@ -129,6 +129,12 @@
 .report-controls select, .report-controls button { min-height: 44px; border: 1px solid var(--control-line); border-radius: 6px; padding: 10px 12px; font: inherit; }
 .report-controls select { max-width: 100%; background: #fff; color: var(--ink); }
 .report-controls button { background: var(--violet); border-color: var(--violet); color: #fff; font-weight: 600; cursor: pointer; }
+.report-controls .secondary { background: #fff; color: var(--violet); }
+.share-result { margin-top: 24px; }
+.share-preview { display: block; width: 100%; max-width: 540px; height: auto; border: 1px solid var(--line); border-radius: 10px; }
+.share-result > label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.share-result textarea { display: block; width: 100%; min-height: 150px; padding: 12px; margin-bottom: 16px; resize: vertical; border: 1px solid var(--control-line); border-radius: 6px; background: #fff; color: var(--ink); font: 14px/1.6 system-ui; }
+.share-result textarea:focus-visible { outline: 3px solid var(--violet); outline-offset: 3px; }
 .report-export .save-status { margin: 12px 0 0; }
 
 .intention-list { list-style: none; padding: 0; margin: 28px 0; }

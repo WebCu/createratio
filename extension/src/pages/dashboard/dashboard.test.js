@@ -152,6 +152,21 @@ test('repeated report downloads retain only one temporary URL and release it aft
   assert.equal(p.timeouts.size, 0);
   assert.deepEqual(p.revokedURLs, p.state.downloads.map(download => download.url));
 });
+test('share-card history failures never expose a stale preview and allow retrying', async () => {
+  const p = dashboard(); await p.ready();
+  p.state.replies.set('history', { ok: true });
+  await p.nodes['share-create'].fire('click');
+  assert.equal(p.nodes.error.textContent, 'Unable to create share card.');
+  assert.equal(p.nodes['share-result'].hidden, true);
+  assert.equal(p.nodes['share-download'].disabled, true);
+  assert.equal(p.nodes['share-create'].disabled, false);
+  assert.equal(p.blobs.length, 0);
+  p.state.replies.delete('history');
+  p.state.rejections.set('history', new Error('Worker disconnected.'));
+  await p.nodes['share-create'].fire('click');
+  assert.equal(p.nodes.error.textContent, 'Worker disconnected.');
+  assert.equal(p.nodes['share-create'].disabled, false);
+});
 test('dashboard distinguishes creation-score measurements from all-site browsing time', () => {
   const html = fs.readFileSync(path.join(__dirname, 'dashboard.html'), 'utf8');
   assert.match(html, /id="ratio-view"[^>]*>Creation score/); assert.match(html, /id="websites-view"[^>]*>Website time/);

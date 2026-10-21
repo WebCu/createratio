@@ -8,7 +8,7 @@
   function minutes(seconds) { return (seconds / 60).toFixed(1) + 'm'; }
   function row(label, stats) { return `<tr><th scope="row">${escape(label)}</th><td>${minutes(stats.createSec)}</td><td>${minutes(stats.consumeSec)}</td><td>${C3.score(stats).toFixed(2)}</td></tr>`; }
   function table(caption, heading, rows) { return `<table><caption>${caption}</caption><thead><tr><th scope="col">${heading}</th><th scope="col">Creating</th><th scope="col">Consuming</th><th scope="col">Score</th></tr></thead><tbody>${rows}</tbody></table>`; }
-  function create(days, range, now = new Date()) {
+  function summarize(days, range, now = new Date()) {
     if (!['today', 'week'].includes(range)) throw new Error('Choose Today or Last 7 days.');
     const dates = C3.recentDates(range === 'today' ? 1 : 7, now), first = dates[0], last = dates.at(-1);
     const bySite = Object.create(null);
@@ -17,7 +17,11 @@
       bySite[site] ||= C3.emptyStats();
       for (const key of C3.FIELDS) bySite[site][key] += stats[key];
     }
-    const total = C3.aggregate(bySite), names = new Map(C3.SITES.map(site => [site.id, site.name]));
+    return { dates, first, last, bySite, total: C3.aggregate(bySite) };
+  }
+  function create(days, range, now = new Date()) {
+    const { dates, first, last, bySite, total } = summarize(days, range, now);
+    const names = new Map(C3.SITES.map(site => [site.id, site.name]));
     const hasActivity = C3.FIELDS.some(key => total[key] > 0);
     const title = range === 'today' ? 'Today' : 'Last 7 days';
     const period = first === last ? last : `${first} to ${last}`;
@@ -39,5 +43,5 @@ ${table('Daily breakdown', 'Local date', dates.map(date => row(date, C3.aggregat
 </body></html>`;
     return { html, filename: `CreateRatio-report-${first}${first === last ? '' : '-to-' + last}.html` };
   }
-  return { create };
+  return { create, summarize };
 });
