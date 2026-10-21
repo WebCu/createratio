@@ -258,6 +258,77 @@ tail -n 40 "$logs/check.log"
 exit "$status"
 ```
 
+## Release automation
+
+`pnpm check` includes release-command, package-reproduction and store-submission
+tests. These tests additionally require Git, `zip` and `unzip` on PATH. Release
+command tests use disposable real Git repositories and local remotes; GitHub CLI
+and local-check subprocesses are substituted at their external boundaries. Git
+URL queries map only the fixture's approved local transport to the official URL;
+all other Git operations are real and restricted to file transport. Tests reject
+alternate push URLs and URL rewrites before creating branches or tags. With
+automatic tag following and mirror settings enabled, they verify the complete
+remote ref set: preparation adds only its branch, publication only its version
+tag, and unrelated local refs remain local. They never push to the actual
+repository or publish a store version.
+
+The package test extracts the generated reviewer-source archive, rebuilds Firefox
+with the real build script, and compares every generated file against the packaged
+bundle. It also runs the real build tests with a different synchronized version,
+preventing fixed-version expectations from blocking preparation. It checks archive
+contents, checksums, stale-output removal, dirty
+source refusal and tag/commit mismatches. Store API tests substitute HTTP only,
+covering version/pending-submission guards, authentication, validation polling,
+write failures and refusal paths. Those tests do not establish live credentials,
+provider acceptance or publication.
+
+Before approving each store deployment, test its exact extracted artifact in the
+relevant browser and complete the manual extension checks below. Verify Chrome
+and Firefox submission results separately. A successful job reports submission;
+each store controls review, signing and public availability. See
+[releases](releases.md) for commands, approval and recovery.
+
+### Store-integration acceptance
+
+Human validation is a release gate, not a CI result. Keep a new integration's
+acceptance incomplete until a maintainer has supervised its first real release.
+Do not create a test version or push a tag merely to test credentials. That first
+release needs explicit authorization, followed by each store's environment
+approval; approving one store does not approve the other.
+
+Before approving a store job:
+
+1. Download that run's artifact. Record its tag, source commit and archive hashes
+   from `release.txt` and `SHA256SUMS`; verify the hashes locally with
+   `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum --check SHA256SUMS` on Linux.
+   Test a disposable extracted copy in the actual target browser and complete the
+   [extension checklist](#extension). For Firefox, use a supported real Firefox
+   version, not Chromium emulation, and reproduce the bundle using the
+   [reviewer-source instructions](firefox-add-ons.md#reproduce-the-firefox-package-from-reviewer-source).
+2. In the owning developer dashboard, check the existing listing, intended version,
+   permissions, license and disclosures. Record browser/OS versions, test outcomes
+   and remaining limitations against those exact hashes in a private release note.
+   Use only a sanitized reference in the deployment approval comment. Never attach
+   credentials, activity data or publisher-dashboard captures to the repository.
+   Secret-name presence and dashboard login do not prove API authentication.
+
+For the first explicitly authorized real release:
+
+3. Supervise the approved job. Its authenticated read-only preflight must succeed
+   before upload; check the upload/validation and version-creation results in the
+   relevant dashboard. For Firefox, confirm the intended listed version and
+   attached reviewer source. Record each store's result separately. On rejection,
+   authentication failure or an ambiguous write, stop and inspect the dashboard;
+   do not approve another store as a workaround or blindly resubmit.
+4. After signing/review and availability, install the store-delivered extension in
+   a disposable profile. Verify its ID and version, behavior and update continuity
+   using synthetic saved preferences. Only then record end-to-end integration
+   acceptance. A submitted version awaiting review is not a verified installation.
+
+The package job links this gate beside the source commit and checksums before
+approval. Environment approval authorizes real writes; it is not evidence that
+subsequent authentication, store review or installation has already succeeded.
+
 ## Refactor equivalence
 
 Build the same browser at the baseline and candidate revisions into separate

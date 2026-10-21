@@ -1,4 +1,4 @@
-name: Release Chrome extension
+name: Release browser extensions
 
 on:
   push:
@@ -50,22 +50,22 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.21.0
-      - name: Build and package only Chrome
+      - name: Package both stores and reproducible Firefox source
         run: |
-          node bin/chrome-store-release.js validate
-          node extension/build.js chrome
-          (cd dist/chrome && zip -X -r ../createratio-chrome.zip .)
-          (cd dist && sha256sum createratio-chrome.zip > createratio-chrome.zip.sha256)
-          printf 'Tag: %s\nCommit: %s\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" > dist/release.txt
+          node bin/package-release.js
           cat dist/release.txt >> "$GITHUB_STEP_SUMMARY"
-          cat dist/createratio-chrome.zip.sha256 >> "$GITHUB_STEP_SUMMARY"
+          cat dist/SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+          printf '\n## Human validation required\n\n' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Keep each store approval pending until the pre-submission checks in the [manual acceptance checklist](%s/%s/blob/%s/docs/testing.md#store-integration-acceptance) are complete for these exact artifacts. CI does not establish live authentication, Firefox behavior or store acceptance.\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - name: Keep the exact package for approval and audit (v7.0.2)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: chrome-store-package
+          name: browser-store-packages
           path: |
             dist/createratio-chrome.zip
-            dist/createratio-chrome.zip.sha256
+            dist/createratio-firefox.zip
+            dist/createratio-source.zip
+            dist/SHA256SUMS
             dist/release.txt
           if-no-files-found: error
           retention-days: 30
@@ -98,11 +98,11 @@ jobs:
       - name: Download the approved package from this run (v7.0.0)
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: chrome-store-package
+          name: browser-store-packages
           path: dist
       - name: Verify package checksum
         working-directory: dist
-        run: sha256sum --check createratio-chrome.zip.sha256
+        run: sha256sum --check SHA256SUMS
       - name: Get short-lived Chrome Web Store credentials (v3.0.0)
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
         id: auth
@@ -118,3 +118,35 @@ jobs:
         env:
           CWS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: node bin/chrome-store-release.js submit
+
+  submit-firefox:
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: firefox-addons
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout tested Firefox release (v7.0.1)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Firefox submission Node.js (v7.1.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.21.0
+      - name: Download approved browser packages (v7.0.0)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: browser-store-packages
+          path: dist
+      - name: Verify Firefox and reviewer-source checksums
+        working-directory: dist
+        run: sha256sum --check SHA256SUMS
+      - name: Upload Firefox and submit to Mozilla
+        env:
+          AMO_ADDON_ID: ${{ vars.AMO_ADDON_ID }}
+          AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
+          AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
+        run: node bin/firefox-store-release.js submit
