@@ -117,6 +117,41 @@ test('dashboard downloads daily and weekly readable reports without changing his
   assert.deepEqual(p.data, before);
   assert.equal(p.nodes['report-export'].disabled, false);
 });
+for (const range of ['today', 'week']) for (const step of [2000, -2000]) {
+  test(`${range} report rejects a history reply after the local date moves ${step > 0 ? 'forward' : 'backward'} and can be retried`, async () => {
+    let now = (step > 0 ? new Date(2026, 11, 31, 23, 59, 59) : new Date(2027, 0, 1, 0, 0, 1)).getTime();
+    const dates = C3.recentDates(range === 'today' ? 1 : 7, new Date(now));
+    const days = Object.fromEntries(dates.map(date => [date, { x: { createSec: 120, consumeSec: 60, posts: 1 } }]));
+    const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
+    p.nodes['report-range'].value = range;
+    p.state.replies.set('history', { ok: true, days });
+    const release = p.holdMessage('history');
+    const exporting = p.nodes['report-export'].fire('click');
+    now += step; release(); await exporting;
+    assert.equal(p.blobs.length, 0, 'a rollover must not download an empty or truncated report');
+    assert.deepEqual(p.state.downloads, []);
+    assert.equal(p.nodes.error.textContent, 'The local date changed while loading history. Please try again.');
+    assert.equal(p.nodes['report-export'].disabled, false);
+    const today = C3.localDate(new Date(now));
+    p.state.replies.set('history', { ok: true, days: { [today]: { x: { createSec: 180, consumeSec: 120 } } } });
+    await p.nodes['report-export'].fire('click');
+    assert.match(await p.blobs[0].text(), /<dt>Creating<\/dt><dd>3\.0m<\/dd>/);
+    const selected = C3.recentDates(range === 'today' ? 1 : 7, new Date(now));
+    assert.equal(p.state.downloads[0].filename, `CreateRatio-report-${selected[0]}${range === 'week' ? '-to-' + today : ''}.html`);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+}
+test('a same-day delayed report keeps the date captured when export started', async () => {
+  const started = new Date(2026, 5, 15, 9).getTime();
+  let now = started;
+  const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
+  p.state.replies.set('history', { ok: true, days: { [C3.localDate(new Date(started))]: { x: { createSec: 120 } } } });
+  const release = p.holdMessage('history');
+  const exporting = p.nodes['report-export'].fire('click');
+  now += 3600000; release(); await exporting;
+  assert.equal(p.blobs.length, 1);
+  assert.ok((await p.blobs[0].text()).includes(`Generated locally on ${new Date(started).toLocaleString()}.`));
+});
 test('report export prevents duplicate requests and recovers after loading failures', async () => {
   const p = dashboard(); await p.ready(); p.nodes['report-range'].value = 'today';
   const release = p.holdMessage('history'), before = p.messages.length;

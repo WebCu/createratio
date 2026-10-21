@@ -283,7 +283,9 @@ Before a release, verify:
 - Daily and last-seven-day HTML reports download with the selected local dates,
   match dashboard totals, and print/save as PDF offline. Check empty history,
   narrow layouts, keyboard selection, removed integrations, and that neither
-  website time nor saved intentions appear. Activity and website CSV exports
+  website time nor saved intentions appear. A local-date change during either
+  PNG or HTML history loading must show a retry message without generating an
+  artifact; retry must use the new period. Activity and website CSV exports
   remain unchanged.
 - Activity and website CSV exports work. Confirmed clearing removes histories,
   cancellation preserves them, and settings/access boundaries stay unchanged.

@@ -262,13 +262,16 @@ access fails, the caption is selected for manual copying. The card includes
 CreateRatio branding, rounded creating/consuming time, and detected
 post/reply/comment actions. Its approximate creation score is highlighted in the
 top right, with an action-credit caveat. Action counts are submission detections,
-not confirmed publications; failed submissions and site changes can affect them. Headlines never infer a
-trend from a single period or treat action credits as creating time. Cards and
+not confirmed publications; failed submissions and site changes can affect them.
+Headlines never infer a trend from a single period or treat action credits as
+creating time. Cards and
 captions exclude site names, website time, and saved intentions. No data is
 uploaded and nothing is posted automatically. Changing the period or clearing
 history discards the preview. At most one preview URL and one temporary drawing
 canvas are retained per dashboard; a replaced URL is revoked and the canvas is
-released after encoding. Closing the dashboard releases its preview.
+released after encoding. Closing the dashboard releases its preview. If the local
+date changes while history is loading, PNG and HTML exports stop with a retry
+message instead of mixing periods.
 
 **Download detailed report (HTML)** exports a self-contained printable report
 for the same period, using local calendar dates. Reports include

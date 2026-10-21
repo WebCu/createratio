@@ -153,9 +153,11 @@ $('share-create').addEventListener('click', async () => {
   const version = shareVersion, range = $('report-range').value;
   button.disabled = true;
   try {
+    const now = new Date(), date = C3.localDate(now);
     const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to create share card.');
     if (version !== shareVersion) return;
-    const card = SocialCard.create(data.days, range), canvas = document.createElement('canvas');
+    if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
+    const card = SocialCard.create(data.days, range, now), canvas = document.createElement('canvas');
     try {
       SocialCard.draw(canvas, card);
       const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Unable to create the PNG. Try the detailed report.')), 'image/png'));
@@ -193,8 +195,10 @@ $('report-export').addEventListener('click', async () => {
   const range = $('report-range').value;
   button.disabled = true; $('report-status').textContent = '';
   try {
+    const now = new Date(), date = C3.localDate(now);
     const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to export report.');
-    const report = CreationReport.create(data.days, range);
+    if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
+    const report = CreationReport.create(data.days, range, now);
     clearTimeout(reportTimer);
     if (reportURL) URL.revokeObjectURL(reportURL);
     reportURL = URL.createObjectURL(new Blob([report.html], { type: 'text/html;charset=utf-8' }));
