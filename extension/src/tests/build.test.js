@@ -123,19 +123,21 @@ test('every bundle links to the hosted privacy policy in a separate tab and remo
   }
 });
 
-test('all distributions use CreateRatio 0.0.1 with Create > Consume as the supporting tagline', async t => {
+test('all distributions share the source version and use Create > Consume as the supporting tagline', async t => {
   const root = await temporaryOutput(t);
+  const version = JSON.parse(await fs.readFile(path.join(__dirname, '../manifest.json'), 'utf8')).version;
+  assert.match(version, /^\d+\.\d+\.\d+$/);
   for (const packagePath of ['../../../package.json', '../../package.json']) {
     const metadata = JSON.parse(await fs.readFile(path.join(__dirname, packagePath), 'utf8'));
     assert.equal(metadata.name, 'createratio');
-    assert.equal(metadata.version, '0.0.1');
+    assert.equal(metadata.version, version);
     assert.equal(metadata.license, 'MIT');
   }
   for (const browser of BROWSERS) {
     const output = await build(browser, root);
     const manifest = JSON.parse(await fs.readFile(path.join(output, 'manifest.json'), 'utf8'));
     assert.equal(manifest.name, 'CreateRatio');
-    assert.equal(manifest.version, '0.0.1');
+    assert.equal(manifest.version, version);
     assert.equal(manifest.action.default_title, 'CreateRatio');
     assert.match(manifest.description, /^Create > Consume\./);
     const popup = await fs.readFile(path.join(output, 'popup.html'), 'utf8');

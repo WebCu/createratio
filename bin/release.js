@@ -35,26 +35,31 @@ function compareVersions(left, right) {
   return 0;
 }
 
-function run(program, args) {
-  const result = spawnSync(program, args, { encoding: 'utf8', timeout: 300000, maxBuffer: 10 * 1024 * 1024 });
+function run(program, args, stdio = 'pipe') {
+  const result = spawnSync(program, args, { encoding: 'utf8', stdio, timeout: 300000, maxBuffer: 10 * 1024 * 1024 });
   if (result.error || result.status !== 0) {
     throw new Error(`${program} ${args.slice(0, 2).join(' ')} failed. Your branch, files and tags are preserved; inspect the command before retrying.`);
   }
-  return result.stdout.trim();
+  return (result.stdout || '').trim();
 }
 
 function git(...args) {
   return run('git', args);
 }
 
+function requireOfficialOrigin() {
+  const origin = git('config', '--get', 'remote.origin.url');
+  const destinations = [origin, git('remote', 'get-url', 'origin'), ...git('remote', 'get-url', '--push', '--all', 'origin').split('\n')];
+  if (!destinations.every(url => /^(?:https:\/\/github\.com\/|git@github\.com:)WebCu\/createratio(?:\.git)?$/.test(url))) {
+    throw new Error('Origin must fetch and push only to the official WebCu/createratio repository.');
+  }
+}
+
 function requireCurrentMain() {
   process.chdir(git('rev-parse', '--show-toplevel'));
   if (git('status', '--porcelain')) throw new Error('A clean working tree is required.');
   if (git('branch', '--show-current') !== 'main') throw new Error('Run this command on main.');
-  const origin = git('config', '--get', 'remote.origin.url');
-  if (!/^(?:https:\/\/github\.com\/|git@github\.com:)WebCu\/createratio(?:\.git)?$/.test(origin)) {
-    throw new Error('Origin must be the official WebCu/createratio repository.');
-  }
+  requireOfficialOrigin();
   git('fetch', '--no-tags', 'origin', 'main');
   if (git('rev-parse', 'HEAD') !== git('rev-parse', 'origin/main')) {
     throw new Error('Main must match origin/main. Update it without rewriting history first.');
@@ -84,10 +89,11 @@ function prepare(increment) {
   run('gh', ['auth', 'status', '--hostname', 'github.com']);
   git('switch', '-c', branch);
   for (const [file, text] of edits) writeFileSync(file, text);
-  run('pnpm', ['check']);
+  run('pnpm', ['check'], 'inherit');
   git('add', '--', ...versionFiles);
   git('commit', '-m', `Release ${version}`);
   git('pull', '--rebase', '--ff-only', 'origin', 'main');
+  requireOfficialOrigin();
   git('push', '--set-upstream', 'origin', branch);
   const body = `## Summary\n\nPrepare version ${version} for Chrome and Firefox. All three version fields are updated together.\n\n## Evidence\n\n- pnpm check passed.\n- Store submission reruns CI and requires separate approval after the tag is pushed.\n\n## Merge Danger\n\n**Door:** two-way\n\nMerging updates source versions only; it does not push a release tag.\n\n**Blast Radius:** releases\n\nAfter merge, run pnpm release publish from clean, current main to trigger store submissions.\n`;
   process.stdout.write(run('gh', ['pr', 'create', '--repo', 'WebCu/createratio', '--base', 'main', '--head', branch, '--title', `Release ${version}`, '--body', body]) + '\n');
@@ -108,6 +114,7 @@ function publish() {
   } else {
     git('tag', '--annotate', tag, '--message', `Release ${version}`);
   }
+  requireOfficialOrigin();
   git('push', 'origin', `refs/tags/${tag}`);
   process.stdout.write(`Triggered ${tag} for Chrome and Firefox. Review the packages and approve each store job in GitHub Actions.\n`);
 }

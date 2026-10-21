@@ -40,6 +40,16 @@ test('release packages contain only browser bundles and source reproduces the ex
     GIT_AUTHOR_NAME: 'Package fixture', GIT_AUTHOR_EMAIL: 'package@example.invalid',
     GIT_COMMITTER_NAME: 'Package fixture', GIT_COMMITTER_EMAIL: 'package@example.invalid'
   };
+  for (const file of ['package.json', 'extension/package.json', 'extension/src/manifest.json']) {
+    const target = path.join(directory, file);
+    const metadata = JSON.parse(fs.readFileSync(target, 'utf8'));
+    metadata.version = '7.8.9';
+    fs.writeFileSync(target, JSON.stringify(metadata, null, 2) + '\n');
+  }
+  const testEnv = { ...env };
+  delete testEnv.NODE_TEST_CONTEXT;
+  const buildTests = spawnSync(process.execPath, ['--test', 'extension/src/tests/build.test.js'], { cwd: directory, env: testEnv, encoding: 'utf8', timeout: 30000 });
+  assert.equal(buildTests.status, 0, buildTests.stdout + buildTests.stderr);
   command('git', ['init', '--initial-branch=main'], directory, env);
   command('git', ['config', 'commit.gpgsign', 'false'], directory, env);
   command('git', ['add', '.'], directory, env);

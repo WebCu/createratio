@@ -17,7 +17,8 @@ pnpm release prepare patch
 ```
 
 Use `minor` or `major` instead of `patch` when appropriate. The command validates
-the official origin and synchronized source versions, creates `release/vVERSION`,
+the configured and effective fetch/push URLs against the official origin and
+checks synchronized source versions, creates `release/vVERSION`,
 updates only `package.json`, `extension/package.json` and
 `extension/src/manifest.json`, runs `pnpm check`, commits and pushes the branch,
 and opens a version PR. It does not merge the PR, create a tag or submit to stores.
@@ -74,7 +75,8 @@ Store-specific setup and recovery details:
 ## Failures and retries
 
 Preparation failures preserve your work. A missing GitHub login stops before
-branch creation; failed checks leave the release branch and version edits intact.
+branch creation; failed checks print their output and leave the release branch
+and version edits intact.
 Fix the checks and finish that existing branch rather than overwriting it. If the
 branch was pushed but PR creation failed, open its PR from GitHub.
 

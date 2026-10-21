@@ -211,12 +211,17 @@ exit "$status"
 `pnpm check` includes release-command, package-reproduction and store-submission
 tests. These tests additionally require Git, `zip` and `unzip` on PATH. Release
 command tests use disposable real Git repositories and local remotes; GitHub CLI
-and local-check subprocesses are substituted at their external boundaries. They
-never push to the actual repository or publish a store version.
+and local-check subprocesses are substituted at their external boundaries. Git
+URL queries map only the fixture's approved local transport to the official URL;
+all other Git operations are real and restricted to file transport. Tests reject
+alternate push URLs and URL rewrites before creating branches or tags. They never
+push to the actual repository or publish a store version.
 
 The package test extracts the generated reviewer-source archive, rebuilds Firefox
 with the real build script, and compares every generated file against the packaged
-bundle. It also checks archive contents, checksums, stale-output removal, dirty
+bundle. It also runs the real build tests with a different synchronized version,
+preventing fixed-version expectations from blocking preparation. It checks archive
+contents, checksums, stale-output removal, dirty
 source refusal and tag/commit mismatches. Store API tests substitute HTTP only,
 covering version/pending-submission guards, authentication, validation polling,
 write failures and refusal paths. Those tests do not establish live credentials,

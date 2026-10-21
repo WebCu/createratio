@@ -16,8 +16,18 @@ function repository(t) {
   const bin = path.join(directory, 'bin');
   const log = path.join(directory, 'commands.jsonl');
   for (const folder of [checkout, bin]) fs.mkdirSync(folder, { recursive: true });
+  const transport = path.join(directory, 'git-transport.cjs');
+  fs.writeFileSync(transport, `const cp = require('node:child_process');
+const spawnSync = cp.spawnSync;
+cp.spawnSync = (program, args, options) => {
+  const result = spawnSync(program, args, options);
+  if (program === 'git' && args[0] === 'remote' && args[1] === 'get-url' && result.status === 0) {
+    result.stdout = result.stdout.split('\\n').map(url => url === ${JSON.stringify(`file://${remote}`)} ? 'https://github.com/WebCu/createratio.git' : url).join('\\n');
+  }
+  return result;
+};\n`);
   const env = {
-    ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    ...process.env, NODE_OPTIONS: `--require=${transport}`, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
     GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_ALLOW_PROTOCOL: 'file',
     GIT_AUTHOR_NAME: 'Release fixture', GIT_AUTHOR_EMAIL: 'release@example.invalid',
     GIT_COMMITTER_NAME: 'Release fixture', GIT_COMMITTER_EMAIL: 'release@example.invalid',
@@ -46,7 +56,7 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CLI_LOG, JSON.stringify({tool: ${JSON.stringify(tool)}, args}) + '\\n');
 if (${JSON.stringify(tool)} === 'gh' && args[0] === 'auth' && process.env.FAIL_AUTH) process.exit(1);
-if (${JSON.stringify(tool)} === 'pnpm' && process.env.FAIL_CHECK) process.exit(1);
+if (${JSON.stringify(tool)} === 'pnpm' && process.env.FAIL_CHECK) { console.error('Synthetic check failure'); process.exit(1); }
 if (args[0] === 'pr' && args[1] === 'create') console.log('https://github.com/WebCu/createratio/pull/123');
 `, { mode: 0o755 });
   return {
@@ -114,6 +124,7 @@ test('failed checks preserve the release branch and edits without publishing the
   const repo = repository(t);
   const result = repo.run(['prepare', 'patch'], { FAIL_CHECK: '1' });
   assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Synthetic check failure/);
   assert.match(result.stderr, /pnpm check failed/);
   assert.equal(repo.git('branch', '--show-current'), 'release/v0.0.2');
   assert.ok(repo.git('status', '--porcelain'));
@@ -147,6 +158,29 @@ test('prepare and publish refuse dirty, non-main, stale, divergent, or wrong-ori
       assert.match(result.stderr, message, label);
       assert.equal(repo.git('rev-parse', 'HEAD'), head, label);
       assert.equal(repo.git('tag', '--list'), '', label);
+    }
+  }
+});
+
+test('push URLs and URL rewrites cannot redirect a release away from the official repository', t => {
+  for (const mode of ['pushurl', 'pushInsteadOf', 'insteadOf']) {
+    for (const args of [['prepare', 'patch'], ['publish']]) {
+      const repo = repository(t);
+      const other = path.join(path.dirname(repo.remote), 'other.git');
+      repo.git('init', '--bare', other);
+      if (mode === 'pushurl') repo.git('config', '--add', 'remote.origin.pushurl', `file://${other}`);
+      if (mode === 'pushInsteadOf') repo.git('config', `url.file://${other}.pushInsteadOf`, 'https://github.com/WebCu/createratio.git');
+      if (mode === 'insteadOf') {
+        repo.git('config', '--unset-all', `url.file://${repo.remote}.insteadOf`);
+        repo.git('config', `url.file://${other}.insteadOf`, 'https://github.com/WebCu/createratio.git');
+      }
+      const result = repo.run(args);
+      assert.notEqual(result.status, 0, `${mode}: ${args}`);
+      assert.match(result.stderr, /official/i);
+      assert.equal(repo.git('branch', '--show-current'), 'main');
+      assert.equal(repo.git('status', '--porcelain'), '');
+      assert.equal(repo.git('tag', '--list'), '');
+      assert.deepEqual(repo.calls(), []);
     }
   }
 });
