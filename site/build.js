@@ -21,7 +21,7 @@ function buildSite(output = path.resolve(__dirname, '../dist/site')) {
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8')
     .replace('src="analytics.js"', `src="${analytics}"`);
   fs.writeFileSync(path.join(output, 'index.html'), html);
-  for (const name of ['privacy.html', 'terms.html', 'styles.css', 'arrival.js', 'browser-install.js', 'favicon.svg']) {
+  for (const name of ['privacy.html', 'terms.html', 'llms.txt', 'robots.txt', 'sitemap.xml', 'styles.css', 'arrival.js', 'browser-install.js', 'favicon.svg']) {
     fs.copyFileSync(path.join(__dirname, name), path.join(output, name));
   }
   fs.copyFileSync(path.join(__dirname, '../LICENSE'), path.join(output, 'LICENSE'));

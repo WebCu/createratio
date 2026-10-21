@@ -9,7 +9,7 @@ const read = file => readFileSync(path.join(root, file), 'utf8');
 const manifests = ['package.json', 'extension/package.json'].map(file => JSON.parse(read(file)));
 const exactVersion = /^\d+\.\d+\.\d+$/;
 
-test('CI and deployment pin matching stable tools', () => {
+test('workflows share a pinned Node.js version and CI/deployment pin matching stable tools', () => {
   const versions = ['ci.yml', 'deploy-site.yml'].map(file => {
     const workflow = read(`.github/workflows/${file}`);
     const node = workflow.match(/node-version: (\S+)/)?.[1];
@@ -20,6 +20,12 @@ test('CI and deployment pin matching stable tools', () => {
     return { node, pnpm };
   });
   assert.deepEqual(versions[0], versions[1]);
+  for (const file of readdirSync(path.join(root, '.github/workflows'))) {
+    if (!/\.ya?ml$/.test(file)) continue;
+    for (const [, node] of read(`.github/workflows/${file}`).matchAll(/node-version: (\S+)/g)) {
+      assert.equal(node, versions[0].node, `${file} must use the shared Node.js version`);
+    }
+  }
 });
 
 test('browser runtime remains dependency-free and any development packages use exact versions', () => {
@@ -115,11 +121,15 @@ test('browser verification is a bounded CI job using a pinned, verified browser 
   assert.doesNotMatch(browserJob, /continue-on-error:|\|\| true/);
 });
 
-test('weekly dependency automation excludes automatic major upgrades', () => {
+test('weekly dependency automation proposes Action majors but excludes library and image majors', () => {
   const updates = read('.github/dependabot.yml').split('  - package-ecosystem: ').slice(1);
   assert.deepEqual(updates.map(update => update.split('\n')[0]), ['npm', 'github-actions', 'docker-compose']);
   for (const update of updates) {
     assert.match(update, /interval: weekly/);
-    assert.match(update, /dependency-name: '\*'\n\s+update-types: \['version-update:semver-major'\]/);
+    if (update.startsWith('github-actions\n')) {
+      assert.doesNotMatch(update, /ignore:/);
+    } else {
+      assert.match(update, /dependency-name: '\*'\n\s+update-types: \['version-update:semver-major'\]/);
+    }
   }
 });

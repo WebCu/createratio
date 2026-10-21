@@ -16,6 +16,7 @@
     "verify:access": "node bin/access-equivalence.js",
     "smoke:browser": "pnpm build:chrome && python3 -m unittest discover -s bin/tests -p test_browser_smoke.py && python3 bin/browser-smoke.py",
     "check:syntax": "node bin/check-syntax.js",
+    "check:actions": "node bin/check-actions.js",
     "check": "pnpm check:syntax && pnpm test && pnpm build && pnpm build:site",
     "check:browser": "pnpm build:chrome && pnpm test:browser",
     "test": "node --test --test-concurrency=4 extension/core/tests/*.test.js extension/sites/*.test.js \"extension/src/**/*.test.js\" site/tests/*.test.js bin/tests/*.test.js",

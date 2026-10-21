@@ -78,6 +78,16 @@ the free extension from any future optional paid service. See the
 [release guide](../docs/chrome-web-store.md); verify both deployed HTTPS URLs
 before release and use the privacy URL in Chrome Web Store.
 
+## AI and crawler discovery
+
+The homepage includes a canonical URL and static SoftwareApplication JSON-LD.
+`/llms.txt`, linked in the head and footer, summarizes verified product behavior,
+installation, privacy, and the existing extension UI workflow for browser agents.
+It is guidance, not an API or a guarantee that an AI service will use it.
+`/robots.txt` permits crawling and points to `/sitemap.xml` for public HTML pages.
+All three files ship in static builds and source/Docker previews; keep them current
+with product changes. The guide never exposes local extension data.
+
 ## Analytics
 
 `analytics.js` loads the official `@plausible-analytics/tracker` only on

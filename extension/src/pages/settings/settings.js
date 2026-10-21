@@ -40,6 +40,7 @@ function createSite(site) {
     tracking = document.createElement('input'); tracking.id = label.htmlFor; tracking.type = 'checkbox';
     tracking.setAttribute('role', 'switch'); tracking.setAttribute('aria-label', label.textContent + ' on ' + site.name);
     trackingStatus = document.createElement('small'); trackingStatus.id = 'tracking-status-' + site.id;
+    tracking.setAttribute('aria-describedby', trackingStatus.id);
     tracking.addEventListener('change', () => saveTracking(site.id));
     group.append(label, tracking, trackingStatus); header.append(group);
   } else {

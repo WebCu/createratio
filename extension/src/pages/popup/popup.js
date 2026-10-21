@@ -8,10 +8,12 @@ function error(message = '') { $('error').textContent = message; $('error').hidd
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function createAccessControl(site, state) {
   const row = document.createElement('div'); row.className = 'access-row';
+  row.setAttribute('role', 'group'); row.setAttribute('aria-label', state.name + ' access');
   const label = document.createElement('span'), name = document.createElement('strong'), status = document.createElement('small');
-  label.className = 'refill-target';
+  label.className = 'refill-target'; status.id = 'access-status-' + site;
   name.textContent = state.name; label.append(name, status);
   const button = document.createElement('button');
+  button.setAttribute('aria-describedby', status.id);
   const control = { label, status, button, state, busy: false };
   button.addEventListener('click', async () => {
     control.busy = true; button.disabled = true;
@@ -40,6 +42,7 @@ function renderAccess(access) {
     const seconds = Math.ceil(left / 1000);
     status.textContent = state.enabled === false ? 'Limit & track off' : state.goalAllowed ? 'Open · above daily goal' : open ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} left${state.expiresAt ? '' : ' · paused'}` : state.readyAt ? 'Access requested' : 'Blocked';
     button.textContent = state.enabled === false || state.goalAllowed ? 'Open site' : open ? 'End session' : 'Request access';
+    button.setAttribute('aria-label', state.enabled === false || state.goalAllowed ? 'Open site: ' + state.name : open ? 'End session for ' + state.name : 'Request access to ' + state.name);
     button.disabled = control.busy;
     RefillAnimation.render(control.label, state.goalAllowed ? { ...state, remainingMs: 0 } : state);
   }
