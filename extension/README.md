@@ -206,8 +206,10 @@ stay native. When the document cannot scroll, including when its overflow is
 hidden or clipped, an inner container becomes the page surface only if it is the
 sole scrollable ancestor under the pointer and fills at least half the viewport
 height. Panels inside another scrollable container stay native regardless of
-height; a lone smaller panel stays native too. Keyboard scrolling, touch gestures,
-and scrollbar dragging are unchanged. Line-based wheel input uses a 16-pixel
+height; a lone smaller panel stays native too. An independently scrolling body
+is included in that ancestry; body overflow propagated to the viewport is not
+counted as a separate scroller. Keyboard scrolling, touch gestures, and scrollbar
+dragging are unchanged. Line-based wheel input uses a 16-pixel
 line; page-based input uses the height of the surface being scrolled. Physical
 trackpad feel and native wheel settings vary by browser and operating system.
 No scroll distances or additional activity data are saved.

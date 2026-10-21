@@ -17,8 +17,11 @@ for (const [site, url, messagesURL, editor] of [
           globalThis.resistanceSaves = 0;
           chrome.runtime.onMessage.addListener(message => { if (message.type === 'scroll-friction-setting') resistanceSaves++; });
         })()`);
-        const settings = await browser.page(browser.origin + '/settings.html');
-        await eventually(() => evaluate(browser, settings.session, '!document.querySelector("#scroll-friction-enabled")?.disabled'), 'Settings loaded');
+        const settings = await browser.page('about:blank');
+        const settingsReady = () => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled")?.disabled === false');
+        assert.equal(await settingsReady(), false, 'missing Settings controls are not ready');
+        await browser.cdp.send('Page.navigate', { url: browser.origin + '/settings.html' }, settings.session);
+        await eventually(settingsReady, 'Settings loaded');
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), true);
         const contexts = new Map();
         browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
@@ -206,6 +209,65 @@ for (const [label, lock, overflow, panelHeight] of [
         await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
         for (const delta of [240, -240]) assert.equal(await wheelAt('#panel', delta), delta, 'nested panels keep native distance regardless of height');
         assert.equal(await evaluate(browser, page.session, `document.querySelector('#workspace').scrollTop`), 0, 'the page surface does not move for a nested panel');
+        assert.deepEqual(browser.errors, []);
+      });
+    } finally { await browser.cleanup(); }
+  });
+}
+
+for (const [label, htmlStyle, bodyStyle, surface] of [
+  ['independent body', 'overflow:hidden', '', 'body'],
+  ['one clipped root axis', 'overflow-x:clip;overflow-y:visible', '', 'body'],
+  ['viewport-propagated body', 'overflow:visible', '', 'html'],
+  ['root containment', 'overflow:visible;contain:layout', '', 'body'],
+  ['body containment', 'overflow:visible', 'contain:layout', 'body'],
+  ['body content visibility', 'overflow:visible', 'content-visibility:auto', 'body'],
+  ['body size container', 'overflow:visible', 'container-type:inline-size', 'body'],
+  ['scroll-state without size containment', 'overflow:visible', 'container-type:scroll-state', 'html']
+]) {
+  test(`built body scrolling distinguishes the viewport and preserves tall panels: ${label}`, async () => {
+    const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
+    const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+    try {
+      await withFailureArtifacts(browser, `body scrolling: ${label}`, async () => {
+        const contexts = new Map();
+        browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
+          if (context.origin === browser.origin) contexts.set(session, context.id);
+        });
+        await evaluate(browser, browser.worker, `chrome.storage.local.set({ _access: { linkedin: { remainingMs: 300000, date: C3.localDate() } } })`);
+        const page = await browser.page('https://www.linkedin.com/feed/');
+        await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
+        await browser.cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, page.session);
+        const fixture = `<style>html,body{height:100%;margin:0}html{${htmlStyle}}body{overflow:auto;${bodyStyle}}#panel{height:500px;width:200px;overflow:auto}</style><div id="panel"><div style="height:4000px">Synthetic panel</div></div><div style="height:20000px">Synthetic feed</div>`;
+        await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(fixture)}`);
+        await eventually(async () => {
+          if (!contexts.has(page.session)) return false;
+          const { result } = await browser.cdp.send('Runtime.evaluate', { expression: 'document', contextId: contexts.get(page.session) }, page.session);
+          try {
+            const { listeners } = await browser.cdp.send('DOMDebugger.getEventListeners', { objectId: result.objectId }, page.session);
+            return listeners.some(listener => listener.type === 'wheel' && !listener.passive);
+          } finally { await browser.cdp.send('Runtime.releaseObject', { objectId: result.objectId }, page.session); }
+        }, 'friction is active');
+        async function wheel(selector, delta, x = 400, y = 400) {
+          await evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop = 1000`);
+          await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY: delta }, page.session);
+          await eventually(() => evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop !== 1000`), 'target scrolls');
+          return evaluate(browser, page.session, `(async () => {
+            let previous = -1, stable = 0;
+            for (let frame = 0; frame < 120 && stable < 5; frame++) {
+              await new Promise(requestAnimationFrame);
+              const next = document.querySelector('${selector}').scrollTop;
+              stable = next === previous ? stable + 1 : 0; previous = next;
+            }
+            return document.querySelector('${selector}').scrollTop - 1000;
+          })()`);
+        }
+        for (const delta of [240, -240]) assert.equal(await wheel(surface, delta), delta / 2, 'only the real page surface slows');
+        assert.equal(await evaluate(browser, page.session, `document.querySelector('${surface === 'body' ? 'html' : 'body'}').scrollTop`), 0, 'the other surface stays stationary');
+        await evaluate(browser, page.session, 'document.documentElement.scrollTop = 0; document.body.scrollTop = 0');
+        await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+        for (const delta of [240, -240]) assert.equal(await wheel('#panel', delta, 100, 100), delta, 'tall panels remain native');
+        assert.equal(await evaluate(browser, page.session, `document.querySelector('${surface}').scrollTop`), 0);
         assert.deepEqual(browser.errors, []);
       });
     } finally { await browser.cleanup(); }

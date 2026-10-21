@@ -6,13 +6,22 @@
   const LINE_PIXELS = 16;
   const CONTROLS = 'input,textarea,select,video,audio,[role="textbox"],[role="slider"],[role="listbox"],[role="menu"],[role="dialog"],dialog';
   const SCROLLS = /^(auto|scroll|overlay)$/;
+  const SIZE_CONTAINER = /(?:^| )(?:size|inline-size)(?: |$)/;
+  function hasContainment(style) {
+    return style.contain && style.contain !== 'none' || style.contentVisibility && style.contentVisibility !== 'visible' || SIZE_CONTAINER.test(style.containerType);
+  }
   function create({ document, Element, getComputedStyle }) {
     let speed = 1, remainder = 0, lastPosition = null, lastTarget = null;
     function protectedElement(node) {
       return node instanceof Element && (node.isContentEditable || node.matches(CONTROLS));
     }
     function scrollable(node) {
-      return node.scrollHeight > node.clientHeight && SCROLLS.test(getComputedStyle(node).overflowY);
+      if (node.scrollHeight <= node.clientHeight) return false;
+      const style = getComputedStyle(node);
+      if (!SCROLLS.test(style.overflowY)) return false;
+      if (node !== document.body) return true;
+      const rootStyle = getComputedStyle(document.documentElement);
+      return rootStyle.overflowX !== 'visible' || rootStyle.overflowY !== 'visible' || [style, rootStyle].some(hasContainment);
     }
     function pageSurface(node) {
       return node.clientHeight * 2 >= document.documentElement.clientHeight;
@@ -24,7 +33,7 @@
       const root = document.scrollingElement, ancestors = [];
       for (const node of event.composedPath()) {
         if (protectedElement(node)) return;
-        if (node === root || node === document.documentElement || node === document.body) break;
+        if (node === root || node === document.documentElement) break;
         if (!(node instanceof Element)) continue;
         if (event.deltaX && node.scrollWidth > node.clientWidth && SCROLLS.test(getComputedStyle(node).overflowX)) return;
         if (scrollable(node)) ancestors.push(node);

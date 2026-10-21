@@ -3,12 +3,23 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { launch, evaluate, eventually, withFailureArtifacts } from '../extension/browser-tests/chromium.mjs';
 
+const workloads = {
+  document: {
+    fixture: '<style>body{margin:0;min-height:20000px}</style><h1>Synthetic scroll workload</h1>',
+    surface: 'document.scrollingElement'
+  },
+  'app-shell': {
+    fixture: '<style>html,body{margin:0;height:100%;overflow:hidden}body{min-height:20000px}main{position:fixed;inset:0;overflow:auto}</style><main id="profile-surface"><h1>Synthetic app shell</h1><div style="height:20000px">Synthetic feed</div></main>',
+    surface: 'document.querySelector("#profile-surface")'
+  },
+  body: {
+    fixture: '<style>html,body{margin:0;height:100%}html{overflow:hidden}body{overflow:auto}</style><h1>Synthetic body scroll</h1><div style="height:20000px">Synthetic feed</div>',
+    surface: 'document.body'
+  }
+};
 const [baseline, candidate, output, layout = 'document'] = process.argv.slice(2);
-if (!baseline || !candidate || !output || !['document', 'app-shell'].includes(layout)) throw new Error('Usage: node bin/scroll-friction-profile.mjs BASELINE_BUNDLE CANDIDATE_BUNDLE OUTPUT_JSON [document|app-shell]');
-const fixture = layout === 'app-shell'
-  ? '<style>html,body{margin:0;height:100%;overflow:hidden}body{min-height:20000px}main{position:fixed;inset:0;overflow:auto}</style><main id="profile-surface"><h1>Synthetic app shell</h1><div style="height:20000px">Synthetic feed</div></main>'
-  : '<style>body{margin:0;min-height:20000px}</style><h1>Synthetic scroll workload</h1>';
-const surface = layout === 'app-shell' ? 'document.querySelector("#profile-surface")' : 'document.scrollingElement';
+if (!baseline || !candidate || !output || !Object.hasOwn(workloads, layout)) throw new Error('Usage: node bin/scroll-friction-profile.mjs BASELINE_BUNDLE CANDIDATE_BUNDLE OUTPUT_JSON [document|app-shell|body]');
+const { fixture, surface } = workloads[layout];
 const tabCount = 8, cycles = 30, wheelEvents = 100, idleMs = 6000;
 
 async function injectedBytes(bundle) {
@@ -36,7 +47,10 @@ async function run(bundle, variant, repetition) {
         chrome.runtime.onMessage.addListener((message, sender) => { if (sender.tab && message.type === 'snapshot') profileRequests++; });
       })()`);
       async function replaceSurface(page) {
-        await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(fixture)}; ${surface}.scrollTop = 1000`);
+        const replace = layout === 'body'
+          ? `const body = document.createElement('body'); body.innerHTML = ${JSON.stringify(fixture)}; document.body.replaceWith(body)`
+          : `document.body.innerHTML = ${JSON.stringify(fixture)}`;
+        await evaluate(browser, page.session, `(() => { ${replace}; ${surface}.scrollTop = 1000; })()`);
       }
       async function prepare(url) {
         const page = await browser.page(url);
@@ -129,6 +143,8 @@ async function run(bundle, variant, repetition) {
       assert.equal(inactiveListeners.filter(listener => !listener.passive).length, 0, 'hidden documents release scroll friction');
       const counts = checkpoints.map(checkpoint => checkpoint.wheelListeners.length);
       assert.ok(counts.every(count => count === counts[0]), `lifecycle cycles must not accumulate wheel listeners: ${counts.join(', ')}`);
+      const nodeCounts = checkpoints.map(checkpoint => checkpoint.nodes);
+      assert.ok(nodeCounts.every(count => count === nodeCounts[0]), `surface replacements must not accumulate DOM nodes: ${nodeCounts.join(', ')}`);
       return {
         variant, repetition, layout, wheelDistance, browser: (await browser.cdp.send('Browser.getVersion')).product, injectedBytes: await injectedBytes(bundle),
         controlHeap, checkpoints, afterWheel, inactiveListeners, idleRequests: idle.after - idle.before,

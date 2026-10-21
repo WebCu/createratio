@@ -13,7 +13,7 @@ class Element {
 }
 
 function setup({ root, body, chain = [], active = null, viewport = 800 }) {
-  const documentElement = new Element('html', { scrollHeight: viewport, clientHeight: viewport });
+  const documentElement = root?.name === 'html' ? root : new Element('html', { scrollHeight: viewport, clientHeight: viewport });
   const path = [...chain, body, documentElement];
   const document = {
     scrollingElement: root, documentElement, body, activeElement: active, listener: null, passive: null,
@@ -147,6 +147,30 @@ test('fractional movement accumulates on the promoted surface', () => {
   h.wheel({ deltaY: 3 });
   assert.deepEqual(workspace.moves.map(move => move.top), [1, 2]);
   assert.equal(workspace.scrollTop, 303);
+});
+
+test('an independently scrolling body is the page surface, not its tall nested panel', () => {
+  const root = new Element('html', { scrollHeight: 800, clientHeight: 800, overflowY: 'hidden' });
+  const body = new Element('body', { scrollHeight: 5000, clientHeight: 800, overflowY: 'auto' });
+  body.scrollTop = 1000;
+  const h = setup({ root, body });
+  h.friction.setSpeed(0.5);
+  assert.equal(h.wheel({ deltaY: 240 }).prevented, 1);
+  assert.deepEqual(body.moves, [{ top: 120, left: 0 }]);
+  const panel = new Element('aside', { scrollHeight: 3000, clientHeight: 500, overflowY: 'auto' });
+  assert.equal(h.wheel({ deltaY: 240, composedPath: () => [panel, body, root] }).prevented, 0);
+  assert.deepEqual(panel.moves, []);
+  assert.deepEqual(root.moves, []);
+});
+
+test('body overflow propagated to the viewport does not mask document scrolling', () => {
+  const root = documentScroller(); root.overflowY = 'visible';
+  const body = new Element('body', { scrollHeight: 5000, clientHeight: 800, overflowY: 'auto' });
+  const h = setup({ root, body });
+  h.friction.setSpeed(0.5);
+  assert.equal(h.wheel({ deltaY: 240 }).prevented, 1);
+  assert.deepEqual(root.moves, [{ top: 120, left: 0 }]);
+  assert.deepEqual(body.moves, []);
 });
 
 test('fractional movement resets on target replacement and speed transitions', () => {
