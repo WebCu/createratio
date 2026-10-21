@@ -28,8 +28,9 @@
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Unable to draw the share card. Try downloading the detailed report.');
     const ink = '#30263f', muted = '#62596f', violet = '#6043b5', green = '#16804a', line = '#d9d5e4';
-    const text = (value, x, y, size, color = ink, weight = 500, width = 1056) => {
+    const text = (value, x, y, size, color = ink, weight = 500, width = 1056, align = 'left') => {
       ctx.fillStyle = color;
+      ctx.textAlign = align;
       ctx.font = `${weight} ${size}px system-ui, sans-serif`;
       while (ctx.measureText(String(value)).width > width && size > 20) { size--; ctx.font = `${weight} ${size}px system-ui, sans-serif`; }
       ctx.fillText(String(value), x, y, width);
@@ -37,28 +38,31 @@
     const box = (x, y, width, height, color, radius = 0) => {
       ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y, width, height, radius); ctx.fill();
     };
-    box(0, 0, 1200, 1200, '#f9f9fc');
-    box(72, 64, 64, 64, violet, 16); text('>', 87, 113, 54, '#ffffff', 700, 44);
-    text('CreateRatio', 154, 110, 40, ink, 750, 450);
-    text(card.label, 72, 200, 30, muted, 600);
-    text(card.period, 72, 244, 28, muted);
-    text(card.headline[0], 72, 365, 86, ink, 800);
-    text(card.headline[1], 72, 465, 86, violet, 800);
-    text(card.creating, 72, 625, 104, green, 750, 480);
-    text(card.consuming, 660, 625, 104, ink, 750, 468);
-    text('creating', 76, 678, 38, green, 600, 480);
-    text('consuming', 664, 678, 38, muted, 600, 464);
-    box(72, 718, 1056, 22, line, 11);
-    if (card.creatingShare > 0) box(72, 718, 1056 * card.creatingShare, 22, green, Math.min(11, 528 * card.creatingShare));
-    text(`${card.contributions} posts, replies & comments`, 72, 817, 36, ink, 600, 730);
-    text(card.score, 840, 817, 36, violet, 700, 288);
-    text('creation score', 840, 871, 27, muted, 500, 288);
-    text('Score includes +2m per post, reply or comment.', 72, 871, 27, muted, 500, 730);
-    text('Tracked sites only. Time is rounded. Today is partial.', 72, 916, 27, muted);
-    box(0, 974, 1200, 226, violet);
-    text('Create more. Consume intentionally.', 72, 1046, 43, '#ffffff', 700);
-    text('Free. Private. Try it for yourself.', 72, 1113, 32, '#ffffff', 500, 650);
-    text('createratio.com', 72, 1170, 40, '#ffffff', 750, 1056);
+    box(0, 0, 1200, 1200, violet);
+    box(72, 64, 56, 56, '#ffffff', 14);
+    ctx.strokeStyle = violet; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(89, 80); ctx.lineTo(111, 92); ctx.lineTo(89, 104); ctx.stroke();
+    text('CreateRatio', 146, 106, 36, '#ffffff', 750, 430);
+    text(card.label, 1128, 85, 28, '#ffffff', 600, 480, 'right');
+    text(card.period, 1128, 124, 24, '#ffffff', 500, 480, 'right');
+    text(card.headline[0], 72, 269, 96, '#ffffff', 800);
+    text(card.headline[1], 72, 379, 96, '#ffffff', 800);
+    box(48, 438, 1104, 540, '#ffffff', 28);
+    text(card.creating, 88, 575, 108, green, 750, 480);
+    text(card.consuming, 660, 575, 108, ink, 750, 452);
+    text('creating', 92, 626, 34, green, 600, 480);
+    text('consuming', 664, 626, 34, muted, 600, 448);
+    box(88, 661, 1024, 16, line, 8);
+    if (card.creatingShare > 0) box(88, 661, 1024 * card.creatingShare, 16, green, Math.min(8, 512 * card.creatingShare));
+    text(card.contributions, 88, 760, 58, ink, 700, 480);
+    text('posts, replies & comments', 90, 805, 30, muted, 500, 478);
+    text(card.score, 660, 760, 58, violet, 700, 452);
+    text('creation score', 664, 805, 30, muted, 500, 448);
+    text('Score includes +2m per post, reply or comment.', 88, 881, 27, muted, 500, 1024);
+    text('Tracked sites only. Time is rounded. Today is partial.', 88, 925, 27, muted, 500, 1024);
+    text('Create more. Consume intentionally.', 72, 1045, 34, '#ffffff', 600);
+    text('createratio.com', 72, 1128, 46, '#ffffff', 750, 500);
+    text('Free. Private. Try it for yourself.', 1128, 1128, 30, '#ffffff', 500, 540, 'right');
   }
   return { create, draw };
 });

@@ -35,6 +35,27 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
         await eventually(() => inspect(page, '!document.querySelector("#share-result").hidden && document.querySelector("#share-preview").complete && document.querySelector("#share-preview").naturalWidth === 1200'), 'real PNG preview ready');
       };
       await preview();
+      const drawings = await inspect(page, `(() => {
+        const cases = [{ createSec: 4800, consumeSec: 3600, posts: 9 }, { createSec: 120, consumeSec: 1200, replies: 1 }, {}, { createSec: 604800, consumeSec: 86399, posts: 999, replies: 999, comments: 999 }];
+        return cases.map(stats => {
+          const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'), paint = ctx.fillText.bind(ctx), bounds = [];
+          ctx.fillText = function(value, x, y, maxWidth) {
+            const metrics = this.measureText(value), scale = Math.min(1, maxWidth / Math.max(1, metrics.width));
+            bounds.push({ text: String(value), left: x - metrics.actualBoundingBoxLeft * scale, right: x + metrics.actualBoundingBoxRight * scale, top: y - metrics.actualBoundingBoxAscent, bottom: y + metrics.actualBoundingBoxDescent });
+            return paint(value, x, y, maxWidth);
+          };
+          SocialCard.draw(canvas, SocialCard.create({ [C3.localDate()]: { x: stats } }, 'week'));
+          canvas.width = 0; canvas.height = 0;
+          return {
+            outside: bounds.filter(rect => rect.left < 48 || rect.right > 1152 || rect.top < 48 || rect.bottom > 1152),
+            overlaps: bounds.flatMap((a, index) => bounds.slice(index + 1).filter(b => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).map(b => [a.text, b.text]))
+          };
+        });
+      })()`);
+      for (const drawing of drawings) {
+        assert.deepEqual(drawing.outside, [], 'card text stays within its safe area');
+        assert.deepEqual(drawing.overlaps, [], 'real, empty and large-number text never overlaps');
+      }
       const daily = await inspect(page, 'document.querySelector("#share-caption").value');
       assert.match(daily, /Today so far: 30m creating · 40m consuming · 4 posts\/replies\/comments/);
       assert.match(daily, /A little creating counts, too/);
