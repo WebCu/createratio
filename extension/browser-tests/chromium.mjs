@@ -312,6 +312,26 @@ export async function evaluate(browser, session, expression) {
   return result.result.value;
 }
 
+export async function seedAccess(browser, sites, settings) {
+  await evaluate(browser, browser.worker, `(async () => {
+    const seed = { _access: Object.fromEntries(${JSON.stringify(sites)}.map(site => [site, { remainingMs: 300000, date: C3.localDate() }])) };
+    const preferences = ${JSON.stringify(settings ?? null)};
+    if (preferences) {
+      const { settings = {} } = await chrome.storage.local.get('settings');
+      seed.settings = { ...settings, ...preferences };
+    }
+    await chrome.storage.local.set(seed);
+    await SiteAccess.reconcile();
+  })()`);
+}
+
+export async function waitForEnabledControl(browser, page, selector, timeout) {
+  return eventually(() => evaluate(browser, page.session, `(() => {
+    const control = document.querySelector(${JSON.stringify(selector)});
+    return control?.disabled === false && control.getAttribute('aria-disabled') !== 'true';
+  })()`), `enabled control ${selector}`, timeout);
+}
+
 export async function accessibilityNodes(browser, page) {
   const { nodes } = await browser.cdp.send('Accessibility.getFullAXTree', {}, page.session);
   return nodes.filter(node => !node.ignored);

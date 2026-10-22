@@ -8,51 +8,27 @@ for (const [site, url, messagesURL, editor] of [
   ['linkedin', 'https://www.linkedin.com/feed/', '/messaging/', '<div class="comments-comment-box"><div id="editor" contenteditable="true" role="textbox">Synthetic draft</div></div>']
 ]) {
   test(`built slow-scrolling preference changes trusted ${site} wheel input without affecting writing or nested panels`, async () => {
-    const { launch, evaluate, eventually, click, withFailureArtifacts } = await import('./chromium.mjs');
+    const { launch, evaluate, eventually, click, withFailureArtifacts, seedAccess, waitForEnabledControl } = await import('./chromium.mjs');
     const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
     try {
       await withFailureArtifacts(browser, `${site} slow-scrolling journey`, async () => {
-        await evaluate(browser, browser.worker, `(async () => {
-          await chrome.storage.local.set({ ...${JSON.stringify(site === 'x' ? {} : { settings: { accessMinutes: 12 } })}, _access: { ${site}: { remainingMs: 300000, date: C3.localDate() } } });
-          await SiteAccess.reconcile();
+        await seedAccess(browser, [site], site === 'x' ? undefined : { accessMinutes: 12 });
+        await evaluate(browser, browser.worker, `(() => {
           globalThis.resistanceSaves = 0;
           chrome.runtime.onMessage.addListener(message => { if (message.type === 'scroll-friction-setting') resistanceSaves++; });
         })()`);
         const settings = await browser.page('about:blank');
-        const settingsReady = () => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled")?.disabled === false');
-        assert.equal(await settingsReady(), false, 'missing Settings controls are not ready');
+        await assert.rejects(waitForEnabledControl(browser, settings, '#scroll-friction-enabled', 100), /Timed out: enabled control/);
         await browser.cdp.send('Page.navigate', { url: browser.origin + '/settings.html' }, settings.session);
-        await eventually(settingsReady, 'Settings loaded');
+        await waitForEnabledControl(browser, settings, '#scroll-friction-enabled');
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), true);
-        const contexts = new Map();
-        browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
-          if (context.origin === browser.origin) contexts.set(session, context.id);
-        });
+        const { scrollFixture } = await import('./scrolling.mjs');
+        const scroll = scrollFixture(browser);
         const page = await browser.page(url);
         await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
         await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify('<style>body{margin:0;min-height:20000px}#editor{min-height:100px}#panel{position:fixed;right:20px;top:150px;width:200px;height:150px;overflow:auto;background:white}</style><h1>Synthetic feed</h1>' + editor + '<div id="panel"><div style="height:2000px">Nested panel</div></div>')}`);
-        async function listenerEnabled() {
-          if (!contexts.has(page.session)) return false;
-          const { result } = await browser.cdp.send('Runtime.evaluate', { expression: 'document', contextId: contexts.get(page.session) }, page.session);
-          try {
-            const { listeners } = await browser.cdp.send('DOMDebugger.getEventListeners', { objectId: result.objectId }, page.session);
-            return listeners.some(listener => listener.type === 'wheel' && !listener.passive);
-          } finally { await browser.cdp.send('Runtime.releaseObject', { objectId: result.objectId }, page.session); }
-        }
-        async function wheel(delta, extra = {}) {
-          await evaluate(browser, page.session, 'document.scrollingElement.scrollTop = 1000');
-          await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 400, y: 400, deltaX: 0, deltaY: delta, ...extra }, page.session);
-          await eventually(() => evaluate(browser, page.session, 'document.scrollingElement.scrollTop !== 1000'), 'wheel moves the document');
-          return evaluate(browser, page.session, `(async () => {
-            let previous = -1, stable = 0;
-            for (let frame = 0; frame < 120 && stable < 5; frame++) {
-              await new Promise(requestAnimationFrame);
-              const next = document.scrollingElement.scrollTop;
-              stable = next === previous ? stable + 1 : 0; previous = next;
-            }
-            return document.scrollingElement.scrollTop - 1000;
-          })()`);
-        }
+        const listenerEnabled = () => scroll.isEnabled(page);
+        const wheel = delta => scroll.distance(page, 'html', delta);
         await eventually(listenerEnabled, 'default friction attaches without a saved choice');
         assert.equal(await wheel(240), 120, 'default wheel scrolling moves half as far');
         assert.equal(await evaluate(browser, browser.worker, 'resistanceSaves'), 0);
@@ -125,7 +101,7 @@ for (const [site, url, messagesURL, editor] of [
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").disabled'), true);
         await browser.cdp.send('Page.reload', {}, settings.session);
-        await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled")?.disabled === false'), 'saved preference restored after reload');
+        await waitForEnabledControl(browser, settings, '#scroll-friction-enabled');
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), false);
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
         await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
@@ -136,7 +112,7 @@ for (const [site, url, messagesURL, editor] of [
           await chrome.storage.local.set({ settings: { ...settings, scrollFrictionEnabled: true, scrollFrictionStrength: 0 } });
         })()`);
         await browser.cdp.send('Page.reload', {}, settings.session);
-        await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled")?.disabled === false'), 'saved zero restored');
+        await waitForEnabledControl(browser, settings, '#scroll-friction-enabled');
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), false);
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
         assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => data.settings.scrollFrictionStrength)'), 0);
@@ -161,18 +137,13 @@ for (const [label, lock, overflow, panelHeight] of [
   ['clipped body with a scroll range', 'body', 'clip', 120]
 ]) {
   test(`built app-shell slow scrolling preserves native panels: ${label}`, async () => {
-    const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
+    const { launch, evaluate, eventually, withFailureArtifacts, seedAccess } = await import('./chromium.mjs');
     const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
     try {
       await withFailureArtifacts(browser, `app-shell scrolling: ${label}`, async () => {
-        const contexts = new Map();
-        browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
-          if (context.origin === browser.origin) contexts.set(session, context.id);
-        });
-        await evaluate(browser, browser.worker, `(async () => {
-          await chrome.storage.local.set({ settings: { accessMinutes: 12 }, _access: { linkedin: { remainingMs: 300000, date: C3.localDate() } } });
-          await SiteAccess.reconcile();
-        })()`);
+        const { scrollFixture } = await import('./scrolling.mjs');
+        const scroll = scrollFixture(browser);
+        await seedAccess(browser, ['linkedin'], { accessMinutes: 12, scrollFrictionEnabled: false });
         const page = await browser.page('https://www.linkedin.com/feed/');
         await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
         await browser.cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, page.session);
@@ -181,36 +152,13 @@ for (const [label, lock, overflow, panelHeight] of [
         await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(fixture)}`);
         assert.equal(await evaluate(browser, page.session, 'document.scrollingElement.scrollHeight > document.scrollingElement.clientHeight'), Boolean(lock));
         if (lock) assert.equal(await evaluate(browser, page.session, `getComputedStyle(document.querySelector('${lock}')).overflowY`), overflow);
-        await eventually(async () => {
-          if (!contexts.has(page.session)) return false;
-          const { result } = await browser.cdp.send('Runtime.evaluate', { expression: 'document', contextId: contexts.get(page.session) }, page.session);
-          try {
-            const { listeners } = await browser.cdp.send('DOMDebugger.getEventListeners', { objectId: result.objectId }, page.session);
-            return listeners.some(listener => listener.type === 'wheel' && !listener.passive);
-          } finally { await browser.cdp.send('Runtime.releaseObject', { objectId: result.objectId }, page.session); }
-        }, 'scroll friction is active before input');
-        async function wheelAt(selector, delta) {
-          await evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop = 1000`);
-          const point = await evaluate(browser, page.session, `(() => { const r = document.querySelector('${selector}').getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
-          await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: delta }, page.session);
-          await eventually(() => evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop !== 1000`), `${selector} moves`);
-          return evaluate(browser, page.session, `(async () => {
-            let previous = -1, stable = 0;
-            for (let frame = 0; frame < 120 && stable < 5; frame++) {
-              await new Promise(requestAnimationFrame);
-              const next = document.querySelector('${selector}').scrollTop;
-              stable = next === previous ? stable + 1 : 0; previous = next;
-            }
-            return document.querySelector('${selector}').scrollTop - 1000;
-          })()`);
-        }
-        assert.equal(await wheelAt('#workspace', 240), 120, 'the inner page surface scrolls half as far');
-        assert.equal(await wheelAt('#workspace', -240), -120, 'both directions slow down');
-        assert.equal(await evaluate(browser, page.session, 'document.scrollingElement.scrollTop'), 0, 'the locked document does not move');
-        await evaluate(browser, page.session, `document.querySelector('#workspace').scrollTop = 0`);
-        await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-        for (const delta of [240, -240]) assert.equal(await wheelAt('#panel', delta), delta, 'nested panels keep native distance regardless of height');
-        assert.equal(await evaluate(browser, page.session, `document.querySelector('#workspace').scrollTop`), 0, 'the page surface does not move for a nested panel');
+        const targets = [
+          { selector: '#workspace', distance: 120, stationary: ['html', 'body', '#panel'] },
+          { selector: '#panel', point: null, distance: 240, stationary: ['html', 'body', '#workspace'] }
+        ];
+        await scroll.assertNative(page, targets);
+        await scroll.setEnabled(page, true);
+        await scroll.verify(page, targets);
         assert.deepEqual(browser.errors, []);
       });
     } finally { await browser.cleanup(); }
@@ -234,14 +182,12 @@ for (const [label, htmlStyle, bodyStyle, surface, rulesDelayMs = 0] of [
   ['body containment with clipped overflow', 'overflow:visible', 'height:auto;overflow:clip;contain:layout', 'html']
 ]) {
   test(`built body scrolling distinguishes the viewport and preserves tall panels: ${label}`, async () => {
-    const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
+    const { launch, evaluate, eventually, withFailureArtifacts, seedAccess } = await import('./chromium.mjs');
     const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
     try {
       await withFailureArtifacts(browser, `body scrolling: ${label}`, async () => {
-        const contexts = new Map();
-        browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
-          if (context.origin === browser.origin) contexts.set(session, context.id);
-        });
+        const { scrollFixture } = await import('./scrolling.mjs');
+        const scroll = scrollFixture(browser);
         if (rulesDelayMs) await evaluate(browser, browser.worker, `(() => {
           const update = chrome.declarativeNetRequest.updateSessionRules.bind(chrome.declarativeNetRequest);
           chrome.declarativeNetRequest.updateSessionRules = async options => {
@@ -249,45 +195,19 @@ for (const [label, htmlStyle, bodyStyle, surface, rulesDelayMs = 0] of [
             return update(options);
           };
         })()`);
-        await evaluate(browser, browser.worker, `(async () => {
-          await chrome.storage.local.set({ _access: { linkedin: { remainingMs: 300000, date: C3.localDate() } } });
-          await SiteAccess.reconcile();
-        })()`);
+        await seedAccess(browser, ['linkedin'], { scrollFrictionEnabled: false });
         const page = await browser.page('https://www.linkedin.com/feed/');
         await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
         await browser.cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, page.session);
         const fixture = `<style>html,body{height:100%;margin:0}html{${htmlStyle}}body{overflow:auto;${bodyStyle}}#panel{height:500px;width:200px;overflow:auto}</style><div id="panel"><div style="height:4000px">Synthetic panel</div></div><div style="height:20000px">Synthetic feed</div>`;
         await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(fixture)}`);
-        await eventually(async () => {
-          if (!contexts.has(page.session)) return false;
-          const { result } = await browser.cdp.send('Runtime.evaluate', { expression: 'document', contextId: contexts.get(page.session) }, page.session);
-          try {
-            const { listeners } = await browser.cdp.send('DOMDebugger.getEventListeners', { objectId: result.objectId }, page.session);
-            return listeners.some(listener => listener.type === 'wheel' && !listener.passive);
-          } finally { await browser.cdp.send('Runtime.releaseObject', { objectId: result.objectId }, page.session); }
-        }, 'friction is active');
-        async function wheel(selector, delta, x = 400, y = 400) {
-          assert.equal(await evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop = 1000; document.querySelector('${selector}').scrollTop`), 1000, 'fixture supports the requested scroll position');
-          await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY: delta }, page.session);
-          await eventually(() => evaluate(browser, page.session, `document.querySelector('${selector}').scrollTop !== 1000`), 'target scrolls');
-          return evaluate(browser, page.session, `(async () => {
-            let previous = -1, stable = 0;
-            for (let frame = 0; frame < 120 && stable < 5; frame++) {
-              await new Promise(requestAnimationFrame);
-              const next = document.querySelector('${selector}').scrollTop;
-              stable = next === previous ? stable + 1 : 0; previous = next;
-            }
-            return document.querySelector('${selector}').scrollTop - 1000;
-          })()`);
-        }
-        const movement = { page: [], panel: [] };
-        for (const delta of [240, -240]) movement.page.push(await wheel(surface, delta));
-        assert.equal(await evaluate(browser, page.session, `document.querySelector('${surface === 'body' ? 'html' : 'body'}').scrollTop`), 0, 'the other surface stays stationary');
-        await evaluate(browser, page.session, 'document.documentElement.scrollTop = 0; document.body.scrollTop = 0');
-        await evaluate(browser, page.session, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-        for (const delta of [240, -240]) movement.panel.push(await wheel('#panel', delta, 100, 100));
-        assert.equal(await evaluate(browser, page.session, `document.querySelector('${surface}').scrollTop`), 0);
-        assert.deepEqual(movement, { page: [120, -120], panel: [240, -240] }, 'only the real page surface slows; tall panels remain native');
+        const targets = [
+          { selector: surface, distance: 120, stationary: [surface === 'body' ? 'html' : 'body', '#panel'] },
+          { selector: '#panel', point: { x: 100, y: 100 }, distance: 240, stationary: ['html', 'body'] }
+        ];
+        await scroll.assertNative(page, targets);
+        await scroll.setEnabled(page, true);
+        await scroll.verify(page, targets);
         assert.deepEqual(browser.errors, []);
       });
     } finally { await browser.cleanup(); }

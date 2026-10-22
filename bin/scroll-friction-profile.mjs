@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { launch, evaluate, eventually, withFailureArtifacts } from '../extension/browser-tests/chromium.mjs';
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { launch, evaluate, eventually, withFailureArtifacts, seedAccess } from '../extension/browser-tests/chromium.mjs';
+import { bundleFingerprint, validateProfile } from './scroll-profile-report.mjs';
 
 const workloads = {
   document: {
@@ -28,21 +31,22 @@ async function injectedBytes(bundle) {
   const sizes = await Promise.all([...scripts].map(async script => (await readFile(resolve(bundle, script))).byteLength));
   return sizes.reduce((total, size) => total + size, 0);
 }
-async function run(bundle, variant, repetition) {
+async function run(bundle, variant, repetition, expectedHash) {
   const manifest = JSON.parse(await readFile(resolve(bundle, 'manifest.json'), 'utf8'));
   const hasFriction = manifest.content_scripts.some(entry => entry.js.includes('scroll-friction.js'));
-  const browser = await launch(resolve(bundle));
+  const executionBundle = await mkdtemp(join(tmpdir(), 'scroll-profile-bundle-'));
+  let browser;
   try {
+    await cp(resolve(bundle), executionBundle, { recursive: true });
+    assert.equal((await bundleFingerprint(executionBundle)).sha256, expectedHash, 'Disposable bundle differs from the recorded input');
+    browser = await launch(executionBundle);
     return await withFailureArtifacts(browser, `${variant} ${layout} scroll resource profile ${repetition}`, async () => {
       const contexts = new Map();
       browser.cdp.on('Runtime.executionContextCreated', ({ context }, session) => {
         if (context.origin === browser.origin) contexts.set(session, context.id);
       });
-      await evaluate(browser, browser.worker, `(async () => {
-        await chrome.storage.local.set({ settings: { ...C3.DEFAULT_SETTINGS, scrollFrictionEnabled: true, scrollFrictionStrength: 50 }, _access: {
-          x: { remainingMs: 300000, date: C3.localDate() }, linkedin: { remainingMs: 300000, date: C3.localDate() }
-        } });
-        await SiteAccess.reconcile();
+      await seedAccess(browser, ['x', 'linkedin'], { scrollFrictionEnabled: true, scrollFrictionStrength: 50 });
+      await evaluate(browser, browser.worker, `(() => {
         globalThis.profileRequests = 0;
         chrome.runtime.onMessage.addListener((message, sender) => { if (sender.tab && message.type === 'snapshot') profileRequests++; });
       })()`);
@@ -151,14 +155,42 @@ async function run(bundle, variant, repetition) {
         workload: { elapsedMs, scriptMs: (after.ScriptDuration - before.ScriptDuration) * 1000, taskMs: (after.TaskDuration - before.TaskDuration) * 1000, layoutMs: (after.LayoutDuration - before.LayoutDuration) * 1000 }
       };
     });
-  } finally { await browser.cleanup(); }
-}
-const report = { environment: { node: process.version, platform: process.platform, architecture: process.arch }, layout, tabCount, cycles, lifecycleWheelEvents: cycles * 2 + 1, wheelEvents, idleMs, runs: [] };
-for (let repetition = 1; repetition <= 3; repetition++) {
-  const order = repetition % 2 ? [['baseline', baseline], ['candidate', candidate]] : [['candidate', candidate], ['baseline', baseline]];
-  for (const [variant, bundle] of order) {
-    report.runs.push(await run(bundle, variant, repetition));
-    await writeFile(output, JSON.stringify(report, null, 2) + '\n');
+  } finally {
+    try { await browser?.cleanup(); }
+    finally { await rm(executionBundle, { recursive: true, force: true }); }
   }
+}
+async function workloadFingerprint() {
+  const sources = await Promise.all(['./scroll-friction-profile.mjs', './scroll-profile-report.mjs', '../extension/browser-tests/chromium.mjs'].map(file => readFile(new URL(file, import.meta.url), 'utf8')));
+  return createHash('sha256').update(JSON.stringify(sources)).digest('hex');
+}
+const provenance = { baseline: await bundleFingerprint(baseline), candidate: await bundleFingerprint(candidate), workloadSha256: await workloadFingerprint() };
+const report = { schemaVersion: 1, status: 'running', startedAt: new Date().toISOString(), provenance, environment: { node: process.version, platform: process.platform, architecture: process.arch }, layout, tabCount, cycles, lifecycleWheelEvents: cycles * 2 + 1, wheelEvents, idleMs, runs: [] };
+const save = options => writeFile(output, JSON.stringify(report, null, 2) + '\n', { mode: 0o600, ...options });
+const unchanged = async () => {
+  assert.equal((await bundleFingerprint(baseline)).sha256, provenance.baseline.sha256, 'Baseline bundle changed during profiling');
+  assert.equal((await bundleFingerprint(candidate)).sha256, provenance.candidate.sha256, 'Candidate bundle changed during profiling');
+  assert.equal(await workloadFingerprint(), provenance.workloadSha256, 'Workload changed during profiling');
+};
+await save({ flag: 'wx' });
+try {
+  for (let repetition = 1; repetition <= 3; repetition++) {
+    const order = repetition % 2 ? [['baseline', baseline], ['candidate', candidate]] : [['candidate', candidate], ['baseline', baseline]];
+    for (const [variant, bundle] of order) {
+      await unchanged();
+      const result = await run(bundle, variant, repetition, provenance[variant].sha256);
+      await unchanged();
+      report.runs.push({ ...result, bundleSha256: provenance[variant].sha256 });
+      await save();
+    }
+  }
+  report.completedAt = new Date().toISOString();
+  report.status = 'complete';
+  validateProfile(report);
+  await save();
+} catch (error) {
+  report.status = 'failed';
+  await save();
+  throw error;
 }
 console.log(`Scroll resource measurements: ${resolve(output)}`);
