@@ -151,7 +151,7 @@ export function workerTarget(targets, url) {
 export function devToolsEndpoint(contents) {
   const [port, path] = contents.trim().split(/\r?\n/);
   if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) return null;
-  if (!/^\/devtools\/browser\/[^\s/?#]+$/.test(path ?? '')) return null;
+  if (!/^\/devtools\/browser\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(path ?? '')) return null;
   return `ws://127.0.0.1:${port}${path}`;
 }
 
