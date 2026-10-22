@@ -3,6 +3,9 @@
 CreateRatio's existing [Firefox listing](https://addons.mozilla.org/en-US/firefox/addon/createratio/)
 uses the add-on ID `create-greater-consume@createratio`. Updates target this ID;
 the workflow never creates a replacement listing.
+For a Firefox-only update, use the [manual release option](releases.md#release-to-one-store)
+with `browser=firefox`; the Chrome submission job is skipped and no Google
+credentials are required.
 
 ## One-time setup
 

@@ -10,6 +10,8 @@ Use the shared [Chrome and Firefox release workflow](releases.md) to prepare a
 version PR and push its tag after merge. The workflow retains its existing
 `.github/workflows/release-chrome.yml` filename for Google's federated trust,
 but builds both store packages and submits them in independent approval jobs.
+For a Chrome-only update, use the [manual release option](releases.md#release-to-one-store)
+with `browser=chrome`; the Firefox submission job is skipped.
 
 Download the `browser-store-packages` artifact and inspect an extracted copy of
 `createratio-chrome.zip` before approving `chrome-web-store`. The artifact also
@@ -30,8 +32,9 @@ change permissions, or cancel an existing pending/staged submission.
 The release workflow requires:
 
 - A dedicated Google project, store service account, and federation restricted
-  to this repository's immutable ID, tag pushes, release workflow, and
-  `chrome-web-store` environment.
+  to this repository's immutable ID, version tags, release workflow, and
+  `chrome-web-store` environment. Allow only the `push` and `workflow_dispatch`
+  events for automatic and manually targeted releases.
 - A `chrome-web-store` environment with owner approval, tag-only deployment
   policy, the pinned Google authentication action allowed, and four non-secret
   variables: `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID`,
@@ -41,6 +44,12 @@ The release workflow requires:
   for the corresponding environment variables. Missing values and setup
   placeholders fail before authentication or upload. There are no OAuth refresh
   tokens or service-account keys to store in GitHub.
+
+If the federation currently permits only `push`, its owner must explicitly add
+`workflow_dispatch` before a manually targeted Chrome release. Preserve all
+repository, workflow, tag and environment restrictions. Repository changes do
+not update Google IAM, and existing GitHub variable names do not prove this
+permission is configured.
 
 Google's [service-account setup](https://developer.chrome.com/docs/webstore/service-accounts)
 and [API guide](https://developer.chrome.com/docs/webstore/using-api) describe the
