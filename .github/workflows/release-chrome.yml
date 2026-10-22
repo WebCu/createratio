@@ -1,8 +1,20 @@
 name: Release browser extensions
+run-name: Release ${{ github.ref_name }} (${{ github.event_name == 'push' && 'both' || inputs.browser }})
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: Store(s) to submit the selected version tag to
+        required: true
+        type: choice
+        default: both
+        options:
+        - both
+        - chrome
+        - firefox
 
 permissions:
   contents: read
@@ -27,7 +39,13 @@ jobs:
         with:
           node-version: 24.21.0
       - name: Require a version tag on main history
+        env:
+          RELEASE_BROWSER: ${{ github.event_name == 'push' && 'both' || inputs.browser }}
         run: |
+          case "$RELEASE_BROWSER" in
+            both|chrome|firefox) ;;
+            *) printf 'Select both, chrome or firefox.\n' >&2; exit 1 ;;
+          esac
           test "$GITHUB_REF_TYPE" = tag
           git merge-base --is-ancestor HEAD origin/main
           node bin/chrome-store-release.js validate
@@ -71,6 +89,7 @@ jobs:
           retention-days: 30
 
   submit:
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.browser == 'both' || inputs.browser == 'chrome')) }}
     needs: package
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -120,6 +139,7 @@ jobs:
         run: node bin/chrome-store-release.js submit
 
   submit-firefox:
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.browser == 'both' || inputs.browser == 'firefox')) }}
     needs: package
     runs-on: ubuntu-24.04
     timeout-minutes: 10

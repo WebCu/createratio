@@ -3,7 +3,9 @@
 One version and one Git tag select the source for both stores. Chrome and Firefox
 use different packages, approval environments and submission APIs. Their reviews
 and publication times are independent; one store can succeed while the other fails.
-Finish or resolve current submissions before tagging another version.
+A tag push targets both stores; a manual run can target Chrome, Firefox or both.
+Browser-specific fixes may skip the unaffected store, so store versions can differ.
+Resolve current submissions for the targeted store before submitting another version.
 
 ## Prepare a version PR
 
@@ -66,10 +68,41 @@ The workflow runs the reusable CI, then builds only the two store bundles. Its
   Firefox reproduction instructions, not website assets or credential files;
 - `SHA256SUMS` and `release.txt`, recording archive hashes, tag and source commit.
 
+## Release to one store
+
+For a browser-specific fix, prepare and merge the version PR as usual. Push its
+version tag, then cancel the automatic both-store run before approving either
+store. Do not start overlapping runs for the same version or resubmit a store
+that already received it.
+
+Run the same workflow manually against the existing tag, selecting `chrome`,
+`firefox` or `both`. For example, with the authenticated GitHub CLI:
+
+```sh
+gh workflow run release-chrome.yml --repo WebCu/createratio --ref vVERSION -f browser=chrome
+```
+
+Replace `vVERSION` with the exact existing tag. Manual dispatch must use the tag
+as its workflow ref, not `main` with a tag input. This keeps CI, checkout,
+packaging, environment tag policies and Google identity tied to the same source.
+The tag must contain this manual-release workflow; do not move an older tag to
+add it. Branch refs, invalid browser choices and mismatched versions are rejected.
+
+Both packages are still built and retained for audit, but the unselected store
+job is skipped before environment approval or credentials are accessed. The
+selected store retains the same CI, checksum and human-validation requirements.
+A later release to the other store can use the same tag if that version has not
+already been submitted there. Check that store's dashboard first.
+
+Chrome's Google federation must permit `workflow_dispatch` on version tags as
+well as `push`; see [Chrome setup](chrome-web-store.md#one-time-setup). GitHub
+secrets and variables alone do not establish this provider-side permission.
+
 ## Human validation gate
 
-Keep the `chrome-web-store` and `firefox-addons` approvals pending until the
-pre-submission checks in [store-integration acceptance](testing.md#store-integration-acceptance)
+Keep each selected store's `chrome-web-store` or `firefox-addons` approval pending
+until the pre-submission checks in
+[store-integration acceptance](testing.md#store-integration-acceptance)
 are complete for the exact artifacts. The package job links that checklist in its
 Actions summary alongside the commit and hashes. Approve each store separately;
 CI and secret-name checks do not establish live authentication or Firefox behavior.

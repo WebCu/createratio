@@ -266,7 +266,11 @@ exit "$status"
 ## Release automation
 
 `pnpm check` includes release-command, package-reproduction and store-submission
-tests. These tests additionally require Git, `zip` and `unzip` on PATH. Release
+tests. Workflow tests exercise the submission conditions for automatic tags and
+manual Chrome-only, Firefox-only and both-store runs. They execute the real tag
+guard in disposable Git history, including branch, ancestry, version and browser
+refusals. They do not dispatch GitHub Actions or verify live Google federation.
+These tests additionally require Git, `zip` and `unzip` on PATH. Release
 command tests use disposable real Git repositories and local remotes; GitHub CLI
 and local-check subprocesses are substituted at their external boundaries. Git
 URL queries map only the fixture's approved local transport to the official URL;
