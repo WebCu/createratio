@@ -69,6 +69,10 @@ $('settings').addEventListener('click', async () => {
   try { await extensionAPI.runtime.openOptionsPage(); }
   catch (e) { error(e.message); }
 });
-extensionAPI.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
+const sharing = SocialSharing.mount({ messages, range: () => 'today', error(message = '') { $('share-error').textContent = message; $('share-error').hidden = !message; } });
+extensionAPI.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) sharing.clear();
+  if (RuntimeMessages.shouldRefresh(changes, area)) void refresh();
+});
 setInterval(refresh, 1000);
 void refresh();

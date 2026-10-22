@@ -29,6 +29,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
     replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
     setAttribute(key, value) { this.attributes[key] = value; }
     removeAttribute(key) { delete this.attributes[key]; delete this[key]; }
+    hasAttribute(key) { return Object.hasOwn(this.attributes, key); }
     get lastChild() { return this.children.at(-1); }
     remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); }
     querySelector() { return this.tbody ||= new Element(); }
@@ -99,9 +100,10 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
     confirm(message) { state.confirmations.push(message); return state.confirm; }, setInterval(fn, ms) { interval = fn; intervals[ms] = fn; }, setTimeout(fn, ms) { const id = ++timeoutID; timeouts.set(id, { fn, ms }); return id; }, clearTimeout(id) { timeouts.delete(id); }, Date: PageDate });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/messages.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/refill.js'), 'utf8'), context);
-  if (name === 'dashboard') {
+  if (name === 'dashboard' || name === 'popup') {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../pages/dashboard/report.js'), 'utf8'), context);
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../pages/dashboard/share-card.js'), 'utf8'), context);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/share.js'), 'utf8'), context);
   }
   vm.runInContext(fs.readFileSync(path.join(__dirname, `../pages/${name}/${name}.js`), 'utf8'), context);
   const ready = async () => { await new Promise(resolve => setImmediate(resolve)); };

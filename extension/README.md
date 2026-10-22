@@ -317,8 +317,10 @@ remove oldest whole non-today days sooner, including temporarily ahead-dated
 days. If today's records alone cannot fit, saving reports an error instead of
 deleting today's history. Settings and access boundaries are not pruned.
 
-**Dashboard → Creation score → Preview share card** creates a local 1200 × 1200
-PNG for **Today** or **Last 7 days (including today)**. Review the preview,
+**Popup → Share today** previews today's card directly beside the creation
+score. Close the preview to return to the compact summary. **Dashboard → Creation
+score → Preview share card** also offers **Today** or **Last 7 days (including
+today)**. Both create the same local 1200 × 1200 PNG. Review the preview,
 choose **Download PNG**, then attach it to a social post. **Copy caption** copies
 the matching summary with a clickable `https://createratio.com/` link; if clipboard
 access fails, the caption is selected for manual copying. The card includes
@@ -330,11 +332,11 @@ Headlines never infer a trend from a single period or treat action credits as
 creating time. Cards and
 captions exclude site names, website time, and saved intentions. No data is
 uploaded and nothing is posted automatically. Changing the period or clearing
-history discards the preview. Each dashboard reuses one 1200 × 1200 canvas for
+history discards the preview. Each popup or dashboard reuses one 1200 × 1200 canvas for
 previewing and PNG encoding, retaining one PNG URL only for downloading. The
 preview does not decode that URL into another image. Replacement, clearing, or
 encoding failure revokes the previous URL and resets the canvas dimensions;
-closing the dashboard releases both. If the local
+closing the preview or its page releases both. If the local
 date changes while history is loading, PNG and HTML exports stop with a retry
 message instead of mixing periods. Explicit Clear history has a separate reset
 marker, so ordinary receipt-window rollover preserves ready and pending export
