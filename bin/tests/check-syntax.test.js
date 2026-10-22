@@ -68,6 +68,29 @@ for (const type of ['module', 'commonjs']) {
   });
 }
 
+for (const binding of ['require', 'module', 'exports', '__filename', '__dirname']) {
+  test(`implicit modules redeclaring ${binding} preserve regex interpretation`, t => {
+    const file = path.join(fixture(t), 'implicit.js');
+    writeFileSync(file, `const ${binding} = 1; await / a // b;`);
+    assert.equal(checkSyntax([file]), 1);
+  });
+}
+
+test('implicit module detection still rejects real comments without inventing regex comments', t => {
+  const file = path.join(fixture(t), 'implicit.js');
+  writeFileSync(file, 'const require = 1;\nawait / a // b;\n/* real comment */');
+  assert.throws(() => checkSyntax([file]), error => {
+    assert.equal(error.message, `Code comments are not allowed:\n${file}:3:1`);
+    return true;
+  });
+});
+
+test('ambiguous scripts retain CommonJS comments without an implicit module trigger', t => {
+  const file = path.join(fixture(t), 'implicit.js');
+  writeFileSync(file, 'await / a // b;');
+  assert.throws(() => checkSyntax([file]), /implicit\.js:1:11/);
+});
+
 test('comment-like text in literals and division are not comments', t => {
   const file = path.join(fixture(t), 'literals.js');
   writeFileSync(file, [

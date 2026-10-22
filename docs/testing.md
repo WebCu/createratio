@@ -167,9 +167,10 @@ node bin/scroll-profile-report.mjs /tmp/scroll-document.json /tmp/scroll-app-she
 
 The formatter reports medians and ranges with bundle/workload hashes, environment,
 observation times and limitations. It rejects incomplete runs, inconsistent
-inventories, duplicate layouts, mixed environments/workloads/bundles and failed
-lifecycle invariants. Hashes identify measured inputs, not an inferred source
-commit. The report does not grant resource acceptance; keep it outside Git too.
+inventories, duplicate layouts, mixed environments/workloads/bundles, inconsistent
+wheel distances for the same bundle and layout, and failed lifecycle invariants.
+Distinct bundles or layouts may intentionally produce different scroll distances.
+Hashes identify measured inputs, not an inferred source commit. The report does not grant resource acceptance; keep it outside Git too.
 
 ## Reference tracer bullets
 
@@ -294,8 +295,9 @@ live composing behavior, physical comfort or cross-browser compatibility.
 JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
 reject code comments with file, line and column diagnostics. An initial hashbang
 interpreter directive is allowed; comment-like text in strings, templates and
-regular expressions is not a comment. This guard covers JavaScript only, not
-CSS, HTML or other languages. `pnpm check` runs it before tests and builds.
+regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS
+syntax check, including its wrapper bindings, to select Acorn's grammar. This
+guard covers JavaScript only, not CSS, HTML or other languages. `pnpm check` runs it before tests and builds.
 The pre-commit hook checks staged whitespace, including newly added files.
 `pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
 paths, including skill-directory symlinks and files force-added while ignored.

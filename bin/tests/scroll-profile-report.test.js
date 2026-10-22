@@ -59,6 +59,37 @@ test('profile reports reject incomplete, mixed and invalid evidence', async () =
   }
 });
 
+test('profile reports reject changing scroll behavior across repetitions', async () => {
+  const { renderProfiles } = await import('../scroll-profile-report.mjs');
+  for (const variant of ['baseline', 'candidate']) {
+    const report = fixture();
+    report.runs.find(run => run.variant === variant && run.repetition === 2).wheelDistance = 80;
+    assert.throws(() => renderProfiles([report]), /Inconsistent wheel distance/);
+  }
+});
+
+test('identical bundles cannot report different scroll behavior under different labels', async () => {
+  const { renderProfiles } = await import('../scroll-profile-report.mjs');
+  const report = fixture();
+  for (const run of report.runs) if (run.variant === 'candidate') run.wheelDistance = 80;
+  assert.throws(() => renderProfiles([report]), /Inconsistent wheel distance/);
+});
+
+test('distinct bundles and layouts can intentionally produce different stable scroll distances', async () => {
+  const { renderProfiles } = await import('../scroll-profile-report.mjs');
+  const document = fixture();
+  const files = [{ path: 'manifest.json', bytes: 3, sha256: hash('{}\n') }];
+  document.provenance.baseline = { files, sha256: hash(JSON.stringify(files)) };
+  for (const run of document.runs) if (run.variant === 'baseline') run.bundleSha256 = document.provenance.baseline.sha256;
+  const body = structuredClone(document);
+  body.layout = 'body';
+  for (const run of body.runs) {
+    run.layout = 'body';
+    if (run.variant === 'baseline') run.wheelDistance = 80;
+  }
+  assert.match(renderProfiles([document, body]), /## body/);
+});
+
 test('bundle fingerprints cover all files and paths, ignoring only filesystem timestamps', async t => {
   const { bundleFingerprint } = await import('../scroll-profile-report.mjs');
   const directory = await mkdtemp(path.join(tmpdir(), 'scroll-profile-'));

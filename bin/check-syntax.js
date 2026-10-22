@@ -19,19 +19,20 @@ function codeComments(file) {
   const source = readFileSync(file, 'utf8');
   const extension = path.extname(file);
   const type = extension === '.js' ? packageType(file) : undefined;
-  const sourceTypes = extension === '.mjs' || type === 'module' ? ['module'] :
-    extension === '.cjs' || type === 'commonjs' ? ['commonjs'] : ['commonjs', 'module'];
-  let failure;
-  for (const sourceType of sourceTypes) {
-    const comments = [];
-    try {
-      parse(source, { ecmaVersion: 'latest', sourceType, locations: true, onComment: comments });
-      return comments.filter(comment => !(comment.start === 0 && source.startsWith('#!')));
-    } catch (error) {
-      failure = error;
-    }
+  let sourceType = extension === '.mjs' || type === 'module' ? 'module' : 'commonjs';
+  if (extension === '.js' && !['module', 'commonjs'].includes(type)) {
+    const result = spawnSync(process.execPath, ['--check', '--input-type=commonjs'], { input: source, encoding: 'utf8', timeout: 10000 });
+    if (result.error) throw result.error;
+    if (![0, 1].includes(result.status)) throw new Error(`Module detection failed: ${file}\n${result.stderr}`);
+    sourceType = result.status === 0 ? 'commonjs' : 'module';
   }
-  throw new Error(`Comment parse failed: ${file}\n${failure.message}`);
+  const comments = [];
+  try {
+    parse(source, { ecmaVersion: 'latest', sourceType, locations: true, onComment: comments });
+  } catch (error) {
+    throw new Error(`Comment parse failed: ${file}\n${error.message}`);
+  }
+  return comments.filter(comment => !(comment.start === 0 && source.startsWith('#!')));
 }
 
 function checkSyntax(files) {

@@ -75,6 +75,10 @@ export function validateProfile(report) {
     assert.equal(run.idleRequests, 0, 'Hidden snapshot requests observed');
     assert.equal(run.inactiveListeners.filter(listener => !listener.passive).length, 0, 'Hidden non-passive listeners observed');
   }
+  for (const bundleSha256 of new Set(report.runs.map(run => run.bundleSha256))) {
+    const distances = report.runs.filter(run => run.bundleSha256 === bundleSha256).map(run => run.wheelDistance);
+    assert.equal(new Set(distances).size, 1, 'Inconsistent wheel distance for the same bundle and layout');
+  }
   for (const key of ['node', 'platform', 'architecture']) assert.match(report.environment[key], /^[a-zA-Z0-9.-]+$/);
   assert.equal(new Set(report.runs.map(run => run.browser)).size, 1, 'Mixed browser versions');
   return report;
