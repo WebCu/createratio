@@ -126,7 +126,7 @@ replacement from a browser restart. Website-time sampling starts fresh.
   Slow scrolling, above-goal access, Website time, intention saving, exports, and
   history clearing remain separate. Preferences save automatically.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
-  and CSV exports.
+  shareable daily/seven-day PNG cards, detailed reports, and CSV exports.
 
 ### Browser agents and accessibility
 
@@ -316,6 +316,39 @@ future dates. A shared **4 MiB history budget** and browser quota recovery can
 remove oldest whole non-today days sooner, including temporarily ahead-dated
 days. If today's records alone cannot fit, saving reports an error instead of
 deleting today's history. Settings and access boundaries are not pruned.
+
+**Dashboard → Creation score → Preview share card** creates a local 1200 × 1200
+PNG for **Today** or **Last 7 days (including today)**. Review the preview,
+choose **Download PNG**, then attach it to a social post. **Copy caption** copies
+the matching summary with a clickable `https://createratio.com/` link; if clipboard
+access fails, the caption is selected for manual copying. The card includes
+CreateRatio branding, rounded creating/consuming time, and detected
+post/reply/comment actions. Its approximate creation score is highlighted in the
+top right, with an action-credit caveat. Action counts are submission detections,
+not confirmed publications; failed submissions and site changes can affect them.
+Headlines never infer a trend from a single period or treat action credits as
+creating time. Cards and
+captions exclude site names, website time, and saved intentions. No data is
+uploaded and nothing is posted automatically. Changing the period or clearing
+history discards the preview. Each dashboard reuses one 1200 × 1200 canvas for
+previewing and PNG encoding, retaining one PNG URL only for downloading. The
+preview does not decode that URL into another image. Replacement, clearing, or
+encoding failure revokes the previous URL and resets the canvas dimensions;
+closing the dashboard releases both. If the local
+date changes while history is loading, PNG and HTML exports stop with a retry
+message instead of mixing periods. Explicit Clear history has a separate reset
+marker, so ordinary receipt-window rollover preserves ready and pending export
+snapshots.
+
+**Download detailed report (HTML)** exports a self-contained printable report
+for the same period, using local calendar dates. Reports include
+creation/consumption totals, actions, site and daily breakdowns, and a score
+calculated from the period's combined totals. Open the
+file offline in a browser to review, print, or save as PDF. Today is partial;
+missing or cleared days show zero. Reports exclude website time and saved
+intentions. Downloaded files contain activity data; share them deliberately.
+Existing CSV exports still cover retained history independently of the report
+period.
 
 Activity CSV includes retained dates, site IDs, seconds, action counts, and
 per-site scores, including history from disabled or removed integrations.

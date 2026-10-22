@@ -147,7 +147,7 @@ test('all distributions share the source version and use Create > Consume as the
     assert.doesNotMatch(popup, /LOCAL ONLY/);
     assert.match(popup, /<h1>CreateRatio<\/h1><p class="eyebrow">Create &gt; Consume<\/p>/);
     const dashboardScript = await fs.readFile(path.join(output, 'dashboard.js'), 'utf8');
-    const filenames = [...dashboardScript.matchAll(/link\.download = ([^;]+);/g)].flatMap(([, expression]) =>
+    const filenames = [...dashboardScript.matchAll(/link\.download = (`[^`]+`);/g)].flatMap(([, expression]) =>
       [false, true].map(websites => vm.runInNewContext(expression, {
         websites, C3: { localDate: () => '2026-01-02' }
       })));

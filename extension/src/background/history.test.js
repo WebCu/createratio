@@ -226,6 +226,26 @@ test('creation recording owns retained totals, quote credit and receipt deduplic
   assert.equal(data['2026-10-01'], undefined);
   assert.deepEqual(data.settings, { trackedSites: ['x'] });
 });
+test('only an explicit clear changes the history reset marker, not receipt rollover or journal repair', async () => {
+  const date = '2026-10-31', receipts = () => Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i);
+  const data = { _historyGeneration: 'before-rollover', _historyReset: true, _receipts: receipts() }, h = harness(data);
+  await h.history.prepare();
+  await h.history.recordCreation({ id: 'new-packet', site: 'x', segments: [{ date, mode: 'create', sec: 1 }], actions: [] });
+  assert.notEqual(data._historyGeneration, 'before-rollover');
+  assert.equal(data._historyReset, true);
+  await h.history.clear('explicit-clear');
+  assert.equal(data._historyReset, false);
+  assert.equal(data._historyGeneration, 'explicit-clear');
+  data._receipts = receipts();
+  await h.history.recordCreation({ id: 'later-packet', site: 'x', segments: [], actions: [{ date, action: 'posts' }] });
+  assert.notEqual(data._historyGeneration, 'explicit-clear');
+  assert.equal(data._historyReset, false);
+  await h.history.clear('another-clear');
+  assert.equal(data._historyReset, true);
+  const damaged = { _historyGeneration: {}, _receipts: [], _historyReset: true };
+  await harness(damaged).history.prepare();
+  assert.equal(damaged._historyReset, true);
+});
 test('failed creation recording leaves both totals and receipts unchanged until retry', async () => {
   const date = '2026-10-31', data = { [date]: { x: { consumeSec: 3 } }, _receipts: ['prior'] }, h = harness(data);
   await h.history.prepare();

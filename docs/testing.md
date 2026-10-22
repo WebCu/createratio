@@ -431,6 +431,25 @@ Before a release, verify:
 - Idle, focus, navigation, midnight, and sleep/wake boundaries do not backfill time.
 - All-website permission denial leaves tracking off; opt-in records only focused
   domain/time totals; disabling removes permissions and preserves totals.
+- Daily and last-seven-day share-card previews match recorded totals, download
+  real 1200 × 1200 PNGs, and have readable branding and time/score caveats at feed
+  size. Captions include the public CreateRatio link but no site names or private
+  details. Check clipboard success/denial, PNG encoding failure, stale requests,
+  repeated preview cleanup, and preview removal on period changes/history resets.
+  The canvas preview must match downloaded PNG pixels, retain only one drawing
+  surface, avoid decoding PNG URLs, and release its backing dimensions on clearing
+  or encoding failure. Include changing totals when repeating previews.
+  Ready and pending PNG previews and pending HTML exports must survive normal
+  receipt-window rollover; only an explicit history reset invalidates them.
+  Sharing is manual and never opens a posting flow automatically.
+- Daily and last-seven-day HTML reports download with the selected local dates,
+  match dashboard totals, and print/save as PDF offline. Check empty history,
+  narrow layouts, keyboard selection, removed integrations, and that neither
+  website time nor saved intentions appear. A local-date change during either
+  PNG or HTML history loading must show a retry message without generating an
+  artifact; retry must use the new period. A history reset during HTML history
+  loading must also block the pre-reset response; retry must export only the
+  remaining history. Activity and website CSV exports remain unchanged.
 - Activity and website CSV exports work. Confirmed clearing removes histories,
   cancellation preserves them, and settings/access boundaries stay unchanged.
   Pending measurements from open tabs or failed deliveries cannot restore cleared
