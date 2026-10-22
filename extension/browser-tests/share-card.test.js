@@ -4,6 +4,15 @@ const assert = require('node:assert/strict');
 const { readFile, writeFile } = require('node:fs/promises');
 const path = require('node:path');
 
+function contrast(left, right) {
+  const luminance = channels => channels.map(value => {
+    const normalized = value / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  const values = [luminance(left), luminance(right)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
 test('built dashboard previews and downloads a private social PNG with a copyable referral caption', async () => {
   const { launch, evaluate, eventually, click, withFailureArtifacts } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
@@ -46,15 +55,19 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
           };
           const card = SocialCard.create({ [C3.localDate()]: { x: stats } }, 'week');
           SocialCard.draw(canvas, card);
-          const bars = [[314, [195, 177, 232]], [886, [223, 212, 241]]].map(([x, color]) => {
+          const bars = [[314, [96, 67, 181]], [886, [140, 124, 159]]].map(([x, color]) => {
             const pixels = ctx.getImageData(x, 600, 1, 140).data;
             let height = 0;
             for (let i = 0; i < pixels.length; i += 4) if (color.every((channel, index) => pixels[i + index] === channel)) height++;
             return height;
           });
           const largest = Math.max(stats.createSec || 0, stats.consumeSec || 0, 1);
+          const panelColor = [...ctx.getImageData(600, 650, 1, 1).data].slice(0, 3);
+          const barColors = [314, 886].map(x => [...ctx.getImageData(x, 739, 1, 1).data].slice(0, 3));
           canvas.width = 0; canvas.height = 0;
           return {
+            panelColor, barColors,
+            smallText: bounds.filter(rect => rect.size < 36),
             scores: bounds.filter(rect => rect.text === card.score),
             bars, expectedBars: [140 * (stats.createSec || 0) / largest, 140 * (stats.consumeSec || 0) / largest],
             outside: bounds.filter(rect => rect.left < 48 || rect.right > 1152 || rect.top < 48 || rect.bottom > 1152),
@@ -63,12 +76,16 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
         });
       })()`);
       for (const drawing of drawings) {
+        assert.deepEqual(drawing.smallText, [], 'card labels and qualifications remain at least 12px at a 400px feed size');
         assert.deepEqual(drawing.outside, [], 'card text stays within its safe area');
         assert.deepEqual(drawing.overlaps, [], 'real, empty and large-number text never overlaps');
         assert.equal(drawing.scores.length, 1, 'the score has a single clear focus');
         assert.ok(drawing.scores[0].left > 800 && drawing.scores[0].top < 300, 'the score anchors the top-right block');
         assert.ok(drawing.scores[0].size >= 64, 'the score is prominent at feed size for representative values');
-        drawing.bars.forEach((height, index) => assert.ok(Math.abs(height - drawing.expectedBars[index]) < 2, 'drawn bars reflect raw time, not action credits'));
+        drawing.bars.forEach((height, index) => {
+          assert.ok(Math.abs(height - drawing.expectedBars[index]) < 2, 'drawn bars reflect raw time, not action credits');
+          if (height > 0) assert.ok(contrast(drawing.barColors[index], drawing.panelColor) >= 3, 'both time bars remain distinct from their panel');
+        });
       }
       const daily = await inspect(page, 'document.querySelector("#share-caption").value');
       assert.match(daily, /Today so far: 30m creating · 40m consuming · 4 detected post\/reply\/comment actions/);
