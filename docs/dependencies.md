@@ -1,9 +1,12 @@
 # Dependency policy
 
-The browser extension and tests use no third-party libraries. The landing
-website's only library dependency is the official Plausible tracker, served
-locally. New dependencies require maintainer approval; prefer built-in browser
-and Node.js capabilities.
+The browser extension uses no third-party libraries. Development checks use
+Acorn to enforce the JavaScript comment policy: Node's syntax check does not
+expose comments, and text matching would misclassify strings and regular
+expressions. Acorn is a root dev-only dependency and is not packaged in the
+extension or website. The landing website's only library dependency is the
+official Plausible tracker, served locally. New dependencies require maintainer
+approval; prefer built-in browser and Node.js capabilities.
 
 ## Toolchain and reproducibility
 

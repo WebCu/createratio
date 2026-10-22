@@ -29,5 +29,8 @@
     "build:chrome": "node extension/build.js chrome",
     "build:edge": "node extension/build.js edge",
     "build:firefox": "node extension/build.js firefox"
+  },
+  "devDependencies": {
+    "acorn": "8.19.0"
   }
 }

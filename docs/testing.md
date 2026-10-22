@@ -153,7 +153,24 @@ tabs. CDP wheel-input
 elapsed time includes browser dispatch/acknowledgement overhead; it is not user
 input latency. Idle request counts do not prove worker shutdown. Compare medians
 and ranges, check lifecycle growth, and apply the resource review gate above.
-Keep the resulting JSON outside Git.
+Keep the resulting JSON outside Git. Output files must be new; interrupted or
+failed output cannot pass the report formatter or reuse old evidence.
+Each run loads a disposable copy so Chromium's generated rule caches cannot
+modify the input bundles. Reports fingerprint every input bundle file and the
+profiling/runner source; changes during collection fail the run.
+
+Generate tables from the complete reports rather than copying measurements:
+
+```sh
+node bin/scroll-profile-report.mjs /tmp/scroll-document.json /tmp/scroll-app-shell.json /tmp/scroll-body.json > /tmp/scroll-report.md
+```
+
+The formatter reports medians and ranges with bundle/workload hashes, environment,
+observation times and limitations. It rejects incomplete runs, inconsistent
+inventories, duplicate layouts, mixed environments/workloads/bundles, inconsistent
+wheel distances for the same bundle and layout, and failed lifecycle invariants.
+Distinct bundles or layouts may intentionally produce different scroll distances.
+Hashes identify measured inputs, not an inferred source commit. The report does not grant resource acceptance; keep it outside Git too.
 
 ## Reference tracer bullets
 
@@ -222,6 +239,18 @@ than choosing a row. Both role/name and selector clicks share painted geometry,
 disabled-state, hit-target, and trusted-input handling. Inspect new-tab results
 with `Target.getTargets`; the runner does not enable target-discovery events.
 
+For fixtures that seed access rather than exercise the gate UI, use
+`seedAccess(browser, sites, settings)` from the same runner. It waits for access
+rules after storage changes before navigation. Use `waitForEnabledControl` for
+native controls; absent, disabled and aria-disabled elements are not ready.
+
+For scroll-surface fixtures, construct `scrollFixture(browser)` from
+`extension/browser-tests/scrolling.mjs` before opening the page. Define the page,
+panel and stationary surfaces, prove native Off distances with `assertNative`,
+then enable resistance and verify the expected distances. Measurements reject
+unreachable starting positions and unsettled scrolling. Keep untouched-default
+journeys separate: observe defaults before helpers save any preference.
+
 Run HTML/CSS audits against generated pages such as `dist/chrome/settings.html`
 after `pnpm build:chrome`. Source HTML references the flat packaged layout, so
 shared stylesheets intentionally do not resolve beside `extension/src/pages/`.
@@ -244,10 +273,31 @@ accounts, submit real posts, or establish Firefox/Edge compatibility. DOM
 fixtures, controlled clocks, and simulated worker replacement cannot prove
 operating-system sleep/wake behavior. Keep those release checks manual.
 
+### Live scroll geometry
+
+When a current site behaves differently from synthetic fixtures, review
+[`bin/scroll-geometry.js`](../bin/scroll-geometry.js) and run it manually in that
+tab's DevTools Console. It returns JSON containing numeric viewport/scroll
+geometry, a bounded ancestor path and allowlisted layout styles. It reads no
+page text, input values, URLs, IDs, classes or arbitrary attribute values; it
+writes no storage, clipboard or network data. Custom tag names and unknown style
+values are suppressed. Review the JSON before sharing it.
+
+If browser automation encounters an operating-system permission denial, stop
+that connection attempt and use this manual diagnostic or report access blocked.
+Do not bypass permissions or attach the synthetic failure-capture harness to an
+authenticated profile. Geometry can help reproduce a layout; it cannot establish
+live composing behavior, physical comfort or cross-browser compatibility.
+
 ## Verification guards
 
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
-JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it. `pnpm check` runs it before tests and builds.
+JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
+reject code comments with file, line and column diagnostics. An initial hashbang
+interpreter directive is allowed; comment-like text in strings, templates and
+regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS
+syntax check, including its wrapper bindings, to select Acorn's grammar. This
+guard covers JavaScript only, not CSS, HTML or other languages. `pnpm check` runs it before tests and builds.
 The pre-commit hook checks staged whitespace, including newly added files.
 `pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
 paths, including skill-directory symlinks and files force-added while ignored.
