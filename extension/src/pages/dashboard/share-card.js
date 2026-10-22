@@ -50,24 +50,25 @@
     text(card.score, 968, 276, 112, '#ffffff', 700, 272, 'center');
     text('creation score', 968, 326, 36, '#ffffff', 500, 272, 'center');
     text('approximate', 968, 374, 36, '#ffffff', 500, 272, 'center');
-    box(48, 408, 1104, 492, '#f0ecf9', 28);
-    text(card.creating, 88, 522, 100, ink, 700, 452);
-    text(card.consuming, 660, 522, 100, ink, 700, 452);
-    text('creating', 92, 580, 40, muted, 500, 448);
-    text('consuming', 664, 580, 40, muted, 500, 448);
-    box(88, 738, 1024, 2, line);
+    box(48, 444, 1104, 372, '#f0ecf9', 28);
+    text(card.creating, 88, 548, 100, ink, 700, 452);
+    text(card.consuming, 660, 548, 100, ink, 700, 452);
+    text('creating', 92, 604, 40, muted, 500, 448);
+    text('consuming', 664, 604, 40, muted, 500, 448);
+    box(88, 774, 1024, 2, line);
     const largestShare = Math.max(card.creatingShare, card.consumingShare, Number.EPSILON);
     for (const [x, share, color] of [[88, card.creatingShare, violet], [660, card.consumingShare, '#8c7c9f']]) {
       const height = 140 * share / largestShare;
-      if (height > 0) box(x, 740 - height, 452, height, color, Math.min(12, height / 2));
+      if (height > 0) box(x, 776 - height, 452, height, color, Math.min(12, height / 2));
     }
-    text(card.contributions, 88, 820, 60, ink, 700, 480);
-    text('detected post / reply / comment actions', 90, 870, 40, muted, 500, 1022);
-    text('Approximate score; +2m per detected submission.', 72, 962, 38, muted);
-    text('Tracked sites only. Time is rounded. Today is partial.', 72, 1012, 38, muted);
-    text('Create > Consume', 72, 1062, 40, violet, 700);
-    text('createratio.com', 72, 1142, 48, violet, 700, 500);
-    text('Free. Private. Open source.', 1128, 1142, 36, muted, 500, 540, 'right');
+    text(card.contributions, 72, 888, 56, ink, 700, 240);
+    const actionLabelX = 96 + ctx.measureText(String(card.contributions)).width;
+    text('detected post / reply / comment actions', actionLabelX, 888, 40, muted, 500, 1128 - actionLabelX);
+    text('Approximate score; +2m per detected submission.', 72, 964, 38, muted);
+    text('Tracked sites only. Time is rounded. Today is partial.', 72, 1020, 38, muted);
+    text('Create > Consume', 72, 1088, 40, violet, 700);
+    text('createratio.com', 72, 1140, 48, violet, 700, 500);
+    text('Free. Private. Open source.', 1128, 1140, 36, muted, 500, 540, 'right');
   }
   return { create, draw };
 });

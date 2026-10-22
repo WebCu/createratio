@@ -47,7 +47,11 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
       const drawings = await inspect(page, `(() => {
         const cases = [{ createSec: 4800, consumeSec: 3600, posts: 9 }, { createSec: 120, consumeSec: 1200, replies: 1 }, {}, { createSec: 604800, consumeSec: 86399, posts: 999, replies: 999, comments: 999 }, { consumeSec: 300 }, { posts: 1 }];
         return cases.map(stats => {
-          const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'), paint = ctx.fillText.bind(ctx), bounds = [];
+          const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'), paint = ctx.fillText.bind(ctx), roundRect = ctx.roundRect.bind(ctx), bounds = [], panels = [];
+          ctx.roundRect = function(x, y, width, height, radius) {
+            panels.push({ x, y, width, height, color: this.fillStyle });
+            return roundRect(x, y, width, height, radius);
+          };
           ctx.fillText = function(value, x, y, maxWidth) {
             const metrics = this.measureText(value), scale = Math.min(1, maxWidth / Math.max(1, metrics.width));
             bounds.push({ text: String(value), size: parseFloat(this.font.match(/[0-9.]+px/)[0]), left: x - metrics.actualBoundingBoxLeft * scale, right: x + metrics.actualBoundingBoxRight * scale, top: y - metrics.actualBoundingBoxAscent, bottom: y + metrics.actualBoundingBoxDescent });
@@ -56,17 +60,28 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
           const card = SocialCard.create({ [C3.localDate()]: { x: stats } }, 'week');
           SocialCard.draw(canvas, card);
           const bars = [[314, [96, 67, 181]], [886, [140, 124, 159]]].map(([x, color]) => {
-            const pixels = ctx.getImageData(x, 600, 1, 140).data;
+            const pixels = ctx.getImageData(x, 636, 1, 140).data;
             let height = 0;
             for (let i = 0; i < pixels.length; i += 4) if (color.every((channel, index) => pixels[i + index] === channel)) height++;
             return height;
           });
           const largest = Math.max(stats.createSec || 0, stats.consumeSec || 0, 1);
           const panelColor = [...ctx.getImageData(600, 650, 1, 1).data].slice(0, 3);
-          const barColors = [314, 886].map(x => [...ctx.getImageData(x, 739, 1, 1).data].slice(0, 3));
+          const barColors = [314, 886].map(x => [...ctx.getImageData(x, 775, 1, 1).data].slice(0, 3));
+          const scorePanel = panels.find(panel => panel.x > 800 && panel.width === 320);
+          const timePanel = panels.find(panel => panel.color === '#f0ecf9');
+          const actionCount = bounds.find(rect => rect.text === String(card.contributions));
+          const actionLabel = bounds.find(rect => rect.text === 'detected post / reply / comment actions');
+          const qualification = bounds.find(rect => rect.text.startsWith('Tracked sites only.'));
+          const tagline = bounds.find(rect => rect.text === 'Create > Consume');
           canvas.width = 0; canvas.height = 0;
           return {
             panelColor, barColors,
+            panelGap: timePanel.y - scorePanel.y - scorePanel.height,
+            actionRowOffset: Math.abs(actionCount.bottom - actionLabel.bottom),
+            actionLabelGap: actionLabel.left - actionCount.right,
+            footerGap: tagline.top - qualification.bottom,
+            brandLineGap: bounds.find(rect => rect.text === 'createratio.com').top - tagline.bottom,
             smallText: bounds.filter(rect => rect.size < 36),
             scores: bounds.filter(rect => rect.text === card.score),
             bars, expectedBars: [140 * (stats.createSec || 0) / largest, 140 * (stats.consumeSec || 0) / largest],
@@ -76,6 +91,11 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
         });
       })()`);
       for (const drawing of drawings) {
+        assert.ok(drawing.panelGap >= 36, 'the score and time panel have at least 12px separation at feed size');
+        assert.ok(drawing.actionRowOffset <= 12, 'the action count and description read together on one line');
+        assert.ok(drawing.actionLabelGap >= 18 && drawing.actionLabelGap <= 40, 'the action description stays close to its count');
+        assert.ok(drawing.footerGap >= 24, 'measurement notes and footer branding remain distinct groups');
+        assert.ok(drawing.brandLineGap >= 12 && drawing.brandLineGap < drawing.footerGap, 'footer brand lines have breathing room and group more tightly than the notes');
         assert.deepEqual(drawing.smallText, [], 'card labels and qualifications remain at least 12px at a 400px feed size');
         assert.deepEqual(drawing.outside, [], 'card text stays within its safe area');
         assert.deepEqual(drawing.overlaps, [], 'real, empty and large-number text never overlaps');
