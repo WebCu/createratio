@@ -291,7 +291,11 @@ live composing behavior, physical comfort or cross-browser compatibility.
 ## Verification guards
 
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
-JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it. `pnpm check` runs it before tests and builds.
+JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
+reject code comments with file, line and column diagnostics. An initial hashbang
+interpreter directive is allowed; comment-like text in strings, templates and
+regular expressions is not a comment. This guard covers JavaScript only, not
+CSS, HTML or other languages. `pnpm check` runs it before tests and builds.
 The pre-commit hook checks staged whitespace, including newly added files.
 `pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
 paths, including skill-directory symlinks and files force-added while ignored.
