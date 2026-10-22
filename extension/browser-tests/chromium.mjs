@@ -148,6 +148,13 @@ export function workerTarget(targets, url) {
   return matches[0];
 }
 
+export function devToolsEndpoint(contents) {
+  const [port, path] = contents.trim().split(/\r?\n/);
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) return null;
+  if (!/^\/devtools\/browser\/[^\s/?#]+$/.test(path ?? '')) return null;
+  return `ws://127.0.0.1:${port}${path}`;
+}
+
 export async function launch(extensionPath) {
   extensionPath = resolve(extensionPath);
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
@@ -212,8 +219,7 @@ export async function launch(extensionPath) {
     const endpoint = await eventually(async () => {
       if (spawnError) throw Object.assign(spawnError, { fatal: true });
       if (child.exitCode !== null) throw Object.assign(new Error(`Chromium exited ${child.exitCode}: ${diagnostics}`), { fatal: true });
-      const [port, path] = (await readFile(join(directory, 'profile', 'DevToolsActivePort'), 'utf8')).trim().split('\n');
-      return `ws://127.0.0.1:${port}${path}`;
+      return devToolsEndpoint(await readFile(join(directory, 'profile', 'DevToolsActivePort'), 'utf8'));
     }, `Chromium startup (${executable})`);
     socket = new WebSocket(endpoint);
     await new Promise((resolve, reject) => {
