@@ -4,6 +4,106 @@ const assert = require('node:assert/strict');
 const { readFile, writeFile, mkdir } = require('node:fs/promises');
 const path = require('node:path');
 
+for (const surface of ['popup', 'dashboard']) test(`pending caption writes stay bounded across ${surface} preview lifetimes`, async () => {
+  const { launch, evaluate, eventually, click, clickByRole, withFailureArtifacts } = await import('./chromium.mjs');
+  const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+  try {
+    await withFailureArtifacts(browser, `${surface} pending caption write`, async () => {
+      const settings = await browser.page(browser.origin + '/settings.html');
+      const page = await browser.page(browser.origin + '/' + surface + '.html');
+      const inspect = source => evaluate(browser, page.session, source);
+      await inspect(`(() => {
+        globalThis.captionWrites = [];
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+          writeText: text => new Promise((resolve, reject) => captionWrites.push({ text, resolve, reject }))
+        } });
+        globalThis.liveCaptionURLs = new Set();
+        const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
+        URL.createObjectURL = blob => { const url = create(blob); liveCaptionURLs.add(url); return url; };
+        URL.revokeObjectURL = url => { liveCaptionURLs.delete(url); revoke(url); };
+      })()`);
+      const preview = async () => {
+        await click(browser, page, '#share-create');
+        await eventually(() => inspect('!document.querySelector("#share-result").hidden && !document.querySelector("#share-create").disabled'), 'preview ready');
+      };
+      const repeat = () => inspect(`for (let i = 0; i < 20; i++) {
+        document.querySelector('#share-copy').click();
+        document.querySelector('#share-copy').dispatchEvent(new MouseEvent('click'));
+      }`);
+      const settle = async outcome => {
+        await inspect(outcome === 'resolve' ? 'captionWrites.at(-1).resolve()' : 'captionWrites.at(-1).reject(new Error("Permission denied"))');
+        await inspect('new Promise(resolve => requestAnimationFrame(resolve))');
+      };
+      const readFeedback = () => inspect(`({
+        status: document.querySelector('#share-status').textContent,
+        caption: document.querySelector('#share-caption').value,
+        details: document.querySelector('#share-caption-details')?.open ?? false,
+        focus: document.activeElement.id
+      })`);
+      await preview();
+      const transitions = ['same', 'preview', 'reset', ...(surface === 'popup' ? ['close', 'close-reopen', 'reset-reopen'] : ['range', 'range-reopen', 'reset-reopen'])];
+      for (const outcome of ['resolve', 'reject']) for (const transition of transitions) {
+        if (await inspect('document.querySelector("#share-result").hidden')) await preview();
+        const before = await inspect('captionWrites.length');
+        const caption = await inspect('document.querySelector("#share-caption").value');
+        await clickByRole(browser, page, 'button', 'Copy caption');
+        await repeat();
+        assert.equal(await inspect('captionWrites.length'), before + 1, 'one native write may remain pending per mounted controller');
+        assert.equal(await inspect('captionWrites.at(-1).text'), caption);
+        assert.equal(await inspect('document.querySelector("#share-copy").disabled'), true);
+        if (transition === 'preview') {
+          await evaluate(browser, browser.worker, `chrome.storage.local.set({ [C3.localDate()]: { x: { createSec: ${120 + before}, consumeSec: 60 } } })`);
+          await preview();
+          assert.notEqual(await inspect('document.querySelector("#share-caption").value'), caption);
+        } else if (transition !== 'same') {
+          if (transition.startsWith('close')) await clickByRole(browser, page, 'button', 'Close share card');
+          else if (transition.startsWith('range')) await inspect(`document.querySelector('#report-range').value = document.querySelector('#report-range').value === 'today' ? 'week' : 'today'; document.querySelector('#report-range').dispatchEvent(new Event('change'))`);
+          else {
+            assert.equal((await evaluate(browser, settings.session, 'chrome.runtime.sendMessage({ type: "clear-history" })')).ok, true);
+            await eventually(() => inspect('document.querySelector("#share-result").hidden'), 'history reset clears preview');
+          }
+          assert.equal(await inspect('document.querySelector("#share-preview").width === 0 && document.querySelector("#share-preview").height === 0 && liveCaptionURLs.size === 0'), true, 'pending caption does not keep drawing resources alive');
+          if (transition.startsWith('close')) assert.equal(await inspect('document.activeElement.id'), 'share-create');
+          if (transition.endsWith('reopen')) await preview();
+        }
+        await repeat();
+        assert.equal(await inspect('captionWrites.length'), before + 1, 'clearing or replacing a preview cannot admit another native write');
+        assert.equal(await inspect('document.querySelector("#share-copy").disabled'), true);
+        await inspect('new Promise(resolve => requestAnimationFrame(resolve))');
+        const feedback = await readFeedback();
+        const closed = await inspect('document.querySelector("#share-result").hidden');
+        if (closed) await inspect(`
+          globalThis.captionMutations = [];
+          globalThis.captionObserver = new MutationObserver(records => captionMutations.push(...records));
+          for (const id of ['share-result', 'share-status', 'share-create']) captionObserver.observe(document.getElementById(id), { subtree: true, attributes: true, childList: true, characterData: true });
+        `);
+        await settle(outcome);
+        if (transition === 'same') {
+          if (outcome === 'resolve') {
+            assert.match((await readFeedback()).status, /^Caption copied/);
+            assert.equal((await readFeedback()).focus, feedback.focus);
+          } else {
+            assert.match((await readFeedback()).status, /^Clipboard unavailable/);
+            assert.equal(await inspect('document.activeElement.id === "share-caption" && document.querySelector("#share-caption").selectionEnd === document.querySelector("#share-caption").value.length'), true);
+            if (surface === 'popup') assert.equal(await inspect('document.querySelector("#share-caption-details").open'), true);
+          }
+        } else assert.deepEqual(await readFeedback(), feedback, 'stale settlement cannot change status, caption, fallback or focus');
+        if (closed) {
+          assert.equal(await inspect('captionMutations.length'), 0, 'settlement after clear makes no preview DOM mutations');
+          await inspect('captionObserver.disconnect()');
+          await preview();
+        }
+        assert.equal(await inspect('document.querySelector("#share-copy").disabled'), false, 'settlement restores copy for the current preview');
+        await clickByRole(browser, page, 'button', 'Copy caption');
+        assert.equal(await inspect('captionWrites.length'), before + 2, 'copy recovers after stale or current settlement');
+        await settle('resolve');
+        assert.match((await readFeedback()).status, /^Caption copied/);
+      }
+      assert.deepEqual(browser.errors, []);
+    });
+  } finally { await browser.cleanup(); }
+});
+
 test('popup shares today locally without opening the dashboard and keeps access controls usable', async () => {
   const { launch, evaluate, eventually, clickByRole, withFailureArtifacts } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
