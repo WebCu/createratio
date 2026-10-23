@@ -48,10 +48,10 @@ function xFixture({ dialog = false, url = 'https://x.com/home', action = 'posts'
   if (action === 'quotes') scope.append(new Element(['[data-testid="quoteTweetPreview"]']));
   return { ...env, scope, editor, button, adapter: require('./x.js').create(env) };
 }
-function linkedinFixture({ url = 'https://www.linkedin.com/feed/', message = false, listen } = {}) {
+function linkedinFixture({ url = 'https://www.linkedin.com/feed/', message = false, standalonePost = false, listen } = {}) {
   const env = environment(url, listen);
-  const scope = env.body.append(new Element([message ? '.msg-form' : '.comments-comment-box']));
-  const editor = scope.append(new Element(message ? ['.msg-form__contenteditable[contenteditable="true"]', '.msg-form [contenteditable="true"]'] : ['.comments-comment-box [contenteditable="true"]']));
+  const scope = env.body.append(new Element(standalonePost ? [] : [message ? '.msg-form' : '.comments-comment-box']));
+  const editor = scope.append(new Element(standalonePost ? ['.tiptap.ProseMirror[role="textbox"][contenteditable="true"]'] : message ? ['.msg-form__contenteditable[contenteditable="true"]', '.msg-form [contenteditable="true"]'] : ['.comments-comment-box [contenteditable="true"]']));
   const button = scope.append(new Element(['button', message ? '.msg-form__send-button' : '.comments-comment-box__submit-button'], message ? 'Send' : 'Comment'));
   return { ...env, scope, editor, button, adapter: require('./linkedin.js').create(env) };
 }

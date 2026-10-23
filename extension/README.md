@@ -247,6 +247,10 @@ Old Twitter URLs must redirect to X first.
 Known own profiles and unsupported routes are neutral. If the own-profile link
 cannot be identified, profiles default to consuming. Editors take precedence;
 a blank, unfocused composer does not turn the feed into creating time.
+LinkedIn's standalone post editor at `/sharing/compose` also counts as creating
+while focused. Generic rich-text fields on other routes do not count as post
+writing. This editor support measures writing time; it does not add submission
+bonuses for the redesigned composer.
 Writing direct messages counts as creating on messaging pages and in chat overlays.
 Reading messages on messaging pages stays neutral; unfocused overlays leave the
 underlying page's classification unchanged. Sending a direct message earns no

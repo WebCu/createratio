@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { worker, gate, intent } = require('./background-harness.js');
 const { tracker } = require('./content-harness.js');
+const { Element } = require('../../sites/test-support.js');
 const { page, C3 } = require('./ui-harness.js');
 
 const start = new Date(2026, 9, 11, 12).getTime();
@@ -74,6 +75,76 @@ function csvRows(csv) {
 }
 
 for (const browser of ['chrome', 'browser']) {
+  test(`${browser}: modern LinkedIn post writing saves exact creating time without idle, hidden, unfocused or blocked time`, async () => {
+    const url = 'https://www.linkedin.com/sharing/compose';
+    const source = { id: 'test-extension', tab: { id: 1 }, frameId: 0, url };
+    const w = worker({ _access: { linkedin: { remainingMs: 300000, date } } }, browser, start);
+    w.activate(url);
+    let ready = false, pending = 0;
+    const t = await tracker(browser, { url, standalonePost: true, forward: async message => {
+      pending++;
+      try {
+        const response = await w.send(message, source);
+        ready = true;
+        return response;
+      } finally { pending--; }
+    } });
+    await until(() => ready, 'modern post tracker loads worker preferences');
+    t.route(url, true);
+    async function sample(ms) {
+      w.advance(ms);
+      t.setNow(w.now - start);
+      await t.tick();
+      await until(() => pending === 0, 'tracker deliveries finish before reading totals');
+      return (await w.send({ type: 'snapshot' }, source)).day.linkedin?.createSec || 0;
+    }
+    t.input(false);
+    assert.equal(await sample(5000), 0, 'synthetic typing is ignored');
+    for (const expected of [5, 10, 15, 20]) {
+      t.input();
+      assert.equal(await sample(5000), expected, 'twenty seconds of writing saves twenty seconds');
+    }
+    const popup = await ui(w, 'popup');
+    const dashboard = await ui(w, 'dashboard');
+    assert.equal(popup.nodes['create-min'].textContent, '0.3m');
+    assert.equal(dashboard.nodes['create-min'].textContent, '0.3m');
+    const activity = (await w.send({ type: 'snapshot' }, source)).day.linkedin;
+    for (const field of ['consumeSec', 'posts', 'comments', 'replies']) assert.equal(activity[field] || 0, 0);
+    assert.equal(await sample(2000), 22);
+    t.focus(false);
+    assert.equal(await sample(5000), 22, 'unfocused writing adds no time');
+    t.focus(true);
+    t.visible(false);
+    assert.equal(await sample(5000), 22, 'hidden writing adds no time');
+    t.visible(true);
+    t.input();
+    for (const expected of [27, 32, 37, 42, 47, 52, 52]) assert.equal(await sample(5000), expected, 'idle writing stops at thirty seconds');
+    t.input();
+    assert.equal(await sample(20000), 52, 'a sleep gap is not backfilled');
+    t.input();
+    assert.equal(await sample(5000), 57, 'fresh typing resumes saving');
+    t.document.activeElement = t.document.body.append(new Element(['[role="textbox"][contenteditable="true"]']));
+    t.event('focusin', {});
+    t.input();
+    assert.equal(await sample(5000), 57, 'an unrelated textbox does not earn creating time');
+    t.document.activeElement = t.editor;
+    t.event('focusin', {});
+    assert.equal((await w.send({ type: 'access-end', site: 'linkedin' }, sender('popup'))).ok, true);
+    await sample(0);
+    t.input();
+    assert.equal(await sample(5000), 57, 'ending access stops creation tracking');
+    assert.equal((await w.send({ type: 'access-goal-setting', enabled: true }, sender('settings'))).ok, true);
+    await sample(0);
+    t.input();
+    assert.equal(await sample(5000), 62, 'above-goal access permits fresh writing without a session');
+    assert.equal((await w.send({ type: 'tracking', site: 'linkedin', enabled: false }, sender('settings'))).ok, true);
+    await sample(0);
+    t.input();
+    assert.equal(await sample(5000), 62, 'Limit & track Off cannot record writing even above the goal');
+    assert.deepEqual(w.errors, []);
+    assert.deepEqual(t.warnings, []);
+  });
+
   test(`${browser}: intentional access travels from Settings and gate confirmation to paused popup timer and manual end`, async () => {
     const w = worker({}, browser, start);
     await preferences(w, 2);
