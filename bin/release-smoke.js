@@ -61,7 +61,7 @@ function releaseSmoke() {
     run('git', ['tag', '--annotate', 'v-local-only', '--message', 'Unrelated local tag']);
     run('git', ['config', 'push.followTags', 'true']);
     run('git', ['config', 'remote.origin.mirror', 'true']);
-    fs.writeFileSync(path.join(bin, 'gh'), `#!${process.execPath}\nconst args = process.argv.slice(2);\nif (args.join(' ') === 'auth status --hostname github.com') process.exit(0);\nif (args[0] === 'pr' && args[1] === 'create') process.exit(0);\nprocess.exit(1);\n`, { mode: 0o700 });
+    fs.writeFileSync(path.join(bin, 'gh'), `#!${process.execPath}\nconst args = process.argv.slice(2);\nif (args.join(' ') === 'auth status --hostname github.com') process.exit(0);\nif (args[0] === 'pr' && args[1] === 'create') process.exit(0);\nif (args[0] === 'release' && args[1] === 'create' && args.includes('--generate-notes') && args.includes('--verify-tag')) { require('node:fs').writeFileSync(${JSON.stringify(path.join(directory, 'release.json'))}, JSON.stringify(args)); process.exit(0); }\nprocess.exit(1);\n`, { mode: 0o700 });
     const transport = path.join(directory, 'transport.cjs');
     fs.writeFileSync(transport, `const cp = require('node:child_process');\nconst spawn = cp.spawnSync;\nconst nativeFetch = globalThis.fetch;\nglobalThis.fetch = async (url, options) => {\n  const host = new URL(url instanceof Request ? url.url : url).hostname;\n  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) throw new Error('Release smoke blocks external fetch requests.');\n  return nativeFetch(url, { ...options, redirect: 'error' });\n};\ncp.spawnSync = (program, args, options) => {\n  const result = spawn(program, args, options);\n  if (program === 'git' && args[0] === 'remote' && args[1] === 'get-url' && result.status === 0) result.stdout = result.stdout.split('\\n').map(url => url === ${JSON.stringify(`file://${remote}`)} ? 'https://github.com/WebCu/createratio.git' : url).join('\\n');\n  return result;\n};\n`);
     env.PATH = bin + path.delimiter + process.env.PATH;
@@ -72,6 +72,8 @@ function releaseSmoke() {
     run('git', ['switch', 'main']); run('git', ['merge', '--ff-only', `release/v${version}`]);
     run('git', ['-c', 'remote.origin.mirror=false', 'push', '--no-follow-tags', 'origin', 'refs/heads/main:refs/heads/main']);
     run('pnpm', ['release', 'publish']);
+    const release = JSON.parse(fs.readFileSync(path.join(directory, 'release.json')));
+    if (release[2] !== `v${version}`) throw new Error('Publication did not create the matching GitHub release.');
     if (value('--git-dir', remote, 'tag', '--list') !== `v${version}`) throw new Error('Publication did not select exactly its release tag.');
     if (value('--git-dir', remote, 'rev-parse', `refs/tags/v${version}^{commit}`) !== value('rev-parse', 'HEAD')) throw new Error('The published tag has the wrong commit.');
     env.GITHUB_REF_NAME = `v${version}`; env.GITHUB_SHA = value('rev-parse', `refs/tags/v${version}`);
@@ -81,7 +83,7 @@ function releaseSmoke() {
       if (createHash('sha256').update(fs.readFileSync(path.join(project, 'dist', file))).digest('hex') !== expected) throw new Error('Release archive checksum mismatch.');
     }
     fs.writeFileSync(path.join(directory, 'summary.json'), JSON.stringify({ source: head, version, status: 'passed', fetchPolicy: 'loopback-only' }, null, 2) + '\n', { mode: 0o600 });
-    console.log('PASS real version preparation/checks, local merge/tag publication and archive checksums; no store requests.');
+    console.log('PASS real version preparation/checks, local merge/tag publication, simulated GitHub release creation and archive checksums; no store requests.');
   } catch (error) {
     console.error(fs.readFileSync(log, 'utf8').split('\n').slice(-50).join('\n'));
     throw error;

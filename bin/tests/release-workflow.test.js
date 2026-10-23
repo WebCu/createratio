@@ -21,6 +21,12 @@ function expression(source, key, context) {
   return vm.runInNewContext(value, context, { timeout: 1000 });
 }
 
+test('automatic submissions start from published releases, never raw tag pushes', () => {
+  const triggers = workflow.split('\non:\n')[1].split('\npermissions:')[0];
+  assert.match(triggers, /  release:\n    types: \[published\]/);
+  assert.doesNotMatch(triggers, /^  push:/m);
+});
+
 test('manual releases offer an explicit browser choice and default to both', () => {
   const dispatch = workflow.split('  workflow_dispatch:\n')[1]?.split(/^\S/m)[0];
   assert.ok(dispatch);
@@ -33,7 +39,8 @@ test('manual releases offer an explicit browser choice and default to both', () 
 
 test('only selected store jobs reach their approval environments', () => {
   for (const [event, browser, expected] of [
-    ['push', undefined, [true, true]],
+    ['release', undefined, [true, true]],
+    ['push', undefined, [false, false]],
     ['workflow_dispatch', 'both', [true, true]],
     ['workflow_dispatch', 'chrome', [true, false]],
     ['workflow_dispatch', 'firefox', [false, true]],
@@ -76,7 +83,7 @@ test('manual and automatic release guards validate the selected tag before any s
   const run = guard.match(/        run: \|\n((?:          [^\n]*\n)+)/)?.[1];
   assert.ok(run);
   for (const [event, browser, refType, tag, succeeds] of [
-    ['push', undefined, 'tag', 'v1.2.3', true],
+    ['release', undefined, 'tag', 'v1.2.3', true],
     ['workflow_dispatch', 'both', 'tag', 'v1.2.3', true],
     ['workflow_dispatch', 'chrome', 'tag', 'v1.2.3', true],
     ['workflow_dispatch', 'firefox', 'tag', 'v1.2.3', true],

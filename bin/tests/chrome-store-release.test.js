@@ -134,7 +134,7 @@ test('CLI rejects a mismatched source manifest and incomplete federation setup',
 
 test('release workflow preserves CI, artifact approval, tag ancestry and token boundaries', () => {
   const workflow = fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/release-chrome.yml'), 'utf8');
-  assert.match(workflow, /tags: \['v\*'\]/);
+  assert.match(workflow, /release:\n    types: \[published\]/);
   assert.match(workflow, /git merge-base --is-ancestor HEAD origin\/main/);
   assert.match(workflow, /checks:\n    needs: validate-release\n    uses: \.\/\.github\/workflows\/ci.yml/);
   assert.match(workflow, /package:\n    needs: checks/);
