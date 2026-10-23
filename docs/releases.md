@@ -1,9 +1,11 @@
 # Chrome and Firefox releases
 
-One version and one Git tag select the source for both stores. Chrome and Firefox
+One GitHub Release with generated change notes and an immutable version tag
+selects the source for both stores. Chrome and Firefox
 use different packages, approval environments and submission APIs. Their reviews
 and publication times are independent; one store can succeed while the other fails.
-A tag push targets both stores; a manual run can target Chrome, Firefox or both.
+Publishing a release targets both stores; a tag push alone does not submit anything.
+A manual run can target Chrome, Firefox or both.
 Browser-specific fixes may skip the unaffected store, so store versions can differ.
 Resolve current submissions for the targeted store before submitting another version.
 
@@ -48,12 +50,19 @@ pnpm release publish
 ```
 
 This command requires clean `main` matching `origin/main`, validates all three
-version fields, and pushes an annotated matching `vVERSION` tag. It does not need
-store credentials on your machine. It refuses remote tags that already exist,
-local lightweight tags, and local tags pointing at a different commit; it never
-force-pushes, replaces or moves tags. Only an annotated local tag pointing at the
-current commit, such as one left by a failed push, can be reused. Publication pushes only
-the fully qualified ref for that version, not other local tags.
+version fields, pushes an annotated matching `vVERSION` tag, and creates a
+GitHub Release with GitHub-generated change notes. GitHub CLI authentication is
+required before any tag is created or pushed; store credentials are not needed
+on your machine. The command uses `--verify-tag` so GitHub cannot silently select
+another source commit. Open the printed release URL to see the changes selected
+for deployment; publishing the release starts CI and packaging, not store availability.
+
+It refuses local lightweight tags and tags pointing at another commit; it never
+force-pushes, replaces or moves tags. An existing remote tag can be reused only
+when annotated and pointing at current `main`, allowing recovery if release
+creation failed after the tag push. Publication pushes only the fully qualified
+ref for that version, not other local tags. An existing GitHub Release is not
+edited or republished.
 
 Open **Actions → Release browser extensions**. The workflow retains its filename
 `.github/workflows/release-chrome.yml` because Chrome's federated authentication
@@ -70,8 +79,8 @@ The workflow runs the reusable CI, then builds only the two store bundles. Its
 
 ## Release to one store
 
-For a browser-specific fix, prepare and merge the version PR as usual. Push its
-version tag, then cancel the automatic both-store run before approving either
+For a browser-specific fix, prepare and merge the version PR as usual. Publish its
+GitHub Release, then cancel the automatic both-store run before approving either
 store. Do not start overlapping runs for the same version or resubmit a store
 that already received it.
 
@@ -94,8 +103,8 @@ selected store retains the same CI, checksum and human-validation requirements.
 A later release to the other store can use the same tag if that version has not
 already been submitted there. Check that store's dashboard first.
 
-Chrome's Google federation must permit `workflow_dispatch` on version tags as
-well as `push`; see [Chrome setup](chrome-web-store.md#one-time-setup). GitHub
+Chrome's Google federation must permit `release` and `workflow_dispatch` on
+version tags; see [Chrome setup](chrome-web-store.md#one-time-setup). GitHub
 secrets and variables alone do not establish this provider-side permission.
 
 ## Human validation gate
@@ -124,7 +133,13 @@ and version edits intact.
 Fix the checks and finish that existing branch rather than overwriting it. If the
 branch was pushed but PR creation failed, open its PR from GitHub.
 
-After a tag is pushed, use **Re-run failed jobs** for a failed store job; do not
+If GitHub Release creation fails after the tag push, inspect **Releases** first:
+GitHub may have accepted the request despite a CLI error. If the release exists,
+do not recreate or republish it. If absent, rerun `pnpm release publish` from the
+same clean, current `main`; the matching annotated remote tag is reused. If main
+has advanced, stop and inspect the tagged commit rather than moving the tag.
+
+After a release is published, use **Re-run failed jobs** for a failed store job; do not
 resubmit a successful store job, move the tag, or rerun a different source commit
 under the same version. Inspect the relevant dashboard first if a write request
 timed out: the store may already have received it. Uploads and submissions are not

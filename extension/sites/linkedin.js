@@ -6,6 +6,7 @@
   'use strict';
   const selectors = {
     editor: ['.share-box [contenteditable="true"]', '.share-creation-state__text-editor [contenteditable="true"]', '.share-creation-state [contenteditable="true"]', '.comments-comment-box [contenteditable="true"]', '[role="dialog"][aria-label*="post" i] .ql-editor[contenteditable="true"]', '[role="dialog"][aria-label*="publicación" i] .ql-editor[contenteditable="true"]', '.comments-comment-texteditor [contenteditable="true"]', '[role="textbox"][contenteditable="true"][aria-label*="comment" i]', '[role="textbox"][contenteditable="true"][aria-label*="post" i]'],
+    standalonePostEditor: ['.tiptap.ProseMirror[role="textbox"][contenteditable="true"]'],
     messageEditor: ['.msg-form__contenteditable[contenteditable="true"]', '.msg-form [contenteditable="true"]'],
     postComposer: ['.share-box', '.share-creation-state', '[role="dialog"]:has(.share-creation-state__text-editor)', '[role="dialog"]:has(.ql-editor)'],
     commentComposer: ['.comments-comment-box', '.comments-comment-texteditor', 'form:has([contenteditable="true"][aria-label*="comment" i])'],
@@ -74,7 +75,8 @@
     }
     return {
       mode() {
-        const editor = dom.closest(document.activeElement, selectors.editor) || dom.closest(document.activeElement, selectors.messageEditor);
+        const standalonePostEditor = /^\/sharing\/compose\/?$/.test(location.pathname) ? dom.closest(document.activeElement, selectors.standalonePostEditor) : null;
+        const editor = dom.closest(document.activeElement, selectors.editor) || dom.closest(document.activeElement, selectors.messageEditor) || standalonePostEditor;
         return classifyPage({ url: location.href, linkedinEditorFocused: !!editor && dom.visible(editor) && dom.visible(document.activeElement), ownProfilePath: dom.ownProfilePath(selectors.ownProfileLink) });
       },
       action(event) {

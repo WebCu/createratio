@@ -316,7 +316,7 @@ exit "$status"
 ## Release automation
 
 `pnpm check` includes release-command, package-reproduction and store-submission
-tests. Workflow tests exercise the submission conditions for automatic tags and
+tests. Workflow tests exercise the submission conditions for published releases and
 manual Chrome-only, Firefox-only and both-store runs. They execute the real tag
 guard in disposable Git history, including branch, ancestry, version and browser
 refusals. They do not dispatch GitHub Actions or verify live Google federation.
@@ -328,7 +328,9 @@ all other Git operations are real and restricted to file transport. Tests reject
 alternate push URLs and URL rewrites before creating branches or tags. With
 automatic tag following and mirror settings enabled, they verify the complete
 remote ref set: preparation adds only its branch, publication only its version
-tag, and unrelated local refs remain local. They never push to the actual
+tag, and unrelated local refs remain local. GitHub Release creation is substituted;
+tests check generated-note/verified-tag options, authentication refusal, and
+recovery after release creation fails without moving its tag. They never push to the actual
 repository or publish a store version.
 
 The package test extracts the generated reviewer-source archive, rebuilds Firefox

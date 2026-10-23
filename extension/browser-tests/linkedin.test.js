@@ -2,6 +2,72 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { readFileSync } = require('node:fs');
+
+test('built LinkedIn post editor recognition requires the composer route and a visible editable post field', async () => {
+  const { launch, evaluate, eventually, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
+  const bundle = path.resolve(__dirname, '../../dist/chrome');
+  const browser = await launch(bundle);
+  try {
+    await withFailureArtifacts(browser, 'LinkedIn post editor recognition', async () => {
+      await seedAccess(browser, ['linkedin'], { allowAboveGoal: false });
+      const page = await browser.page('https://www.linkedin.com/sharing/compose');
+      await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#synthetic-site")'), 'synthetic composer is ready');
+      const source = ['sites.js', 'dom.js'].map(file => readFileSync(path.join(bundle, file), 'utf8')).join('\n');
+      await evaluate(browser, page.session, source);
+      const cases = [
+        { name: 'unlabelled modern post', route: '/sharing/compose', attributes: 'class="tiptap ProseMirror" role="textbox" contenteditable="true"', expected: 'create' },
+        { name: 'trailing slash and query', route: '/sharing/compose/?synthetic=true', attributes: 'class="tiptap ProseMirror" role="textbox" contenteditable="true"', expected: 'create' },
+        { name: 'nested editor focus', route: '/sharing/compose', attributes: 'class="tiptap ProseMirror" role="textbox" contenteditable="true"', nested: true, expected: 'create' },
+        { name: 'plain unrelated textbox', route: '/sharing/compose', attributes: 'role="textbox" contenteditable="true"', expected: 'neutral' },
+        { name: 'unrelated rich-text engine', route: '/sharing/compose', attributes: 'class="ProseMirror" role="textbox" contenteditable="true"', expected: 'neutral' },
+        { name: 'read-only post', route: '/sharing/compose', attributes: 'class="tiptap ProseMirror" role="textbox" contenteditable="false"', expected: 'neutral' },
+        { name: 'hidden post', route: '/sharing/compose', attributes: 'class="tiptap ProseMirror" role="textbox" contenteditable="true" style="visibility:hidden"', expected: 'neutral' },
+        { name: 'non-textbox rich field', route: '/sharing/compose', attributes: 'class="tiptap ProseMirror" role="searchbox" contenteditable="true"', expected: 'neutral' },
+        { name: 'unrelated editor on jobs page', route: '/jobs/', attributes: 'class="tiptap ProseMirror" role="textbox" contenteditable="true"', expected: 'neutral' },
+        { name: 'unrelated editor on feed', route: '/feed/', attributes: 'class="tiptap ProseMirror" role="textbox" contenteditable="true"', expected: 'consume' },
+        { name: 'similar route is not a post composer', route: '/sharing/compose-unrelated', attributes: 'class="tiptap ProseMirror" role="textbox" contenteditable="true"', expected: 'neutral' }
+      ];
+      for (const entry of cases) {
+        const result = await evaluate(browser, page.session, `(() => {
+          const entry = ${JSON.stringify(entry)};
+          history.replaceState({}, '', entry.route);
+          document.body.innerHTML = '<div id="editor" tabindex="0" ' + entry.attributes + '><span id="nested" tabindex="0">Synthetic draft</span></div><button id="outside">Outside editor</button>';
+          document.querySelector(entry.nested ? '#nested' : '#editor').focus();
+          const adapter = C3Sites.get('linkedin').create({ document, location, dom: C3_DOM({ document, location, Element, getComputedStyle }) });
+          const focused = adapter.mode();
+          document.querySelector('#outside').focus();
+          return { focused, outside: adapter.mode() };
+        })()`);
+        assert.equal(result.focused, entry.expected, entry.name);
+        assert.equal(result.outside, entry.route === '/feed/' ? 'consume' : 'neutral', entry.name + ' stops creating when the editor loses focus');
+      }
+      assert.deepEqual(browser.errors, []);
+    });
+  } finally { await browser.cleanup(); }
+});
+
+test('built LinkedIn post composer records trusted writing as creating time', async () => {
+  const { launch, evaluate, eventually, click, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
+  const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+  try {
+    await withFailureArtifacts(browser, 'LinkedIn post composer creation time', async () => {
+      await seedAccess(browser, ['linkedin'], { allowAboveGoal: false });
+      await evaluate(browser, browser.worker, `chrome.runtime.onMessage.addListener((message, sender) => {
+        if (sender.url?.startsWith('https://www.linkedin.com/') && message.type === 'snapshot') globalThis.postTrackerReady = true;
+      })`);
+      const page = await browser.page('https://www.linkedin.com/sharing/compose');
+      await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#synthetic-site") && document.hasFocus() && !document.hidden'), 'synthetic LinkedIn composer is focused');
+      await eventually(() => evaluate(browser, browser.worker, 'globalThis.postTrackerReady === true'), 'post tracker has access preferences');
+      await evaluate(browser, page.session, `document.body.innerHTML = '<div><div id="post-editor" class="tiptap ProseMirror" role="textbox" contenteditable="true" style="min-height:80px;border:1px solid"></div></div>'`);
+      await click(browser, page, '#post-editor');
+      await browser.cdp.send('Input.insertText', { text: 'Synthetic post draft; never submitted.' }, page.session);
+      await eventually(() => evaluate(browser, page.session, 'document.activeElement.id === "post-editor" && document.querySelector("#post-editor").textContent === "Synthetic post draft; never submitted."'), 'trusted typing reaches the modern post editor');
+      await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.local.get(C3.localDate()).then(data => data[C3.localDate()]?.linkedin?.createSec > 0)'), 'post writing reaches saved creating time');
+      assert.deepEqual(browser.errors, []);
+    });
+  } finally { await browser.cleanup(); }
+});
 
 for (const route of ['/messaging/thread/synthetic-thread/', '/feed/']) {
   test(`built LinkedIn integration records focused DM writing on ${route} without submission bonuses`, async () => {
