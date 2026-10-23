@@ -168,6 +168,23 @@ for (const browser of ['chrome', 'browser']) {
     }
   });
 
+  test(`${browser}: popup sharing can read only today's creation totals`, async () => {
+    const date = C.localDate(), day = { x: { createSec: 120, consumeSec: 60, posts: 1 } };
+    const w = worker({ [date]: day, ['_websiteTime:' + date]: { 'private.example': 600 }, _intentions: [{ site: 'x', reason: 'Private intention', requestedAt: Date.now() }] }, browser);
+    const reply = await w.send({ type: 'history', kind: 'ratio', range: 'today' }, popupSender);
+    assert.equal(reply.ok, true);
+    assert.deepEqual(reply.days, { [date]: day });
+    for (const kind of ['ratio', 'websites']) for (const range of ['today', 'week', 'month']) {
+      if (kind === 'ratio' && range === 'today') continue;
+      assert.equal((await w.send({ type: 'history', kind, range }, popupSender)).ok, false, `${kind} ${range}`);
+    }
+    for (const sender of [{ ...popupSender, frameId: 1 }, { ...popupSender, url: popupSender.url + '?embedded' }, gate('x'), { ...popupSender, url: 'https://x.com/home', tab: { id: 1 } }]) {
+      assert.equal((await w.send({ type: 'history', kind: 'ratio', range: 'today' }, sender)).ok, false);
+    }
+    assert.equal((await w.send({ type: 'access-history-list' }, popupSender)).ok, false);
+    assert.deepEqual(w.errors, []);
+  });
+
   test(`${browser}: command authority stays specific to each domain boundary`, async () => {
     const w = worker({}, browser);
     const framedPopup = { ...popupSender, frameId: 1 };

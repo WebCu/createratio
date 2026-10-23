@@ -4,6 +4,24 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { page, C3, accessState } = require('../../tests/ui-harness.js');
+test('popup sharing loads only today on demand and recovers from history failure', async () => {
+  const p = page('popup'); await p.ready();
+  assert.ok(p.messages.every(message => message.type === 'snapshot'));
+  p.state.replies.set('history', { ok: true });
+  await p.nodes['share-create'].fire('click');
+  assert.deepEqual(p.messages.at(-1), { type: 'history', kind: 'ratio', range: 'today' });
+  assert.equal(p.nodes['share-error'].textContent, 'Unable to create share card.');
+  assert.equal(p.nodes['share-result'].hidden, true);
+  assert.equal(p.nodes['share-download'].disabled, true);
+  assert.equal(p.nodes['share-create'].disabled, false);
+  p.refresh(); await p.ready();
+  assert.equal(p.nodes['share-error'].textContent, 'Unable to create share card.', 'score refresh must not erase sharing errors');
+  p.state.rejections.set('history', new Error('Worker disconnected.'));
+  p.state.replies.delete('history');
+  await p.nodes['share-create'].fire('click');
+  assert.equal(p.nodes['share-error'].textContent, 'Worker disconnected.');
+  assert.equal(p.nodes['share-create'].disabled, false);
+});
 test('popup rejects malformed replies without changing totals or claiming a session ended', async () => {
   const p = page('popup'); await p.ready();
   p.state.replies.set('snapshot', { ok: 'true', day: { x: { consumeSec: 600 } }, access: {} });

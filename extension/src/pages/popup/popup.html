@@ -9,17 +9,26 @@
 <body class="compact-popup">
   <header><div class="mark" aria-hidden="true">&gt;</div><div><h1>CreateRatio</h1><p class="eyebrow">Create &gt; Consume</p></div></header>
   <main>
-    <div class="section-label"><h2>Creation score today</h2><time id="date">Loading…</time></div>
+    <div class="section-label"><h2>Creation score today</h2><div class="score-heading-actions"><time id="date">Loading…</time><button id="share-create" type="button" aria-expanded="false" aria-controls="share-result">Share today</button></div></div>
     <section class="score-card" aria-label="Today's creation score">
       <div><span class="caption">Created / consumed</span><div id="score" class="score">-</div></div>
       <div class="goal"><strong>1.0</strong><small>daily target</small></div>
       <p id="score-status">Your time, with intention.</p>
     </section>
     <div class="minutes"><div><span class="dot create"></span><span>Creating</span><strong id="create-min">-</strong></div><div><span class="dot consume"></span><span>Consuming</span><strong id="consume-min">-</strong></div></div>
+    <section id="share-result" class="popup-share" aria-labelledby="share-title" hidden>
+      <div class="section-label"><h2 id="share-title">Today's share card</h2><button id="share-close" type="button" aria-label="Close share card">Close</button></div>
+      <canvas id="share-preview" width="0" height="0" role="img"></canvas>
+      <p class="share-note">Recorded totals only. No site names or saved intentions. Nothing is posted automatically.</p>
+      <div class="share-actions"><button id="share-download" type="button" disabled>Download PNG</button><button id="share-copy" type="button" disabled>Copy caption</button></div>
+      <details id="share-caption-details"><summary>Suggested caption</summary><label for="share-caption" class="sr-only">Suggested caption</label><textarea id="share-caption" rows="5" readonly></textarea></details>
+    </section>
+    <p id="share-status" class="share-note" role="status"></p>
+    <p id="share-error" role="alert" hidden></p>
     <section class="blocking" aria-labelledby="blocking-title"><div class="section-label"><h2 id="blocking-title">Site access</h2><span>Active tab time</span></div><div id="access-sites"><p>Checking access…</p></div><p class="method">On: timed, tracked sessions. Off: free access.</p></section>
     <p id="error" role="alert" hidden></p>
   </main>
   <footer class="popup-links"><a href="dashboard.html" target="_blank" rel="noopener">Open dashboard</a><button id="settings" disabled>Settings</button><a href="https://createratio.com/privacy.html" target="_blank" rel="noopener noreferrer">Privacy policy</a></footer>
-  <script src="sites.js"></script><script src="core.js"></script><script src="refill.js"></script><script src="messages.js"></script><script src="popup.js"></script>
+  <script src="sites.js"></script><script src="core.js"></script><script src="refill.js"></script><script src="messages.js"></script><script src="report.js"></script><script src="share-card.js"></script><script src="share.js"></script><script src="popup.js"></script>
 </body>
 </html>

@@ -64,7 +64,8 @@
       }
     }
     function history(message, sender) {
-      if (!topPage(sender, ['dashboard', 'settings'])) throw refuse('History must come from an extension page');
+      const popupToday = topPage(sender, ['popup']) && message.kind === 'ratio' && message.range === 'today';
+      if (!popupToday && !topPage(sender, ['dashboard', 'settings'])) throw refuse('History must come from an extension page');
       if (!['ratio', 'websites'].includes(message.kind) || !['today', 'week', 'month'].includes(message.range)) throw refuse('Invalid history range');
     }
     function intentions(sender) {

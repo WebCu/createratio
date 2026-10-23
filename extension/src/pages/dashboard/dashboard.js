@@ -3,7 +3,7 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
-let reportURL = null, reportTimer = null, shareURL = null, shareCard = null, shareVersion = 0, reportVersion = 0;
+let reportURL = null, reportTimer = null, reportVersion = 0;
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function svgElement(tag, attrs = {}, text) {
@@ -136,58 +136,8 @@ async function exportHistory(kind) {
     setTimeout(() => URL.revokeObjectURL(url), 10000); error();
   } catch (e) { error(e.message); }
 }
-function clearShareCard() {
-  shareVersion++;
-  if (shareURL) URL.revokeObjectURL(shareURL);
-  shareURL = null; shareCard = null;
-  $('share-preview').width = 0; $('share-preview').height = 0;
-  $('share-preview').removeAttribute('aria-label');
-  $('share-result').hidden = true; $('share-caption').value = '';
-  $('share-download').disabled = true; $('share-copy').disabled = true;
-  $('share-status').textContent = '';
-}
-$('report-range').addEventListener('change', clearShareCard);
-$('share-create').addEventListener('click', async () => {
-  const button = $('share-create');
-  if (button.disabled) return;
-  clearShareCard();
-  const version = shareVersion, range = $('report-range').value;
-  button.disabled = true;
-  try {
-    const now = new Date(), date = C3.localDate(now);
-    const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to create share card.');
-    if (version !== shareVersion) return;
-    if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
-    const card = SocialCard.create(data.days, range, now), canvas = $('share-preview');
-    SocialCard.draw(canvas, card);
-    const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Unable to create the PNG. Try the detailed report.')), 'image/png'));
-    if (version !== shareVersion) return;
-    shareURL = URL.createObjectURL(blob); shareCard = card;
-    canvas.setAttribute('aria-label', card.description);
-    $('share-caption').value = card.caption; $('share-result').hidden = false;
-    $('share-download').disabled = false; $('share-copy').disabled = false;
-    error(); $('share-status').textContent = 'Your card is ready. Review it before sharing.';
-  } catch (e) { if (version === shareVersion) { clearShareCard(); error(e.message); } }
-  finally { button.disabled = false; }
-});
-$('share-download').addEventListener('click', () => {
-  if (!shareCard || !shareURL) return;
-  const link = document.createElement('a'); link.href = shareURL;
-  link.download = shareCard.filename; document.body.append(link); link.click(); link.remove();
-  $('share-status').textContent = 'PNG download started. Attach it to your post and include the caption link.';
-});
-$('share-copy').addEventListener('click', async () => {
-  if (!shareCard) return;
-  const caption = $('share-caption').value, version = shareVersion;
-  try {
-    await navigator.clipboard.writeText(caption);
-    if (version === shareVersion) $('share-status').textContent = 'Caption copied. Paste it alongside your image.';
-  } catch (_) {
-    if (version !== shareVersion) return;
-    $('share-caption').focus(); $('share-caption').select();
-    $('share-status').textContent = 'Clipboard unavailable. The caption is selected; copy it manually.';
-  }
-});
+const sharing = SocialSharing.mount({ messages, range: () => $('report-range').value, error });
+$('report-range').addEventListener('change', sharing.clear);
 $('report-export').addEventListener('click', async () => {
   const button = $('report-export');
   if (button.disabled) return;
@@ -212,7 +162,7 @@ $('report-export').addEventListener('click', async () => {
 $('website-export').addEventListener('click', () => exportHistory('websites'));
 $('export').addEventListener('click', () => exportHistory('ratio'));
 extensionAPI.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) { reportVersion++; clearShareCard(); }
+  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) { reportVersion++; sharing.clear(); }
   if (RuntimeMessages.shouldRefresh(changes, area)) void refresh();
 });
 setInterval(refresh, 5000);
