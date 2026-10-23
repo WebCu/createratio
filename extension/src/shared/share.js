@@ -4,7 +4,7 @@
     const $ = id => document.getElementById(id);
     const button = $('share-create'), label = button.textContent;
     const expandable = button.hasAttribute('aria-expanded');
-    let url = null, card = null, version = 0;
+    let url = null, card = null, version = 0, copying = false;
     function clear() {
       version++;
       if (url) URL.revokeObjectURL(url);
@@ -35,7 +35,7 @@
         url = URL.createObjectURL(blob); card = next;
         canvas.setAttribute('aria-label', card.description);
         $('share-caption').value = card.caption; $('share-result').hidden = false;
-        $('share-download').disabled = false; $('share-copy').disabled = false;
+        $('share-download').disabled = false; $('share-copy').disabled = copying;
         if (expandable) button.setAttribute('aria-expanded', 'true');
         $('share-status').textContent = 'Your card is ready. Review it before sharing.';
       } catch (e) { if (request === version) { clear(); error(e.message); } }
@@ -48,8 +48,9 @@
       $('share-status').textContent = 'PNG download started. Attach it to your post and include the caption link.';
     });
     $('share-copy').addEventListener('click', async () => {
-      if (!card) return;
+      if (!card || copying) return;
       const caption = $('share-caption').value, request = version;
+      copying = true; $('share-copy').disabled = true;
       try {
         await navigator.clipboard.writeText(caption);
         if (request === version) $('share-status').textContent = 'Caption copied. Paste it alongside your image.';
@@ -58,6 +59,9 @@
         if ($('share-caption-details')) $('share-caption-details').open = true;
         $('share-caption').focus(); $('share-caption').select();
         $('share-status').textContent = 'Clipboard unavailable. The caption is selected; copy it manually.';
+      } finally {
+        copying = false;
+        if (card) $('share-copy').disabled = false;
       }
     });
     if ($('share-close')) $('share-close').addEventListener('click', () => { clear(); error(); button.focus(); });
