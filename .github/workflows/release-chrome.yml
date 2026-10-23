@@ -1,9 +1,9 @@
 name: Release browser extensions
-run-name: Release ${{ github.ref_name }} (${{ github.event_name == 'push' && 'both' || inputs.browser }})
+run-name: Release ${{ github.ref_name }} (${{ github.event_name == 'release' && 'both' || inputs.browser }})
 
 on:
-  push:
-    tags: ['v*']
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       browser:
@@ -40,7 +40,7 @@ jobs:
           node-version: 24.21.0
       - name: Require a version tag on main history
         env:
-          RELEASE_BROWSER: ${{ github.event_name == 'push' && 'both' || inputs.browser }}
+          RELEASE_BROWSER: ${{ github.event_name == 'release' && 'both' || inputs.browser }}
         run: |
           case "$RELEASE_BROWSER" in
             both|chrome|firefox) ;;
@@ -89,7 +89,7 @@ jobs:
           retention-days: 30
 
   submit:
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.browser == 'both' || inputs.browser == 'chrome')) }}
+    if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && (inputs.browser == 'both' || inputs.browser == 'chrome')) }}
     needs: package
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -139,7 +139,7 @@ jobs:
         run: node bin/chrome-store-release.js submit
 
   submit-firefox:
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.browser == 'both' || inputs.browser == 'firefox')) }}
+    if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && (inputs.browser == 'both' || inputs.browser == 'firefox')) }}
     needs: package
     runs-on: ubuntu-24.04
     timeout-minutes: 10

@@ -58,6 +58,11 @@ fs.appendFileSync(process.env.CLI_LOG, JSON.stringify({tool: ${JSON.stringify(to
 if (${JSON.stringify(tool)} === 'gh' && args[0] === 'auth' && process.env.FAIL_AUTH) process.exit(1);
 if (${JSON.stringify(tool)} === 'pnpm' && process.env.FAIL_CHECK) { console.error('Synthetic check failure'); process.exit(1); }
 if (args[0] === 'pr' && args[1] === 'create') console.log('https://github.com/WebCu/createratio/pull/123');
+if (args[0] === 'release' && args[1] === 'create') {
+  if (process.env.FAIL_RELEASE || fs.existsSync(process.env.CLI_LOG + '.release')) process.exit(1);
+  fs.writeFileSync(process.env.CLI_LOG + '.release', JSON.stringify(args));
+  console.log('https://github.com/WebCu/createratio/releases/tag/' + args[2]);
+}
 `, { mode: 0o755 });
   return {
     checkout, remote, env, git,
@@ -259,7 +264,7 @@ test('unexpected or empty arguments cannot trigger publication', t => {
   }
 });
 
-test('publish pushes an annotated matching tag without changing versions or creating a PR', t => {
+test('publish creates a GitHub release with generated changes on the matching annotated tag', t => {
   const repo = repository(t);
   const head = repo.git('rev-parse', 'HEAD');
   const result = repo.run(['publish']);
@@ -268,7 +273,11 @@ test('publish pushes an annotated matching tag without changing versions or crea
   assert.equal(repo.git('--git-dir', repo.remote, 'rev-parse', 'refs/tags/v0.0.1^{}'), head);
   assert.equal(repo.git('rev-parse', 'HEAD'), head);
   assert.equal(repo.git('status', '--porcelain'), '');
-  assert.deepEqual(repo.calls(), []);
+  assert.deepEqual(repo.calls(), [
+    { tool: 'gh', args: ['auth', 'status', '--hostname', 'github.com'] },
+    { tool: 'gh', args: ['release', 'create', 'v0.0.1', '--repo', 'WebCu/createratio', '--verify-tag', '--title', 'Release 0.0.1', '--generate-notes'] }
+  ]);
+  assert.match(result.stdout, /https:\/\/github.com\/WebCu\/createratio\/releases\/tag\/v0.0.1/);
 });
 
 test('publish refuses an existing lightweight tag without replacing or pushing it', t => {
@@ -320,7 +329,7 @@ test('publish reuses a matching local tag after a failed push but never moves or
   assert.equal(repo.git('rev-parse', 'refs/tags/v0.0.1'), tagObject);
   const repeated = repo.run(['publish']);
   assert.notEqual(repeated.status, 0);
-  assert.match(repeated.stderr, /already exists remotely/);
+  assert.match(repeated.stderr, /Inspect the GitHub release/);
   const other = repository(t);
   other.git('tag', '--annotate', 'v0.0.1', '--message', 'Original tag');
   const original = other.git('rev-parse', 'v0.0.1^{}');
@@ -331,6 +340,43 @@ test('publish reuses a matching local tag after a failed push but never moves or
   assert.match(moved.stderr, /another commit/);
   assert.equal(other.git('rev-parse', 'v0.0.1^{}'), original);
   assert.equal(other.git('ls-remote', '--tags', 'origin'), '');
+});
+
+test('publication authentication fails before creating or pushing a tag', t => {
+  const repo = repository(t);
+  const result = repo.run(['publish'], { FAIL_AUTH: '1' });
+  assert.notEqual(result.status, 0);
+  assert.equal(repo.git('tag', '--list'), '');
+  assert.equal(repo.git('ls-remote', '--tags', 'origin'), '');
+  assert.equal(repo.calls().filter(call => call.args[0] === 'release').length, 0);
+});
+
+test('a failed release creation preserves the tag and can resume without moving it', t => {
+  const repo = repository(t);
+  const failed = repo.run(['publish'], { FAIL_RELEASE: '1' });
+  assert.notEqual(failed.status, 0);
+  assert.match(failed.stderr, /Inspect the GitHub release/);
+  const tag = repo.git('--git-dir', repo.remote, 'rev-parse', 'refs/tags/v0.0.1');
+  assert.equal(repo.git('status', '--porcelain'), '');
+  const resumed = repo.run(['publish']);
+  assert.equal(resumed.status, 0, resumed.stderr);
+  assert.equal(repo.git('--git-dir', repo.remote, 'rev-parse', 'refs/tags/v0.0.1'), tag);
+});
+
+test('remote tags must be annotated and point to current main before release creation', t => {
+  for (const annotated of [false, true]) {
+    const repo = repository(t);
+    repo.git('tag', ...(annotated ? ['--annotate', 'v0.0.1', '--message', 'Old release'] : ['v0.0.1']));
+    repo.git('push', 'origin', 'refs/tags/v0.0.1:refs/tags/v0.0.1');
+    if (annotated) {
+      repo.git('commit', '--allow-empty', '-m', 'New main');
+      repo.git('push', 'origin', 'main');
+    }
+    const result = repo.run(['publish']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /remote tag must be annotated and point to current main/);
+    assert.equal(repo.calls().filter(call => call.args[0] === 'release').length, 0);
+  }
 });
 
 test('version limits and ambiguous version fields fail before branch creation', t => {

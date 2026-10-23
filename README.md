@@ -124,8 +124,9 @@ for Docker previews, analytics, and static builds.
 
 Use `pnpm release prepare patch` from clean, current `main` to synchronize the
 extension versions and open a version PR. After merging that PR, run
-`pnpm release publish` from updated `main` to push the matching tag.
-GitHub Actions tests and packages Chrome and Firefox, then requests separate
+`pnpm release publish` from updated `main` to create a GitHub Release with
+generated change notes and the matching tag. Publishing the release triggers
+GitHub Actions to test and package Chrome and Firefox, then request separate
 store approvals before submitting each package. Stores control their own review
 and publication timing. See the [release guide](docs/releases.md) for setup,
 manual checks, package inspection and recovery.
