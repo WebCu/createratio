@@ -1,7 +1,7 @@
 # CreateRatio browser extension
 
 A dependency-free Manifest V3 extension for intentional access to X and LinkedIn
-and local creating-versus-consuming tracking.
+and local creating-versus-consuming tracking, with an opt-in TikTok integration.
 
 ## Layout and installation
 
@@ -249,6 +249,7 @@ Old Twitter URLs must redirect to X first.
 | --- | --- | --- |
 | X | Home, Explore, Search, other profiles and status pages | Post/reply/quote editors and a focused home composer |
 | LinkedIn | Feed and other personal/company/school profiles | Focused post, comment, or direct-message editors |
+| TikTok | For You, Following, Explore, Search, tags, music, profiles, videos and photos | Focused comment, upload-caption, or message editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
 cannot be identified, profiles default to consuming. Editors take precedence;
@@ -296,6 +297,21 @@ Charts show active time without action credits.
 
 See the [core contract](core/README.md) and [integration interface](sites/README.md)
 for contributor-facing details.
+
+### TikTok tracking
+
+TikTok starts Off under **Settings → Tracking only**. It uses the exact HTTPS hosts
+`tiktok.com` and `www.tiktok.com`, with no access gate or session timer. Enabling
+applies the existing Slow scrolling preference on consuming pages. Off restores
+native scrolling and retains history.
+
+Scoped comment Post controls and plain Enter count comments; upload-caption Post
+controls count posts. Positive Like and Save controls count without score credit.
+Reading `/messages` is neutral; focused message editors create without submit
+bonuses. Upload pages create only while a recognized caption editor is focused.
+Mobile hosts, live streams, unsupported shortcuts and ambiguous controls are not
+supported. Recognition uses specific `data-e2e` controls and composer structure;
+synthetic fixtures do not prove current authenticated markup or publication.
 
 ## Optional all-website time
 
@@ -397,7 +413,9 @@ optional intention history saves the text you explicitly submit. Nothing uses
 
 Required permissions are `storage`, `alarms`, and
 `declarativeNetRequestWithHostAccess`. Host access is limited to X, Twitter aliases,
-and LinkedIn. Optional `tabs` and `idle` permissions are requested only for
+and LinkedIn. TikTok adds only exact HTTPS root and `www.` host permissions, not
+HTTP or wildcard subdomains. Updates can require browser approval of these hosts.
+Optional `tabs` and `idle` permissions are requested only for
 all-website time. No browser-history or all-sites host permission is requested.
 Chromium restricts aggregate storage to trusted extension contexts; Firefox's
 isolated content scripts can technically access extension storage, though this
