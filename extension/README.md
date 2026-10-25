@@ -1,7 +1,7 @@
 # CreateRatio browser extension
 
 A dependency-free Manifest V3 extension for intentional access to X and LinkedIn
-and local creating-versus-consuming tracking.
+and local creating-versus-consuming tracking, with an opt-in Reddit integration.
 
 ## Layout and installation
 
@@ -249,6 +249,7 @@ Old Twitter URLs must redirect to X first.
 | --- | --- | --- |
 | X | Home, Explore, Search, other profiles and status pages | Post/reply/quote editors and a focused home composer |
 | LinkedIn | Feed and other personal/company/school profiles | Focused post, comment, or direct-message editors |
+| Reddit | Home, community feeds, search, threads and profiles | Focused post, comment, or message-compose editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
 cannot be identified, profiles default to consuming. Editors take precedence;
@@ -296,6 +297,21 @@ Charts show active time without action credits.
 
 See the [core contract](core/README.md) and [integration interface](sites/README.md)
 for contributor-facing details.
+
+### Reddit tracking
+
+Reddit starts Off under **Settings → Tracking only**. It uses the exact HTTPS hosts
+`reddit.com` and `www.reddit.com`, with no access gate or session timer. Enabling
+applies the shared Slow scrolling preference on consuming pages. Off restores
+native scrolling and retains history.
+
+Scoped Post/Submit clicks count posts and Comment/Reply clicks count comments.
+Only recognized forms and light-DOM composers are supported. Message-compose
+editors create without submit bonuses; inbox/chat/settings/moderation routes
+stay neutral. English labels are recognized. Old/new/mobile/chat subdomains,
+shadow-root-only editors, unverified editor shortcuts, votes and awards are
+unsupported. Synthetic fixtures do not prove current authenticated markup or
+publication.
 
 ## Optional all-website time
 
@@ -397,7 +413,9 @@ optional intention history saves the text you explicitly submit. Nothing uses
 
 Required permissions are `storage`, `alarms`, and
 `declarativeNetRequestWithHostAccess`. Host access is limited to X, Twitter aliases,
-and LinkedIn. Optional `tabs` and `idle` permissions are requested only for
+and LinkedIn. Reddit adds only exact HTTPS root and `www.` host permissions, not
+HTTP or wildcard subdomains. Updates can require browser approval of these hosts.
+Optional `tabs` and `idle` permissions are requested only for
 all-website time. No browser-history or all-sites host permission is requested.
 Chromium restricts aggregate storage to trusted extension contexts; Firefox's
 isolated content scripts can technically access extension storage, though this
