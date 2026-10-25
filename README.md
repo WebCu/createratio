@@ -8,13 +8,15 @@ intention, wait 60 seconds, then confirm access for five active minutes by defau
 Switching away pauses the timer.
 
 - **Intentional access:** configurable session times and a **Limit & track**
-  switch for each supported site. Turning it off removes access restrictions
+  switch for X and LinkedIn. Turning it off removes access restrictions
   and stops new creation-score measurements without deleting history.
 - **A daily creation score:** compares creating time and credit for posts,
   replies, and comments against consuming time. See the
   [measurement rules and limitations](extension/README.md#measurement-and-score).
 - **Scroll friction:** wheel/trackpad scrolling on consuming pages moves half
   as far by default. Tune the resistance or turn it off in Settings.
+- **Reddit:** opt into creating/consuming tracking and shared Slow scrolling.
+  No access gate or session timer is added; the integration starts Off.
 - **Optional extras:** track time across websites or save your access intentions.
   Both are off by default.
 - **Private by default:** no extension account, analytics, telemetry, or activity

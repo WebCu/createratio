@@ -32,7 +32,7 @@
     validateAccessRules(id, access.sessionRules, access.ruleIds);
     validateAccessHome(id, access);
   }
-  const catalog = [{ id: 'x' }, { id: 'linkedin' }];
+  const catalog = [{ id: 'x' }, { id: 'linkedin' }, { id: 'reddit' }];
   const plugins = catalog.map(({ id }) => {
     if (!/^[a-z][a-z0-9_-]*$/.test(id)) throw new Error('Invalid integration ID: ' + id);
     const plugin = load(id);
