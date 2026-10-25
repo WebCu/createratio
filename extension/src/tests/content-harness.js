@@ -14,7 +14,7 @@ async function tracker(browser = 'chrome', options = {}) {
   function unlisten(type, fn) { events[type] = (events[type] || []).filter(listener => listener !== fn); }
   const elements = [], warnings = [];
   const url = options.url || 'https://x.com/home';
-  const fixture = C.siteForURL(url) === 'linkedin' ? linkedinFixture({ url, message: options.message, standalonePost: options.standalonePost, listen }) : xFixture({ url, action: options.action, listen });
+  const fixture = options.fixture ? options.fixture({ url, listen }) : C.siteForURL(url) === 'linkedin' ? linkedinFixture({ url, message: options.message, standalonePost: options.standalonePost, listen }) : xFixture({ url, action: options.action, listen });
   const doc = fixture.document, location = fixture.location;
   doc.hasFocus = () => focused;
   doc.removeEventListener = unlisten;

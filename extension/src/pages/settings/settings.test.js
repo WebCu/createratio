@@ -181,11 +181,11 @@ test('goal-based access defaults off, saves both ways and restores failed change
   p.setSettings({ ...C3.DEFAULT_SETTINGS, allowAboveGoal: true }); p.change(); await p.ready();
   assert.equal(input.checked, true);
 });
-test('one row per site combines creation tracking and access limits without selectors or nudges', async () => {
+test('gated rows combine creation tracking and access limits without selectors or nudges', async () => {
   const p = settingsPage(); await p.ready(); const rows = p.nodes['site-settings'].children;
-  assert.deepEqual(rows.map(row => row.children[0].children[0].textContent), ['Default', ...C3.SITES.map(site => site.name)]);
+  assert.deepEqual(rows.map(row => row.children[0].children[0].textContent), ['Default', ...C3.SITES.filter(site => site.gated).map(site => site.name)]);
   assert.deepEqual(value(p), [5, 'Default']);
-  for (const { id } of C3.SITES) {
+  for (const { id } of C3.SITES.filter(site => site.gated)) {
     assert.deepEqual(value(p, id), [5, 'From Default']); const c = controls(p, id), row = rows.find(row => row.attributes['data-site'] === id);
     assert.equal(c.tracking.checked, true); assert.equal(c.tracking.parent.parent.parent, row); assert.equal(c.access.parent.parent.parent, row);
     assert.equal(c.tracking.attributes['aria-label'], 'Limit & track on ' + C3.SITES.find(site => site.id === id).name);
@@ -242,7 +242,11 @@ test('failed creation tracking saves restore the switch and show an error', asyn
 });
 test('external preferences update existing site rows, including all creation tracking off', async () => {
   const p = settingsPage(); await p.ready(); p.setSettings({ ...C3.DEFAULT_SETTINGS, trackedSites: [] }); p.change(); await p.ready();
-  for (const { id } of C3.SITES) { assert.equal(controls(p, id).tracking.checked, false); assert.equal(controls(p, id).access.value, 5); assert.equal(controls(p, id).access.disabled, true); }
+  for (const { id, gated } of C3.SITES) {
+    assert.equal(controls(p, id).tracking.checked, false);
+    if (gated) { assert.equal(controls(p, id).access.value, 5); assert.equal(controls(p, id).access.disabled, true); }
+    else assert.equal(controls(p, id).access, undefined);
+  }
   assert.equal(p.data[C3.localDate()].x.consumeSec, 60);
 });
 test('Settings derives gate controls from capabilities rather than a list of known site IDs', async () => {
@@ -261,9 +265,50 @@ test('Settings derives gate controls from capabilities rather than a list of kno
   } finally { C3.SITES.splice(length); }
 });
 
+test('tracking-only integrations start off and save independently without session controls', async () => {
+  const sites = [
+    { id: 'reading', name: 'Reading' }, { id: 'writing', name: 'Writing' },
+    { id: 'video', name: 'Video' }, { id: 'community', name: 'Community' }, { id: 'social', name: 'Social' }
+  ];
+  const length = C3.SITES.length;
+  C3.SITES.push(...sites.filter(site => !C3.SITES.some(existing => existing.id === site.id)).map(site => ({ ...site, gated: false, defaultEnabled: false })));
+  try {
+    const p = settingsPage(); await p.ready();
+    const rows = p.nodes['tracking-only-settings'].children;
+    assert.equal(p.nodes['tracking-only-section'].hidden, false);
+    assert.deepEqual(rows.map(row => row.children[0].children[0].textContent), C3.SITES.filter(site => !site.gated).map(site => site.name));
+    for (const { id, name } of sites) {
+      const c = controls(p, id), row = rows.find(row => row.attributes['data-site'] === id);
+      assert.equal(c.tracking.checked, false); assert.equal(c.tracking.disabled, false);
+      assert.equal(c.tracking.attributes.role, 'switch'); assert.equal(c.tracking.attributes['aria-label'], 'Track creating & consuming on ' + name);
+      assert.equal(c.tracking.attributes['aria-describedby'], 'tracking-only-note tracking-status-' + id);
+      assert.equal(c.access, undefined); assert.equal(c.reset, undefined); assert.equal(c.source, undefined);
+      assert.equal(row.children.length, 1);
+      c.tracking.focus(); const release = p.holdMessage('tracking');
+      p.toggle(id, true); assert.equal(c.tracking.disabled, true); assert.equal(row.attributes['aria-busy'], 'true');
+      assert.equal(controls(p, 'x').access.disabled, false);
+      p.refresh(); await p.ready(); assert.equal(c.tracking.checked, true); assert.equal(c.tracking.disabled, true);
+      release(); await p.ready();
+      assert.equal(c.tracking.checked, true); assert.equal(c.tracking.disabled, false); assert.equal(row.attributes['aria-busy'], 'false');
+      assert.equal(p.document.activeElement, c.tracking); assert.ok(p.settings.trackedSites.includes(id));
+      const reopened = settingsPage({ settings: p.settings }); await reopened.ready();
+      assert.equal(controls(reopened, id).tracking.checked, true); assert.equal(controls(reopened, id).access, undefined);
+      p.fail = true; p.toggle(id, false); await p.ready();
+      assert.equal(c.tracking.checked, true); assert.equal(c.tracking.disabled, false); assert.equal(p.nodes.error.textContent, 'Could not save.');
+      p.fail = false; p.toggle(id, false); await p.ready();
+      assert.equal(c.tracking.checked, false); assert.equal(p.settings.trackedSites.includes(id), false);
+      assert.match(p.nodes['save-status'].textContent, /Creation-score tracking is off/);
+    }
+    assert.equal(p.messages.some(message => message.type === 'access-duration'), false);
+    assert.equal(p.nodes['scroll-friction-enabled'].checked, true); assert.equal(p.nodes['scroll-friction-strength'].value, 50);
+    assert.equal(p.data[C3.localDate()].x.consumeSec, 60);
+  } finally { C3.SITES.splice(length); }
+});
 test('removed integrations have no editable row and keep recorded history', async () => {
   const p = settingsPage({ [C3.localDate()]: { retired: { consumeSec: 120 } } }); await p.ready();
-  assert.equal(p.nodes['site-settings'].children.length, C3.SITES.length + 1); assert.equal(p.nodes['track-retired'], undefined); assert.equal(p.data[C3.localDate()].retired.consumeSec, 120);
+  assert.equal(p.nodes['site-settings'].children.length, C3.SITES.filter(site => site.gated).length + 1);
+  assert.equal(p.nodes['tracking-only-settings'].children.length, C3.SITES.filter(site => !site.gated).length);
+  assert.equal(p.nodes['track-retired'], undefined); assert.equal(p.data[C3.localDate()].retired.consumeSec, 120);
 });
 test('Default access limits validate whole minutes and recover failed saves', async () => {
   const p = settingsPage(); await p.ready(); const input = controls(p).access;

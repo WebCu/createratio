@@ -120,9 +120,10 @@ replacement from a browser restart. Website-time sampling starts fresh.
 ## Using the extension
 
 - **Popup:** today's score, active time, and request/end-access controls.
-- **Settings:** one Default session-time row and one row per vetted site with a
-  **Limit & track** switch. Times show **From Default** or **Custom**; **Use Default**
-  removes an override. Off disables time editing/reset without losing saved times.
+- **Settings:** **Limit & track** groups Default and gated controls;
+  **Tracking only** lists other integrations with compact switches when available.
+  Session times show **From Default** or **Custom**; **Use Default** removes an
+  override. Off disables time editing/reset without losing saved times.
   Slow scrolling, above-goal access, Website time, intention saving, exports, and
   history clearing remain separate. Preferences save automatically.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
@@ -180,8 +181,11 @@ its midnight refill. Re-enabling requires a fresh intention and wait unless
 optional above-goal access applies. Fresh trusted input is required to measure.
 
 New vetted integrations start disabled; arbitrary domains or user scripts cannot
-be added from the UI. Integrations without explicit gate support remain
-tracking-only.
+be added from the UI. Integrations without explicit gate support appear under
+**Tracking only**. Enabling one measures supported creating/consuming time and
+submit interactions and applies the shared Slow scrolling preference. It never
+adds an access gate, intention, wait, or session timer. Off stops measurements and
+restores native scrolling while keeping history.
 
 ### Slow scrolling
 
@@ -199,8 +203,9 @@ The percentage and distance preview update while dragging; the preference saves
 when you release the slider or use its keyboard controls. It applies to open tabs
 without a reload. Changes replace only a cached scroll multiplier, without a
 timer, popup, or queued animation. It applies only to consuming pages on enabled
-sites during timed or above-goal access, using the existing page classification
-below. Turning a site's Limit & track off also removes its scroll friction.
+integrations, using the page classification below. Gated sites additionally need
+timed or above-goal access; tracking-only integrations need their tracking switch
+On. Turning either kind of site Off also removes its scroll friction.
 
 Editors, messaging routes, nested scroll panels, horizontal gestures, and zoom
 stay native. When the document cannot scroll, including when its overflow is
@@ -229,9 +234,10 @@ intermediate slider value.
 
 ## Measurement and score
 
-Creation-score measurements require Limit & track On and timed or optional
-above-goal access. Both the content tracker and background reject measurements
-while blocked or Off. The budget counts all active-tab time, including creating,
+Creation-score measurements require the site's tracking switch On. Gated sites
+additionally require timed or optional above-goal access. Both the content tracker
+and background reject measurements while blocked or Off. Tracking-only sites have
+no access budget. A gated site's budget counts all active-tab time, including creating,
 consuming, and neutral pages—not only consuming time. Default changes affect
 inherited times, while explicit site overrides remain unchanged. Duration changes
 apply to new sessions and midnight refills, not the current budget.

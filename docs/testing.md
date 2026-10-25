@@ -484,6 +484,12 @@ Before a release, verify:
   physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
+- Available tracking-only integrations start Off and have no access gates or
+  session timers. Their compact Settings switches persist independently; enabling
+  applies the shared Slow scrolling preference on consuming pages, while editors,
+  messaging, unsupported routes and Off retain native scrolling. Verify documented
+  submit controls in each current logged-in UI. Disabling preserves history and
+  stops new measurements. Check exact HTTPS hosts and update-permission prompts.
 - Idle, focus, navigation, midnight, and sleep/wake boundaries do not backfill time.
 - All-website permission denial leaves tracking off; opt-in records only focused
   domain/time totals; disabling removes permissions and preserves totals.

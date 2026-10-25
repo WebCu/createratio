@@ -13,58 +13,63 @@ function createAccessField(site) {
   const line = document.createElement('div'); line.className = 'site-field-value';
   const unit = document.createElement('span'), sourceLine = document.createElement('div'), source = document.createElement('small');
   sourceLine.className = 'site-field-source'; source.id = 'accessMinutes-source-' + (site.id ? 'site-' + site.id : 'default'); sourceLine.append(source);
-  let input = null, reset = null;
-  if (site.id && !accessSites.has(site.id)) unit.textContent = 'Not gated';
-  else {
-    input = document.createElement('input'); input.type = 'number';
-    input.id = 'accessMinutes-' + (site.id ? 'site-' + site.id : 'default'); heading.htmlFor = input.id;
-    input.setAttribute('aria-label', 'Session time for ' + site.name); input.setAttribute('aria-describedby', source.id);
-    input.min = String(C3.ACCESS_LIMITS.minMinutes); input.max = String(C3.ACCESS_LIMITS.maxMinutes); input.step = '1'; unit.textContent = 'active min';
-    input.addEventListener('change', () => saveAccessDuration(site.id)); line.append(input);
-    if (site.id) {
-      reset = document.createElement('button'); reset.type = 'button'; reset.textContent = 'Use Default'; reset.id = 'access-reset-' + site.id;
-      reset.setAttribute('aria-label', 'Use Default session time for ' + site.name);
-      reset.addEventListener('click', () => saveAccessDuration(site.id, true)); sourceLine.append(reset);
-    }
+  const input = document.createElement('input'); input.type = 'number';
+  input.id = 'accessMinutes-' + (site.id ? 'site-' + site.id : 'default'); heading.htmlFor = input.id;
+  input.setAttribute('aria-label', 'Session time for ' + site.name); input.setAttribute('aria-describedby', source.id);
+  input.min = String(C3.ACCESS_LIMITS.minMinutes); input.max = String(C3.ACCESS_LIMITS.maxMinutes); input.step = '1'; unit.textContent = 'active min';
+  input.addEventListener('change', () => saveAccessDuration(site.id)); line.append(input);
+  let reset = null;
+  if (site.id) {
+    reset = document.createElement('button'); reset.type = 'button'; reset.textContent = 'Use Default'; reset.id = 'access-reset-' + site.id;
+    reset.setAttribute('aria-label', 'Use Default session time for ' + site.name);
+    reset.addEventListener('click', () => saveAccessDuration(site.id, true)); sourceLine.append(reset);
   }
   line.append(unit); node.append(heading, line, sourceLine);
   return { node, input, source, reset };
 }
 function createSite(site) {
-  const row = document.createElement('li'); row.className = 'site-preferences'; row.setAttribute('data-site', site.id);
+  const trackingOnly = !!site.id && !accessSites.has(site.id);
+  const row = document.createElement('li'); row.className = 'site-preferences' + (trackingOnly ? ' tracking-only-site' : ''); row.setAttribute('data-site', site.id);
   const header = document.createElement('div'); header.className = 'site-preference-heading';
   const name = document.createElement('h3'); name.textContent = site.name; header.append(name);
   let tracking = null, trackingStatus = null;
   if (site.id) {
     const group = document.createElement('div'); group.className = 'site-tracking';
-    const label = document.createElement('label'); label.htmlFor = 'track-' + site.id; label.textContent = accessSites.has(site.id) ? 'Limit & track' : 'Track creating & consuming';
+    const label = document.createElement('label'); label.htmlFor = 'track-' + site.id; label.textContent = trackingOnly ? 'Track' : 'Limit & track';
     tracking = document.createElement('input'); tracking.id = label.htmlFor; tracking.type = 'checkbox';
-    tracking.setAttribute('role', 'switch'); tracking.setAttribute('aria-label', label.textContent + ' on ' + site.name);
+    tracking.setAttribute('role', 'switch'); tracking.setAttribute('aria-label', (trackingOnly ? 'Track creating & consuming' : 'Limit & track') + ' on ' + site.name);
     trackingStatus = document.createElement('small'); trackingStatus.id = 'tracking-status-' + site.id;
-    tracking.setAttribute('aria-describedby', trackingStatus.id);
+    tracking.setAttribute('aria-describedby', (trackingOnly ? 'tracking-only-note ' : '') + trackingStatus.id);
     tracking.addEventListener('change', () => saveTracking(site.id));
     group.append(label, tracking, trackingStatus); header.append(group);
   } else {
     const note = document.createElement('small'); note.textContent = 'Fallback for gated sites'; header.append(note);
   }
-  const access = createAccessField(site), note = document.createElement('p'); note.className = 'site-mode-note';
-  note.textContent = accessSites.has(site.id) ? 'Off: browse freely. No wait, time limit, or creation-score tracking.' : 'Off: no creation-score tracking.';
-  row.append(header, access.node, note); $('site-settings').append(row);
-  return { site, access, tracking, trackingStatus, note, busy: new Set() };
+  const access = trackingOnly ? null : createAccessField(site);
+  let note = null;
+  row.append(header);
+  if (access) row.append(access.node);
+  if (site.id && !trackingOnly) {
+    note = document.createElement('p'); note.className = 'site-mode-note';
+    note.textContent = 'Off: browse freely. No wait, time limit, or creation-score tracking.'; row.append(note);
+  }
+  $(trackingOnly ? 'tracking-only-settings' : 'site-settings').append(row);
+  return { site, row, access, tracking, trackingStatus, note, busy: new Set() };
 }
 function renderSite(control, settings, force) {
   const { site, access } = control;
   const effective = C3.siteSettings(site.id, settings), overridden = Object.hasOwn(settings.siteOverrides?.[site.id] || {}, 'accessMinutes');
   const enabled = !site.id || C3.trackingEnabled(site.id, settings);
   const inactive = !!site.id && !enabled, switching = control.busy.has('tracking');
-  control.note.hidden = !inactive;
-  if (access.input) {
+  control.row.setAttribute('aria-busy', String(control.busy.size > 0));
+  if (control.note) control.note.hidden = !inactive;
+  if (access) {
     if (!control.busy.has('access') && (force === site.id + ':access' || document.activeElement !== access.input)) access.input.value = effective.accessMinutes;
     access.input.disabled = control.busy.has('access') || switching || inactive;
+    access.source.textContent = !site.id ? 'Default' : overridden ? 'Custom' : 'From Default';
+    access.source.className = overridden ? 'settings-source-custom' : '';
+    if (access.reset) { access.reset.hidden = !overridden; access.reset.disabled = control.busy.has('access') || switching || inactive; }
   }
-  access.source.textContent = !access.input ? 'No access gate' : !site.id ? 'Default' : overridden ? 'Custom' : 'From Default';
-  access.source.className = overridden ? 'settings-source-custom' : '';
-  if (access.reset) { access.reset.hidden = !overridden; access.reset.disabled = control.busy.has('access') || switching || inactive; }
   if (control.tracking) {
     if (!switching) control.tracking.checked = C3.trackingEnabled(site.id, settings);
     control.tracking.disabled = switching; control.trackingStatus.textContent = control.tracking.checked ? 'On' : 'Off';
@@ -87,7 +92,10 @@ function renderScroll(settings) {
 }
 function render(settings, force = '') {
   currentSettings = settings;
-  if (!siteControls.size) $('site-settings').replaceChildren();
+  if (!siteControls.size) {
+    $('site-settings').replaceChildren(); $('tracking-only-settings').replaceChildren();
+    $('tracking-only-section').hidden = !C3.SITES.some(site => !site.gated);
+  }
   for (const site of [{ id: '', name: 'Default' }, ...C3.SITES]) {
     let control = siteControls.get(site.id);
     if (!control) { control = createSite(site); siteControls.set(site.id, control); }
@@ -126,13 +134,13 @@ async function saveTracking(site) {
   await saveSitePreference(control, 'tracking', { type: 'tracking', site, enabled: control.tracking.checked });
 }
 async function saveSitePreference(control, group, message) {
-  const site = control.site.id, input = control.access.input;
-  control.busy.add(group);
+  const site = control.site.id, input = control.access?.input;
+  control.busy.add(group); control.row.setAttribute('aria-busy', 'true');
   if (group === 'tracking') {
     control.tracking.disabled = true; control.trackingStatus.textContent = control.tracking.checked ? 'On' : 'Off';
   }
   if (input) input.disabled = true;
-  if (control.access.reset) control.access.reset.disabled = true;
+  if (control.access?.reset) control.access.reset.disabled = true;
   try {
     const result = await messages.send(message, 'Unable to save settings.');
     const snapshot = message.type === 'tracking' ? result : await messages.send({ type: 'snapshot' }, 'Unable to load your saved settings.');

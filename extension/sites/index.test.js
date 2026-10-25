@@ -9,7 +9,7 @@ function browserCatalog(modules) {
   const context = vm.createContext({ URL, C3_SITE_MODULES: modules });
   vm.runInContext(source, context); return context.C3Sites;
 }
-function modules() { return { x: require('./x.js'), linkedin: require('./linkedin.js') }; }
+function modules() { return Object.fromEntries(integrations.sites.map(site => [site.id, require('./' + site.id + '.js')])); }
 
 test('explicit catalog works in Node and browser worlds without reading the DOM', () => {
   const catalog = browserCatalog(modules());

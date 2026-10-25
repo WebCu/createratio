@@ -302,11 +302,15 @@ test('retired nudge preferences cannot be changed or used as site access limits'
   const settings = C.siteSettings('x', stored);
   assert.equal(settings.accessMinutes, 12); assert.equal(settings.nudgeEnabled, undefined); assert.deepEqual(settings.siteOverrides, {});
 });
-test('CSV exports all date buckets and both sites, excluding internal keys', () => {
+test('CSV exports all date buckets and catalog sites, excluding internal keys', () => {
   const output = C.csv({ settings: C.DEFAULT_SETTINGS, _receipts: ['abc'], '2026-10-11': { x: { consumeSec: 120, posts: 1, quotes: 1 } }, '2026-10-10': {} });
-  const lines = output.trim().split('\r\n'); assert.equal(lines.length, 5);
-  assert.match(lines[1], /^2026-10-10,x,/); assert.match(lines[3], /^2026-10-11,x,120\.000,0\.000,1,/);
-  assert.match(lines[3], /,1\.000$/); assert.ok(!output.includes('settings')); assert.ok(!output.includes('abc'));
+  const lines = output.trim().split('\r\n'); assert.equal(lines.length, 1 + 2 * C.SITES.length);
+  for (const date of ['2026-10-10', '2026-10-11']) {
+    assert.deepEqual(lines.slice(1).filter(line => line.startsWith(date + ',')).map(line => line.split(',')[1]), C.SITES.map(site => site.id));
+  }
+  const recorded = lines.find(line => line.startsWith('2026-10-11,x,'));
+  assert.match(recorded, /^2026-10-11,x,120\.000,0\.000,1,/);
+  assert.match(recorded, /,1\.000$/); assert.ok(!output.includes('settings')); assert.ok(!output.includes('abc'));
 });
 test('tracking defaults enable X and LinkedIn and an empty selection disables all sites', () => {
   assert.deepEqual(C.DEFAULT_SETTINGS.trackedSites, ['x', 'linkedin']);
