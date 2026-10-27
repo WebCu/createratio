@@ -660,7 +660,7 @@ test('navigation and closing the active tab pause access without storing tab IDs
 });
 
 test('worker restart preserves the checkpointed active budget without charging browser downtime', async () => {
-  const w = worker(); await unlock(w);
+  const w = worker({}, 'chrome', new Date(2026, 9, 11, 12).getTime()); await unlock(w);
   w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
   w.advance(30000); await w.send({ type: 'access-status' });
   const resumed = worker(w.data, 'chrome', w.now + 1000000);
