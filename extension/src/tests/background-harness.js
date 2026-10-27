@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 const C = require('../../core/core.js');
-function worker(data = {}, browser = 'chrome', now = Date.now(), options = {}) {
+function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 0, 0), options = {}) {
   const session = options.session || {};
   let listener, installed, started, alarmListener, rules = [], failRules = false, websitePermissions = false;
   const badge = {}, accessLevels = [], alarms = {}, tabs = [], events = {}, errors = [];
