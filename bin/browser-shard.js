@@ -6,11 +6,13 @@ const path = require('node:path');
 
 try {
   const shards = JSON.parse(readFileSync(path.join(__dirname, 'browser-shards.json'), 'utf8'));
-  if (!Array.isArray(shards) || shards.length !== 6 || shards.some(files => !Array.isArray(files) || !files.length)) {
-    throw new Error('Browser plan must contain six nonempty shards.');
+  if (!Array.isArray(shards) || !shards.length || shards.some(files => !Array.isArray(files) || !files.length)) {
+    throw new Error('Browser plan must contain nonempty shards.');
   }
   const [selection, ...extra] = process.argv.slice(2);
-  if (!/^[1-6]$/.test(selection) || extra.length) throw new Error('Usage: node bin/browser-shard.js <1-6>');
+  if (!/^[1-9]\d*$/.test(selection) || Number(selection) > shards.length || extra.length) {
+    throw new Error(`Usage: node bin/browser-shard.js <1-${shards.length}>`);
+  }
   const directory = path.resolve(__dirname, '../extension/browser-tests');
   const inventory = new Set(readdirSync(directory).filter(file => file.endsWith('.test.js')));
   const assigned = new Set();

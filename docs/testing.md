@@ -20,11 +20,11 @@ the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;
 missing browsers and failed checks are errors, not successful skips.
 
-CI runs browser journeys across six independent runners, with one browser at a
+CI runs browser journeys across eight independent runners, with one browser at a
 time per shard. `bin/browser-shards.json` assigns every browser test file exactly
 once; missing, duplicate, or unassigned files fail before journeys start. After
 adding or moving a browser test, update that plan and keep shard durations balanced.
-Run one shard locally with `pnpm check:browser:shard 1` (through `6`); the normal
+Run one shard locally with `pnpm check:browser:shard 1` (through `8`); the normal
 `pnpm check:browser` still runs the complete suite. The broader smoke runs
 separately. The existing `browser-smoke` check requires both that smoke and every
 journey shard to succeed, including when a dependency fails, is skipped, or is

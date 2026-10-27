@@ -12,10 +12,10 @@ function fixture(t) {
   mkdirSync(path.join(root, 'bin'));
   mkdirSync(path.join(root, 'extension/browser-tests'), { recursive: true });
   copyFileSync(path.resolve(__dirname, '../browser-shard.js'), path.join(root, 'bin/browser-shard.js'));
-  const shards = Array.from({ length: 6 }, (_, index) => [`case-${index + 1}.test.js`]);
+  const shards = Array.from({ length: 8 }, (_, index) => [`case-${index + 1}.test.js`]);
   const save = () => writeFileSync(path.join(root, 'bin/browser-shards.json'), JSON.stringify(shards));
   save();
-  for (let index = 1; index <= 6; index++) {
+  for (let index = 1; index <= shards.length; index++) {
     writeFileSync(path.join(root, `extension/browser-tests/case-${index}.test.js`), `require('node:test').test('journey ${index}', () => console.log('visited-${index}'));`);
   }
   const env = { ...process.env };
@@ -25,12 +25,12 @@ function fixture(t) {
 }
 
 test('each browser shard runs only its assigned real test files', t => {
-  const { run } = fixture(t);
-  for (let index = 1; index <= 6; index++) {
+  const { run, shards } = fixture(t);
+  for (let index = 1; index <= shards.length; index++) {
     const result = run(String(index));
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, new RegExp(`visited-${index}`));
-    for (let other = 1; other <= 6; other++) {
+    for (let other = 1; other <= shards.length; other++) {
       if (other !== index) assert.doesNotMatch(result.stdout, new RegExp(`visited-${other}`));
     }
   }
@@ -44,7 +44,7 @@ test('a failing browser journey makes its shard fail', t => {
   assert.match(result.stdout, /browser regression/);
 });
 
-for (const args of [[], ['0'], ['7'], ['1.0'], ['1', '2']]) {
+for (const args of [[], ['0'], ['9'], ['1.0'], ['1', '2']]) {
   test(`browser shards refuse invalid selection ${JSON.stringify(args)}`, t => {
     const result = fixture(t).run(...args);
     assert.equal(result.status, 1);
@@ -86,17 +86,21 @@ test('missing or unsafe browser test paths cannot run', t => {
 
 test('the browser matrix cannot contain empty or omitted shards', t => {
   const { shards, save, run } = fixture(t);
-  shards[5] = [];
+  const last = shards.pop();
+  shards.push([]);
   save();
   assert.equal(run('1').status, 1);
+  shards[shards.length - 1] = last;
   shards.pop();
   save();
-  assert.equal(run('1').status, 1);
+  const result = run('1');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unassigned.*case-8\.test\.js/i);
 });
 
 test('the committed browser plan is a complete disjoint partition', () => {
   const shards = JSON.parse(readFileSync(path.resolve(__dirname, '../browser-shards.json'), 'utf8'));
-  assert.equal(shards.length, 6);
+  assert.equal(shards.length, 8);
   const { readdirSync } = require('node:fs');
   const files = readdirSync(path.resolve(__dirname, '../../extension/browser-tests')).filter(file => file.endsWith('.test.js')).sort();
   assert.deepEqual(shards.flat().sort(), files);
