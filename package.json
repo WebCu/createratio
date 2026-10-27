@@ -23,6 +23,7 @@
     "check:actions": "node bin/check-actions.js",
     "check": "pnpm check:syntax && pnpm test && pnpm build && pnpm build:site",
     "check:browser": "pnpm build:chrome && pnpm test:browser",
+    "check:browser:shard": "pnpm build:chrome && node bin/browser-shard.js",
     "verify": "node bin/verify.js",
     "test": "node --test --test-concurrency=4 extension/core/tests/*.test.js extension/sites/*.test.js \"extension/src/**/*.test.js\" site/tests/*.test.js bin/tests/*.test.js",
     "test:tracers": "node --test --test-concurrency=2 extension/src/tests/tracer-journeys.test.js extension/src/tests/lifecycle-properties.test.js",
