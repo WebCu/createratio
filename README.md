@@ -17,6 +17,8 @@ Switching away pauses the timer.
   as far by default. Tune the resistance or turn it off in Settings.
 - **TikTok:** opt into creating/consuming tracking and shared Slow scrolling.
   No access gate or session timer is added; the integration starts Off.
+- **Instagram:** opt into creating/consuming tracking and shared Slow scrolling.
+  No access gate or session timer is added; the integration starts Off.
 - **Optional extras:** track time across websites or save your access intentions.
   Both are off by default.
 - **Private by default:** no extension account, analytics, telemetry, or activity
