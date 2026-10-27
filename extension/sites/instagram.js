@@ -18,7 +18,10 @@
   };
   const selectors = {
     commentEditor: ['textarea[aria-label="Add a comment…"]', 'textarea[aria-label="Add a comment..."]'],
-    captionEditor: ['textarea[aria-label="Write a caption…"]', 'textarea[aria-label="Write a caption..."]'],
+    captionEditor: [
+      'textarea[aria-label="Write a caption…"]', 'textarea[aria-label="Write a caption..."]',
+      '[role="textbox"][contenteditable="true"][aria-label="Write a caption…"]', '[role="textbox"][contenteditable="true"][aria-label="Write a caption..."]'
+    ],
     messageEditor: ['[role="textbox"][contenteditable="true"][aria-label="Message"]'],
     commentScope: ['form'],
     postScope: ['[role="dialog"]'],
