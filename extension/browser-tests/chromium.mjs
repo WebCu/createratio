@@ -334,6 +334,13 @@ export async function seedAccess(browser, sites, settings) {
   })()`);
 }
 
+export async function openSettingsSection(browser, page, name) {
+  const selector = '#' + name + '-settings';
+  await eventually(() => evaluate(browser, page.session, `!!document.querySelector(${JSON.stringify(selector)})`), name + ' settings section exists');
+  if (!await evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`)) await click(browser, page, selector + ' > summary');
+  await eventually(() => evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`), name + ' settings section open');
+}
+
 export async function waitForEnabledControl(browser, page, selector, timeout) {
   return eventually(() => evaluate(browser, page.session, `(() => {
     const control = document.querySelector(${JSON.stringify(selector)});

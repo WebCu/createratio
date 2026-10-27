@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { scrollFixture } from './scrolling.mjs';
 
 export async function platformJourney(platform) {
-    const { launch, evaluate, eventually, click, clickByRole, withFailureArtifacts } = await import('./chromium.mjs');
+    const { launch, evaluate, eventually, click, clickByRole, withFailureArtifacts, openSettingsSection } = await import('./chromium.mjs');
     const browser = await launch(fileURLToPath(new URL('../../dist/chrome', import.meta.url)));
     try {
       await withFailureArtifacts(browser, `${platform.id} tracking and scroll resistance`, async () => {
@@ -58,6 +58,7 @@ export async function platformJourney(platform) {
         await eventually(listenerEnabled, 'enabled consuming feed has scroll resistance');
         assert.equal(await wheel(240), 120, '50% resistance halves a 240px wheel');
         assert.equal(await wheel(-240), -120);
+        await openSettingsSection(browser, settings, 'browsing');
         await click(browser, settings, 'label[for="scroll-friction-strength"]');
         await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'End', code: 'End', windowsVirtualKeyCode: 35 }, settings.session);
         await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'End', code: 'End', windowsVirtualKeyCode: 35 }, settings.session);
@@ -83,6 +84,7 @@ export async function platformJourney(platform) {
         await evaluate(browser, page.session, `history.pushState({}, '', ${JSON.stringify(new URL(platform.url).pathname + new URL(platform.url).search)})`);
         await eventually(listenerEnabled, 'returning to feed restores resistance');
         assert.equal((await totals()).comments, 1, 'unsupported route cannot submit comments');
+        await openSettingsSection(browser, settings, 'websites');
         await clickByRole(browser, settings, 'switch', 'Limit & track on ' + platform.name);
         await eventually(() => evaluate(browser, settings.session, `!document.querySelector(${JSON.stringify(toggle)}).checked && !document.querySelector(${JSON.stringify(toggle)}).disabled && document.querySelector('#save-status').textContent.includes('Your history is kept.')`), 'tracking disabled through Settings');
         await activatePage();

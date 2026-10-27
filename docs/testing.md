@@ -486,11 +486,14 @@ Before a release, verify:
   physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
-- All four popup rows show current access and editable session times when On.
-  Saving affects new sessions/refills, not the current budget. Verify invalid
-  input, save failure, focused drafts across polling, and Settings synchronization.
-  Settings groups all four Limit & track switches and times with Default/Custom
-  inheritance. Check 320px layouts, keyboard input and forced colors.
+- All four popup rows show current access without session-time editors.
+  Settings opens Websites initially; Browsing, Privacy and Your data open through
+  native section summaries, closing the previous section. Verify keyboard access,
+  320px layouts, reduced motion and forced colors. Duration menus support presets,
+  inherited Default and on-demand Custom edits from 1–240 whole minutes. Verify
+  Save/Cancel, invalid input, failed saves, focused drafts across polling and
+  retained arbitrary durations after reload. Saving affects new sessions/refills,
+  not the current budget; Off disables editing without deleting saved times.
 - Available tracking-only integrations start Off and have no access gates or
   session timers. Their compact Settings switches persist independently; enabling
   applies the shared Slow scrolling preference on consuming pages, while editors,

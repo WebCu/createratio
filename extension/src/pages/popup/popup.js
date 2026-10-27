@@ -4,7 +4,7 @@ const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 let refreshing = false, refreshFailed = false;
 const accessControls = new Map();
-function error(message = '') { $('error').textContent = message; $('error').hidden = !message; refreshFailed = false; if (message) $('access-save-status').textContent = ''; }
+function error(message = '') { $('error').textContent = message; $('error').hidden = !message; refreshFailed = false; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function createAccessControl(site, state) {
   const row = document.createElement('div'); row.className = 'access-row';
@@ -12,35 +12,9 @@ function createAccessControl(site, state) {
   const label = document.createElement('span'), name = document.createElement('strong'), status = document.createElement('small');
   label.className = 'refill-target'; status.id = 'access-status-' + site;
   name.textContent = state.name; label.append(name, status);
-  const durationLabel = document.createElement('label'); durationLabel.className = 'access-duration';
-  const duration = document.createElement('input'); duration.type = 'number'; duration.id = 'session-time-' + site;
-  duration.min = String(C3.ACCESS_LIMITS.minMinutes); duration.max = String(C3.ACCESS_LIMITS.maxMinutes); duration.step = '1';
-  duration.setAttribute('aria-label', 'Session time for ' + state.name);
-  duration.setAttribute('aria-describedby', 'access-time-note');
-  const unit = document.createElement('span'); unit.textContent = 'min';
-  durationLabel.append(duration, unit); label.append(durationLabel);
   const button = document.createElement('button');
   button.setAttribute('aria-describedby', status.id);
-  const control = { row, label, status, button, duration, state, busy: false, durationBusy: false };
-  duration.addEventListener('change', async () => {
-    if (control.durationBusy || duration.disabled) return;
-    const minutes = Number(duration.value);
-    if (!duration.reportValidity() || !C3.validAccessMinutes(minutes)) {
-      error(`Choose a whole number from ${C3.ACCESS_LIMITS.minMinutes} to ${C3.ACCESS_LIMITS.maxMinutes} minutes.`);
-      duration.value = control.state.sessionMinutes; return;
-    }
-    control.durationBusy = true; duration.disabled = true; $('access-save-status').textContent = '';
-    try {
-      const result = await messages.send({ type: 'access-duration', site, minutes }, 'Unable to save session time.');
-      renderAccess(result.access);
-      $('access-save-status').textContent = `${control.state.name}: ${minutes} min saved for new sessions and daily refills.`;
-      error();
-    } catch (e) { error(e.message); }
-    finally {
-      control.durationBusy = false; duration.value = control.state.sessionMinutes;
-      duration.disabled = control.state.enabled === false;
-    }
-  });
+  const control = { row, label, status, button, state, busy: false };
   button.addEventListener('click', async () => {
     control.busy = true; button.disabled = true;
     try {
@@ -62,10 +36,8 @@ function renderAccess(access) {
     let control = accessControls.get(site);
     if (!control) { control = createAccessControl(site, state); accessControls.set(site, control); }
     control.state = state;
-    const { status, button, duration } = control;
+    const { status, button } = control;
     control.row.setAttribute('data-state', state.enabled === false ? 'off' : state.goalAllowed || state.remainingMs > 0 ? 'open' : 'blocked');
-    if (!control.durationBusy && document.activeElement !== duration) duration.value = state.sessionMinutes;
-    duration.disabled = control.durationBusy || state.enabled === false;
     const open = state.remainingMs > 0;
     const left = state.expiresAt ? Math.max(0, state.expiresAt - Date.now()) : state.remainingMs;
     const seconds = Math.ceil(left / 1000);

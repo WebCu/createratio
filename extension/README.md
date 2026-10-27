@@ -119,16 +119,19 @@ replacement from a browser restart. Website-time sampling starts fresh.
 
 ## Using the extension
 
-- **Popup:** today's score, all four sites' request/end-access controls and quick
-  per-site session-time inputs. Changes save automatically for new sessions and
-  midnight refills, without changing the running budget. Off sites open directly;
-  turn their **Limit & track** on in Settings to configure a time.
-- **Settings:** **Limit & track** groups Default and gated controls;
-  **Tracking only** lists other integrations with compact switches when available.
-  Session times show **From Default** or **Custom**; **Use Default** removes an
-  override. Off disables time editing/reset without losing saved times.
-  Slow scrolling, above-goal access, Website time, intention saving, exports, and
-  history clearing remain separate. Preferences save automatically.
+- **Popup:** today's score and all four sites' request/end-access controls.
+  Off sites open directly. Session-time editing lives only in Settings.
+- **Settings:** four expandable sections, with **Websites** open initially.
+  Opening **Browsing**, **Privacy** or **Your data** closes the previous section.
+  **Websites** holds Limit & track switches, the Default session and per-site
+  duration menus. Choose a preset or **Custom…** for 1–240 whole minutes; custom
+  edits require **Save** or **Cancel**. Choosing **Default** or the reset button
+  removes a site override. Off disables editing without losing saved times.
+  **Browsing** holds Slow scrolling and Above-goal access; **Privacy** holds
+  intention saving and Website time; **Your data** holds exports and clearing.
+  Long explanations stay in disclosures. Preferences save automatically, except
+  an unconfirmed custom-time draft. New times affect new sessions and midnight
+  refills, not a running budget.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
   shareable daily/seven-day PNG cards, detailed reports, and CSV exports.
 
@@ -140,7 +143,7 @@ Open CreateRatio from the extensions menu; use **Open dashboard** or **Settings*
 for full pages rather than hard-coding an installation-specific extension ID.
 
 Site-access buttons have site-specific accessible names and describe the current
-state. Settings expose native switches and labeled session-time fields;
+state. Settings expose native section disclosures, switches and labeled duration menus;
 dashboard views expose pressed states and hide inactive panels. The access gate
 exposes its form, intention requirements, waiting/active regions, and disabled
 confirmation state. Use roles and names, not row positions. Check save status or
@@ -171,7 +174,7 @@ cancels its daily refill.
 
 **Save drafts before expiry:** open tabs redirect to the local blocked page.
 
-Optional **Allow sites while above the daily goal** skips gates and timers only
+Optional **Settings → Browsing → Above-goal access** skips gates and timers only
 while today's aggregate score is strictly above the current daily target
 (default 1.0). Existing timed budgets pause. At or below the target, on a new day,
 or when disabled, normal gates return unless a timed budget still has time.
@@ -198,7 +201,7 @@ restores native scrolling while keeping history.
 
 ### Slow scrolling
 
-**Settings → Slow scrolling** is on by default at **50% resistance**. Saved Off
+**Settings → Browsing → Slow scrolling** is on by default at **50% resistance**. Saved Off
 choices are preserved. Its **Scroll resistance** slider ranges from **50% (Light)**
 to **95% (Heavy)** in five-point steps. Higher resistance means less vertical page
 movement for the same wheel or trackpad gesture, in either direction. The default
@@ -310,7 +313,7 @@ for contributor-facing details.
 
 ### TikTok tracking
 
-TikTok starts Off under **Settings → Limit & track**. Enabling adds the shared
+TikTok starts Off under **Settings → Websites → TikTok → Limit & track**. Enabling adds the shared
 intention, wait and active-time budget, plus creation tracking and Slow scrolling.
 Blocking covers HTTP/S `tiktok.com` and its subdomains; creation tracking uses only
 HTTPS `tiktok.com` and `www.tiktok.com`. Off restores free access and native
@@ -326,7 +329,7 @@ synthetic fixtures do not prove current authenticated markup or publication.
 
 ### Instagram tracking
 
-Instagram starts Off under **Settings → Limit & track**. Enabling adds the shared
+Instagram starts Off under **Settings → Websites → Instagram → Limit & track**. Enabling adds the shared
 intention, wait and active-time budget, plus creation tracking and Slow scrolling.
 Blocking covers HTTP/S `instagram.com` and its subdomains; creation tracking uses
 only HTTPS `instagram.com` and `www.instagram.com`. Off restores free access and

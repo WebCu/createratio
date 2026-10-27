@@ -43,8 +43,9 @@ quality.
 - On gated sites, users write an intention, wait, and explicitly confirm access.
   Active-time budgets pause when users switch away. Users can change session
   durations or turn a site's **Limit & track** off.
-- The popup shows today's score, access controls and quick per-site session times;
-  Settings owns site switches, Default times and preferences;
+- The popup shows today's score and access controls, without time editing.
+  Settings groups site switches, session times and optional preferences into
+  focused expandable sections;
   the dashboard provides history, charts, and exports.
 - Users must save drafts before installation or access expiry: open gated-site
   tabs redirect to the blocked page.

@@ -7,52 +7,67 @@
   <link rel="stylesheet" href="popup.css"><link rel="stylesheet" href="page.css">
 </head>
 <body class="extension-page settings-page">
-  <header><a class="extension-brand" href="dashboard.html" aria-label="CreateRatio dashboard"><span class="mark" aria-hidden="true">&gt;</span><span><strong class="brand-name">CreateRatio</strong><span class="eyebrow">Create &gt; Consume</span></span></a><nav aria-label="Extension pages"><a href="dashboard.html">Dashboard</a><a href="settings.html" aria-current="page">Settings</a></nav></header>
+  <header><a class="extension-brand" href="dashboard.html" aria-label="CreateRatio dashboard"><span class="mark" aria-hidden="true">&gt;</span><strong class="brand-name">CreateRatio</strong></a><nav aria-label="Extension pages"><a href="dashboard.html">Dashboard</a><a href="settings.html" aria-current="page">Settings</a></nav></header>
   <main>
-    <div class="page-heading"><h1>Settings</h1><p>Your sites. Your time. Changes save automatically.</p></div>
-    <section class="preference" aria-labelledby="site-settings-title">
-      <h2 id="site-settings-title">Limit &amp; track</h2>
-      <p class="preference-note">Choose which sites to block and how long each session lasts. On requires an intention and a 60-second wait; Off means free access with no creation-score tracking.</p><p id="site-time-note" class="preference-note">Time counts only while a site is active and pauses when you leave. Changes apply to new sessions and daily refills, not a session already running.</p>
-      <ul id="site-settings" class="site-settings"><li>Loading settings…</li></ul>
-      <details class="policy-details">
-        <summary>How limits, Default and daily refills work</summary>
-        <ul class="policy-rules">
-          <li><strong>On:</strong> tracks creating/consuming time and supported actions for your creation score. The site blocks when time runs out.</li>
-          <li><strong>Off:</strong> no gate, wait, timer or new creation-score measurements. Keeps history and saved duration; cancels the current budget, pending wait and refill. Turning On starts fresh unless above-goal access applies.</li>
-          <li><strong>Shared active time:</strong> all tabs for a site share one budget. All active-tab time counts, not just consuming. Switching away pauses it.</li>
-          <li><strong>From Default</strong> follows the Default time. A <strong>Custom</strong> time stays unchanged when Default changes; <strong>Use Default</strong> removes that override.</li>
-          <li>Time changes apply to new sessions and midnight refills, not the current budget.</li>
-          <li>At local midnight, unused or exhausted session budgets refill to the configured duration once per day, without accumulating. Sites you have never opened stay blocked.</li>
-          <li>Manually ending a session or turning Off cancels its daily refill.</li>
-        </ul>
-      </details>
-    </section>
-    <section id="tracking-only-section" class="preference" aria-labelledby="tracking-only-title" hidden>
-      <h2 id="tracking-only-title">Tracking only</h2>
-      <p id="tracking-only-note" class="preference-note">Track creating/consuming time and supported actions for your creation score. No access limits, intentions or waits apply. Off by default; enabling a site also applies your Slow scrolling setting.</p>
-      <ul id="tracking-only-settings" class="site-settings tracking-only-settings"></ul>
-    </section>
-    <section class="preference" aria-labelledby="scroll-friction-title">
-      <div class="preference-heading"><label for="scroll-friction-enabled"><strong id="scroll-friction-title">Slow scrolling</strong><small>Choose how much effort each scroll takes.</small></label><input id="scroll-friction-enabled" type="checkbox" role="switch" disabled aria-describedby="scroll-friction-note"></div>
-      <div id="scroll-resistance" class="scroll-resistance" data-enabled="false">
-        <div class="scroll-resistance-heading"><label for="scroll-friction-strength">Scroll resistance</label><output id="scroll-friction-value" for="scroll-friction-strength" aria-hidden="true">50%</output></div>
-        <input id="scroll-friction-strength" type="range" disabled aria-describedby="scroll-friction-effect">
-        <div class="scroll-resistance-scale" aria-hidden="true"><span>Light</span><span>Heavy</span></div>
-        <p id="scroll-friction-effect">Page moves half as far when enabled.</p>
+    <div class="page-heading settings-heading"><h1>Settings</h1><p>Changes save automatically</p></div>
+    <details id="websites-settings" class="settings-section" name="settings-group" open>
+      <summary><h2 id="site-settings-title">Websites</h2><span>Access limits and session times for your sites.</span></summary>
+      <div class="settings-section-body">
+        <ul id="default-settings" class="site-settings default-settings"><li>Loading settings…</li></ul>
+        <div class="site-column-headings" aria-hidden="true"><span>Website</span><span>Session time</span><span>Limit &amp; track</span></div>
+        <ul id="site-settings" class="site-settings"></ul>
+        <div id="tracking-only-section" class="tracking-only-section" hidden><h3 id="tracking-only-title">Tracking only</h3><p id="tracking-only-note">Creation tracking without access limits.</p><ul id="tracking-only-settings" class="site-settings tracking-only-settings"></ul></div>
+        <p id="site-time-note" class="site-time-note">Time pauses when you leave a site. New times apply to new sessions and daily refills.</p>
+        <details class="policy-details">
+          <summary>How access works</summary>
+          <ul class="policy-rules">
+            <li><strong>On:</strong> requires an intention, a 60-second wait and explicit confirmation. Tracks creating/consuming time and supported actions for your creation score. The whole site blocks when time runs out, including editors and messages.</li>
+            <li><strong>Off:</strong> unrestricted access with no wait, timer or new creation-score measurements. Keeps history and saved time; cancels the current budget, pending wait and daily refill. Re-enabling starts fresh unless above-goal access applies.</li>
+            <li>All tabs for a site share one active-time budget. Creating, consuming and neutral pages all use time while active.</li>
+            <li><strong>Default</strong> follows your Default session time. Choosing another time creates a site override; choose Default again to remove it. Custom times support 1–240 whole minutes.</li>
+            <li>Time changes do not alter a session already running. At local midnight, an existing session refills once to its configured duration without accumulating. Never-opened sites stay blocked; ending a session cancels its refill.</li>
+          </ul>
+        </details>
       </div>
-      <p id="scroll-friction-note" class="preference-note">On by default at 50%. One setting for browsing pages on all enabled integrations. Sites with Limit &amp; track also require access. Turn off for normal scrolling. Editors, messages and nested panels stay native. Keyboard, touch, scrollbar dragging and zoom are unchanged. No pauses or popups.</p>
-    </section>
-    <section class="preference" aria-labelledby="goal-access-title">
-      <div class="preference-heading"><label for="allow-above-goal"><strong id="goal-access-title">Allow sites while above the daily goal</strong><small>Skip the intention, wait and timer while today’s score is above your current daily target.</small></label><input id="allow-above-goal" type="checkbox" role="switch" disabled aria-labelledby="goal-access-title" aria-describedby="goal-access-note"></div>
-      <p id="goal-access-note" class="preference-note">Off by default. For sites with Limit &amp; track on, this is an exception to timed access: creation-score tracking continues while above the goal. At or below the target, or on a new day, they block unless a timed session still has time. Sites with Limit &amp; track off always stay unrestricted and untracked.</p>
-    </section>
-    <section class="preference" aria-labelledby="intentions-title"><div class="preference-heading"><label for="intention-history-enabled"><strong id="intentions-title">Remember my intentions</strong><small>A reminder of why you wanted to visit.</small></label><input id="intention-history-enabled" type="checkbox" role="switch" disabled aria-labelledby="intentions-title" aria-describedby="intention-note"></div><p id="intention-note" class="preference-note">Off by default. Saves the text, site and date of your latest 100 access requests on this device, including cancelled waits. Review or clear them in the dashboard. Turning this off stops saving new intentions and keeps existing history.</p></section>
-    <section class="preference" aria-labelledby="websites-title"><div class="preference-heading"><label for="website-time-enabled"><strong id="websites-title">Website time</strong><small>Optional browsing overview across all sites</small></label><input id="website-time-enabled" type="checkbox" role="switch" disabled aria-label="Track website time across all sites" aria-describedby="website-note"></div><p id="website-note">A separate overview of focused browsing time by domain, including sites with Limit &amp; track off. This is not your session timer: it does not limit access, classify creating/consuming, record actions, or affect your creation score.</p><p class="preference-note">Optional browser permission. Only domain names and time are saved on this device. Stops after 30 seconds without computer activity; private windows are excluded.</p><p id="website-status" class="preference-note"></p></section>
-    <section class="preference" aria-labelledby="data-title"><h2 id="data-title">Your data</h2><p>History stays on this device for 30 days, including today. Older days are deleted automatically; if storage fills, the oldest days are removed sooner. Export regularly if you want a longer record. View detailed stats in the <a href="dashboard.html">dashboard</a>.</p><div class="preference-setting"><button id="export-ratio" type="button">Export activity CSV</button><button id="export-websites" type="button">Export website time CSV</button></div><div class="preference-setting danger-setting"><button id="clear-history" type="button">Clear history</button></div><p class="preference-note">Clearing history removes activity and website time, not your settings or site access boundaries. Tracking continues from now.</p></section>
+    </details>
+    <details id="browsing-settings" class="settings-section" name="settings-group">
+      <summary><h2>Browsing</h2><span>Slow scrolling · above-goal access</span></summary>
+      <div class="settings-section-body">
+        <section class="settings-row-group" aria-labelledby="scroll-friction-title">
+          <div class="preference-heading"><label for="scroll-friction-enabled"><strong id="scroll-friction-title">Slow scrolling</strong><small>Slow wheel and trackpad scrolling on feeds.</small></label><input id="scroll-friction-enabled" type="checkbox" role="switch" disabled aria-labelledby="scroll-friction-title" aria-describedby="scroll-friction-note"></div>
+          <div id="scroll-resistance" class="scroll-resistance" data-enabled="false">
+            <div class="scroll-resistance-heading"><label for="scroll-friction-strength">Scroll resistance</label><output id="scroll-friction-value" for="scroll-friction-strength" aria-hidden="true">50%</output></div>
+            <input id="scroll-friction-strength" type="range" disabled aria-describedby="scroll-friction-effect">
+            <div class="scroll-resistance-scale" aria-hidden="true"><span>Light</span><span>Heavy</span></div>
+            <p id="scroll-friction-effect">Page moves half as far when enabled.</p>
+          </div>
+          <details class="setting-help"><summary>Where this applies</summary><p id="scroll-friction-note">On by default at 50%. Applies to consuming pages on enabled integrations with access. Editors, messages and nested panels stay native. Keyboard, touch, scrollbar dragging and zoom are unchanged. Turn off for normal scrolling; your chosen resistance is kept.</p></details>
+        </section>
+        <section class="settings-row-group" aria-labelledby="goal-access-title">
+          <div class="preference-heading"><label for="allow-above-goal"><strong id="goal-access-title">Above-goal access</strong><small>Skip limits while your score is above the daily goal.</small></label><input id="allow-above-goal" type="checkbox" role="switch" disabled aria-labelledby="goal-access-title" aria-describedby="goal-access-note"></div>
+          <details class="setting-help"><summary>How this exception works</summary><p id="goal-access-note">Off by default. Enabled sites skip the intention, wait and timer while today’s score is strictly above your current daily target; creation tracking continues. At or below the target, or on a new day, normal gates return unless a timed session still has time. Off sites stay unrestricted and untracked.</p></details>
+        </section>
+      </div>
+    </details>
+    <details id="privacy-settings" class="settings-section" name="settings-group">
+      <summary><h2>Privacy</h2><span>Saved intentions · optional website time</span></summary>
+      <div class="settings-section-body">
+        <section class="settings-row-group" aria-labelledby="intentions-title"><div class="preference-heading"><label for="intention-history-enabled"><strong id="intentions-title">Remember my intentions</strong><small>Save your latest 100 access requests on this device.</small></label><input id="intention-history-enabled" type="checkbox" role="switch" disabled aria-labelledby="intentions-title" aria-describedby="intention-note"></div><details class="setting-help"><summary>What is remembered</summary><p id="intention-note">Off by default. Saves intention text, site and date, including cancelled waits. Review or clear them in the dashboard. Turning this off stops new entries and keeps existing history. Intentions are never included in exports.</p></details></section>
+        <section class="settings-row-group" aria-labelledby="websites-title"><div class="preference-heading"><label for="website-time-enabled"><strong id="websites-title">Website time</strong><small>A separate browsing overview. Never affects your score.</small></label><input id="website-time-enabled" type="checkbox" role="switch" disabled aria-label="Track website time across all sites" aria-describedby="website-note"></div><p id="website-status" class="preference-note"></p><details class="setting-help"><summary>Permissions and measurement</summary><p id="website-note">Optional browser permission. Saves only focused domain names and time on this device, including sites with Limit &amp; track off. It does not limit access, classify creating/consuming or record actions. Stops after 30 seconds without computer activity; private windows are excluded. Turning it off keeps recorded totals.</p></details></section>
+      </div>
+    </details>
+    <details id="data-settings" class="settings-section" name="settings-group">
+      <summary><h2 id="data-title">Your data</h2><span>Export CSVs · clear history</span></summary>
+      <div class="settings-section-body">
+        <section class="settings-row-group"><h3>Export a copy</h3><p>Download your recorded totals. Saved intentions are not included.</p><div class="preference-setting"><button id="export-ratio" type="button">Export activity CSV</button><button id="export-websites" type="button">Export website time CSV</button></div></section>
+        <section class="settings-row-group"><h3>Clear history</h3><p>Delete recorded activity and website time. Your settings, intentions and access sessions stay unchanged.</p><div class="preference-setting danger-setting"><button id="clear-history" type="button">Clear history</button></div></section>
+        <details class="setting-help"><summary>Storage and retention</summary><p>History stays on this device for 30 days, including today. Older days are deleted automatically; if storage fills, the oldest days are removed sooner. Export regularly for a longer record. See detailed totals in the <a href="dashboard.html">dashboard</a>.</p></details>
+      </div>
+    </details>
+    <div class="settings-feedback"><p id="save-status" role="status" class="save-status"></p><p id="error" role="alert" hidden></p></div>
     <section class="feedback" aria-label="Feedback"><a id="feedback" data-store="chrome" role="link" aria-disabled="true" tabindex="-1" target="_blank" rel="noopener noreferrer" aria-describedby="feedback-privacy">Send feedback <span aria-hidden="true">↗</span></a><p id="feedback-privacy">Available in the Chrome Web Store version.</p><p><a href="https://createratio.com/privacy.html" target="_blank" rel="noopener noreferrer">Privacy policy</a> · <a href="https://createratio.com/terms.html" target="_blank" rel="noopener noreferrer">Terms of use</a></p></section>
-    <p id="save-status" role="status" class="save-status"></p><p id="error" role="alert" hidden></p>
   </main>
-  <footer><span>Private by design. No account needed. Changes save automatically.</span></footer>
+  <footer><span>Create &gt; Consume. Private by design. No account needed.</span></footer>
   <script src="feedback.js"></script><script src="sites.js"></script><script src="core.js"></script><script src="web-time.js"></script><script src="messages.js"></script><script src="settings.js"></script>
 </body>
 </html>
