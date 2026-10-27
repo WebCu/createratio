@@ -1,0 +1,10 @@
+[
+  ["settings-feedback.test.js"],
+  ["linkedin.test.js", "share-card.test.js", "report.test.js"],
+  ["scroll-body-layout.test.js", "export-receipts.test.js", "input.test.js"],
+  ["scroll-body-overflow.test.js", "layout.test.js"],
+  ["scroll-app-shell.test.js", "refresh.test.js", "export-reset.test.js"],
+  ["popup-share.test.js", "smoke.test.js", "share-memory.test.js"],
+  ["instagram.test.js", "tracker-idle.test.js", "agent-ui.test.js", "export-rollover.test.js"],
+  ["tiktok.test.js", "scroll-friction.test.js", "harness-readiness.test.js"]
+]
