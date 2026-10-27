@@ -126,6 +126,37 @@ test('Instagram caption sharing is a post only with a visible dialog editor and 
   }
 });
 
+test('Instagram Reel rich-text captions recognize final Share without reading private text', () => {
+  for (const label of ['Write a caption…', 'Write a caption...']) {
+    const f = fixture('post');
+    f.editor.selectors = new Set([`[role="textbox"][contenteditable="true"][aria-label="${label}"]`]);
+    f.button.selectors = new Set(['[role="button"]']);
+    for (const field of ['textContent', 'innerText', 'value']) Object.defineProperty(f.editor, field, { get() { throw new Error('Editor text must stay private'); } });
+    const result = f.adapter.action(click(f.button.append(new Element())));
+    assert.equal(result?.action, 'posts', label);
+    assert.equal(result.button, f.button);
+    assert.equal(result.submission, true);
+    f.document.activeElement = f.editor;
+    assert.equal(f.adapter.mode(), 'create', label);
+    for (const text of ['Next', 'Create', 'Share to story', 'Cancel']) {
+      f.button.textContent = text;
+      assert.equal(f.adapter.action(click(f.button)), null, text);
+    }
+    f.button.textContent = 'Share';
+    assert.equal(f.adapter.action(key(f.editor)), null);
+    f.editor.style.display = 'none';
+    assert.equal(f.adapter.mode(), 'consume');
+    assert.equal(f.adapter.action(click(f.button)), null);
+    f.editor.style = {};
+    f.button.attributes['aria-disabled'] = 'true';
+    assert.equal(f.adapter.action(click(f.button)), null);
+    f.button.attributes = {};
+    f.scope.selectors.clear();
+    assert.equal(f.adapter.mode(), 'consume');
+    assert.equal(f.adapter.action(click(f.button)), null);
+  }
+});
+
 test('Instagram rejects inert and disabled composer ancestors for modes and actions', () => {
   for (const kind of ['comment', 'post', 'message']) {
     const f = fixture(kind, kind === 'message' ? 'https://instagram.com/direct/t/123/' : 'https://instagram.com/');
@@ -206,6 +237,30 @@ test('Instagram recognizes positive light actions without unliking, unsaving, sh
 });
 
 for (const browser of ['chrome', 'browser']) {
+  test(`Instagram Reel rich-text captions save writing time and one Share action (${browser})`, async () => {
+    let mounted;
+    const integration = { ...plugin, create(env) {
+      mounted = mount(env, 'post');
+      mounted.editor.selectors = new Set(['[role="textbox"][contenteditable="true"][aria-label="Write a caption..."]']);
+      return mounted.adapter;
+    } };
+    const t = await tracker(browser, { url: 'https://instagram.com/', integration, snapshot: { day: {}, settings: { ...C.DEFAULT_SETTINGS, trackedSites: ['instagram'] } } });
+    mounted.document.activeElement = mounted.editor;
+    t.event('focusin', {});
+    t.event('input', { target: mounted.editor, isTrusted: true });
+    t.setNow(5000); await t.tick();
+    assert.equal(seconds(t, 'create'), 5);
+    assert.deepEqual(t.packets.flatMap(packet => packet.actions), []);
+    t.event('click', { ...click(mounted.button), isTrusted: false });
+    await t.tick();
+    assert.deepEqual(t.packets.flatMap(packet => packet.actions), []);
+    t.event('click', { ...click(mounted.button), isTrusted: true });
+    t.event('click', { ...click(mounted.button), isTrusted: true });
+    await t.tick();
+    assert.deepEqual(t.packets.flatMap(packet => packet.actions).map(action => action.action), ['posts']);
+    assert.deepEqual(t.warnings, []);
+  });
+
   test(`Instagram real adapter uses shared trusted wheel/touch tracking, opt-in and submission deduplication (${browser})`, async () => {
     let mounted, creations = 0;
     const integration = { ...plugin, create(env) { creations++; mounted = mount(env); return mounted.adapter; } };
