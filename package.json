@@ -10,6 +10,9 @@
   },
   "scripts": {
     "preview": "node site/dev-server.js",
+    "marketing": "pnpm marketing:copy && pnpm marketing:assets",
+    "marketing:copy": "node bin/marketing.js",
+    "marketing:assets": "pnpm build:chrome && node bin/marketing-assets.mjs",
     "release": "node bin/release.js",
     "prepare": "node bin/setup-git-hooks.js --if-unconfigured",
     "setup:hooks": "node bin/setup-git-hooks.js",
