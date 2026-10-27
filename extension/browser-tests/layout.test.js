@@ -62,6 +62,44 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         await noOverflow(page);
       }
     });
+    await journey('unpacked Settings hides store feedback without hiding privacy and terms', async () => {
+      const page = await pageAt('/settings.html', 320);
+      await eventually(() => inspect(page, '!!document.querySelector("#track-x")'), 'Settings ready');
+      assert.equal(await inspect(page, '(async () => (await chrome.management.getSelf()).installType)()'), 'development');
+      assert.deepEqual(await inspect(page, '["feedback", "feedback-privacy"].map(id => getComputedStyle(document.getElementById(id)).display)'), ['none', 'none']);
+      for (const target of ['privacy.html', 'terms.html']) {
+        const link = await inspect(page, `(() => { const node = document.querySelector('.feedback a[href="https://createratio.com/${target}"]'); return { visible: node.getClientRects().length > 0, target: node.target, rel: node.rel }; })()`);
+        assert.equal(link.visible, true);
+        assert.equal(link.target, '_blank');
+        assert.equal(link.rel, 'noopener noreferrer');
+      }
+      await noOverflow(page);
+    });
+    await journey('section navigation waits for the initial preference-backed layout', async () => {
+      const page = await browser.page('about:blank');
+      await browser.cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+        const send = chrome.runtime.sendMessage.bind(chrome.runtime); let first = true;
+        chrome.runtime.sendMessage = async message => {
+          const reply = await send(message);
+          if (message.type === 'snapshot' && first) {
+            first = false;
+            await new Promise(resolve => {
+              globalThis.snapshotHeld = true;
+              const finish = () => { globalThis.snapshotHeld = false; resolve(); };
+              document.addEventListener('mousemove', finish, { once: true });
+              setTimeout(finish, 800);
+            });
+          }
+          return reply;
+        };
+      })();` }, page.session);
+      await browser.cdp.send('Page.navigate', { url: browser.origin + '/settings.html' }, page.session);
+      await eventually(() => inspect(page, 'globalThis.snapshotHeld === true'), 'initial snapshot held');
+      await openSettingsSection(browser, page, 'data');
+      assert.equal(await inspect(page, 'document.querySelectorAll("#site-settings select").length'), 4);
+      assert.equal(await inspect(page, 'document.querySelector("#data-settings").open'), true);
+      assert.ok(await findByRole(browser, page, 'button', 'Clear history'));
+    });
     await journey('native settings sections isolate tasks and keep policy details keyboard accessible', async () => {
       const page = await pageAt('/settings.html', 390);
       await eventually(() => inspect(page, '!!document.querySelector("#track-x")'), 'Settings ready');

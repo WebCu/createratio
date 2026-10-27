@@ -536,7 +536,8 @@ Before a release, verify:
   and never appears in CSV exports.
 - Retention and size limits remove oldest history without altering preferences.
 - Store-installed Chrome feedback opens the correct public reviews page without
-  activity data. Unpacked builds show feedback as unavailable.
+  activity data. Unpacked and other-browser builds omit unavailable store feedback;
+  Privacy policy and Terms of use remain accessible.
 - Popup, Settings, dashboard, and blocked pages work with keyboard navigation,
   narrow windows, and reduced motion.
 

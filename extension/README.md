@@ -454,8 +454,9 @@ tracker communicates through background messages. Website scripts cannot access 
 
 **Send feedback** in store-installed Chrome builds opens the extension's store
 reviews page. Reviews are public and handled by Google; no activity data is
-attached. Unpacked builds have no feedback link, and Edge/Firefox links are not
-configured. Do not include private data or CSV exports in reviews.
+attached. Unpacked builds, Edge/Firefox builds and failed store lookups omit the
+unavailable feedback control. Privacy policy and Terms of use remain accessible.
+Do not include private data or CSV exports in reviews.
 
 ## Limitations and verification
 
