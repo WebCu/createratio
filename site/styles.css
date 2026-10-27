@@ -26,6 +26,10 @@ a:focus-visible, summary:focus-visible { outline: 3px solid var(--violet); outli
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--violet); color: white; font-size: 28px; }
 nav { display: flex; gap: 28px; font-size: 14px; }
 nav a { text-decoration: none; }
+.release-note { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: 40px; padding: 28px 32px; margin-top: 24px; background: var(--lavender); border-radius: 16px; scroll-margin-top: 24px; }
+.release-note h2 { font-size: clamp(24px, 2.6vw, 32px); letter-spacing: -.03em; margin: 0; max-width: 18ch; text-wrap: balance; }
+.release-note p { font-size: 15px; line-height: 1.65; margin: 0 0 12px; max-width: 70ch; color: var(--muted); }
+.release-note a { font-size: 14px; font-weight: 700; color: var(--violet); }
 .hero { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: center; gap: 56px; padding: 64px 0 80px; }
 .hero-copy, .features article, .install-copy { min-width: 0; }
 .intro { font-size: 15px; margin: 0 0 22px; color: var(--muted); }
@@ -106,7 +110,8 @@ footer div { display: flex; flex-wrap: wrap; gap: 16px 24px; }
   place-items: center;
 }
 .arrival-header { position: absolute; top: 24px; left: 32px; right: 32px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.arrival-header p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--muted); }
+.arrival-header p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted); text-align: right; }
+.arrival-header p a { font-weight: 700; color: var(--violet); }
 .scroll-hint {
   position: absolute;
   bottom: max(24px, env(safe-area-inset-bottom));
@@ -257,7 +262,9 @@ footer div { display: flex; flex-wrap: wrap; gap: 16px 24px; }
   .page { padding: 0 22px; }
   .header { padding: 24px 0; }
   .arrival-header { top: 20px; left: 22px; right: 22px; flex-direction: column; align-items: flex-start; gap: 8px; }
-  .arrival-header p { font-size: 14px; }
+  .arrival-header p { font-size: 13px; text-align: left; max-width: 34ch; }
+  .release-note { grid-template-columns: 1fr; gap: 16px; padding: 24px; margin-top: 12px; }
+  .release-note h2 { max-width: none; }
   .arrival-thought { font-size: clamp(42px, 10vw, 68px); }
   .arrival-caption { font-size: clamp(16px, 4.6vw, 20px); margin-top: 24px; letter-spacing: -.45px; }
   .attention-orbit { width: 130%; height: 52%; }
