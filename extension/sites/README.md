@@ -13,7 +13,9 @@ ship, not which integrations a user activates. Users independently enable or
 disable available sites in Settings; their choices persist locally.
 
 X and LinkedIn declare `defaultEnabled: true` in their modules. New integrations
-omit this flag and start disabled until the user enables them. Adding a module
+omit this flag and start disabled until the user enables them. Tracking-only
+integrations share the existing Slow scrolling preference on consuming pages
+without declaring access gates. Adding a module
 file without registering it does not ship or activate it.
 
 ## Plugin interface

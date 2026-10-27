@@ -11,22 +11,26 @@
   <main>
     <div class="page-heading"><h1>Settings</h1><p>Set your boundaries once. Keep the popup for quick visits.</p></div>
     <section class="preference" aria-labelledby="site-settings-title">
-      <h2 id="site-settings-title">Site access</h2>
-      <ul class="policy-rules">
-        <li><strong>On:</strong> timed access plus creation-score tracking of creating/consuming time and actions. Each new session needs an intention and 60-second wait; the site blocks when time runs out.</li>
-        <li><strong>Off:</strong> free access; no gate, wait, timer or new creation-score measurements. Keeps history and saved duration; cancels the current budget, pending wait and refill. Turning On starts fresh unless above-goal access applies.</li>
-        <li><strong>Shared active time:</strong> all tabs for a site share one budget. All active-tab time counts, not just consuming. Switching away pauses it.</li>
-      </ul>
+      <h2 id="site-settings-title">Limit &amp; track</h2>
+      <p class="preference-note">Timed access with creation-score tracking. Each new session needs an intention and a 60-second wait. Off means unrestricted access and no new measurements.</p>
       <ul id="site-settings" class="site-settings"><li>Loading settings…</li></ul>
       <details class="policy-details">
-        <summary>Session times, Default and daily refills</summary>
+        <summary>How limits, Default and daily refills work</summary>
         <ul class="policy-rules">
+          <li><strong>On:</strong> tracks creating/consuming time and supported actions for your creation score. The site blocks when time runs out.</li>
+          <li><strong>Off:</strong> no gate, wait, timer or new creation-score measurements. Keeps history and saved duration; cancels the current budget, pending wait and refill. Turning On starts fresh unless above-goal access applies.</li>
+          <li><strong>Shared active time:</strong> all tabs for a site share one budget. All active-tab time counts, not just consuming. Switching away pauses it.</li>
           <li><strong>From Default</strong> follows the Default time. A <strong>Custom</strong> time stays unchanged when Default changes; <strong>Use Default</strong> removes that override.</li>
           <li>Time changes apply to new sessions and midnight refills, not the current budget.</li>
           <li>At local midnight, unused or exhausted session budgets refill to the configured duration once per day, without accumulating. Sites you have never opened stay blocked.</li>
           <li>Manually ending a session or turning Off cancels its daily refill.</li>
         </ul>
       </details>
+    </section>
+    <section id="tracking-only-section" class="preference" aria-labelledby="tracking-only-title" hidden>
+      <h2 id="tracking-only-title">Tracking only</h2>
+      <p id="tracking-only-note" class="preference-note">Track creating/consuming time and supported actions for your creation score. No access limits, intentions or waits apply. Off by default; enabling a site also applies your Slow scrolling setting.</p>
+      <ul id="tracking-only-settings" class="site-settings tracking-only-settings"></ul>
     </section>
     <section class="preference" aria-labelledby="scroll-friction-title">
       <div class="preference-heading"><label for="scroll-friction-enabled"><strong id="scroll-friction-title">Slow scrolling</strong><small>Choose how much effort each scroll takes.</small></label><input id="scroll-friction-enabled" type="checkbox" role="switch" disabled aria-describedby="scroll-friction-note"></div>
@@ -36,7 +40,7 @@
         <div class="scroll-resistance-scale" aria-hidden="true"><span>Light</span><span>Heavy</span></div>
         <p id="scroll-friction-effect">Page moves half as far when enabled.</p>
       </div>
-      <p id="scroll-friction-note" class="preference-note">On by default at 50%. Turn off for normal scrolling. Slows browsing pages on X and LinkedIn during access, with Limit &amp; track on. Editors, messages and nested panels stay native. Keyboard, touch, scrollbar dragging and zoom are unchanged. No pauses or popups.</p>
+      <p id="scroll-friction-note" class="preference-note">On by default at 50%. One setting for browsing pages on all enabled integrations. Sites with Limit &amp; track also require access. Turn off for normal scrolling. Editors, messages and nested panels stay native. Keyboard, touch, scrollbar dragging and zoom are unchanged. No pauses or popups.</p>
     </section>
     <section class="preference" aria-labelledby="goal-access-title">
       <div class="preference-heading"><label for="allow-above-goal"><strong id="goal-access-title">Allow sites while above the daily goal</strong><small>Skip the intention, wait and timer while today’s score is above your current daily target.</small></label><input id="allow-above-goal" type="checkbox" role="switch" disabled aria-labelledby="goal-access-title" aria-describedby="goal-access-note"></div>

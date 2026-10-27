@@ -80,7 +80,11 @@
 .site-preference-heading h3 { font-size: 16px; margin: 0; }
 .site-preference-heading small { color: var(--muted); font-size: 12px; }
 .site-tracking { display: grid; grid-template-columns: auto 40px 24px; align-items: center; gap: 10px; font-size: 13px; }
-.site-tracking label { cursor: pointer; }
+.site-tracking label { display: flex; align-items: center; min-height: 44px; cursor: pointer; }
+.tracking-only-settings { margin: 20px 0 0; }
+.tracking-only-site { padding: 10px 0; }
+.tracking-only-site .site-preference-heading { flex-wrap: nowrap; margin-bottom: 0; }
+.tracking-only-site h3 { min-width: 0; overflow-wrap: anywhere; }
 .site-mode-note { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
 .site-preference-field { display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 0 20px; }
 .site-preference-field > label { font-size: 13px; color: var(--muted); }

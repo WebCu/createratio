@@ -46,7 +46,10 @@ test('all browser bundles include the exact shared core and every referenced ass
     assert.deepEqual(manifest.permissions, ['storage', 'alarms', 'declarativeNetRequestWithHostAccess']);
     assert.deepEqual(manifest.optional_permissions, ['tabs', 'idle']);
     assert.ok((await fs.stat(path.join(output, 'web-time.js'))).isFile());
-    assert.deepEqual(manifest.host_permissions, ['http://*.x.com/*', 'https://*.x.com/*', 'http://*.twitter.com/*', 'https://*.twitter.com/*', 'http://*.linkedin.com/*', 'https://*.linkedin.com/*']);
+    const trackingHosts = require('../../sites/index.js').sites.filter(site => !site.gated).flatMap(site => site.hosts);
+    assert.deepEqual(manifest.host_permissions, ['http://*.x.com/*', 'https://*.x.com/*', 'http://*.twitter.com/*', 'https://*.twitter.com/*', 'http://*.linkedin.com/*', 'https://*.linkedin.com/*', ...trackingHosts.map(host => 'https://' + host + '/*')]);
+    for (const entry of manifest.content_scripts.slice(1)) for (const host of trackingHosts) assert.ok(entry.matches.includes('https://' + host + '/*'));
+    for (const host of trackingHosts) assert.ok(!manifest.content_scripts[0].matches.includes('https://' + host + '/*'), 'tracking-only hosts do not get access guards');
     assert.deepEqual(manifest.declarative_net_request.rule_resources, [{ id: 'site-blocking', enabled: true, path: 'block-rules.json' }]);
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
     assert.equal(rules.length, 3);
@@ -262,7 +265,7 @@ test('new gated and tracking-only modules need only site files and catalog regis
   })(globalThis);`);
   const catalogPath = path.join(extension, 'sites/index.js');
   const catalog = await fs.readFile(catalogPath, 'utf8');
-  await fs.writeFile(catalogPath, catalog.replace("const catalog = [{ id: 'x' }, { id: 'linkedin' }];", "const catalog = [{ id: 'x' }, { id: 'linkedin' }, { id: 'example' }, { id: 'reading' }];"));
+  await fs.writeFile(catalogPath, catalog.replace(/const catalog = (\[[^\n]+\]);/, (_, entries) => "const catalog = " + entries.slice(0, -1) + ", { id: 'example' }, { id: 'reading' }];"));
   const { build: fixtureBuild } = require(path.join(extension, 'build.js'));
   for (const browser of BROWSERS) {
     const output = await fixtureBuild(browser, path.join(root, 'output'));

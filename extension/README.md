@@ -1,7 +1,8 @@
 # CreateRatio browser extension
 
 A dependency-free Manifest V3 extension for intentional access to X and LinkedIn
-and local creating-versus-consuming tracking.
+and local creating-versus-consuming tracking, with opt-in TikTok and Instagram
+integrations.
 
 ## Layout and installation
 
@@ -120,9 +121,10 @@ replacement from a browser restart. Website-time sampling starts fresh.
 ## Using the extension
 
 - **Popup:** today's score, active time, and request/end-access controls.
-- **Settings:** one Default session-time row and one row per vetted site with a
-  **Limit & track** switch. Times show **From Default** or **Custom**; **Use Default**
-  removes an override. Off disables time editing/reset without losing saved times.
+- **Settings:** **Limit & track** groups Default and gated controls;
+  **Tracking only** lists other integrations with compact switches when available.
+  Session times show **From Default** or **Custom**; **Use Default** removes an
+  override. Off disables time editing/reset without losing saved times.
   Slow scrolling, above-goal access, Website time, intention saving, exports, and
   history clearing remain separate. Preferences save automatically.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
@@ -180,8 +182,11 @@ its midnight refill. Re-enabling requires a fresh intention and wait unless
 optional above-goal access applies. Fresh trusted input is required to measure.
 
 New vetted integrations start disabled; arbitrary domains or user scripts cannot
-be added from the UI. Integrations without explicit gate support remain
-tracking-only.
+be added from the UI. Integrations without explicit gate support appear under
+**Tracking only**. Enabling one measures supported creating/consuming time and
+submit interactions and applies the shared Slow scrolling preference. It never
+adds an access gate, intention, wait, or session timer. Off stops measurements and
+restores native scrolling while keeping history.
 
 ### Slow scrolling
 
@@ -199,8 +204,9 @@ The percentage and distance preview update while dragging; the preference saves
 when you release the slider or use its keyboard controls. It applies to open tabs
 without a reload. Changes replace only a cached scroll multiplier, without a
 timer, popup, or queued animation. It applies only to consuming pages on enabled
-sites during timed or above-goal access, using the existing page classification
-below. Turning a site's Limit & track off also removes its scroll friction.
+integrations, using the page classification below. Gated sites additionally need
+timed or above-goal access; tracking-only integrations need their tracking switch
+On. Turning either kind of site Off also removes its scroll friction.
 
 Editors, messaging routes, nested scroll panels, horizontal gestures, and zoom
 stay native. When the document cannot scroll, including when its overflow is
@@ -229,9 +235,10 @@ intermediate slider value.
 
 ## Measurement and score
 
-Creation-score measurements require Limit & track On and timed or optional
-above-goal access. Both the content tracker and background reject measurements
-while blocked or Off. The budget counts all active-tab time, including creating,
+Creation-score measurements require the site's tracking switch On. Gated sites
+additionally require timed or optional above-goal access. Both the content tracker
+and background reject measurements while blocked or Off. Tracking-only sites have
+no access budget. A gated site's budget counts all active-tab time, including creating,
 consuming, and neutral pages—not only consuming time. Default changes affect
 inherited times, while explicit site overrides remain unchanged. Duration changes
 apply to new sessions and midnight refills, not the current budget.
@@ -243,6 +250,8 @@ Old Twitter URLs must redirect to X first.
 | --- | --- | --- |
 | X | Home, Explore, Search, other profiles and status pages | Post/reply/quote editors and a focused home composer |
 | LinkedIn | Feed and other personal/company/school profiles | Focused post, comment, or direct-message editors |
+| TikTok | For You, Following, Explore, Search, tags, music, profiles, videos and photos | Focused comment, upload-caption, or message editors |
+| Instagram | Feed, Explore, Search, Reels, tagged feeds, posts, stories and profiles | Focused comment, dialog-caption, or message editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
 cannot be identified, profiles default to consuming. Editors take precedence;
@@ -290,6 +299,36 @@ Charts show active time without action credits.
 
 See the [core contract](core/README.md) and [integration interface](sites/README.md)
 for contributor-facing details.
+
+### TikTok tracking
+
+TikTok starts Off under **Settings → Tracking only**. It uses the exact HTTPS hosts
+`tiktok.com` and `www.tiktok.com`, with no access gate or session timer. Enabling
+applies the existing Slow scrolling preference on consuming pages. Off restores
+native scrolling and retains history.
+
+Scoped comment Post controls and plain Enter count comments; upload-caption Post
+controls count posts. Positive Like and Save controls count without score credit.
+Reading `/messages` is neutral; focused message editors create without submit
+bonuses. Upload pages create only while a recognized caption editor is focused.
+Mobile hosts, live streams, unsupported shortcuts and ambiguous controls are not
+supported. Recognition uses specific `data-e2e` controls and composer structure;
+synthetic fixtures do not prove current authenticated markup or publication.
+
+### Instagram tracking
+
+Instagram starts Off under **Settings → Tracking only**. It uses the exact HTTPS
+hosts `instagram.com` and `www.instagram.com`, with no access gate or session timer.
+Enabling applies the shared Slow scrolling preference on consuming pages. Off
+restores native scrolling and retains history.
+
+Scoped comment Post controls and plain Enter count comments; caption-dialog Share
+counts posts. Positive Like and Save controls count without score credit. Reading
+Direct stays neutral; focused supported message editors create without submission
+bonuses. English labels are recognized; ambiguous controls, unsupported shortcuts,
+and upload steps without a recognized caption submit do not count. Mobile hosts
+are unsupported. Synthetic fixtures do not prove current authenticated markup or
+publication.
 
 ## Optional all-website time
 
@@ -391,7 +430,10 @@ optional intention history saves the text you explicitly submit. Nothing uses
 
 Required permissions are `storage`, `alarms`, and
 `declarativeNetRequestWithHostAccess`. Host access is limited to X, Twitter aliases,
-and LinkedIn. Optional `tabs` and `idle` permissions are requested only for
+and LinkedIn. TikTok and Instagram add only exact HTTPS root and `www.` host
+permissions, not HTTP or wildcard subdomains. Updates can require browser approval
+of these hosts.
+Optional `tabs` and `idle` permissions are requested only for
 all-website time. No browser-history or all-sites host permission is requested.
 Chromium restricts aggregate storage to trusted extension contexts; Firefox's
 isolated content scripts can technically access extension storage, though this

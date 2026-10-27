@@ -5,6 +5,9 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import integrations from '../sites/index.js';
+
+const syntheticHosts = new Set([...integrations.sites.flatMap(site => site.hosts), 'twitter.com', 'www.twitter.com']);
 
 export async function eventually(check, description, timeout = 10000) {
   const deadline = Date.now() + timeout;
@@ -238,7 +241,7 @@ export async function launch(extensionPath) {
     cdp.on('Page.frameNavigated', (event, session) => record('navigation', { url: event.frame.url }, session));
     cdp.on('Fetch.requestPaused', (event, session) => {
       const url = new URL(event.request.url);
-      const synthetic = event.resourceType === 'Document' && ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com', 'www.linkedin.com'].includes(url.hostname);
+      const synthetic = event.resourceType === 'Document' && syntheticHosts.has(url.hostname);
       const operation = synthetic
         ? cdp.send('Fetch.fulfillRequest', { requestId: event.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from('<!doctype html><html><head><title>Synthetic offline site</title></head><body><h1 id="synthetic-site">Offline synthetic site</h1><p>No login, posting, or remote requests.</p></body></html>').toString('base64') }, session)
         : cdp.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' }, session);
