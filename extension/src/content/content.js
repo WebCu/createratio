@@ -11,9 +11,11 @@
   let sequence = 0, lastSample = performance.now(), lastInput = -Infinity;
   let enabled = false, mode = 'neutral';
   let wasVisible = document.visibilityState === 'visible', wasFocused = document.hasFocus();
-  let segments = [], actions = [], outbox = [], sending = false, stopped = false, pageActive = true;
+  let segments = [], actions = [], outbox = [], delivery = null, stopped = false, pageActive = true, updating = false;
+  const listeners = [];
+  function listen(target, type, fn, options) { target.addEventListener(type, fn, options); listeners.push([target, type, fn, options]); }
   let adapter = null, failed = false;
-  let refreshTimer = null, generation = null, recordingPaused = false;
+  let refreshTimer = null, generation = null, recordingPaused = false, activeBeforeUpdate = false;
   const { maxPackets: MAX_PACKETS, maxItems: MAX_ITEMS, maxSeconds: MAX_SECONDS } = C3.DELIVERY_LIMITS;
   const clicks = new WeakMap();
 
@@ -64,7 +66,7 @@
     if (refreshTimer === null) refreshTimer = setTimeout(() => { refreshTimer = null; refresh(); }, 150);
   }
   function canRecord(event) {
-    return event.isTrusted && !stopped && enabled && !recordingPaused && pageActive && document.hasFocus() && document.visibilityState === 'visible';
+    return event.isTrusted && !stopped && !updating && enabled && !recordingPaused && pageActive && document.hasFocus() && document.visibilityState === 'visible';
   }
   function markInput(event) {
     if (!canRecord(event)) return;
@@ -100,9 +102,12 @@
     synchronizeTracking(nextEnabled, result.generation ?? null);
     refresh();
   }
-  async function pump() {
-    if (sending || stopped) return;
-    sending = true;
+  function pump() {
+    if (stopped) return Promise.resolve();
+    if (!delivery) delivery = deliver().finally(() => { delivery = null; });
+    return delivery;
+  }
+  async function deliver() {
     try {
       if (!outbox.length) {
         acceptSnapshot(await messages.send({ type: 'snapshot' }, 'No response'));
@@ -118,8 +123,6 @@
     } catch (error) {
       if (!extensionAPI.runtime?.id || /context invalidated/i.test(error.message)) { stop(); }
       else console.warn('CreateRatio: tracking will retry.', error.message);
-    } finally {
-      sending = false;
     }
   }
   function flush() {
@@ -147,35 +150,52 @@
     scheduleRefresh();
   }
   function boundary() { refresh(); flush(); }
-  for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input']) document.addEventListener(type, markInput, { capture: true, passive: true });
-  document.addEventListener('click', onInteraction, true);
-  document.addEventListener('keydown', onInteraction, true);
-  document.addEventListener('focusin', refresh, true);
-  document.addEventListener('focusout', scheduleRefresh, true);
-  document.addEventListener('visibilitychange', boundary);
-  window.addEventListener('focus', boundary);
-  window.addEventListener('blur', boundary);
-  window.addEventListener('pagehide', () => {
+  for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input']) listen(document, type, markInput, { capture: true, passive: true });
+  listen(document, 'click', onInteraction, true);
+  listen(document, 'keydown', onInteraction, true);
+  listen(document, 'focusin', refresh, true);
+  listen(document, 'focusout', scheduleRefresh, true);
+  listen(document, 'visibilitychange', boundary);
+  listen(window, 'focus', boundary);
+  listen(window, 'blur', boundary);
+  listen(window, 'pagehide', () => {
     settle(); pageActive = false; lastInput = -Infinity;
     boundary();
   });
-  window.addEventListener('pageshow', () => {
+  listen(window, 'pageshow', () => {
     lastSample = performance.now(); pageActive = true;
     boundary();
   });
-  for (const type of ['c3:route-change', 'popstate', 'hashchange']) window.addEventListener(type, refresh);
+  for (const type of ['c3:route-change', 'popstate', 'hashchange']) listen(window, type, refresh);
   const observer = new MutationObserver(scheduleRefresh);
   observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['contenteditable', 'aria-hidden', 'style', 'class', 'data-testid'] });
   const interval = setInterval(() => {
+    if (!extensionAPI.runtime?.id) { stop(); return; }
+    if (stopped || updating) return;
     if (outbox.length || pageActive && document.visibilityState === 'visible' && document.hasFocus()) {
-      refresh(); flush();
+      refresh();
+      if (outbox.length || segments.length || actions.length) flush();
     }
   }, 5000);
   function stop() {
     stopped = true; scrollFriction.setSpeed(1); clearInterval(interval); clearTimeout(refreshTimer); observer.disconnect();
+    for (const [target, type, fn, options] of listeners) target.removeEventListener(type, fn, options);
+    listeners.length = 0;
+    extensionAPI.runtime.onMessage.removeListener(receive);
   }
-  extensionAPI.runtime.onMessage.addListener(message => {
-    if (message.type === 'refresh') { refresh(); void pump(); }
+  function receive(message) {
+    if (message.type === 'refresh' && !stopped && !updating) { refresh(); void pump(); }
+  }
+  extensionAPI.runtime.onMessage.addListener(receive);
+  ContentLifecycle.register('tracker', {
+    async prepare(force) {
+      if (!force && enabled && pageActive && document.hasFocus() && document.visibilityState === 'visible' && performance.now() - lastInput < 30000) return false;
+      settle(); resetInput(); activeBeforeUpdate = pageActive; updating = true; pageActive = false; scrollFriction.setSpeed(1);
+      await pump(); queuePacket(); await pump();
+      return outbox.length === 0;
+    },
+    resume() { if (!stopped && updating) { updating = false; pageActive = activeBeforeUpdate; resetInput(); refresh(); } },
+    stop
   });
   refresh(); void pump();
 })();

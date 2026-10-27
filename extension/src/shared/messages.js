@@ -45,8 +45,8 @@
       ]) : entry];
     });
   }
-  function shouldRefresh(changes, area) {
-    return area === 'local' && Object.entries(changes).some(([key, change]) => !key.startsWith('_websiteTime:') && (key !== '_access'
+  function shouldRefresh(changes, area, websites = false) {
+    return area === 'local' && Object.entries(changes).some(([key, change]) => key !== '_pendingUpdate' && (websites || !key.startsWith('_websiteTime:')) && (key !== '_access'
       || JSON.stringify(accessPhase(change.oldValue)) !== JSON.stringify(accessPhase(change.newValue))));
   }
   function create(runtime) {
@@ -60,6 +60,7 @@
       if (['access-status', 'access-begin', 'access-open', 'access-cancel', 'access-end', 'access-duration', 'access-goal-setting'].includes(message.type) && !access(reply.access)) throw new Error(fallbackMessage);
       if (message.type === 'scroll-friction-setting' && (typeof reply.settings.scrollFrictionEnabled !== 'boolean'
         || message.strength !== undefined && core()?.validScrollFrictionStrength(reply.settings.scrollFrictionStrength) !== true)) throw new Error(fallbackMessage);
+      if (message.type === 'update-apply' && typeof reply.applied !== 'boolean') throw new Error(fallbackMessage);
       if (message.type === 'website-time-setting' && typeof reply.enabled !== 'boolean') throw new Error(fallbackMessage);
       if (message.type === 'history' && !history(reply.days, message.kind)) throw new Error(fallbackMessage);
       if (message.type === 'access-history-list' && !intentions(reply.intentions)) throw new Error(fallbackMessage);

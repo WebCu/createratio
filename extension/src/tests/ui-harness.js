@@ -17,9 +17,10 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
   }
   const PageDate = options.now ? Clock : Date;
   const core = options.now ? { ...C3, localDate: (date = new PageDate()) => C3.localDate(date), recentDates: (count = 7, now = new PageDate()) => C3.recentDates(count, now) } : C3;
-  const intervals = {}, timeouts = new Map(), revokedURLs = [], saved = new Map();
+  const intervals = {}, timeouts = new Map(), revokedURLs = [], saved = new Map(), events = {};
   let timeoutID = 0;
-  let settings = { ...C3.DEFAULT_SETTINGS, ...data.settings }, changed, interval;
+  let settings = { ...C3.DEFAULT_SETTINGS, ...data.settings }, interval;
+  const storageListeners = [], changed = (...args) => storageListeners.forEach(fn => fn(...args));
   const messageWaits = new Map();
   const state = { permission: true, requested: 0, removed: 0, messages: [], notifications: [], fail: false, failSnapshot: false, optionsOpened: 0, tabs: [], downloads: [], access: {}, confirm: true, confirmations: [], storageReads: [], snapshotChanges: false, replies: new Map(), rejections: new Map() };
   class Element {
@@ -40,6 +41,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
     click() { state.downloads.push({ filename: this.download, url: this.href }); }
   }
   const nodes = Object.fromEntries([...fs.readFileSync(path.join(__dirname, `../pages/${name}/${name}.html`), 'utf8').matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
+  nodes['update-notice'].hidden = true;
   if (nodes['website-range']) { nodes['website-range'].value = 'month'; nodes['websites-panel'].hidden = true; }
   if (nodes['report-range']) nodes['report-range'].value = 'today';
   if (nodes.chart) nodes.chart.append(new Element(), new Element());
@@ -74,6 +76,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
         if (message.enabled) active.add(message.site); else active.delete(message.site);
         settings = { ...settings, trackedSites: [...active] };
       }
+      if (message.type === 'update-apply') return { ok: true, applied: false };
       if (message.type === 'settings') return { ok: false, error: 'Unknown message' };
       if (message.type === 'access-duration') {
         settings = C3.updatePreferences(settings, { accessMinutes: message.minutes }, message.site);
@@ -92,7 +95,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
       if (message.type === 'access-end') state.access[message.site] = { ...state.access[message.site], remainingMs: 0, expiresAt: 0 };
       return { ok: true, date: C3.localDate(), day: structuredClone(data[C3.localDate()] || {}), settings: C3.settingsSnapshot(structuredClone(settings)), access: structuredClone(state.access), websiteTimeEnabled: enabled };
     } },
-    storage: { local: { async get(keys) { state.storageReads.push(keys); return keys === '_websiteTime' ? { _websiteTime: structuredClone(data._websiteTime) } : structuredClone(data); } }, onChanged: { addListener(fn) { changed = fn; } } },
+    storage: { local: { async get(keys) { state.storageReads.push(keys); return keys === '_websiteTime' ? { _websiteTime: structuredClone(data._websiteTime) } : structuredClone(data); } }, onChanged: { addListener(fn) { storageListeners.push(fn); } } },
     permissions: { async request() { state.requested++; return state.permission; }, async remove() { state.removed++; } },
     tabs: { async create(options) { state.tabs.push(options); }, async query(query) { assert.deepEqual(Object.keys(query), []); return [{ id: 1 }, { id: 2 }]; }, async sendMessage(id, message) { state.notifications.push({ id, ...structuredClone(message) }); } }
   };
@@ -100,9 +103,10 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
   const blobs = [];
   const context = vm.createContext({ C3: core, C3Sites, WebTime, chrome: api, document, console, Blob, URL: class extends URL { static createObjectURL(blob) { blobs.push(blob); return 'blob:test/' + blobs.length; } static revokeObjectURL(url) { revokedURLs.push(url); } }, URLSearchParams,
     location: { search: '?site=' + (options.site || 'x'), replace(url) { state.redirects.push(url); } },
-    localStorage: { getItem(key) { return saved.get(key) ?? null; }, setItem(key, value) { saved.set(key, String(value)); } }, addEventListener() {},
+    localStorage: { getItem(key) { return saved.get(key) ?? null; }, setItem(key, value) { saved.set(key, String(value)); } }, addEventListener(type, fn) { events[type] = fn; },
     confirm(message) { state.confirmations.push(message); return state.confirm; }, setInterval(fn, ms) { interval = fn; intervals[ms] = fn; }, setTimeout(fn, ms) { const id = ++timeoutID; timeouts.set(id, { fn, ms }); return id; }, clearTimeout(id) { timeouts.delete(id); }, Date: PageDate });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/messages.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/update-notice.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/refill.js'), 'utf8'), context);
   if (name === 'dashboard' || name === 'popup') {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../pages/dashboard/report.js'), 'utf8'), context);
@@ -120,7 +124,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
     },
     timeouts, revokedURLs, runTimeout(id) { const pending = timeouts.get(id); timeouts.delete(id); pending.fn(); },
     ready, flush: ready, set fail(value) { state.fail = value; }, get settings() { return structuredClone(settings); }, setSettings(value) { settings = value; }, setDay(value) { data[C3.localDate()] = value; },
-    change(changes = { settings: { newValue: structuredClone(settings) } }, area = 'local') { changed(changes, area); }, refresh() { interval(); }, timer(ms) { intervals[ms](); },
+    change(changes = { settings: { newValue: structuredClone(settings) } }, area = 'local') { changed(changes, area); }, refresh() { if (events.focus) events.focus(); else if (interval) interval(); else changed({ settings: { newValue: structuredClone(settings) } }, 'local'); }, timer(ms) { intervals[ms](); },
     toggle(site, active) { const input = nodes['track-' + site]; input.checked = active; input.fire('change'); return input; }
   };
 }

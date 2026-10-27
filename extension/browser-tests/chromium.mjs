@@ -158,11 +158,15 @@ export function devToolsEndpoint(contents) {
   return `ws://127.0.0.1:${port}${path}`;
 }
 
-export async function launch(extensionPath) {
+export async function launch(extensionPath, options = {}) {
   extensionPath = resolve(extensionPath);
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
   const workerURL = extensionWorkerURL(extensionPath, manifest);
   const directory = await mkdtemp(join(tmpdir(), 'createratio-browser-'));
+  if (options.developerMode) {
+    await mkdir(join(directory, 'profile', 'Default'), { recursive: true });
+    await writeFile(join(directory, 'profile', 'Default', 'Preferences'), JSON.stringify({ extensions: { ui: { developer_mode: true } } }));
+  }
   const executable = process.env.CHROMIUM_PATH || process.env.CHROMIUM || '/usr/bin/chromium';
   const args = [
     `--user-data-dir=${join(directory, 'profile')}`, '--remote-debugging-port=0',

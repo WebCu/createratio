@@ -44,7 +44,7 @@ test('switching to intentions requests only that view and leaves range-based his
   const p = dashboard({ [C3.localDate()]: { x: { consumeSec: 60 } }, _websiteTime: { [C3.localDate()]: { 'example.com': 120 } }, _intentions: [{ site: 'x', reason: 'Reply to a colleague', requestedAt: 1 }] });
   p.nodes['intentions-view'].fire('click'); await p.ready();
   assert.equal(p.messages.at(-1).type, 'access-history-list');
-  assert.equal(p.nodes['intention-list'].children.length, 1); assert.deepEqual(p.state.storageReads, []);
+  assert.equal(p.nodes['intention-list'].children.length, 1); assert.deepEqual(p.state.storageReads, ['_pendingUpdate']);
   p.nodes['websites-view'].fire('click'); await p.ready();
   assert.equal(p.nodes['website-total'].textContent, '2m 0s');
   p.nodes['ratio-view'].fire('click'); await p.ready();
@@ -210,14 +210,15 @@ test('report export prevents duplicate requests and recovers after loading failu
 });
 test('repeated report downloads retain only one temporary URL and release it after ten seconds', async () => {
   const p = dashboard(); await p.ready();
+  const reportTimers = () => [...p.timeouts].filter(([, timer]) => timer.ms === 10000);
   for (let i = 0; i < 5; i++) {
     await p.nodes['report-export'].fire('click');
-    assert.equal(p.timeouts.size, 1);
+    assert.equal(reportTimers().length, 1);
+    assert.equal(p.timeouts.size, 2, 'one report cleanup and one local-midnight refresh');
     assert.equal(p.revokedURLs.length, i);
-    assert.equal([...p.timeouts.values()][0].ms, 10000);
   }
-  p.runTimeout([...p.timeouts.keys()][0]);
-  assert.equal(p.timeouts.size, 0);
+  p.runTimeout(reportTimers()[0][0]);
+  assert.equal(reportTimers().length, 0);
   assert.deepEqual(p.revokedURLs, p.state.downloads.map(download => download.url));
 });
 test('share-card history failures never expose a stale preview and allow retrying', async () => {
@@ -245,7 +246,7 @@ test('dashboard sends no preference messages or permission requests', async () =
   const p = dashboard(); await p.ready(); p.refresh(); await p.ready();
   assert.ok(p.messages.every(m => ['snapshot', 'history'].includes(m.type))); assert.equal(p.state.requested, 0);
   assert.ok(p.messages.filter(m => m.type === 'history').every(m => m.kind === 'ratio' && m.range === 'week'));
-  assert.deepEqual(p.state.storageReads, []);
+  assert.deepEqual(p.state.storageReads, ['_pendingUpdate']);
   assert.equal(p.nodes['access-minutes'], undefined); assert.equal(p.nodes['website-time-enabled'], undefined);
 });
 test('a view switch during history loading discards the stale render and loads the selected view', async () => {

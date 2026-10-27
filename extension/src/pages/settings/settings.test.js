@@ -248,13 +248,13 @@ test('Settings slow-scrolling choice reaches the real worker, survives restart a
   assert.equal(t.document.scrollingElement.scrollTop, 1100);
   p.nodes['scroll-friction-strength'].value = '75';
   const beforeRefresh = replies;
-  await p.nodes['scroll-friction-strength'].fire('change'); await t.tick();
+  await p.nodes['scroll-friction-strength'].fire('change'); t.notify(); await t.tick();
   await until(() => replies > beforeRefresh);
   assert.equal(w.data.settings.scrollFrictionStrength, 75);
   assert.equal(t.wheel(200).defaultPrevented, true);
   assert.equal(t.document.scrollingElement.scrollTop, 1150);
   p.nodes['scroll-friction-enabled'].checked = false;
-  await p.nodes['scroll-friction-enabled'].fire('change'); await t.tick();
+  await p.nodes['scroll-friction-enabled'].fire('change'); t.notify(); await t.tick();
   await until(() => t.listenerCount('wheel') === 1);
   assert.equal(t.wheel(200).defaultPrevented, false);
   const restarted = worker(w.data, 'chrome', w.now);

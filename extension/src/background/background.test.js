@@ -792,10 +792,10 @@ test('clear history resets the website time sample without backfilling the prior
   const w = worker(); w.grantWebsitePermissions(); w.activate('https://example.com');
   const sender = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };
   await w.send({ type: 'website-time-setting', enabled: true }, sender); w.advance(5000);
-  await w.send({ type: 'snapshot' }); assert.equal(w.data['_websiteTime:' + C.localDate()]['example.com'], 5);
+  w.alarm('website-time'); await w.send({ type: 'snapshot' }); assert.equal(w.data['_websiteTime:' + C.localDate()]['example.com'], 5);
   w.advance(3000); await w.send({ type: 'clear-history' }, sender);
   assert.equal(w.data['_websiteTime:' + C.localDate()], undefined); assert.equal(w.data._websiteTimeEnabled, true);
-  w.advance(2000); await w.send({ type: 'snapshot' });
+  w.advance(2000); w.alarm('website-time'); await w.send({ type: 'snapshot' });
   assert.equal(w.data['_websiteTime:' + C.localDate()]['example.com'], 2);
 });
 

@@ -87,7 +87,7 @@ test('feedback is isolated from activity loading and needs no feedback-specific 
   assert.match(html, /href="https:\/\/createratio\.com\/privacy\.html"/);
   assert.match(html, /href="https:\/\/createratio\.com\/terms\.html"/);
   const manifest = JSON.parse(readFileSync(resolve(extension, 'manifest.json'), 'utf8'));
-  assert.deepEqual(manifest.permissions, ['storage', 'alarms', 'declarativeNetRequestWithHostAccess']);
+  assert.deepEqual(manifest.permissions, ['storage', 'alarms', 'declarativeNetRequestWithHostAccess', 'scripting']);
   assert.match(manifest.content_security_policy.extension_pages, /connect-src 'none'/);
   assert.ok(!existsSync(resolve(extension, '../.github/ISSUE_TEMPLATE/feedback.yml')));
 });

@@ -5,6 +5,32 @@ const C = require('../../core/core.js');
 const integrations = require('../../sites/index.js');
 const { Element } = require('../../sites/test-support.js');
 const { tracker } = require('../tests/content-harness.js');
+test('focused trackers with no fresh input do not keep the worker alive', async () => {
+  const t = await tracker(); const before = t.messages.length;
+  t.setNow(5000); await t.tick();
+  assert.equal(t.messages.length, before);
+});
+
+test('updates defer active input, flush partial measurements and release all listeners on commit', async () => {
+  const t = await tracker(); t.input(); t.setNow(2000);
+  assert.equal((await t.command({ type: 'prepare-update' })).ready, false);
+  assert.equal((await t.command({ type: 'prepare-update', force: true })).ready, true);
+  assert.equal(t.packets.flatMap(packet => packet.segments).reduce((sum, segment) => sum + segment.sec, 0), 2);
+  t.setNow(5000); t.input(); await t.tick();
+  assert.equal(t.packets.length, 1);
+  await t.command({ type: 'commit-update' });
+  assert.equal(t.listenerCount('wheel'), 0); assert.equal(t.listenerCount('keydown'), 0);
+});
+
+test('failed update delivery resumes tracking and preserves the exact retry packet', async () => {
+  const options = { failIngest: true, attempts: [] }, t = await tracker('chrome', options);
+  t.input(); t.setNow(2000);
+  assert.equal((await t.command({ type: 'prepare-update', force: true })).ready, false);
+  options.failIngest = false; await t.tick();
+  assert.deepEqual(options.attempts[1], options.attempts[0]);
+  assert.equal(t.packets[0].segments[0].sec, 2);
+});
+
 test('an unusable ingest acknowledgement retains the exact queued packet for retry', async () => {
   for (const browser of ['chrome', 'browser']) {
     for (const invalid of [{ ok: true }, { ok: 'true' }, { ok: true, settings: null }, { ok: true, settings: { trackedSites: 'x' } }]) {
@@ -170,9 +196,9 @@ test('invalidated extension contexts and failed adapters restore native scrollin
     if (invalidated) throw new Error('Extension context invalidated');
     return result;
   } });
-  invalidated = true; await t.tick();
+  invalidated = true; t.input(); t.setNow(5000); await t.tick();
   assert.equal(t.wheel(200).defaultPrevented, false);
-  assert.equal(t.listenerCount('wheel'), 1);
+  assert.equal(t.listenerCount('wheel'), 0);
   let broken = false;
   const integration = { ...integrations.get('x'), create() { return { mode() { if (broken) throw new Error('Unsupported DOM'); return 'consume'; }, action() { return null; } }; } };
   const failed = await tracker('chrome', { integration, snapshot: { day: {}, settings: { scrollFrictionEnabled: true } } });
