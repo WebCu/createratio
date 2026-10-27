@@ -620,7 +620,7 @@ test('tracking preferences reject unvetted sites, invalid flags and untrusted se
 
 
 test('access budget pauses away from the site and resumes across tabs without double counting', async () => {
-  const w = worker(); await unlock(w);
+  const w = worker({}, 'chrome', new Date(2026, 9, 11, 12).getTime()); await unlock(w);
   w.advance(600000);
   let state = (await w.send({ type: 'access-status' })).access.x;
   assert.equal(state.remainingMs, 300000, 'unused access must not expire');
@@ -645,7 +645,7 @@ test('access budget pauses away from the site and resumes across tabs without do
 
 test('navigation and closing the active tab pause access without storing tab IDs or URLs', async () => {
   for (const browser of ['chrome', 'browser']) {
-    const w = worker({}, browser); await unlock(w);
+    const w = worker({}, browser, new Date(2026, 9, 11, 12).getTime()); await unlock(w);
     w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
     w.advance(5000); w.navigate('https://example.com/private'); await w.send({ type: 'access-status' });
     w.advance(600000);
