@@ -1,8 +1,8 @@
 [
-  ["settings-feedback.test.js", "share-memory.test.js", "export-receipts.test.js"],
-  ["linkedin.test.js", "smoke.test.js", "share-card.test.js"],
-  ["scroll-body-layout.test.js", "tracker-idle.test.js", "refresh.test.js", "export-rollover.test.js"],
-  ["scroll-body-overflow.test.js", "scroll-friction.test.js", "harness-readiness.test.js", "export-reset.test.js"],
+  ["settings-feedback.test.js", "share-memory.test.js"],
+  ["linkedin.test.js", "smoke.test.js", "share-card.test.js", "export-receipts.test.js"],
+  ["scroll-body-layout.test.js", "tracker-idle.test.js", "refresh.test.js"],
+  ["scroll-body-overflow.test.js", "scroll-friction.test.js", "harness-readiness.test.js", "export-reset.test.js", "export-rollover.test.js"],
   ["scroll-app-shell.test.js", "tiktok.test.js", "agent-ui.test.js", "input.test.js"],
   ["popup-share.test.js", "instagram.test.js", "layout.test.js", "report.test.js"]
 ]

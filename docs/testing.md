@@ -303,7 +303,8 @@ live composing behavior, physical comfort or cross-browser compatibility.
 
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
 JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
-reject code comments with file, line and column diagnostics. An initial hashbang
+reject code comments with file, line and column diagnostics. Files are checked
+across at most four workers; any worker failure fails the command. An initial hashbang
 interpreter directive is allowed; comment-like text in strings, templates and
 regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS
 syntax check, including its wrapper bindings, to select Acorn's grammar. This
