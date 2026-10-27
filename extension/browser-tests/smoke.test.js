@@ -5,7 +5,7 @@ const { access, readFile } = require('node:fs/promises');
 const path = require('node:path');
 
 test('built Chromium extension: access gates and history controls', async t => {
-  const { launch, evaluate, eventually, click, withFailureArtifacts } = await import('./chromium.mjs');
+  const { launch, evaluate, eventually, click, withFailureArtifacts, openSettingsSection } = await import('./chromium.mjs');
   const extension = path.resolve(__dirname, '../../dist/chrome');
   await access(path.join(extension, 'manifest.json'));
   const browser = await launch(extension);
@@ -175,6 +175,7 @@ test('built Chromium extension: access gates and history controls', async t => {
       await keptIntentions();
       await cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: browser.directory, eventsEnabled: true });
       const download = async (selector, filename) => {
+        await openSettingsSection(browser, settings, 'data');
         let guid, done = false;
         const removeBegin = cdp.on('Browser.downloadWillBegin', event => {
           assert.equal(event.suggestedFilename, filename);

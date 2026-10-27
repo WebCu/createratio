@@ -73,7 +73,7 @@
 .policy-details .policy-rules { margin-top: 12px; margin-bottom: 0; }
 
 .site-settings { list-style: none; margin: 28px 0 24px; padding: 0; }
-.site-preferences { padding: 24px 0; border-bottom: 1px solid var(--line); }
+.site-preferences { padding: 20px 0; border-bottom: 1px solid var(--line); }
 .site-preferences:last-child { border-bottom: 0; }
 .site-preferences[data-site=""] { padding: 24px 20px; margin: 0 -20px 8px; background: #f0edf7; border: 0; border-radius: 10px; }
 .site-preference-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -96,6 +96,100 @@
 .site-field-source .settings-source-custom { color: var(--violet); font-weight: 600; }
 .site-field-source button { border: 0; background: transparent; padding: 0; min-height: 24px; color: var(--violet); font: 600 12px system-ui; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .site-field-source button:disabled { cursor: default; }
+
+.settings-page { max-width: 864px; padding-bottom: 72px; }
+.settings-page main { padding-top: 32px; }
+.settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+.settings-heading p { margin: 0; font-size: 12px; color: var(--green); }
+.settings-section { margin: 12px 0 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.settings-section > summary { position: relative; display: grid; gap: 3px; list-style: none; padding: 20px 52px 20px 24px; cursor: pointer; }
+.settings-section > summary::-webkit-details-marker { display: none; }
+.settings-section > summary::after { content: ""; position: absolute; right: 26px; top: 36px; width: 8px; height: 8px; border-right: 1.5px solid var(--violet); border-bottom: 1.5px solid var(--violet); transform: rotate(45deg); }
+.settings-section[open] > summary::after { transform: rotate(225deg); top: 40px; }
+.settings-section > summary:hover { background: #f5f3fa; border-radius: 12px; }
+.settings-section > summary:focus-visible, .setting-help > summary:focus-visible { outline: 3px solid var(--violet); outline-offset: 3px; border-radius: 6px; }
+.settings-section > summary h2 { font-size: 17px; line-height: 1.4; }
+.settings-section > summary > span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.settings-section-body { padding: 0 24px 20px; }
+.settings-page .site-settings { margin: 0; }
+.settings-page .site-preferences:not(.tracking-only-site), .site-column-headings { display: grid; grid-template-columns: minmax(0, 1fr) 220px 80px; gap: 8px 20px; align-items: center; }
+.site-column-headings { min-height: 40px; font-size: 12px; color: var(--muted); }
+.site-column-headings > :last-child { text-align: right; }
+.settings-page .site-preferences:not(.tracking-only-site) { min-height: 64px; padding: 12px 0; }
+.settings-page .site-preferences:not(.tracking-only-site) .site-preference-heading, .settings-page .site-preference-field { display: contents; }
+.settings-page .site-preference-heading h3 { grid-column: 1; grid-row: 1; font-size: 15px; line-height: 1.5; }
+.settings-page .site-tracking { grid-column: 3; grid-row: 1; display: flex; justify-content: flex-end; gap: 8px; }
+.settings-page .site-tracking > label { min-height: 0; }
+.settings-page .site-tracking small { min-width: 20px; font-size: 12px; }
+.settings-page .site-field-value { grid-column: 2; grid-row: 1; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+.settings-page .site-field-value select { appearance: none; width: 176px; max-width: 100%; min-width: 0; min-height: 40px; padding: 8px 32px 8px 12px; border: 1px solid var(--control-line); border-radius: 6px; color: var(--ink); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2362596f' stroke-width='1.5'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E") no-repeat right 10px center; font: 600 13px/1.5 system-ui; font-variant-numeric: tabular-nums; cursor: pointer; }
+.settings-page .site-field-value select:disabled { background-color: #f7f6fa; cursor: default; }
+.duration-reset { display: grid; place-items: center; flex: 0 0 36px; min-height: 40px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--violet); cursor: pointer; }
+.duration-reset:hover { background: #ece8fa; }
+.duration-reset svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.settings-page .site-preferences[data-site=""] { min-height: 80px; margin: 0; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: transparent; border-radius: 0; }
+.settings-page .site-preferences[data-site=""] .site-preference-heading { display: block; grid-column: 1; grid-row: 1; }
+.settings-page .site-preferences[data-site=""] h3 { font-size: 14px; }
+.settings-page .site-preferences[data-site=""] small { display: block; font-size: 12px; margin-top: 3px; }
+.settings-page .site-preferences[data-site=""] .site-field-value { grid-column: 2 / -1; justify-content: flex-end; }
+.custom-duration { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 0 4px; border-top: 1px solid var(--line); font-size: 13px; }
+.custom-duration label { margin-right: auto; }
+.custom-duration input { width: 76px; min-height: 40px; padding: 8px; border: 1px solid var(--control-line); border-radius: 6px; background: #fff; color: var(--ink); caret-color: var(--violet); font: inherit; font-variant-numeric: tabular-nums; }
+.custom-duration button { min-height: 40px; padding: 8px 12px; border: 1px solid var(--control-line); border-radius: 6px; background: #fff; color: var(--violet); font: 600 12px/1.5 system-ui; cursor: pointer; }
+.custom-duration button[type=submit] { background: var(--violet); border-color: var(--violet); color: #fff; }
+.custom-duration button:hover { filter: brightness(.95); }
+.site-time-note { margin: 16px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.settings-page .policy-details { margin-top: 6px; }
+.settings-page .policy-details summary { padding: 8px 0; }
+.settings-page .policy-rules { margin-top: 8px; }
+.settings-row-group { padding: 20px 0; border-top: 1px solid var(--line); }
+.settings-row-group:last-of-type { padding-bottom: 8px; }
+.settings-row-group h3, .settings-page .preference-heading strong { font-size: 15px; font-weight: 650; line-height: 1.5; margin: 0; }
+.settings-page .preference-heading { align-items: center; gap: 24px; }
+.settings-page .preference-heading small { margin-top: 4px; font-size: 13px; line-height: 1.5; }
+.settings-row-group > p { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.settings-page #website-status:empty { display: none; }
+.setting-help { margin-top: 10px; font-size: 12px; }
+.setting-help > summary { width: fit-content; padding: 6px 0; min-height: 30px; color: var(--violet); font-weight: 600; cursor: pointer; }
+.setting-help > p { max-width: 70ch; color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+.settings-page .scroll-resistance { margin: 18px 0 0; padding: 0; background: transparent; border-radius: 0; }
+.settings-page .scroll-resistance-heading label { font-size: 13px; font-weight: 400; color: var(--muted); }
+.settings-page .scroll-resistance-heading output { font-size: 16px; }
+.settings-page .preference-setting { margin-top: 16px; }
+.settings-page .danger-setting { margin-top: 12px; }
+.settings-page .tracking-only-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.settings-page .tracking-only-section h3 { margin: 0; font-size: 14px; }
+.settings-page .tracking-only-section > p { margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
+.settings-page .tracking-only-site .site-preference-heading { margin-bottom: 0; }
+.settings-page .feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-top: 20px; padding-top: 12px; border-top: 0; }
+.settings-page .feedback a { font-size: 12px; }
+.settings-page .feedback p { margin: 0; }
+.settings-page footer { margin-top: 20px; padding: 20px 0; }
+.settings-feedback { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 760px; padding: 12px 16px; border: 1px solid var(--control-line); border-radius: 10px; background: var(--paper); z-index: 2; }
+.settings-feedback:has(#save-status:empty):has(#error[hidden]) { display: none; }
+.settings-feedback #save-status, .settings-feedback #error { margin: 0; padding: 0; min-height: 0; font-size: 13px; line-height: 1.5; }
+.settings-feedback #save-status:empty { display: none; }
+@media (forced-colors: active) {
+  .settings-page .site-field-value select { appearance: auto; background-image: none; }
+}
+@media (max-width: 520px) {
+  .settings-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .settings-section > summary { padding: 18px 42px 18px 16px; }
+  .settings-section > summary::after { right: 20px; }
+  .settings-section-body { padding: 0 16px 16px; }
+  .site-column-headings { display: none; }
+  .settings-page .site-preferences:not(.tracking-only-site) { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 16px 0; }
+  .settings-page .site-tracking { grid-column: 2; }
+  .settings-page .site-field-value { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .settings-page .site-field-value select { width: 176px; }
+  .settings-page .site-preferences[data-site=""] .site-preference-heading { grid-column: 1 / -1; }
+  .settings-page .site-preferences[data-site=""] .site-field-value { grid-column: 1 / -1; justify-content: flex-start; }
+  .settings-page .site-preferences[data-site=""] .site-preference-field > label { display: none; }
+  .custom-duration { grid-row: 3; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .custom-duration label { grid-column: 1 / -1; margin-right: 0; }
+  .custom-duration input { width: 100%; min-width: 0; }
+  .settings-page .preference-heading { gap: 16px; }
+}
 
 .scroll-resistance { --scroll-accent: var(--violet); margin-top: 24px; padding: 20px 24px; border-radius: 12px; background: #f0edf7; }
 .scroll-resistance[data-enabled=false] { --scroll-accent: var(--consume); }

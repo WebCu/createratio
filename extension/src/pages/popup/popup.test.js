@@ -35,7 +35,7 @@ test('popup rejects malformed replies without changing totals or claiming a sess
   assert.equal(button.textContent, 'End session'); assert.equal(button.disabled, false);
   assert.equal(p.nodes.error.textContent, 'Unable to end session.');
 });
-test('popup keeps today summary but leaves configuration and detailed stats to full pages', async () => {
+test('popup keeps today summary and leaves session times and detailed stats to full pages', async () => {
   const p = page('popup'); await p.ready();
   assert.equal(p.nodes['consume-min'].textContent, '1.0m'); assert.equal(p.nodes.score.textContent, '0.00');
   for (const id of ['access-minutes', 'nudge-enabled', 'nudge-minutes', 'tracking-sites', 'website-time-enabled', 'chart', 'export']) assert.equal(p.nodes[id], undefined);
@@ -97,6 +97,15 @@ test('popup animates a daily refill once without replacing the countdown or acce
   await button.fire('click'); await p.ready();
   assert.equal(label.children.length, 2); assert.equal(button.textContent, 'Request access');
 });
+test('popup exposes all four access actions without session-time editing', async () => {
+  const p = page('popup'); await p.ready();
+  p.state.access = Object.fromEntries(C3.SITES.map(site => [site.id, accessState(site.id, { remainingMs: 60000 })]));
+  p.change(); await p.ready();
+  assert.equal(p.nodes['access-sites'].children.length, 4);
+  for (const site of C3.SITES) assert.equal(p.nodes['session-time-' + site.id], undefined);
+  assert.equal(p.messages.some(message => message.type === 'access-duration'), false);
+  await p.nodes.settings.fire('click'); assert.equal(p.state.optionsOpened, 1);
+});
 test('popup refresh keeps visible totals current, including historical integrations', async () => {
   const p = page('popup'); await p.ready(); p.setDay({ retired: { consumeSec: 120, posts: 1 } }); p.refresh(); await p.ready();
   assert.equal(p.nodes['consume-min'].textContent, '2.0m'); assert.equal(p.nodes.score.textContent, '1.00');
@@ -106,6 +115,7 @@ test('failed access actions show an error and leave the button usable', async ()
   const p = page('popup'); await p.ready(); p.state.access = { x: accessState('x', { remainingMs: 60000 }) }; p.change(); await p.ready();
   p.fail = true; const button = p.nodes['access-sites'].children[0].children[1]; await button.fire('click');
   assert.equal(button.disabled, false); assert.equal(p.nodes.error.textContent, 'Could not save.');
+  p.refresh(); await p.ready(); assert.equal(p.nodes.error.textContent, 'Could not save.', 'polling preserves action errors');
 });
 test('refreshing during an end-session action keeps the same control busy until acknowledgement', async () => {
   const p = page('popup'); await p.ready();

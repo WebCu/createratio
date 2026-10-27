@@ -102,9 +102,9 @@ The build packages registered modules into `sites.js`; unregistered code and
 colocated tests do not ship. See [Site integrations](extension/sites/README.md)
 for selector changes, editing, removal, failure isolation, and ownership rules.
 
-Tracking support does **not** automatically add whole-site blocking. X and
-LinkedIn have explicit gate support: **Limit & track** enables their gate and
-creation-score measurements together. Adding a gate is a separate product
+Tracking support does **not** automatically add whole-site blocking. X, LinkedIn,
+TikTok and Instagram have explicit gate support: **Limit & track** enables their
+gate and creation-score measurements together. Adding a gate is a separate product
 change: declare its domains, home URL, stable rule IDs, and allow rules in the
 site module's optional `access` interface, with colocated policy tests. Shared
 access code, Settings, and the build discover gate support through the catalog.

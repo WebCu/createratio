@@ -5,6 +5,17 @@
 })(globalThis, function () {
   'use strict';
   const hosts = ['tiktok.com', 'www.tiktok.com'];
+  const domains = ['tiktok.com'], navigationId = 105, resourceId = 106;
+  const access = {
+    domains, home: 'https://www.tiktok.com/', redirectRuleId: 3, ruleIds: [navigationId, resourceId],
+    unrestrictedRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
+      { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
+    ],
+    sessionRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] } }
+    ]
+  };
   const selectors = {
     commentEditor: ['[data-e2e="comment-input"] [contenteditable="true"]'],
     commentSubmit: ['[data-e2e="comment-post"]'],
@@ -90,5 +101,5 @@
       }
     };
   }
-  return { id: 'tiktok', name: 'TikTok', hosts, actions: ['posts', 'comments', 'likes', 'bookmarks'], classifyPage, create };
+  return { id: 'tiktok', name: 'TikTok', hosts, access, actions: ['posts', 'comments', 'likes', 'bookmarks'], classifyPage, create };
 });

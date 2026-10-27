@@ -8,7 +8,7 @@ for (const [site, url, messagesURL, editor] of [
   ['linkedin', 'https://www.linkedin.com/feed/', '/messaging/', '<div class="comments-comment-box"><div id="editor" contenteditable="true" role="textbox">Synthetic draft</div></div>']
 ]) {
   test(`built slow-scrolling preference changes trusted ${site} wheel input without affecting writing or nested panels`, async () => {
-    const { launch, evaluate, eventually, click, withFailureArtifacts, seedAccess, waitForEnabledControl } = await import('./chromium.mjs');
+    const { launch, evaluate, eventually, click, withFailureArtifacts, seedAccess, waitForEnabledControl, openSettingsSection } = await import('./chromium.mjs');
     const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
     try {
       await withFailureArtifacts(browser, `${site} slow-scrolling journey`, async () => {
@@ -32,6 +32,7 @@ for (const [site, url, messagesURL, editor] of [
         await eventually(listenerEnabled, 'default friction attaches without a saved choice');
         assert.equal(await wheel(240), 120, 'default wheel scrolling moves half as far');
         assert.equal(await evaluate(browser, browser.worker, 'resistanceSaves'), 0);
+        await openSettingsSection(browser, settings, 'browsing');
         await click(browser, settings, '#scroll-friction-enabled');
         await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#save-status").textContent.includes("disabled")'), 'explicit Off saved');
         await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
@@ -116,6 +117,7 @@ for (const [site, url, messagesURL, editor] of [
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), false);
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
         assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => data.settings.scrollFrictionStrength)'), 0);
+        await openSettingsSection(browser, settings, 'browsing');
         await click(browser, settings, '#scroll-friction-enabled');
         await eventually(() => evaluate(browser, settings.session, 'document.querySelector("#save-status").textContent.includes("saved at 50%")'), 'enabling replaces saved zero with a positive strength');
         assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => data.settings.scrollFrictionStrength)'), 50);

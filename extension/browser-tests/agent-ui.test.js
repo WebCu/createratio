@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 test('agents discover site-specific actions and complete the existing access UI through accessibility names', async () => {
-  const { launch, evaluate, eventually, withFailureArtifacts, accessibilityNodes, findByRole, clickByRole } = await import('./chromium.mjs');
+  const { launch, evaluate, eventually, withFailureArtifacts, accessibilityNodes, findByRole, clickByRole, openSettingsSection } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   const inspect = (page, source) => evaluate(browser, page.session, source);
   const nodes = page => accessibilityNodes(browser, page);
@@ -13,11 +13,16 @@ test('agents discover site-specific actions and complete the existing access UI 
   try {
     await withFailureArtifacts(browser, 'agent accessibility journey', async () => {
       const popup = await browser.page(browser.origin + '/popup.html');
-      await eventually(() => inspect(popup, 'document.querySelectorAll(".access-row button").length === 2'), 'popup loaded');
+      await eventually(() => inspect(popup, 'document.querySelectorAll(".access-row button").length === 4'), 'popup loaded');
       for (const site of ['X', 'LinkedIn']) {
         const button = await find(popup, 'button', `Request access to ${site}`);
         assert.equal(button.description?.value, 'Blocked');
         await find(popup, 'group', `${site} access`);
+      }
+      for (const site of ['TikTok', 'Instagram']) {
+        await find(popup, 'group', `${site} access`);
+        assert.equal((await find(popup, 'button', `Open site: ${site}`)).description?.value, 'Limit & track off');
+        assert.equal((await nodes(popup)).some(node => node.role?.value === 'spinbutton' || node.role?.value === 'combobox'), false);
       }
       await clickNamed(popup, 'Request access to LinkedIn');
       await eventually(async () => (await browser.cdp.send('Target.getTargets')).targetInfos.some(target => target.url === browser.origin + '/blocked.html?site=linkedin'), 'named action opens the matching site gate');
@@ -48,9 +53,11 @@ test('agents discover site-specific actions and complete the existing access UI 
       await eventually(() => inspect(settings, '!!document.querySelector("#track-x")'), 'settings loaded');
       const tracking = await find(settings, 'switch', 'Limit & track on X');
       assert.equal(tracking.properties.find(property => property.name === 'checked').value.value, 'true');
+      await find(settings, 'combobox', 'Session time for X');
+      await openSettingsSection(browser, settings, 'privacy');
       await find(settings, 'switch', 'Remember my intentions');
-      await find(settings, 'switch', 'Allow sites while above the daily goal');
-      await find(settings, 'spinbutton', 'Session time for X');
+      await openSettingsSection(browser, settings, 'browsing');
+      await find(settings, 'switch', 'Above-goal access');
       const dashboard = await browser.page(browser.origin + '/dashboard.html');
       await eventually(() => inspect(dashboard, '!document.querySelector("#export").disabled'), 'dashboard loaded');
       await find(dashboard, 'region', 'Creation score');

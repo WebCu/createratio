@@ -7,9 +7,13 @@ const { page, C3 } = require('../../tests/ui-harness.js');
 const settingsPage = (data, enabled) => page('settings', data, enabled);
 function controls(p, site = '') {
   const suffix = site ? 'site-' + site : 'default';
-  return { access: p.nodes['accessMinutes-' + suffix], source: p.nodes['accessMinutes-source-' + suffix]?.textContent, tracking: p.nodes['track-' + site], reset: p.nodes['access-reset-' + site] };
+  return { custom: p.nodes['customMinutes-' + suffix], editor: p.nodes['custom-duration-' + suffix], apply: p.nodes['custom-save-' + suffix], cancel: p.nodes['custom-cancel-' + suffix], access: p.nodes['accessMinutes-' + suffix], source: p.nodes['accessMinutes-source-' + suffix]?.textContent, tracking: p.nodes['track-' + site], reset: p.nodes['access-reset-' + site] };
 }
-function value(p, site = '') { const c = controls(p, site); return [c.access.value, c.source]; }
+function value(p, site = '') {
+  const c = controls(p, site);
+  const minutes = c.access.value === 'default' ? Number(c.access.children[0].textContent.match(/\d+/)[0]) : Number(c.access.value);
+  return [minutes, c.source];
+}
 
 test('malformed saves restore persisted controls without claiming success or notifying trackers', async () => {
   const p = settingsPage(); await p.ready();
@@ -25,6 +29,50 @@ test('malformed saves restore persisted controls without claiming success or not
   p.nodes['website-time-enabled'].checked = true; await p.nodes['website-time-enabled'].fire('change'); await p.ready();
   assert.equal(p.nodes['website-time-enabled'].checked, false); assert.equal(p.nodes['website-time-enabled'].disabled, false);
   assert.equal(p.nodes.error.textContent, 'Unable to change website time.'); assert.equal(p.nodes['save-status'].textContent, '');
+});
+test('duration menus preserve inheritance and expose custom minutes only on request', async () => {
+  const p = settingsPage(); await p.ready(); const x = controls(p, 'x');
+  assert.equal(x.access.value, 'default'); assert.equal(x.editor.hidden, true);
+  assert.deepEqual(x.access.children.filter(option => !option.hidden).map(option => option.textContent), ['Default · 5 min', '5 min', '10 min', '15 min', '30 min', '45 min', '60 min', 'Custom…']);
+  const before = p.messages.length;
+  x.access.value = 'custom'; await x.access.fire('change');
+  assert.equal(x.editor.hidden, false); assert.equal(p.document.activeElement, x.custom);
+  assert.equal(p.messages.length, before, 'opening custom time does not save a preference');
+  x.custom.value = '17'; p.refresh(); await p.ready();
+  assert.equal(x.custom.value, '17', 'polling preserves the custom draft');
+  await x.editor.fire('submit', { preventDefault() {} }); await p.ready();
+  assert.equal(p.settings.siteOverrides.x.accessMinutes, 17);
+  assert.equal(x.editor.hidden, true); assert.equal(p.document.activeElement, x.access);
+  assert.deepEqual(value(p, 'x'), [17, 'Custom']);
+  assert.ok(x.access.children.some(option => option.value === '17' && option.textContent === '17 min' && !option.hidden));
+  const size = x.access.children.length;
+  for (let count = 0; count < 40; count++) { p.refresh(); await p.ready(); }
+  assert.equal(x.access.children.length, size, 'refresh reuses a bounded set of options');
+  x.access.value = 'default'; await x.access.fire('change'); await p.ready();
+  assert.deepEqual(value(p, 'x'), [5, 'From Default']);
+  assert.equal(Object.hasOwn(p.settings.siteOverrides?.x || {}, 'accessMinutes'), false);
+});
+test('custom durations cancel, validate the full range and recover failed saves without losing the draft', async () => {
+  const p = settingsPage(); await p.ready(); const c = controls(p);
+  c.access.value = 'custom'; await c.access.fire('change');
+  c.custom.value = '23'; await c.cancel.fire('click');
+  assert.equal(c.editor.hidden, true); assert.equal(p.document.activeElement, c.access);
+  assert.equal(p.messages.some(message => message.type === 'access-duration'), false);
+  c.access.value = 'custom'; await c.access.fire('change');
+  const count = p.messages.length;
+  for (const invalid of ['', '0', '241', '1.5']) {
+    c.custom.value = invalid; await c.editor.fire('submit', { preventDefault() {} });
+    assert.equal(p.messages.length, count); assert.equal(c.editor.hidden, false);
+    assert.match(p.nodes.error.textContent, /whole number/);
+  }
+  p.fail = true; c.custom.value = '240'; await c.editor.fire('submit', { preventDefault() {} });
+  assert.equal(c.editor.hidden, false); assert.equal(c.custom.value, '240');
+  assert.equal(p.settings.accessMinutes, 5); assert.equal(p.nodes.error.textContent, 'Could not save.');
+  p.fail = false; await c.editor.fire('submit', { preventDefault() {} });
+  assert.equal(p.settings.accessMinutes, 240); assert.equal(c.editor.hidden, true);
+  c.access.value = 'custom'; await c.access.fire('change'); c.custom.value = '1';
+  await c.editor.fire('submit', { preventDefault() {} });
+  assert.equal(p.settings.accessMinutes, 1); assert.equal(c.editor.hidden, true);
 });
 test('slow scrolling defaults on, saves independently and restores failed or malformed changes', async () => {
   const p = settingsPage(); await p.ready();
@@ -183,11 +231,11 @@ test('goal-based access defaults off, saves both ways and restores failed change
 });
 test('gated rows combine creation tracking and access limits without selectors or nudges', async () => {
   const p = settingsPage(); await p.ready(); const rows = p.nodes['site-settings'].children;
-  assert.deepEqual(rows.map(row => row.children[0].children[0].textContent), ['Default', ...C3.SITES.filter(site => site.gated).map(site => site.name)]);
+  assert.deepEqual(rows.map(row => row.children[0].children[0].textContent), C3.SITES.filter(site => site.gated).map(site => site.name));
   assert.deepEqual(value(p), [5, 'Default']);
   for (const { id } of C3.SITES.filter(site => site.gated)) {
     assert.deepEqual(value(p, id), [5, 'From Default']); const c = controls(p, id), row = rows.find(row => row.attributes['data-site'] === id);
-    assert.equal(c.tracking.checked, true); assert.equal(c.tracking.parent.parent.parent, row); assert.equal(c.access.parent.parent.parent, row);
+    assert.equal(c.tracking.checked, C3.SITES.find(site => site.id === id).defaultEnabled); assert.equal(c.access.disabled, !c.tracking.checked); assert.equal(c.tracking.parent.parent.parent, row); assert.equal(c.access.parent.parent.parent, row);
     assert.equal(c.tracking.attributes['aria-label'], 'Limit & track on ' + C3.SITES.find(site => site.id === id).name);
     assert.equal(p.nodes['nudgeEnabled-site-' + id], undefined); assert.equal(p.nodes['nudgeMinutes-site-' + id], undefined);
   }
@@ -206,7 +254,7 @@ test('inline access fields stay stable and keep keyboard focus across refresh', 
   const p = settingsPage(); await p.ready(); const input = controls(p, 'x').access;
   input.focus(); p.refresh(); await p.ready();
   assert.equal(controls(p, 'x').access, input); assert.equal(p.document.activeElement, input);
-  assert.equal(input.attributes['aria-label'], 'Session time for X'); assert.equal(input.attributes['aria-describedby'], 'accessMinutes-source-site-x');
+  assert.equal(input.attributes['aria-label'], 'Session time for X'); assert.equal(input.attributes['aria-describedby'], 'accessMinutes-source-site-x site-time-note');
 });
 test('saved session times and Default changes update all rows; resets keep Limit & track On', async () => {
   const p = settingsPage(); await p.ready(); const x = controls(p, 'x'), defaults = controls(p);
@@ -230,7 +278,7 @@ test('Limit & track switches turn timing and measurements off together and keep 
   assert.deepEqual(p.messages.find(message => message.type === 'tracking'), { type: 'tracking', site: 'x', enabled: false });
   assert.equal(input.checked, false); assert.equal(input.disabled, false); assert.equal(controls(p, 'linkedin').tracking.checked, true);
   assert.equal(p.nodes['tracking-status-x'].textContent, 'Off'); assert.match(p.nodes['save-status'].textContent, /X: Limit & track is off/); assert.equal(x.access.disabled, true);
-  assert.equal(x.access.value, 5); assert.equal(p.data[C3.localDate()].x.consumeSec, 60);
+  assert.equal(x.access.value, 'default'); assert.equal(p.data[C3.localDate()].x.consumeSec, 60);
   assert.deepEqual(p.notifications, [{ id: 1, type: 'refresh' }, { id: 2, type: 'refresh' }]);
   p.refresh(); await p.ready(); assert.equal(controls(p, 'x').tracking, input);
   p.toggle('x', true); await p.ready(); assert.equal(input.checked, true); assert.equal(x.access.disabled, false);
@@ -244,7 +292,7 @@ test('external preferences update existing site rows, including all creation tra
   const p = settingsPage(); await p.ready(); p.setSettings({ ...C3.DEFAULT_SETTINGS, trackedSites: [] }); p.change(); await p.ready();
   for (const { id, gated } of C3.SITES) {
     assert.equal(controls(p, id).tracking.checked, false);
-    if (gated) { assert.equal(controls(p, id).access.value, 5); assert.equal(controls(p, id).access.disabled, true); }
+    if (gated) { assert.equal(controls(p, id).access.value, 'default'); assert.equal(controls(p, id).access.disabled, true); }
     else assert.equal(controls(p, id).access, undefined);
   }
   assert.equal(p.data[C3.localDate()].x.consumeSec, 60);
@@ -254,7 +302,7 @@ test('Settings derives gate controls from capabilities rather than a list of kno
   C3.SITES.push({ id: 'example', name: 'Example', gated: true }, { id: 'reading', name: 'Reading', gated: false });
   try {
     const p = settingsPage({ settings: { trackedSites: ['example', 'reading'] } }); await p.ready();
-    assert.equal(controls(p, 'example').access.value, 5);
+    assert.equal(controls(p, 'example').access.value, 'default');
     assert.equal(controls(p, 'example').tracking.attributes['aria-label'], 'Limit & track on Example');
     assert.equal(controls(p, 'reading').access, undefined);
     assert.equal(controls(p, 'reading').tracking.attributes['aria-label'], 'Track creating & consuming on Reading');
@@ -306,7 +354,7 @@ test('tracking-only integrations start off and save independently without sessio
 });
 test('removed integrations have no editable row and keep recorded history', async () => {
   const p = settingsPage({ [C3.localDate()]: { retired: { consumeSec: 120 } } }); await p.ready();
-  assert.equal(p.nodes['site-settings'].children.length, C3.SITES.filter(site => site.gated).length + 1);
+  assert.equal(p.nodes['site-settings'].children.length, C3.SITES.filter(site => site.gated).length);
   assert.equal(p.nodes['tracking-only-settings'].children.length, C3.SITES.filter(site => !site.gated).length);
   assert.equal(p.nodes['track-retired'], undefined); assert.equal(p.data[C3.localDate()].retired.consumeSec, 120);
 });
@@ -341,28 +389,22 @@ test('creation tracking and Website time remain independent in both directions',
   assert.equal(controls(p, 'x').tracking.checked, false); assert.equal(controls(p, 'linkedin').tracking.checked, false);
   p.toggle('x', true); await p.ready(); assert.equal(p.nodes['website-time-enabled'].checked, false); assert.equal(p.state.requested, 0);
 });
-test('Settings gives site boundaries and the optional goal exception separate labelled sections', () => {
+test('Settings exposes four native sections with only Websites open initially', () => {
   const html = fs.readFileSync(path.join(__dirname, 'settings.html'), 'utf8');
-  const sections = new Map([...html.matchAll(/<section class="preference" aria-labelledby="([^"]+)">([\s\S]*?)<\/section>/g)].map(([, id, content]) => [id, content]));
-  assert.match(sections.get('site-settings-title'), /id="site-settings"/);
-  assert.doesNotMatch(sections.get('site-settings-title'), /id="allow-above-goal"/);
-  assert.match(sections.get('goal-access-title'), /id="allow-above-goal"/);
-  assert.match(sections.get('goal-access-title'), /id="goal-access-note"/);
-  assert.match(sections.get('intentions-title'), /id="intention-history-enabled"/);
-  assert.match(sections.get('websites-title'), /id="website-time-enabled"/);
-  assert.match(sections.get('data-title'), /id="clear-history"/);
-  assert.match(html, /<h1>Settings<\/h1>/);
+  const sections = [...html.matchAll(/<details id="([^"]+)" class="settings-section" name="settings-group"( open)?>/g)];
+  assert.deepEqual(sections.map(match => match[1]), ['websites-settings', 'browsing-settings', 'privacy-settings', 'data-settings']);
+  assert.deepEqual(sections.map(match => !!match[2]), [true, false, false, false]);
   assert.equal([...html.matchAll(/<h1\b/g)].length, 1);
 });
 test('site access resets preserve saved legacy preferences without exposing or activating nudges', async () => {
   const p = settingsPage(); await p.ready();
   p.setSettings({ ...C3.DEFAULT_SETTINGS, nudgeEnabled: true, nudgeMinutes: 1, siteOverrides: { x: { nudgeEnabled: true, nudgeMinutes: 3 } } }); p.change(); await p.ready();
-  const x = controls(p, 'x'); assert.equal(x.access.value, 5); assert.equal(x.reset.hidden, true);
+  const x = controls(p, 'x'); assert.equal(x.access.value, 'default'); assert.equal(x.reset.hidden, true);
   x.access.value = '2'; await x.access.fire('change'); await p.ready();
   assert.deepEqual(p.messages.find(message => message.type === 'access-duration'), { type: 'access-duration', site: 'x', minutes: 2 });
-  assert.equal(x.access.value, 2); assert.equal(x.reset.hidden, false); assert.equal(controls(p, 'linkedin').access.value, 5);
+  assert.equal(x.access.value, 2); assert.equal(x.reset.hidden, false); assert.equal(controls(p, 'linkedin').access.value, 'default');
   controls(p).access.value = '12'; await controls(p).access.fire('change'); await p.ready(); assert.equal(x.access.value, 2);
-  await x.reset.fire('click'); await p.ready(); assert.equal(x.access.value, 12); assert.equal(x.reset.hidden, true);
+  await x.reset.fire('click'); await p.ready(); assert.equal(x.access.value, 'default'); assert.equal(x.reset.hidden, true);
   assert.deepEqual(p.messages.filter(message => message.type === 'access-duration').at(-1), { type: 'access-duration', site: 'x', minutes: null });
   assert.deepEqual(p.settings.siteOverrides.x, { nudgeEnabled: true, nudgeMinutes: 3 }); assert.equal(p.settings.nudgeEnabled, true);
   assert.equal(p.nodes['nudgeEnabled-site-x'], undefined); assert.ok(p.messages.every(message => message.type !== 'settings'));

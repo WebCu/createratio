@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { worker, gate, intent } = require('./background-harness.js');
+const { worker, gate, intent, rulesFor } = require('./background-harness.js');
 const { tracker } = require('./content-harness.js');
 const { Element } = require('../../sites/test-support.js');
 const { page, C3 } = require('./ui-harness.js');
@@ -174,7 +174,7 @@ for (const browser of ['chrome', 'browser']) {
     assert.deepEqual(reloaded.state.redirects, []);
     assert.equal(reloaded.messages.some(message => message.type === 'access-open'), false);
     assert.equal((await w.send({ type: 'access-status' })).access.x.remainingMs, 0);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
 
     await reloaded.nodes.open.fire('click');
     assert.deepEqual(reloaded.state.redirects, ['https://x.com/home']);
@@ -213,7 +213,7 @@ for (const browser of ['chrome', 'browser']) {
     await accessRow(resumed).children[1].fire('click');
     assert.equal(accessRow(resumed).children[0].children[1].textContent, 'Blocked');
     assert.equal((await w.send({ type: 'snapshot' })).access.x.remainingMs, 0);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
     assert.deepEqual(w.tabs.map(tab => tab.url), [gate('x').url, gate('x').url]);
     assert.deepEqual(w.data.settings, savedPreferences);
     assert.deepEqual(w.data._intentions, intentions);

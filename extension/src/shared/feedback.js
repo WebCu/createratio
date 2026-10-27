@@ -2,10 +2,7 @@
 (async () => {
   const link = document.getElementById('feedback');
   const note = document.getElementById('feedback-privacy');
-  if (link.dataset.store !== 'chrome') {
-    note.textContent = 'Store feedback is not configured for this browser yet.';
-    return;
-  }
+  if (link.dataset.store !== 'chrome') return;
   try {
     const info = await chrome.management.getSelf();
     if (info.installType === 'development') return;
@@ -15,7 +12,7 @@
     link.removeAttribute('aria-disabled');
     link.removeAttribute('tabindex');
     note.textContent = 'Opens Chrome Web Store · feedback is public. No activity data attached.';
-  } catch {
-    note.textContent = 'Store feedback is unavailable right now.';
-  }
+    link.hidden = false;
+    note.hidden = false;
+  } catch {}
 })();
