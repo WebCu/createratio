@@ -15,6 +15,8 @@ Switching away pauses the timer.
   [measurement rules and limitations](extension/README.md#measurement-and-score).
 - **Scroll friction:** wheel/trackpad scrolling on consuming pages moves half
   as far by default. Tune the resistance or turn it off in Settings.
+- **TikTok:** opt into creating/consuming tracking and shared Slow scrolling.
+  No access gate or session timer is added; the integration starts Off.
 - **Instagram:** opt into creating/consuming tracking and shared Slow scrolling.
   No access gate or session timer is added; the integration starts Off.
 - **Optional extras:** track time across websites or save your access intentions.

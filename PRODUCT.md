@@ -15,7 +15,7 @@ web
 
 Anyone who wants to create more than they consume online. There is no narrower
 professional or demographic audience. Site integrations support X, LinkedIn,
-and opt-in, tracking-only Instagram without an access gate.
+and opt-in, tracking-only TikTok and Instagram without access gates.
 
 ## Product Purpose
 
