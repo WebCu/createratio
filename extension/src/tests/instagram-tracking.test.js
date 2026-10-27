@@ -1,4 +1,4 @@
 'use strict';
-const { trackingOnlyPlatform } = require('./platform-tracking.js');
+const { gatedPlatform } = require('./platform-tracking.js');
 
-trackingOnlyPlatform({"id": "instagram", "url": "https://www.instagram.com/p/synthetic/", "neutral": "/accounts/edit/"});
+gatedPlatform({"id": "instagram", "url": "https://www.instagram.com/p/synthetic/", "neutral": "/accounts/edit/"});

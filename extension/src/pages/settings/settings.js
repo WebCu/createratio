@@ -15,7 +15,7 @@ function createAccessField(site) {
   sourceLine.className = 'site-field-source'; source.id = 'accessMinutes-source-' + (site.id ? 'site-' + site.id : 'default'); sourceLine.append(source);
   const input = document.createElement('input'); input.type = 'number';
   input.id = 'accessMinutes-' + (site.id ? 'site-' + site.id : 'default'); heading.htmlFor = input.id;
-  input.setAttribute('aria-label', 'Session time for ' + site.name); input.setAttribute('aria-describedby', source.id);
+  input.setAttribute('aria-label', 'Session time for ' + site.name); input.setAttribute('aria-describedby', source.id + ' site-time-note');
   input.min = String(C3.ACCESS_LIMITS.minMinutes); input.max = String(C3.ACCESS_LIMITS.maxMinutes); input.step = '1'; unit.textContent = 'active min';
   input.addEventListener('change', () => saveAccessDuration(site.id)); line.append(input);
   let reset = null;
@@ -43,7 +43,7 @@ function createSite(site) {
     tracking.addEventListener('change', () => saveTracking(site.id));
     group.append(label, tracking, trackingStatus); header.append(group);
   } else {
-    const note = document.createElement('small'); note.textContent = 'Fallback for gated sites'; header.append(note);
+    const note = document.createElement('small'); note.textContent = 'Used unless a site has a Custom time'; header.append(note);
   }
   const access = trackingOnly ? null : createAccessField(site);
   let note = null;
@@ -62,6 +62,7 @@ function renderSite(control, settings, force) {
   const enabled = !site.id || C3.trackingEnabled(site.id, settings);
   const inactive = !!site.id && !enabled, switching = control.busy.has('tracking');
   control.row.setAttribute('aria-busy', String(control.busy.size > 0));
+  control.row.setAttribute('data-enabled', String(enabled));
   if (control.note) control.note.hidden = !inactive;
   if (access) {
     if (!control.busy.has('access') && (force === site.id + ':access' || document.activeElement !== access.input)) access.input.value = effective.accessMinutes;

@@ -5,6 +5,17 @@
 })(globalThis, function () {
   'use strict';
   const hosts = ['instagram.com', 'www.instagram.com'];
+  const domains = ['instagram.com'], navigationId = 107, resourceId = 108;
+  const access = {
+    domains, home: 'https://www.instagram.com/', redirectRuleId: 4, ruleIds: [navigationId, resourceId],
+    unrestrictedRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
+      { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
+    ],
+    sessionRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] } }
+    ]
+  };
   const selectors = {
     commentEditor: ['textarea[aria-label="Add a comment…"]', 'textarea[aria-label="Add a comment..."]'],
     captionEditor: ['textarea[aria-label="Write a caption…"]', 'textarea[aria-label="Write a caption..."]'],
@@ -94,5 +105,5 @@
       }
     };
   }
-  return { id: 'instagram', name: 'Instagram', hosts, actions: ['posts', 'comments', 'likes', 'bookmarks'], classifyPage, create };
+  return { id: 'instagram', name: 'Instagram', hosts, access, actions: ['posts', 'comments', 'likes', 'bookmarks'], classifyPage, create };
 });

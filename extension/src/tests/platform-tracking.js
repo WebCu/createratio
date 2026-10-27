@@ -5,11 +5,11 @@ const C = require('../../core/core.js');
 const { environment } = require('../../sites/test-support.js');
 const Sites = require('../../sites/index.js');
 const { tracker } = require('./content-harness.js');
-const { worker, popupSender } = require('./background-harness.js');
+const { worker, popupSender, unlock } = require('./background-harness.js');
 
-function trackingOnlyPlatform({ id: site, url, neutral: neutralPath }) {
+function gatedPlatform({ id: site, url, neutral: neutralPath }) {
   for (const browser of ['chrome', 'browser']) {
-    test(`${browser}: ${site} opts into the shared time and scrolling lifecycle without an access gate`, async () => {
+    test(`${browser}: ${site} opts into the shared gated time and scrolling lifecycle`, async () => {
       const t = await tracker(browser, { url, fixture: ({ url, listen }) => environment(url, listen) });
       const consumed = () => t.packets.flatMap(packet => packet.segments).reduce((sum, segment) => sum + (segment.mode === 'consume' ? segment.sec : 0), 0);
       t.input(); t.setNow(5000); await t.tick();
@@ -57,7 +57,10 @@ function trackingOnlyPlatform({ id: site, url, neutral: neutralPath }) {
       const enabled = await w.send({ type: 'tracking', site, enabled: true }, popupSender);
       assert.equal(enabled.ok, true);
       assert.ok(enabled.settings.trackedSites.includes(site));
-      assert.equal(enabled.access[site], undefined, 'tracking-only sites have no invented budget');
+      assert.equal(enabled.access[site].remainingMs, 0, 'enabling starts blocked');
+      assert.equal((await w.send(packet, sender)).ok, true);
+      assert.equal(w.data[date], undefined, 'blocked sites cannot record measurements');
+      await unlock(w, site);
       assert.ok(Sites.get(site).actions.includes('comments'));
       const unsupported = C.FIELDS.find(field => !field.endsWith('Sec') && !Sites.get(site).actions.includes(field));
       assert.ok(unsupported, 'fixture can test an undeclared action');
@@ -84,4 +87,4 @@ function trackingOnlyPlatform({ id: site, url, neutral: neutralPath }) {
   }
 }
 
-module.exports = { trackingOnlyPlatform };
+module.exports = { gatedPlatform };

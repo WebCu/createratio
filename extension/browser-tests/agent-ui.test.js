@@ -13,11 +13,17 @@ test('agents discover site-specific actions and complete the existing access UI 
   try {
     await withFailureArtifacts(browser, 'agent accessibility journey', async () => {
       const popup = await browser.page(browser.origin + '/popup.html');
-      await eventually(() => inspect(popup, 'document.querySelectorAll(".access-row button").length === 2'), 'popup loaded');
+      await eventually(() => inspect(popup, 'document.querySelectorAll(".access-row button").length === 4'), 'popup loaded');
       for (const site of ['X', 'LinkedIn']) {
         const button = await find(popup, 'button', `Request access to ${site}`);
         assert.equal(button.description?.value, 'Blocked');
         await find(popup, 'group', `${site} access`);
+      }
+      for (const site of ['TikTok', 'Instagram']) {
+        await find(popup, 'group', `${site} access`);
+        assert.equal((await find(popup, 'button', `Open site: ${site}`)).description?.value, 'Limit & track off');
+        const time = await find(popup, 'spinbutton', `Session time for ${site}`);
+        assert.equal(time.properties.find(property => property.name === 'disabled')?.value.value, true);
       }
       await clickNamed(popup, 'Request access to LinkedIn');
       await eventually(async () => (await browser.cdp.send('Target.getTargets')).targetInfos.some(target => target.url === browser.origin + '/blocked.html?site=linkedin'), 'named action opens the matching site gate');

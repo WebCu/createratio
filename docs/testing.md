@@ -450,7 +450,9 @@ screenshots, credentials, or publisher-dashboard information.
 
 Before a release, verify:
 
-- X/Twitter aliases and LinkedIn block, while unrelated sites remain accessible.
+- Enabled X/Twitter aliases, LinkedIn, TikTok and Instagram block, including HTTP/S
+  subdomains, while unrelated sites remain accessible. TikTok and Instagram start
+  Off; saved choices survive updates. Verify browser approval of expanded hosts.
 - Reloading preserves the 60-second wait; only explicit confirmation unlocks.
 - Access budgets are shared per site, pause on tab/window changes, survive
   restarts, refill at local midnight, and revoke access at expiry or manual end.
@@ -484,6 +486,11 @@ Before a release, verify:
   physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
+- All four popup rows show current access and editable session times when On.
+  Saving affects new sessions/refills, not the current budget. Verify invalid
+  input, save failure, focused drafts across polling, and Settings synchronization.
+  Settings groups all four Limit & track switches and times with Default/Custom
+  inheritance. Check 320px layouts, keyboard input and forced colors.
 - Available tracking-only integrations start Off and have no access gates or
   session timers. Their compact Settings switches persist independently; enabling
   applies the shared Slow scrolling preference on consuming pages, while editors,

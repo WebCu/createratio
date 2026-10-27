@@ -1,8 +1,7 @@
 # CreateRatio browser extension
 
-A dependency-free Manifest V3 extension for intentional access to X and LinkedIn
-and local creating-versus-consuming tracking, with opt-in TikTok and Instagram
-integrations.
+A dependency-free Manifest V3 extension for intentional access and local
+creating-versus-consuming tracking on X, LinkedIn, TikTok and Instagram.
 
 ## Layout and installation
 
@@ -27,8 +26,8 @@ harnesses stay in `src/tests/`. Test commands discover tests recursively, and th
 explicit build asset list excludes tests and harnesses.
 
 [Install the published Chrome extension from the Chrome Web Store](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk).
-Save X and LinkedIn drafts before installing; existing tabs redirect to the
-access gate.
+Save drafts on enabled gated sites before installing; existing tabs redirect
+to the access gate.
 [Install the published Firefox add-on](https://addons.mozilla.org/en-US/firefox/addon/createratio/).
 For development builds or Edge, follow the
 [build and installation instructions](../README.md#build-and-install).
@@ -120,7 +119,10 @@ replacement from a browser restart. Website-time sampling starts fresh.
 
 ## Using the extension
 
-- **Popup:** today's score, active time, and request/end-access controls.
+- **Popup:** today's score, all four sites' request/end-access controls and quick
+  per-site session-time inputs. Changes save automatically for new sessions and
+  midnight refills, without changing the running budget. Off sites open directly;
+  turn their **Limit & track** on in Settings to configure a time.
 - **Settings:** **Limit & track** groups Default and gated controls;
   **Tracking only** lists other integrations with compact switches when available.
   Session times show **From Default** or **Custom**; **Use Default** removes an
@@ -150,8 +152,9 @@ agent permission to change settings, export private data, or bypass access gates
 
 ### Site access
 
-X, Twitter aliases, and LinkedIn, including subdomains, are blocked on HTTP and
-HTTPS. Blocking covers the whole site, including posting and messages.
+Enabled X, Twitter aliases, LinkedIn, TikTok and Instagram, including subdomains,
+are blocked on HTTP and HTTPS. Blocking covers the whole site, including posting
+and messages.
 
 1. Visit a blocked site or choose **Request access**.
 2. Write an intention of 20–280 characters and start the **60-second wait**.
@@ -180,6 +183,11 @@ wait, timer, and new creation-score measurements together. Saved duration and
 history remain. Off discards the current budget and waiting request, including
 its midnight refill. Re-enabling requires a fresh intention and wait unless
 optional above-goal access applies. Fresh trusted input is required to measure.
+
+TikTok and Instagram start Off. Enable **Limit & track** in Settings to use the
+same intention, wait and active-time budgets as X and LinkedIn. Saved On/Off
+choices are preserved, including previously enabled tracking choices; enabled
+TikTok and Instagram sites now require access sessions. Save drafts before updating.
 
 New vetted integrations start disabled; arbitrary domains or user scripts cannot
 be added from the UI. Integrations without explicit gate support appear under
@@ -302,10 +310,11 @@ for contributor-facing details.
 
 ### TikTok tracking
 
-TikTok starts Off under **Settings → Tracking only**. It uses the exact HTTPS hosts
-`tiktok.com` and `www.tiktok.com`, with no access gate or session timer. Enabling
-applies the existing Slow scrolling preference on consuming pages. Off restores
-native scrolling and retains history.
+TikTok starts Off under **Settings → Limit & track**. Enabling adds the shared
+intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Blocking covers HTTP/S `tiktok.com` and its subdomains; creation tracking uses only
+HTTPS `tiktok.com` and `www.tiktok.com`. Off restores free access and native
+scrolling while retaining history and saved duration.
 
 Scoped comment Post controls and plain Enter count comments; upload-caption Post
 controls count posts. Positive Like and Save controls count without score credit.
@@ -317,10 +326,11 @@ synthetic fixtures do not prove current authenticated markup or publication.
 
 ### Instagram tracking
 
-Instagram starts Off under **Settings → Tracking only**. It uses the exact HTTPS
-hosts `instagram.com` and `www.instagram.com`, with no access gate or session timer.
-Enabling applies the shared Slow scrolling preference on consuming pages. Off
-restores native scrolling and retains history.
+Instagram starts Off under **Settings → Limit & track**. Enabling adds the shared
+intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Blocking covers HTTP/S `instagram.com` and its subdomains; creation tracking uses
+only HTTPS `instagram.com` and `www.instagram.com`. Off restores free access and
+native scrolling while retaining history and saved duration.
 
 Scoped comment Post controls and plain Enter count comments; caption-dialog Share
 counts posts. Positive Like and Save controls count without score credit. Reading
@@ -429,10 +439,10 @@ optional intention history saves the text you explicitly submit. Nothing uses
 `storage.sync`.
 
 Required permissions are `storage`, `alarms`, and
-`declarativeNetRequestWithHostAccess`. Host access is limited to X, Twitter aliases,
-and LinkedIn. TikTok and Instagram add only exact HTTPS root and `www.` host
-permissions, not HTTP or wildcard subdomains. Updates can require browser approval
-of these hosts.
+`declarativeNetRequestWithHostAccess`. Host access is limited to HTTP/S X, Twitter
+aliases, LinkedIn, TikTok and Instagram, including their subdomains, for access
+gating. Creation tracking still uses each site's exact HTTPS hosts. This expanded
+TikTok/Instagram scope can require browser approval when updating.
 Optional `tabs` and `idle` permissions are requested only for
 all-website time. No browser-history or all-sites host permission is requested.
 Chromium restricts aggregate storage to trusted extension contexts; Firefox's

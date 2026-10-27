@@ -53,29 +53,30 @@ test('built extension keeps narrow tasks and history readable', async t => {
       assert.equal(await inspect(page, 'document.activeElement.tagName'), 'SUMMARY');
       await noOverflow(page);
     }));
-    await t.test('Settings separates access limits from opt-in tracking at narrow widths', () => withFailureArtifacts(browser, 'narrow catalog settings', async () => {
-      const sites = require('../sites/index.js').sites.filter(site => !site.gated);
+    await t.test('Settings configures all four access limits at narrow widths', () => withFailureArtifacts(browser, 'narrow catalog settings', async () => {
+      const catalog = require('../sites/index.js').sites;
+      const sites = catalog.filter(site => !site.defaultEnabled);
       for (const width of [320, 390]) {
         const page = await pageAt('/settings.html', width);
-        await eventually(() => inspect(page, `document.querySelector('#accessMinutes-default') && document.querySelectorAll('#tracking-only-settings input[role=switch]').length === ${sites.length}`), 'catalog controls rendered');
-        assert.equal(await inspect(page, 'document.querySelector("#tracking-only-section").hidden'), sites.length === 0);
-        assert.deepEqual(await inspect(page, '[...document.querySelectorAll("#site-settings > li")].map(row => row.dataset.site)'), ['', 'x', 'linkedin']);
-        assert.equal(await inspect(page, 'document.querySelectorAll("#site-settings input[type=number]").length'), 3);
+        await eventually(() => inspect(page, `document.querySelector('#accessMinutes-default') && document.querySelectorAll('#site-settings input[role=switch]').length === ${catalog.length}`), 'catalog controls rendered');
+        assert.equal(await inspect(page, 'document.querySelector("#tracking-only-section").hidden'), true);
+        assert.deepEqual(await inspect(page, '[...document.querySelectorAll("#site-settings > li")].map(row => row.dataset.site)'), ['', ...catalog.map(site => site.id)]);
+        assert.equal(await inspect(page, 'document.querySelectorAll("#site-settings input[type=number]").length'), 5);
         for (const { id, name } of sites) {
           const row = await inspect(page, `(() => {
-            const row = document.querySelector('#tracking-only-settings [data-site=${id}]'), input = row.querySelector('input');
+            const row = document.querySelector('#site-settings [data-site=${id}]'), input = row.querySelector('input[role=switch]');
             return { checked: input.checked, disabled: input.disabled, inputs: row.querySelectorAll('input').length, fields: row.querySelectorAll('.site-preference-field, button').length, height: row.getBoundingClientRect().height, describedBy: input.getAttribute('aria-describedby') };
           })()`);
           assert.equal(row.checked, false); assert.equal(row.disabled, false);
-          assert.equal(row.inputs, 1); assert.equal(row.fields, 0); assert.ok(row.height <= 80, JSON.stringify({ width, id, ...row }));
-          assert.ok(row.describedBy.includes('tracking-only-note'));
-          await clickByRole(browser, page, 'switch', 'Track creating & consuming on ' + name);
+          assert.equal(row.inputs, 2); assert.equal(row.fields, 2); assert.ok(row.height <= 220, JSON.stringify({ width, id, ...row }));
+          assert.ok(row.describedBy.includes('tracking-status-' + id));
+          await clickByRole(browser, page, 'switch', 'Limit & track on ' + name);
           await eventually(() => inspect(page, `document.querySelector('#track-${id}').checked && !document.querySelector('#track-${id}').disabled`), id + ' tracking enabled');
         }
         await browser.cdp.send('Page.reload', {}, page.session);
-        await eventually(() => inspect(page, `document.querySelector('#accessMinutes-default') && document.querySelectorAll('#tracking-only-settings input:checked').length === ${sites.length}`), 'tracking preferences survive reload');
+        await eventually(() => inspect(page, `document.querySelector('#accessMinutes-default') && document.querySelectorAll('#site-settings input:checked').length === ${catalog.length}`), 'tracking preferences survive reload');
         for (const { id, name } of sites) {
-          await clickByRole(browser, page, 'switch', 'Track creating & consuming on ' + name);
+          await clickByRole(browser, page, 'switch', 'Limit & track on ' + name);
           await eventually(() => inspect(page, `!document.querySelector('#track-${id}').checked && !document.querySelector('#track-${id}').disabled`), id + ' tracking disabled');
         }
         assert.equal(await inspect(page, 'document.querySelectorAll("#tracking-only-settings input[type=number]").length'), 0);
@@ -87,6 +88,33 @@ test('built extension keeps narrow tasks and history readable', async t => {
         assert.equal(await inspect(page, 'document.querySelectorAll("#scroll-friction-strength").length'), 1);
         await noOverflow(page);
       }
+    }));
+    await t.test('four popup session times save through trusted input and stay synchronized with Settings', () => withFailureArtifacts(browser, 'four popup session times', async () => {
+      const sites = require('../sites/index.js').sites;
+      await evaluate(browser, browser.worker, `chrome.storage.local.set({ settings: { trackedSites: ${JSON.stringify(sites.map(site => site.id))} } })`);
+      const popup = await pageAt('/popup.html', 400);
+      await eventually(() => inspect(popup, 'document.querySelectorAll(".access-row").length === 4'), 'all four popup rows rendered');
+      const visibleRows = await inspect(popup, '(() => { const main = document.querySelector("main").getBoundingClientRect(); return [...document.querySelectorAll(".access-row")].every(row => row.getBoundingClientRect().bottom <= main.bottom); })()');
+      assert.equal(visibleRows, true, 'all four controls fit without scrolling at the shipped popup size');
+      for (const [index, site] of sites.entries()) {
+        const selector = '#session-time-' + site.id, value = 11 + index;
+        await click(browser, popup, selector);
+        await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2 }, popup.session);
+        await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2 }, popup.session);
+        await browser.cdp.send('Input.insertText', { text: String(value) }, popup.session);
+        await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }, popup.session);
+        await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }, popup.session);
+        await eventually(() => inspect(popup, `document.querySelector('#access-save-status').textContent.includes('${value} min saved') && !document.querySelector(${JSON.stringify(selector)}).disabled`), site.name + ' popup time saved');
+        assert.equal(await evaluate(browser, browser.worker, `chrome.storage.local.get('settings').then(data => data.settings.siteOverrides[${JSON.stringify(site.id)}].accessMinutes)`), value);
+        assert.equal(await inspect(popup, '(() => { const notice = document.querySelector("#access-save-status").getBoundingClientRect(); return notice.top >= 0 && notice.bottom <= innerHeight; })()'), true, 'save feedback stays visible outside the scrolling content');
+      }
+      const settings = await pageAt('/settings.html', 1000);
+      await eventually(() => inspect(settings, '!!document.querySelector("#accessMinutes-site-instagram")'), 'Settings rendered');
+      for (const [index, site] of sites.entries()) {
+        assert.equal(await inspect(settings, `document.querySelector('#accessMinutes-site-${site.id}').value`), String(11 + index));
+        assert.equal(await inspect(settings, `document.querySelector('#accessMinutes-source-site-${site.id}').textContent`), 'Custom');
+      }
+      await noOverflow(popup); await noOverflow(settings);
     }));
     await t.test('narrow history exposes readable values instead of shrinking the chart', () => withFailureArtifacts(browser, 'narrow history values', async () => {
       await evaluate(browser, browser.worker, 'chrome.storage.local.set({ [C3.localDate()]: { x: { createSec: 2880, consumeSec: 1920, posts: 2 } } })');

@@ -187,7 +187,7 @@ test('gated rows combine creation tracking and access limits without selectors o
   assert.deepEqual(value(p), [5, 'Default']);
   for (const { id } of C3.SITES.filter(site => site.gated)) {
     assert.deepEqual(value(p, id), [5, 'From Default']); const c = controls(p, id), row = rows.find(row => row.attributes['data-site'] === id);
-    assert.equal(c.tracking.checked, true); assert.equal(c.tracking.parent.parent.parent, row); assert.equal(c.access.parent.parent.parent, row);
+    assert.equal(c.tracking.checked, C3.SITES.find(site => site.id === id).defaultEnabled); assert.equal(c.access.disabled, !c.tracking.checked); assert.equal(c.tracking.parent.parent.parent, row); assert.equal(c.access.parent.parent.parent, row);
     assert.equal(c.tracking.attributes['aria-label'], 'Limit & track on ' + C3.SITES.find(site => site.id === id).name);
     assert.equal(p.nodes['nudgeEnabled-site-' + id], undefined); assert.equal(p.nodes['nudgeMinutes-site-' + id], undefined);
   }
@@ -206,7 +206,7 @@ test('inline access fields stay stable and keep keyboard focus across refresh', 
   const p = settingsPage(); await p.ready(); const input = controls(p, 'x').access;
   input.focus(); p.refresh(); await p.ready();
   assert.equal(controls(p, 'x').access, input); assert.equal(p.document.activeElement, input);
-  assert.equal(input.attributes['aria-label'], 'Session time for X'); assert.equal(input.attributes['aria-describedby'], 'accessMinutes-source-site-x');
+  assert.equal(input.attributes['aria-label'], 'Session time for X'); assert.equal(input.attributes['aria-describedby'], 'accessMinutes-source-site-x site-time-note');
 });
 test('saved session times and Default changes update all rows; resets keep Limit & track On', async () => {
   const p = settingsPage(); await p.ready(); const x = controls(p, 'x'), defaults = controls(p);

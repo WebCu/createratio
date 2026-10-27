@@ -35,12 +35,12 @@ test('popup rejects malformed replies without changing totals or claiming a sess
   assert.equal(button.textContent, 'End session'); assert.equal(button.disabled, false);
   assert.equal(p.nodes.error.textContent, 'Unable to end session.');
 });
-test('popup keeps today summary but leaves configuration and detailed stats to full pages', async () => {
+test('popup keeps today summary and quick session times but leaves detailed stats to full pages', async () => {
   const p = page('popup'); await p.ready();
   assert.equal(p.nodes['consume-min'].textContent, '1.0m'); assert.equal(p.nodes.score.textContent, '0.00');
   for (const id of ['access-minutes', 'nudge-enabled', 'nudge-minutes', 'tracking-sites', 'website-time-enabled', 'chart', 'export']) assert.equal(p.nodes[id], undefined);
   const html = fs.readFileSync(path.join(__dirname, 'popup.html'), 'utf8');
-  assert.match(html, /Creation score today/); assert.match(html, /href="dashboard.html"/); assert.doesNotMatch(html, /type="(?:checkbox|number)"/);
+  assert.match(html, /Creation score today/); assert.match(html, /href="dashboard.html"/); assert.doesNotMatch(html, /type="checkbox"/);
   await p.nodes.settings.fire('click'); assert.equal(p.state.optionsOpened, 1);
 });
 test('popup shows active and paused budgets and retains request/end access actions', async () => {
@@ -81,7 +81,7 @@ test('popup opens a goal-allowed site directly rather than offering request or e
   assert.equal(p.messages.some(m => m.type === 'access-end'), false);
   p.state.access.x = { ...p.state.access.x, remainingMs: 60000, refilledAt: Date.now() };
   p.change(); await p.ready();
-  assert.equal(row.children[0].children.length, 2, 'goal-based access does not show a timed-session refill');
+  assert.equal(row.children[0].children.length, 3, 'goal-based access does not show a timed-session refill');
 });
 
 test('popup animates a daily refill once without replacing the countdown or access button', async () => {
@@ -89,13 +89,46 @@ test('popup animates a daily refill once without replacing the countdown or acce
   p.state.access = { x: accessState('x', { remainingMs: 300000, refilledAt: Date.now() }) };
   p.change(); await p.ready();
   const row = p.nodes['access-sites'].children[0], label = row.children[0];
-  const notice = label.children[2], button = row.children[1];
+  const notice = label.children[3], button = row.children[1];
   assert.equal(notice.children[0].textContent, 'Time refilled');
   assert.equal(label.children[1].textContent, '5:00 left · paused');
   p.refresh(); await p.ready();
-  assert.equal(label.children[2], notice); assert.equal(row.children[1], button);
+  assert.equal(label.children[3], notice); assert.equal(row.children[1], button);
   await button.fire('click'); await p.ready();
-  assert.equal(label.children.length, 2); assert.equal(button.textContent, 'Request access');
+  assert.equal(label.children.length, 3); assert.equal(button.textContent, 'Request access');
+});
+test('popup edits all four session times without replacing controls or changing running budgets', async () => {
+  const p = page('popup'); await p.ready();
+  p.state.access = Object.fromEntries(C3.SITES.map(site => [site.id, accessState(site.id, { remainingMs: 60000 })]));
+  p.change(); await p.ready();
+  assert.equal(p.nodes['access-sites'].children.length, 4);
+  for (const site of C3.SITES) {
+    const input = p.nodes['session-time-' + site.id];
+    assert.equal(input.value, 5); assert.equal(input.disabled, false);
+    assert.equal(input.attributes['aria-label'], 'Session time for ' + site.name);
+    input.focus(); input.value = '17'; p.refresh(); await p.ready();
+    assert.equal(input.value, '17', 'polling preserves the focused draft');
+    const release = p.holdMessage('access-duration'), saving = input.fire('change');
+    assert.equal(input.disabled, true);
+    p.refresh(); await p.ready(); assert.equal(input.value, '17');
+    release(); await saving;
+    assert.equal(input.disabled, false); assert.equal(input.value, 17);
+    assert.equal(p.state.access[site.id].remainingMs, 60000);
+    assert.match(p.nodes['access-save-status'].textContent, /17 min saved for new sessions/);
+    for (const invalid of ['', '0', '241', '1.5']) {
+      const sent = p.messages.length; input.value = invalid; await input.fire('change');
+      assert.equal(p.messages.length, sent); assert.equal(input.value, 17);
+      assert.match(p.nodes.error.textContent, /whole number/);
+    }
+    p.fail = true; input.value = '9'; await input.fire('change'); p.fail = false;
+    assert.equal(input.value, 17); assert.equal(input.disabled, false);
+    assert.equal(p.nodes.error.textContent, 'Could not save.');
+    p.refresh(); await p.ready();
+    assert.equal(p.nodes.error.textContent, 'Could not save.', 'polling must not erase an action error');
+  }
+  p.state.access.instagram.enabled = false; p.change(); await p.ready();
+  assert.equal(p.nodes['session-time-instagram'].disabled, true);
+  assert.equal(p.nodes['session-time-instagram'].value, 17);
 });
 test('popup refresh keeps visible totals current, including historical integrations', async () => {
   const p = page('popup'); await p.ready(); p.setDay({ retired: { consumeSec: 120, posts: 1 } }); p.refresh(); await p.ready();

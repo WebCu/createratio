@@ -21,11 +21,14 @@ function seconds(t, mode) {
   return t.packets.flatMap(packet => packet.segments).filter(segment => segment.mode === mode).reduce((sum, segment) => sum + segment.sec, 0);
 }
 
-test('Instagram publishes a tracking-only, opt-in module in Node and the browser', () => {
+test('Instagram publishes an opt-in module with explicit access policy in Node and the browser', () => {
   assert.equal(plugin.id, 'instagram'); assert.equal(plugin.name, 'Instagram');
   assert.deepEqual(plugin.hosts, ['instagram.com', 'www.instagram.com']);
   assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
-  assert.equal(Object.hasOwn(plugin, 'access'), false);
+  assert.deepEqual(plugin.access.domains, ['instagram.com']);
+  assert.equal(plugin.access.home, 'https://www.instagram.com/');
+  assert.equal(plugin.access.sessionRules.some(rule => rule.condition.excludedResourceTypes?.includes('sub_frame')), true);
+  assert.equal(plugin.access.unrestrictedRules.some(rule => rule.condition.excludedResourceTypes?.includes('main_frame')), true);
   assert.deepEqual(plugin.actions, ['posts', 'comments', 'likes', 'bookmarks']);
   const context = vm.createContext({});
   vm.runInContext(fs.readFileSync(require.resolve('./instagram.js'), 'utf8'), context);

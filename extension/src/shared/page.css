@@ -73,7 +73,23 @@
 .policy-details .policy-rules { margin-top: 12px; margin-bottom: 0; }
 
 .site-settings { list-style: none; margin: 28px 0 24px; padding: 0; }
-.site-preferences { padding: 24px 0; border-bottom: 1px solid var(--line); }
+.site-preferences { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.settings-page .site-preferences:not(.tracking-only-site) { display: grid; grid-template-columns: minmax(0, 1fr) 280px; align-items: center; gap: 8px 28px; }
+.settings-page .site-preferences:not(.tracking-only-site) .site-preference-heading { margin-bottom: 0; }
+.settings-page .site-preferences .site-mode-note { grid-column: 1 / -1; margin: 0; }
+.settings-page .site-preferences[data-site=""] .site-preference-heading { display: block; }
+.settings-page .site-preferences[data-site=""] .site-preference-heading small { display: block; margin-top: 6px; }
+.settings-page .site-preference-field { grid-template-columns: 96px minmax(0, 1fr); gap: 0 12px; }
+.settings-page .site-field-source { min-height: 24px; padding-top: 2px; }
+.settings-page .site-field-value { min-height: 40px; }
+.settings-page .site-settings { margin-top: 24px; }
+.settings-page .preference > #site-time-note { margin-top: 8px; }
+.settings-page .site-preferences input[type=number] { font-variant-numeric: tabular-nums; caret-color: var(--violet); }
+.settings-page .site-field-value input[type=number]:disabled { background: var(--paper); }
+.settings-page .site-field-source button { min-height: 32px; }
+.settings-page .site-tracking { gap: 8px; }
+.settings-page .site-tracking small { font-weight: 600; }
+.settings-page .site-preferences[data-enabled=false] .site-tracking small { font-weight: 400; }
 .site-preferences:last-child { border-bottom: 0; }
 .site-preferences[data-site=""] { padding: 24px 20px; margin: 0 -20px 8px; background: #f0edf7; border: 0; border-radius: 10px; }
 .site-preference-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -177,6 +193,11 @@
 .intention-list li div { font-size: 12px; color: var(--muted); }
 .intention-list li p { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
+@media (max-width: 760px) {
+  .settings-page .site-preferences:not(.tracking-only-site) { grid-template-columns: 1fr; gap: 8px; }
+  .settings-page .site-preference-field { grid-template-columns: 96px minmax(0, 1fr); }
+}
+
 @media (max-width: 600px) {
   .extension-page { padding: 0 24px; }
   .extension-page header { padding: 24px 0; flex-wrap: wrap; }
@@ -208,5 +229,9 @@
 @media (max-width: 380px) {
   .extension-page { padding: 0 20px; }
   .site-preference-field { grid-template-columns: 1fr; gap: 8px; }
+  .settings-page .site-preference-field { grid-template-columns: 88px minmax(0, 1fr); gap: 0 8px; }
+  .settings-page .site-preference-heading { gap: 8px 12px; }
+  .settings-page .site-tracking { font-size: 12px; gap: 6px; }
   .site-field-source { grid-column: 1; }
+  .settings-page .site-field-source { grid-column: 2; }
 }
