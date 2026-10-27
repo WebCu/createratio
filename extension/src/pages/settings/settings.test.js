@@ -15,6 +15,66 @@ function value(p, site = '') {
   return [minutes, c.source];
 }
 
+test('save confirmations fade after four seconds and polling does not extend their lifetime', async () => {
+  const p = settingsPage(); await p.ready();
+  p.toggle('x', false); await p.ready();
+  assert.match(p.nodes['save-status'].textContent, /Limit & track is off/);
+  assert.equal(p.timeouts.size, 1, 'a confirmation owns one dismissal timer');
+  const [dismissal, timer] = [...p.timeouts][0];
+  assert.equal(timer.ms, 4000);
+  p.refresh(); await p.ready();
+  assert.equal(p.timeouts.has(dismissal), true, 'background refresh does not restart the timer');
+  p.runTimeout(dismissal);
+  assert.equal(p.nodes['save-status'].hasAttribute('data-leaving'), true);
+  assert.match(p.nodes['save-status'].textContent, /Limit & track is off/, 'keep text during the fade');
+  const [cleanup, fade] = [...p.timeouts][0];
+  assert.equal(fade.ms, 180);
+  p.runTimeout(cleanup);
+  assert.equal(p.nodes['save-status'].textContent, '');
+  assert.equal(p.nodes['save-status'].hasAttribute('data-leaving'), false);
+  assert.equal(p.timeouts.size, 0);
+});
+test('repeated confirmations replace pending dismissal and fade cleanup without accumulating timers', async () => {
+  const p = settingsPage(); await p.ready();
+  for (let count = 0; count < 30; count++) {
+    p.toggle('x', false); await p.ready();
+    assert.equal(p.timeouts.size, 1);
+    const [dismissal] = p.timeouts.keys(); p.runTimeout(dismissal);
+    const [cleanup] = p.timeouts.keys();
+    p.toggle('x', true); await p.ready();
+    assert.equal(p.timeouts.has(cleanup), false, 'an old fade cannot erase a new confirmation');
+    assert.equal(p.timeouts.size, 1);
+    assert.equal(p.nodes['save-status'].hasAttribute('data-leaving'), false);
+    assert.match(p.nodes['save-status'].textContent, /Limit & track is on/);
+  }
+});
+test('save errors cancel an outgoing confirmation and remain visible until a successful retry', async () => {
+  const p = settingsPage(); await p.ready();
+  p.toggle('x', false); await p.ready();
+  assert.equal(p.timeouts.size, 1);
+  p.runTimeout([...p.timeouts.keys()][0]);
+  p.fail = true; p.toggle('x', true); await p.ready();
+  assert.equal(p.nodes['save-status'].textContent, '');
+  assert.equal(p.nodes.error.hidden, false);
+  assert.equal(p.nodes.error.textContent, 'Could not save.');
+  assert.equal(p.timeouts.size, 0, 'errors must not auto-dismiss');
+  p.refresh(); await p.ready();
+  assert.equal(p.nodes.error.hidden, false);
+  p.fail = false; p.toggle('x', true); await p.ready();
+  assert.equal(p.nodes.error.hidden, true);
+  assert.match(p.nodes['save-status'].textContent, /Limit & track is on/);
+  assert.equal(p.timeouts.size, 1);
+});
+test('opening a custom duration clears the previous confirmation and releases its timer', async () => {
+  const p = settingsPage(); await p.ready();
+  p.toggle('x', false); await p.ready();
+  const access = controls(p);
+  access.access.value = 'custom'; await access.access.fire('change');
+  assert.equal(p.nodes['save-status'].textContent, '');
+  assert.equal(p.timeouts.size, 0);
+  assert.equal(access.editor.hidden, false);
+  assert.equal(p.document.activeElement, access.custom);
+});
 test('malformed saves restore persisted controls without claiming success or notifying trackers', async () => {
   const p = settingsPage(); await p.ready();
   p.state.replies.set('tracking', { ok: true, settings: null });

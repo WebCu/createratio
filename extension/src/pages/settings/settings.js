@@ -5,8 +5,20 @@ const $ = id => document.getElementById(id);
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
 let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
 let scrollEditing = false, scrollPending = null, scrollSaving = null;
-function error(message = '') { $('error').textContent = message; $('error').hidden = !message; if (message) $('save-status').textContent = ''; }
-function saved(message) { error(); $('save-status').textContent = message; }
+let saveDismissTimer = null, saveCleanupTimer = null;
+function clearSaved() {
+  clearTimeout(saveDismissTimer); clearTimeout(saveCleanupTimer);
+  saveDismissTimer = saveCleanupTimer = null;
+  $('save-status').textContent = ''; $('save-status').removeAttribute('data-leaving');
+}
+function error(message = '') { $('error').textContent = message; $('error').hidden = !message; if (message) clearSaved(); }
+function saved(message) {
+  clearSaved(); error(); $('save-status').textContent = message;
+  saveDismissTimer = setTimeout(() => {
+    saveDismissTimer = null; $('save-status').setAttribute('data-leaving', '');
+    saveCleanupTimer = setTimeout(clearSaved, 180);
+  }, 4000);
+}
 const durationPresets = [5, 10, 15, 30, 45, 60];
 function createAccessField(site) {
   const suffix = site.id ? 'site-' + site.id : 'default';
@@ -147,7 +159,7 @@ async function saveAccessDuration(site, reset = false, custom = false) {
   if (control.busy.has('access') || input.disabled) return;
   if (!reset && !custom && input.value === 'custom') {
     access.editing = true; access.custom.value = C3.siteSettings(site, currentSettings).accessMinutes;
-    $('save-status').textContent = ''; error(); renderSite(control, currentSettings); access.custom.focus(); return;
+    clearSaved(); error(); renderSite(control, currentSettings); access.custom.focus(); return;
   }
   const field = custom ? access.custom : input;
   const minutes = reset || !custom && site && input.value === 'default' ? null : Number(field.value);
@@ -192,7 +204,7 @@ async function saveSitePreference(control, group, message) {
 async function saveScrollSettings() {
   const choice = { enabled: $('scroll-friction-enabled').checked, strength: Number($('scroll-friction-strength').value) };
   scrollEditing = false;
-  $('save-status').textContent = '';
+  clearSaved();
   if (!C3.validScrollFrictionStrength(choice.strength)) { error('Choose a valid scroll resistance.'); renderScroll(currentSettings); return; }
   scrollPending = scrollSaving?.enabled === choice.enabled && scrollSaving?.strength === choice.strength ? null : choice;
   if (scrollSettingBusy) { renderScroll(currentSettings); return; }
