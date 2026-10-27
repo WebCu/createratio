@@ -1,7 +1,8 @@
 # CreateRatio browser extension
 
-A dependency-free Manifest V3 extension for intentional access to X and LinkedIn
-and local creating-versus-consuming tracking, with an opt-in Facebook integration.
+A dependency-free Manifest V3 extension for intentional access and local
+creating-versus-consuming tracking on X, LinkedIn, TikTok and Instagram, with an
+opt-in, tracking-only Facebook integration.
 
 ## Layout and installation
 
@@ -26,8 +27,8 @@ harnesses stay in `src/tests/`. Test commands discover tests recursively, and th
 explicit build asset list excludes tests and harnesses.
 
 [Install the published Chrome extension from the Chrome Web Store](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk).
-Save X and LinkedIn drafts before installing; existing tabs redirect to the
-access gate.
+Save drafts on enabled gated sites before installing; existing tabs redirect
+to the access gate.
 [Install the published Firefox add-on](https://addons.mozilla.org/en-US/firefox/addon/createratio/).
 For development builds or Edge, follow the
 [build and installation instructions](../README.md#build-and-install).
@@ -119,13 +120,19 @@ replacement from a browser restart. Website-time sampling starts fresh.
 
 ## Using the extension
 
-- **Popup:** today's score, active time, and request/end-access controls.
-- **Settings:** **Limit & track** groups Default and gated controls;
-  **Tracking only** lists other integrations with compact switches when available.
-  Session times show **From Default** or **Custom**; **Use Default** removes an
-  override. Off disables time editing/reset without losing saved times.
-  Slow scrolling, above-goal access, Website time, intention saving, exports, and
-  history clearing remain separate. Preferences save automatically.
+- **Popup:** today's score and all four sites' request/end-access controls.
+  Off sites open directly. Session-time editing lives only in Settings.
+- **Settings:** four expandable sections, with **Websites** open initially.
+  Opening **Browsing**, **Privacy** or **Your data** closes the previous section.
+  **Websites** holds Limit & track switches, the Default session and per-site
+  duration menus. Choose a preset or **Custom…** for 1–240 whole minutes; custom
+  edits require **Save** or **Cancel**. Choosing **Default** or the reset button
+  removes a site override. Off disables editing without losing saved times.
+  **Browsing** holds Slow scrolling and Above-goal access; **Privacy** holds
+  intention saving and Website time; **Your data** holds exports and clearing.
+  Long explanations stay in disclosures. Preferences save automatically, except
+  an unconfirmed custom-time draft. New times affect new sessions and midnight
+  refills, not a running budget.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
   shareable daily/seven-day PNG cards, detailed reports, and CSV exports.
 
@@ -137,7 +144,7 @@ Open CreateRatio from the extensions menu; use **Open dashboard** or **Settings*
 for full pages rather than hard-coding an installation-specific extension ID.
 
 Site-access buttons have site-specific accessible names and describe the current
-state. Settings expose native switches and labeled session-time fields;
+state. Settings expose native section disclosures, switches and labeled duration menus;
 dashboard views expose pressed states and hide inactive panels. The access gate
 exposes its form, intention requirements, waiting/active regions, and disabled
 confirmation state. Use roles and names, not row positions. Check save status or
@@ -149,8 +156,9 @@ agent permission to change settings, export private data, or bypass access gates
 
 ### Site access
 
-X, Twitter aliases, and LinkedIn, including subdomains, are blocked on HTTP and
-HTTPS. Blocking covers the whole site, including posting and messages.
+Enabled X, Twitter aliases, LinkedIn, TikTok and Instagram, including subdomains,
+are blocked on HTTP and HTTPS. Blocking covers the whole site, including posting
+and messages.
 
 1. Visit a blocked site or choose **Request access**.
 2. Write an intention of 20–280 characters and start the **60-second wait**.
@@ -167,7 +175,7 @@ cancels its daily refill.
 
 **Save drafts before expiry:** open tabs redirect to the local blocked page.
 
-Optional **Allow sites while above the daily goal** skips gates and timers only
+Optional **Settings → Browsing → Above-goal access** skips gates and timers only
 while today's aggregate score is strictly above the current daily target
 (default 1.0). Existing timed budgets pause. At or below the target, on a new day,
 or when disabled, normal gates return unless a timed budget still has time.
@@ -180,6 +188,11 @@ history remain. Off discards the current budget and waiting request, including
 its midnight refill. Re-enabling requires a fresh intention and wait unless
 optional above-goal access applies. Fresh trusted input is required to measure.
 
+TikTok and Instagram start Off. Enable **Limit & track** in Settings to use the
+same intention, wait and active-time budgets as X and LinkedIn. Saved On/Off
+choices are preserved, including previously enabled tracking choices; enabled
+TikTok and Instagram sites now require access sessions. Save drafts before updating.
+
 New vetted integrations start disabled; arbitrary domains or user scripts cannot
 be added from the UI. Integrations without explicit gate support appear under
 **Tracking only**. Enabling one measures supported creating/consuming time and
@@ -189,7 +202,7 @@ restores native scrolling while keeping history.
 
 ### Slow scrolling
 
-**Settings → Slow scrolling** is on by default at **50% resistance**. Saved Off
+**Settings → Browsing → Slow scrolling** is on by default at **50% resistance**. Saved Off
 choices are preserved. Its **Scroll resistance** slider ranges from **50% (Light)**
 to **95% (Heavy)** in five-point steps. Higher resistance means less vertical page
 movement for the same wheel or trackpad gesture, in either direction. The default
@@ -249,6 +262,8 @@ Old Twitter URLs must redirect to X first.
 | --- | --- | --- |
 | X | Home, Explore, Search, other profiles and status pages | Post/reply/quote editors and a focused home composer |
 | LinkedIn | Feed and other personal/company/school profiles | Focused post, comment, or direct-message editors |
+| TikTok | For You, Following, Explore, Search, tags, music, profiles, videos and photos | Focused comment, upload-caption, or message editors |
+| Instagram | Feed, Explore, Search, Reels, tagged feeds, posts, stories and profiles | Focused comment, dialog-caption, or message editors |
 | Facebook | Home, Watch feed, reels, group feeds/posts, supported permalink and numeric-profile routes | Focused post-dialog, comment, or messaging-page editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
@@ -298,12 +313,45 @@ Charts show active time without action credits.
 See the [core contract](core/README.md) and [integration interface](sites/README.md)
 for contributor-facing details.
 
+### TikTok tracking
+
+TikTok starts Off under **Settings → Websites → TikTok → Limit & track**. Enabling adds the shared
+intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Blocking covers HTTP/S `tiktok.com` and its subdomains; creation tracking uses only
+HTTPS `tiktok.com` and `www.tiktok.com`. Off restores free access and native
+scrolling while retaining history and saved duration.
+
+Scoped comment Post controls and plain Enter count comments; upload-caption Post
+controls count posts. Positive Like and Save controls count without score credit.
+Reading `/messages` is neutral; focused message editors create without submit
+bonuses. Upload pages create only while a recognized caption editor is focused.
+Mobile hosts, live streams, unsupported shortcuts and ambiguous controls are not
+supported. Recognition uses specific `data-e2e` controls and composer structure;
+synthetic fixtures do not prove current authenticated markup or publication.
+
+### Instagram tracking
+
+Instagram starts Off under **Settings → Websites → Instagram → Limit & track**. Enabling adds the shared
+intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Blocking covers HTTP/S `instagram.com` and its subdomains; creation tracking uses
+only HTTPS `instagram.com` and `www.instagram.com`. Off restores free access and
+native scrolling while retaining history and saved duration.
+
+Scoped comment Post controls and plain Enter count comments; caption-dialog Share
+counts posts, including Reels with rich-text captions. Positive Like and Save
+controls count without score credit. Reading Direct stays neutral; focused
+supported message editors create without submission
+bonuses. English labels are recognized; ambiguous controls, unsupported shortcuts,
+and upload steps without a recognized caption submit do not count. Mobile hosts
+are unsupported. Synthetic fixtures do not prove current authenticated markup or
+publication.
+
 ### Facebook tracking
 
-Facebook starts Off under **Settings → Tracking only**. It uses the exact HTTPS
-hosts `facebook.com` and `www.facebook.com`, with no access gate or session timer.
-Enabling applies the shared Slow scrolling preference on consuming pages. Off
-restores native scrolling and retains history.
+Facebook starts Off under **Settings → Websites → Tracking only**. It uses the
+exact HTTPS hosts `facebook.com` and `www.facebook.com`, with no access gate or
+session timer. Enabling applies the shared Slow scrolling preference on consuming
+pages. Off restores native scrolling and retains history.
 
 A scoped create-post dialog's Post control counts posts; scoped comment/reply
 submits and plain Enter in comment editors count comments. Reactions, shares,
@@ -412,9 +460,12 @@ optional intention history saves the text you explicitly submit. Nothing uses
 `storage.sync`.
 
 Required permissions are `storage`, `alarms`, and
-`declarativeNetRequestWithHostAccess`. Host access is limited to X, Twitter aliases,
-and LinkedIn. Facebook adds only exact HTTPS root and `www.` host permissions,
-not HTTP or wildcard subdomains. Updates can require browser approval of these hosts.
+`declarativeNetRequestWithHostAccess`. Host access is limited to HTTP/S X, Twitter
+aliases, LinkedIn, TikTok and Instagram, including their subdomains, for access
+gating. Creation tracking still uses each site's exact HTTPS hosts. Facebook adds
+only exact HTTPS root and `www.` host permissions, not HTTP or wildcard subdomains.
+The expanded TikTok/Instagram scope and new Facebook hosts can require browser
+approval when updating.
 Optional `tabs` and `idle` permissions are requested only for
 all-website time. No browser-history or all-sites host permission is requested.
 Chromium restricts aggregate storage to trusted extension contexts; Firefox's
@@ -423,8 +474,9 @@ tracker communicates through background messages. Website scripts cannot access 
 
 **Send feedback** in store-installed Chrome builds opens the extension's store
 reviews page. Reviews are public and handled by Google; no activity data is
-attached. Unpacked builds have no feedback link, and Edge/Firefox links are not
-configured. Do not include private data or CSV exports in reviews.
+attached. Unpacked builds, Edge/Firefox builds and failed store lookups omit the
+unavailable feedback control. Privacy policy and Terms of use remain accessible.
+Do not include private data or CSV exports in reviews.
 
 ## Limitations and verification
 

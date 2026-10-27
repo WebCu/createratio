@@ -62,4 +62,8 @@ async function unlock(w, site = 'x') {
   assert.equal(result.ok, true); return result;
 }
 const popupSender = { id: 'test-extension', url: 'chrome-extension://test-extension/popup.html' };
-module.exports = { worker, activeWorker, unlock, gate, intent, popupSender };
+function rulesFor(w, sites = ['x', 'linkedin']) {
+  const ids = sites.flatMap(site => require('../../sites/index.js').get(site).access.ruleIds);
+  return w.rules.filter(rule => ids.includes(rule.id));
+}
+module.exports = { worker, activeWorker, unlock, gate, intent, popupSender, rulesFor };

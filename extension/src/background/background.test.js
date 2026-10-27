@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../../core/core.js');
-const { worker, activeWorker, unlock, gate, intent, popupSender } = require('../tests/background-harness.js');
+const { worker, activeWorker, unlock, gate, intent, popupSender, rulesFor } = require('../tests/background-harness.js');
 const { tracker } = require('../tests/content-harness.js');
 test('initializes Chromium and Firefox backgrounds with their available storage APIs', async () => {
   for (const browser of ['chrome', 'browser']) {
@@ -100,14 +100,14 @@ test('shared access lifecycle uses a third module’s home, aliases, session rul
     assert.equal(result.access.example.name, 'Example'); assert.equal(result.access.example.home, access.home);
     assert.equal(result.access.example.remainingMs, 0);
     await unlock(w, 'example');
-    assert.deepEqual(w.rules, access.sessionRules);
+    assert.deepEqual(w.rules.filter(rule => access.ruleIds.includes(rule.id)), access.sessionRules);
     w.tabs.push({ id: 1, url: 'http://mobile.alias.test/read' }, { id: 2, url: 'https://example.test.evil.test/' });
     result = await w.send({ type: 'access-end', site: 'example' }, gate('example'));
-    assert.equal(result.ok, true); assert.equal(result.access.example.remainingMs, 0); assert.deepEqual(w.rules, []);
+    assert.equal(result.ok, true); assert.equal(result.access.example.remainingMs, 0); assert.deepEqual(w.rules.filter(rule => access.ruleIds.includes(rule.id)), []);
     assert.equal(w.tabs[0].url, gate('example').url); assert.equal(w.tabs[1].url, 'https://example.test.evil.test/');
     result = await w.send(tracking('example', false), popupSender);
     assert.equal(result.ok, true); assert.equal(result.access.example.enabled, false);
-    assert.deepEqual(w.rules, access.unrestrictedRules);
+    assert.deepEqual(w.rules.filter(rule => access.ruleIds.includes(rule.id)), access.unrestrictedRules);
   }
 });
 
@@ -118,7 +118,7 @@ test('Limit & track Off removes gates and measurement, preserves history and sav
     const result = await w.send(tracking('x', false), popupSender);
     assert.equal(result.ok, true); assert.equal(result.access.x.enabled, false); assert.equal(result.access.x.remainingMs, 0);
     assert.equal(w.data._access.x, undefined); assert.equal(w.alarms['access-x'], undefined);
-    assert.deepEqual(w.rules, [
+    assert.deepEqual(rulesFor(w), [
       { id: 101, priority: 2, action: { type: 'allow' }, condition: { requestDomains: ['x.com', 'twitter.com'], resourceTypes: ['main_frame'] } },
       { id: 104, priority: 2, action: { type: 'allow' }, condition: { requestDomains: ['x.com', 'twitter.com'], excludedResourceTypes: ['main_frame'] } }
     ]);
@@ -133,7 +133,7 @@ test('Limit & track On restores blocking immediately and requires a new access s
   const w = worker({ settings: { trackedSites: ['linkedin'] } });
   w.tabs.push({ id: 1, url: 'https://x.com/home' }); await w.send({ type: 'access-status' });
   const on = await w.send(tracking('x', true), popupSender);
-  assert.equal(on.access.x.enabled, true); assert.equal(on.access.x.remainingMs, 0); assert.deepEqual(w.rules, []);
+  assert.equal(on.access.x.enabled, true); assert.equal(on.access.x.remainingMs, 0); assert.deepEqual(rulesFor(w), []);
   assert.equal(w.tabs[0].url, gate('x').url);
   await w.send(packet('before-session')); assert.equal(w.data[C.localDate()], undefined);
   await unlock(w); await w.send(packet('during-session')); assert.equal(w.data[C.localDate()].x.consumeSec, 5);
@@ -151,7 +151,7 @@ test('goal-based access is opt-in, uses today’s exact score and keeps frame re
     const date = C.localDate();
     const w = worker({ [date]: { x: { createSec: 121, consumeSec: 120 } } }, browser);
     assert.equal((await w.send({ type: 'access-status' })).access.x.goalAllowed, false);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
     assert.equal((await w.send({ type: 'access-goal-setting', enabled: true }, popupSender)).ok, true);
     const result = await w.send({ type: 'access-status' });
     for (const site of ['x', 'linkedin']) {
@@ -159,21 +159,21 @@ test('goal-based access is opt-in, uses today’s exact score and keeps frame re
       assert.equal(result.access[site].remainingMs, 0);
       assert.equal(result.access[site].expiresAt, 0);
     }
-    assert.equal(w.rules.length, 3);
+    assert.equal(rulesFor(w).length, 3);
     assert.deepEqual(w.rules.find(rule => rule.id === 101).condition.excludedResourceTypes, ['sub_frame']);
     assert.deepEqual(w.rules.find(rule => rule.id === 103).condition.initiatorDomains, ['linkedin.com']);
     assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
     assert.equal(w.data._access, undefined, 'goal access creates no timed session');
     w.tabs.push({ id: 1, url: 'https://x.com/home' }, { id: 2, url: 'https://www.linkedin.com/feed/' });
     assert.equal((await w.send(packet('fall-to-goal'))).ok, true);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
     assert.equal(w.tabs[0].url, gate('x').url);
     assert.equal(w.tabs[1].url, gate('linkedin').url);
   }
   for (const day of [{}, { x: { createSec: 120, consumeSec: 120 } }, { x: { createSec: 119, consumeSec: 120 } }]) {
     const w = worker({ settings: { allowAboveGoal: true }, [C.localDate()]: day });
     assert.equal((await w.send({ type: 'access-status' })).access.x.goalAllowed, false);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
   }
 });
 test('goal-based access follows the current configurable daily target, including mid-day changes', async () => {
@@ -184,7 +184,7 @@ test('goal-based access follows the current configurable daily target, including
     w.tabs.push({ id: 1, url: 'https://x.com/home' });
     w.data.settings.dailyTarget = 2;
     assert.equal((await w.send({ type: 'snapshot' })).access.x.goalAllowed, false, 'raising the goal immediately restores the gate');
-    assert.deepEqual(w.rules, []); assert.equal(w.tabs[0].url, gate('x').url);
+    assert.deepEqual(rulesFor(w), []); assert.equal(w.tabs[0].url, gate('x').url);
     w.data[date].x.createSec = 360;
     assert.equal((await w.send({ type: 'access-status' })).access.x.goalAllowed, true);
     w.data.settings.dailyTarget = 3;
@@ -209,7 +209,7 @@ test('goal-based preference rejects untrusted senders and invalid values, and di
   w.tabs.push({ id: 1, url: 'https://x.com/home' });
   assert.equal((await w.send({ type: 'access-end', site: 'x' }, popupSender)).ok, false);
   assert.equal((await w.send({ ...message, enabled: false }, popupSender)).ok, true);
-  assert.deepEqual(w.rules, []);
+  assert.deepEqual(rulesFor(w), []);
   assert.equal(w.tabs[0].url, gate('x').url);
 });
 test('goal-based access survives restart but yesterday’s score cannot unlock a new day', async () => {
@@ -222,7 +222,7 @@ test('goal-based access survives restart but yesterday’s score cannot unlock a
   assert.equal(w.tabs[0].url, 'https://x.com/home');
   w.advance(60000); w.alarm('daily-badge');
   assert.equal((await w.send({ type: 'access-status' })).access.x.goalAllowed, false);
-  assert.deepEqual(w.rules, []);
+  assert.deepEqual(rulesFor(w), []);
   assert.equal(w.tabs[0].url, gate('x').url);
 });
 test('goal-based access pauses an existing timed budget and resumes it below the goal', async () => {
@@ -241,7 +241,7 @@ test('goal-based access pauses an existing timed budget and resumes it below the
   assert.equal(below.access.x.goalAllowed, false);
   assert.equal(below.access.x.remainingMs, 290000);
   assert.equal(below.access.x.expiresAt, w.now + 290000);
-  assert.equal(w.rules.length, 1);
+  assert.equal(rulesFor(w).length, 1);
 });
 
 test('intention history is opt-in, saves accepted requests once, and survives restart', async () => {
@@ -306,12 +306,16 @@ test('a new unblock records a refill timestamp but repeated confirmation does no
   assert.equal(repeated.access.x.refilledAt, refilledAt);
   assert.equal(repeated.access.x.remainingMs, 300000);
 });
-test('whole-site access is blocked by default with no allow rules', async () => {
+test('X and LinkedIn start blocked while opt-in TikTok and Instagram remain unrestricted', async () => {
   for (const browser of ['chrome', 'browser']) {
     const w = worker({}, browser), result = await w.send({ type: 'access-status' });
     assert.equal(result.ok, true);
     for (const site of ['x', 'linkedin']) assert.equal(result.access[site].expiresAt, 0);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
+    for (const site of ['tiktok', 'instagram']) {
+      assert.equal(result.access[site].enabled, false);
+      assert.deepEqual(rulesFor(w, [site]), require('../../sites/index.js').get(site).access.unrestrictedRules);
+    }
   }
 });
 test('invalid intentions and unsupported senders return rejections without reporting worker crashes', async () => {
@@ -348,7 +352,7 @@ test('unlock requires a specific intention, the full wait and explicit confirmat
   assert.equal(result.access.x.remainingMs, 300000);
   assert.equal(result.access.x.expiresAt, 0, 'access starts paused on the gate');
   assert.equal(result.access.linkedin.expiresAt, 0);
-  assert.deepEqual(w.rules.map(rule => rule.condition.requestDomains), [['x.com', 'twitter.com']]);
+  assert.deepEqual(rulesFor(w).map(rule => rule.condition.requestDomains), [['x.com', 'twitter.com']]);
   assert.deepEqual(w.rules[0].condition.excludedResourceTypes, ['sub_frame'], 'site resources unlock, embedded frames do not');
   assert.equal(w.rules[0].condition.resourceTypes, undefined);
   assert.equal(w.alarms['access-x'], undefined);
@@ -378,7 +382,7 @@ test('LinkedIn frame exceptions survive worker restart but are revoked at expiry
     const first = worker(); await unlock(first, 'linkedin');
     const w = worker(first.data, 'chrome', first.now);
     await w.send({ type: 'access-status' });
-    assert.equal(w.rules.length, 2);
+    assert.equal(rulesFor(w).length, 2);
     w.tabs.push({ id: 1, url: 'https://www.linkedin.com/notifications/' });
     w.activate(w.tabs[0].url); await w.send({ type: 'access-status' });
     if (ending === 'expiry') w.advance(300000);
@@ -386,11 +390,11 @@ test('LinkedIn frame exceptions survive worker restart but are revoked at expiry
     const message = ending === 'expiry' ? { type: 'access-status' } : { type: 'access-end', site: 'linkedin' };
     const popup = { id: 'test-extension', url: 'chrome-extension://test-extension/popup.html' };
     assert.equal((await w.send(message, popup)).ok, false);
-    assert.equal(w.rules.length, 2, 'failed revocation retains both rules for retry');
+    assert.equal(rulesFor(w).length, 2, 'failed revocation retains both rules for retry');
     assert.ok(w.data._access.linkedin.remainingMs);
     w.failRules = false;
     assert.equal((await w.send(message, popup)).ok, true);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
     assert.equal(w.tabs[0].url, gate('linkedin').url);
   }
 });
@@ -401,7 +405,7 @@ test('content scripts, popup, spoofed gates and subframes cannot start or confir
     assert.equal((await w.send({ type: 'access-begin', site: 'x', reason: intent }, sender)).ok, false);
     assert.equal((await w.send({ type: 'access-open', site: 'x' }, sender)).ok, false);
   }
-  assert.deepEqual(w.rules, []);
+  assert.deepEqual(rulesFor(w), []);
 });
 test('rejects unknown sites and inherited object keys without persisting access', async () => {
   const w = worker();
@@ -409,7 +413,7 @@ test('rejects unknown sites and inherited object keys without persisting access'
     assert.equal((await w.send({ type: 'access-begin', site, reason: intent }, gate(site))).ok, false);
     assert.equal((await w.send({ type: 'access-open', site }, gate(site))).ok, false);
   }
-  assert.equal(w.data._access, undefined); assert.deepEqual(w.rules, []);
+  assert.equal(w.data._access, undefined); assert.deepEqual(rulesFor(w), []);
 });
 test('concurrent gates share a wait and repeated opens cannot extend a session', async () => {
   const w = worker();
@@ -443,7 +447,7 @@ test('expiry revokes access and redirects all matching open tabs, not unrelated 
   w.advance(300000); w.alarm('access-x');
   const result = await w.send({ type: 'access-status' });
   assert.equal(result.access.x.expiresAt, 0);
-  assert.deepEqual(w.rules, []);
+  assert.deepEqual(rulesFor(w), []);
   assert.equal(w.tabs[0].url, gate('x').url); assert.equal(w.tabs[1].url, gate('x').url);
   assert.equal(w.tabs[2].url, 'https://x.com.evil.test/home'); assert.equal(w.tabs[3].url, 'https://www.linkedin.com/feed/');
   assert.equal(w.data._access.x.expiresAt, undefined);
@@ -453,13 +457,13 @@ test('startup restores unused budgets, migrates legacy deadlines and blocks pre-
   const resumed = worker(structuredClone(first.data), 'chrome', first.now + 1000000);
   resumed.startup();
   assert.equal((await resumed.send({ type: 'access-status' })).access.x.remainingMs, 300000);
-  assert.equal(resumed.rules.length, 1);
+  assert.equal(rulesFor(resumed).length, 1);
   const legacy = worker({ _access: { x: { expiresAt: first.now + 300000 } } }, 'chrome', first.now + 100000);
   assert.equal((await legacy.send({ type: 'access-status' })).access.x.remainingMs, 200000);
   const expired = worker({ _access: { x: { expiresAt: first.now + 300000 } } }, 'chrome', first.now + 300000);
   expired.tabs.push({ id: 1, url: 'https://x.com/home' }); expired.startup();
   assert.equal((await expired.send({ type: 'access-status' })).access.x.expiresAt, 0);
-  assert.deepEqual(expired.rules, []); assert.equal(expired.tabs[0].url, gate('x').url);
+  assert.deepEqual(rulesFor(expired), []); assert.equal(expired.tabs[0].url, gate('x').url);
   const fresh = worker(); fresh.tabs.push({ id: 1, url: 'https://www.linkedin.com/messaging/' }); fresh.install();
   await fresh.send({ type: 'access-status' }); assert.equal(fresh.tabs[0].url, gate('linkedin').url);
 });
@@ -470,10 +474,10 @@ test('worker wake or re-enable blocks existing tabs even without an expired sess
 });
 test('both sites have independent sessions and ending one does not end the other', async () => {
   const w = worker(); await unlock(w, 'x'); await unlock(w, 'linkedin');
-  assert.equal(w.rules.length, 3);
+  assert.equal(rulesFor(w).length, 3);
   const result = await w.send({ type: 'access-end', site: 'x' }, { id: 'test-extension', url: 'chrome-extension://test-extension/popup.html' });
   assert.equal(result.ok, true); assert.equal(result.access.x.expiresAt, 0); assert.ok(result.access.linkedin.remainingMs);
-  assert.deepEqual(w.rules.map(rule => rule.id), [102, 103]);
+  assert.deepEqual(rulesFor(w).map(rule => rule.id), [102, 103]);
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
 });
 test('cancelling a wait forces a new full wait', async () => {
@@ -492,7 +496,7 @@ test('failed rule revocation preserves the running budget for a retry', async ()
   assert.ok(w.data._access.x.remainingMs);
   w.failRules = false;
   assert.equal((await w.send({ type: 'access-status' })).access.x.expiresAt, 0);
-  assert.deepEqual(w.rules, []);
+  assert.deepEqual(rulesFor(w), []);
 });
 
 const tracking = (site, enabled) => ({ type: 'tracking', site, enabled });
@@ -636,7 +640,7 @@ test('access budget pauses away from the site and resumes across tabs without do
   w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
   w.advance(260000); w.alarm('access-x');
   assert.equal((await w.send({ type: 'access-status' })).access.x.remainingMs, 0);
-  assert.deepEqual(w.rules, []);
+  assert.deepEqual(rulesFor(w), []);
 });
 
 test('navigation and closing the active tab pause access without storing tab IDs or URLs', async () => {
@@ -734,7 +738,7 @@ test('Limit & track uses the session timer on creating pages, while Off has no t
     w.advance(60000); const status = await w.send({ type: 'access-status' });
     assert.equal(status.access.x.enabled, enabled); assert.equal(status.access.x.remainingMs, 0);
     assert.equal(w.tabs[0].url, enabled ? 'chrome-extension://test-extension/blocked.html?site=x' : 'https://x.com/compose/post');
-    assert.equal(w.rules.length, enabled ? 0 : 2);
+    assert.equal(rulesFor(w).length, enabled ? 0 : 2);
   }
 });
 test('access duration is validated, persisted and only affects new sessions until midnight', async () => {
@@ -808,7 +812,7 @@ test('paused access refills at local midnight using the current configured durat
     assert.equal(state.remainingMs, 720000);
     assert.equal(state.refilledAt, midnight);
     assert.equal(state.expiresAt, 0);
-    assert.equal(w.rules.length, 1);
+    assert.equal(rulesFor(w).length, 1);
     assert.equal(w.alarms['access-midnight'].when, new Date(2026, 9, 13).getTime());
     w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
     w.advance(5000); w.alarm('access-midnight');
@@ -860,7 +864,7 @@ test('midnight does not unlock never-opened or ended sessions or skip intention 
     const result = await w.send({ type: 'access-status' });
     assert.equal(result.access.x.remainingMs, 0, ending);
     assert.equal(result.access.linkedin.remainingMs, 0, ending);
-    assert.deepEqual(w.rules, [], ending);
+    assert.deepEqual(rulesFor(w), [], ending);
     assert.equal(w.alarms['access-midnight'], undefined, ending);
     if (ending === 'waiting') assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
   }
@@ -874,13 +878,13 @@ test('exhausted access refills at midnight even if expiry was reconciled late', 
     w.advance(300000);
     if (checkExpiry) {
       assert.equal((await w.send({ type: 'access-status' })).access.x.remainingMs, 0);
-      assert.deepEqual(w.rules, []);
+      assert.deepEqual(rulesFor(w), []);
       assert.equal(w.alarms['access-midnight'].when, midnight);
     }
     w.advance(midnight - w.now); w.alarm('access-midnight');
     const state = (await w.send({ type: 'access-status' })).access.x;
     assert.equal(state.remainingMs, 300000);
-    assert.equal(w.rules.length, 1);
+    assert.equal(rulesFor(w).length, 1);
   }
 });
 
@@ -940,7 +944,7 @@ test('above-goal access tracks enabled sites but never overrides Off or saves Of
     const result = await w.send(packet('goal-tracked', 'linkedin'), { id: 'test-extension', tab: { id: 2 }, frameId: 0, url: 'https://www.linkedin.com/feed/' });
     assert.equal(result.ok, true); assert.equal(w.data[date].linkedin.consumeSec, 5);
     assert.equal(result.access.linkedin.goalAllowed, false); assert.equal(result.access.x.enabled, false);
-    assert.deepEqual(w.rules.map(rule => rule.id), [101, 104]);
+    assert.deepEqual(rulesFor(w).map(rule => rule.id), [101, 104]);
     assert.equal((await w.send(tracking('x', true), popupSender)).access.x.remainingMs, 0);
     await unlock(w); assert.equal(w.data._intentions.length, 1);
   }

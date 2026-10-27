@@ -5,37 +5,70 @@ const $ = id => document.getElementById(id);
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
 let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
 let scrollEditing = false, scrollPending = null, scrollSaving = null;
-function error(message = '') { $('error').textContent = message; $('error').hidden = !message; if (message) $('save-status').textContent = ''; }
-function saved(message) { error(); $('save-status').textContent = message; }
+let saveDismissTimer = null, saveCleanupTimer = null;
+function clearSaved() {
+  clearTimeout(saveDismissTimer); clearTimeout(saveCleanupTimer);
+  saveDismissTimer = saveCleanupTimer = null;
+  $('save-status').textContent = ''; $('save-status').removeAttribute('data-leaving');
+}
+function error(message = '') { $('error').textContent = message; $('error').hidden = !message; if (message) clearSaved(); }
+function saved(message) {
+  clearSaved(); error(); $('save-status').textContent = message;
+  saveDismissTimer = setTimeout(() => {
+    saveDismissTimer = null; $('save-status').setAttribute('data-leaving', '');
+    saveCleanupTimer = setTimeout(clearSaved, 180);
+  }, 4000);
+}
+const durationPresets = [5, 10, 15, 30, 45, 60];
 function createAccessField(site) {
+  const suffix = site.id ? 'site-' + site.id : 'default';
   const node = document.createElement('div'); node.className = 'site-preference-field';
-  const heading = document.createElement('label'); heading.textContent = 'Session time';
+  const heading = document.createElement('label'); heading.textContent = 'Session time'; heading.className = 'sr-only';
   const line = document.createElement('div'); line.className = 'site-field-value';
-  const unit = document.createElement('span'), sourceLine = document.createElement('div'), source = document.createElement('small');
-  sourceLine.className = 'site-field-source'; source.id = 'accessMinutes-source-' + (site.id ? 'site-' + site.id : 'default'); sourceLine.append(source);
-  const input = document.createElement('input'); input.type = 'number';
-  input.id = 'accessMinutes-' + (site.id ? 'site-' + site.id : 'default'); heading.htmlFor = input.id;
-  input.setAttribute('aria-label', 'Session time for ' + site.name); input.setAttribute('aria-describedby', source.id);
-  input.min = String(C3.ACCESS_LIMITS.minMinutes); input.max = String(C3.ACCESS_LIMITS.maxMinutes); input.step = '1'; unit.textContent = 'active min';
+  const source = document.createElement('small'); source.id = 'accessMinutes-source-' + suffix; source.className = 'sr-only';
+  const input = document.createElement('select'); input.id = 'accessMinutes-' + suffix; heading.htmlFor = input.id;
+  input.setAttribute('aria-label', 'Session time for ' + site.name); input.setAttribute('aria-describedby', source.id + ' site-time-note');
+  function option(value, text) {
+    const item = document.createElement('option'); item.value = String(value); item.textContent = text; input.append(item); return item;
+  }
+  const defaultOption = site.id ? option('default', 'Default') : null;
+  for (const minutes of durationPresets) option(minutes, minutes + ' min');
+  const savedOption = option('', ''); savedOption.hidden = true;
+  option('custom', 'Custom…');
   input.addEventListener('change', () => saveAccessDuration(site.id)); line.append(input);
   let reset = null;
   if (site.id) {
-    reset = document.createElement('button'); reset.type = 'button'; reset.textContent = 'Use Default'; reset.id = 'access-reset-' + site.id;
-    reset.setAttribute('aria-label', 'Use Default session time for ' + site.name);
-    reset.addEventListener('click', () => saveAccessDuration(site.id, true)); sourceLine.append(reset);
+    reset = document.createElement('button'); reset.type = 'button'; reset.className = 'duration-reset'; reset.id = 'access-reset-' + site.id;
+    reset.setAttribute('aria-label', 'Use Default session time for ' + site.name); reset.title = 'Use Default';
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); icon.setAttribute('viewBox', '0 0 20 20'); icon.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M4 8a6 6 0 1 1 0 6M4 3v5h5'); icon.append(path); reset.append(icon);
+    reset.addEventListener('click', () => saveAccessDuration(site.id, true)); line.append(reset);
   }
-  line.append(unit); node.append(heading, line, sourceLine);
-  return { node, input, source, reset };
+  const editor = document.createElement('form'); editor.className = 'custom-duration'; editor.id = 'custom-duration-' + suffix; editor.hidden = true;
+  const customLabel = document.createElement('label'); customLabel.textContent = 'Custom time'; customLabel.htmlFor = 'customMinutes-' + suffix;
+  const custom = document.createElement('input'); custom.type = 'number'; custom.id = customLabel.htmlFor; custom.required = true;
+  custom.min = String(C3.ACCESS_LIMITS.minMinutes); custom.max = String(C3.ACCESS_LIMITS.maxMinutes); custom.step = '1';
+  custom.setAttribute('aria-label', 'Custom session time for ' + site.name); custom.setAttribute('aria-describedby', 'site-time-note');
+  const unit = document.createElement('span'); unit.textContent = 'min';
+  const apply = document.createElement('button'); apply.type = 'submit'; apply.textContent = 'Save'; apply.id = 'custom-save-' + suffix;
+  apply.setAttribute('aria-label', 'Save custom session time for ' + site.name);
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.id = 'custom-cancel-' + suffix;
+  cancel.setAttribute('aria-label', 'Cancel custom session time for ' + site.name);
+  editor.addEventListener('submit', event => { event.preventDefault(); return saveAccessDuration(site.id, false, true); });
+  cancel.addEventListener('click', () => { const control = siteControls.get(site.id); control.access.editing = false; renderSite(control, currentSettings, site.id + ':access'); input.focus(); });
+  editor.append(customLabel, custom, unit, apply, cancel); node.append(heading, line, source, editor);
+  return { node, input, source, reset, defaultOption, savedOption, editor, custom, apply, cancel, editing: false };
 }
 function createSite(site) {
   const trackingOnly = !!site.id && !accessSites.has(site.id);
   const row = document.createElement('li'); row.className = 'site-preferences' + (trackingOnly ? ' tracking-only-site' : ''); row.setAttribute('data-site', site.id);
   const header = document.createElement('div'); header.className = 'site-preference-heading';
-  const name = document.createElement('h3'); name.textContent = site.name; header.append(name);
+  const name = document.createElement('h3'); name.textContent = site.id ? site.name : 'Default session'; header.append(name);
   let tracking = null, trackingStatus = null;
   if (site.id) {
     const group = document.createElement('div'); group.className = 'site-tracking';
     const label = document.createElement('label'); label.htmlFor = 'track-' + site.id; label.textContent = trackingOnly ? 'Track' : 'Limit & track';
+    if (!trackingOnly) label.className = 'sr-only';
     tracking = document.createElement('input'); tracking.id = label.htmlFor; tracking.type = 'checkbox';
     tracking.setAttribute('role', 'switch'); tracking.setAttribute('aria-label', (trackingOnly ? 'Track creating & consuming' : 'Limit & track') + ' on ' + site.name);
     trackingStatus = document.createElement('small'); trackingStatus.id = 'tracking-status-' + site.id;
@@ -43,18 +76,13 @@ function createSite(site) {
     tracking.addEventListener('change', () => saveTracking(site.id));
     group.append(label, tracking, trackingStatus); header.append(group);
   } else {
-    const note = document.createElement('small'); note.textContent = 'Fallback for gated sites'; header.append(note);
+    const note = document.createElement('small'); note.textContent = 'Used unless a site has its own time.'; header.append(note);
   }
   const access = trackingOnly ? null : createAccessField(site);
-  let note = null;
   row.append(header);
   if (access) row.append(access.node);
-  if (site.id && !trackingOnly) {
-    note = document.createElement('p'); note.className = 'site-mode-note';
-    note.textContent = 'Off: browse freely. No wait, time limit, or creation-score tracking.'; row.append(note);
-  }
-  $(trackingOnly ? 'tracking-only-settings' : 'site-settings').append(row);
-  return { site, row, access, tracking, trackingStatus, note, busy: new Set() };
+  $(trackingOnly ? 'tracking-only-settings' : site.id ? 'site-settings' : 'default-settings').append(row);
+  return { site, row, access, tracking, trackingStatus, busy: new Set() };
 }
 function renderSite(control, settings, force) {
   const { site, access } = control;
@@ -62,13 +90,18 @@ function renderSite(control, settings, force) {
   const enabled = !site.id || C3.trackingEnabled(site.id, settings);
   const inactive = !!site.id && !enabled, switching = control.busy.has('tracking');
   control.row.setAttribute('aria-busy', String(control.busy.size > 0));
-  if (control.note) control.note.hidden = !inactive;
+  control.row.setAttribute('data-enabled', String(enabled));
   if (access) {
-    if (!control.busy.has('access') && (force === site.id + ':access' || document.activeElement !== access.input)) access.input.value = effective.accessMinutes;
+    if (access.defaultOption) access.defaultOption.textContent = 'Default · ' + C3.siteSettings('', settings).accessMinutes + ' min';
+    access.savedOption.value = String(effective.accessMinutes); access.savedOption.textContent = effective.accessMinutes + ' min';
+    access.savedOption.hidden = durationPresets.includes(effective.accessMinutes);
+    if (inactive) access.editing = false;
+    if (!control.busy.has('access') && (force === site.id + ':access' || document.activeElement !== access.input)) access.input.value = access.editing ? 'custom' : site.id && !overridden ? 'default' : effective.accessMinutes;
     access.input.disabled = control.busy.has('access') || switching || inactive;
     access.source.textContent = !site.id ? 'Default' : overridden ? 'Custom' : 'From Default';
-    access.source.className = overridden ? 'settings-source-custom' : '';
-    if (access.reset) { access.reset.hidden = !overridden; access.reset.disabled = control.busy.has('access') || switching || inactive; }
+    access.editor.hidden = !access.editing;
+    access.custom.disabled = access.apply.disabled = access.cancel.disabled = access.input.disabled;
+    if (access.reset) { access.reset.hidden = !overridden; access.reset.disabled = access.input.disabled; }
   }
   if (control.tracking) {
     if (!switching) control.tracking.checked = C3.trackingEnabled(site.id, settings);
@@ -93,7 +126,7 @@ function renderScroll(settings) {
 function render(settings, force = '') {
   currentSettings = settings;
   if (!siteControls.size) {
-    $('site-settings').replaceChildren(); $('tracking-only-settings').replaceChildren();
+    $('default-settings').replaceChildren(); $('site-settings').replaceChildren(); $('tracking-only-settings').replaceChildren();
     $('tracking-only-section').hidden = !C3.SITES.some(site => !site.gated);
   }
   for (const site of [{ id: '', name: 'Default' }, ...C3.SITES]) {
@@ -108,7 +141,7 @@ function render(settings, force = '') {
   $('intention-history-enabled').disabled = intentionSettingBusy;
   if (!websiteSettingBusy) $('website-time-enabled').checked = websiteTimeEnabled;
   $('website-time-enabled').disabled = websiteSettingBusy;
-  $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. See domain totals in the dashboard.' : 'Website time is off. Previously recorded browsing time is kept.';
+  $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. See domain totals in the dashboard.' : '';
 }
 async function refresh() {
   if (refreshing) return; refreshing = true;
@@ -121,12 +154,19 @@ async function notifyTrackers() {
   const tabs = await extensionAPI.tabs.query({}).catch(() => []);
   await Promise.all(tabs.map(tab => extensionAPI.tabs.sendMessage(tab.id, { type: 'refresh' }).catch(() => {})));
 }
-async function saveAccessDuration(site, reset = false) {
-  const control = siteControls.get(site), input = control.access.input;
+async function saveAccessDuration(site, reset = false, custom = false) {
+  const control = siteControls.get(site), access = control.access, input = access.input;
   if (control.busy.has('access') || input.disabled) return;
-  const minutes = reset ? null : Number(input.value);
-  if (!reset && (!input.reportValidity() || !C3.validAccessMinutes(minutes))) { error(`Choose a whole number from ${C3.ACCESS_LIMITS.minMinutes} to ${C3.ACCESS_LIMITS.maxMinutes} minutes.`); return; }
-  await saveSitePreference(control, 'access', { type: 'access-duration', minutes, ...(site ? { site } : {}) });
+  if (!reset && !custom && input.value === 'custom') {
+    access.editing = true; access.custom.value = C3.siteSettings(site, currentSettings).accessMinutes;
+    clearSaved(); error(); renderSite(control, currentSettings); access.custom.focus(); return;
+  }
+  const field = custom ? access.custom : input;
+  const minutes = reset || !custom && site && input.value === 'default' ? null : Number(field.value);
+  if (minutes !== null && (!field.reportValidity() || !C3.validAccessMinutes(minutes))) { error(`Choose a whole number from ${C3.ACCESS_LIMITS.minMinutes} to ${C3.ACCESS_LIMITS.maxMinutes} minutes.`); return; }
+  if (await saveSitePreference(control, 'access', { type: 'access-duration', minutes, ...(site ? { site } : {}) })) {
+    if (access.editing) { access.editing = false; renderSite(control, currentSettings, site + ':access'); input.focus(); }
+  }
 }
 async function saveTracking(site) {
   const control = siteControls.get(site);
@@ -139,26 +179,32 @@ async function saveSitePreference(control, group, message) {
   if (group === 'tracking') {
     control.tracking.disabled = true; control.trackingStatus.textContent = control.tracking.checked ? 'On' : 'Off';
   }
-  if (input) input.disabled = true;
+  if (input) {
+    input.disabled = true;
+    control.access.custom.disabled = control.access.apply.disabled = control.access.cancel.disabled = true;
+  }
   if (control.access?.reset) control.access.reset.disabled = true;
+  let success = false;
   try {
     const result = await messages.send(message, 'Unable to save settings.');
     const snapshot = message.type === 'tracking' ? result : await messages.send({ type: 'snapshot' }, 'Unable to load your saved settings.');
     render(snapshot.settings);
     if (group === 'tracking') {
       const description = accessSites.has(site)
-        ? message.enabled ? 'Limit & track is on. Start an access session to record creating and consuming.' : 'Limit & track is off. Free access; no creation-score tracking.'
+        ? message.enabled ? 'Limit & track is on.' : 'Limit & track is off.'
         : message.enabled ? 'Creating/consuming and action measurements are on.' : 'Creation-score tracking is off.';
       saved(`${control.site.name}: ${description} Your history is kept.`);
     } else saved(`${control.site.name} session time saved for new sessions and midnight refills.`);
     if (group === 'tracking') await notifyTrackers();
+    success = true;
   } catch (e) { error(e.message); }
   finally { control.busy.delete(group); render(currentSettings, site + ':' + group); }
+  return success;
 }
 async function saveScrollSettings() {
   const choice = { enabled: $('scroll-friction-enabled').checked, strength: Number($('scroll-friction-strength').value) };
   scrollEditing = false;
-  $('save-status').textContent = '';
+  clearSaved();
   if (!C3.validScrollFrictionStrength(choice.strength)) { error('Choose a valid scroll resistance.'); renderScroll(currentSettings); return; }
   scrollPending = scrollSaving?.enabled === choice.enabled && scrollSaving?.strength === choice.strength ? null : choice;
   if (scrollSettingBusy) { renderScroll(currentSettings); return; }

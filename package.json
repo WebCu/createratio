@@ -1,6 +1,6 @@
 {
   "name": "createratio",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "license": "MIT",
   "description": "CreateRatio: track time spent creating versus consuming online",
@@ -10,6 +10,9 @@
   },
   "scripts": {
     "preview": "node site/dev-server.js",
+    "marketing": "pnpm marketing:copy && pnpm marketing:assets",
+    "marketing:copy": "node bin/marketing.js",
+    "marketing:assets": "pnpm build:chrome && node bin/marketing-assets.mjs",
     "release": "node bin/release.js",
     "prepare": "node bin/setup-git-hooks.js --if-unconfigured",
     "setup:hooks": "node bin/setup-git-hooks.js",
@@ -20,6 +23,7 @@
     "check:actions": "node bin/check-actions.js",
     "check": "pnpm check:syntax && pnpm test && pnpm build && pnpm build:site",
     "check:browser": "pnpm build:chrome && pnpm test:browser",
+    "check:browser:shard": "pnpm build:chrome && node bin/browser-shard.js",
     "verify": "node bin/verify.js",
     "test": "node --test --test-concurrency=4 extension/core/tests/*.test.js extension/sites/*.test.js \"extension/src/**/*.test.js\" site/tests/*.test.js bin/tests/*.test.js",
     "test:tracers": "node --test --test-concurrency=2 extension/src/tests/tracer-journeys.test.js extension/src/tests/lifecycle-properties.test.js",

@@ -1,0 +1,22 @@
+{
+  "headline": "Instagram and TikTok are here.",
+  "summary": "The same deliberate pause, active-time limits and local creation tracking, now on Instagram and TikTok alongside X and LinkedIn.",
+  "activation": "Instagram and TikTok start Off. In Settings → Websites, turn on Limit & track for each site you want. Your saved choices stay yours.",
+  "shortDescription": "Create more, consume intentionally on X, LinkedIn, Instagram and TikTok. Private, local creation tracking and timed access.",
+  "description": [
+    "CreateRatio helps you create more and consume intentionally on X, LinkedIn, Instagram and TikTok.",
+    "Write an intention, wait the full 60 seconds, then explicitly start a timed session. Sessions default to five active minutes shared across a site's tabs, pause when you switch away, and refill daily until ended or disabled. Session times are configurable. Optional above-goal access is off by default.",
+    "X and LinkedIn start with Limit & track on. Instagram and TikTok start Off: enable each in Settings → Websites. Turning a site's Limit & track off removes its access restrictions and stops new creation-score measurements without deleting history. Saved choices persist.",
+    "See your daily creation score and seven-day chart. Creation tracking compares supported creating and consuming time, with credit for detected post, reply and comment actions. Recognition is approximate, not proof of publication. Slow scrolling adds adjustable wheel and trackpad resistance on enabled consuming pages.",
+    "Your extension records stay in your browser profile. No extension account, analytics, telemetry or activity uploads. No post text, keystroke values or full URLs are saved. Optional Website time records focused domains and elapsed time separately from the score. Website time and Remember my intentions start off.",
+    "History is kept for 30 local calendar days including today; a shared 4 MiB history budget may remove older days sooner. Export totals to CSV or clear history in Settings. Saved intentions are separate, limited to the latest 100 and excluded from CSV exports.",
+    "Save drafts before installing and before access expires: open gated-site tabs redirect to the blocked page. CreateRatio is a personal focus tool, not tamper-proof enforcement.",
+    "Free and open source under MIT. Privacy: https://createratio.com/privacy.html | Support: https://github.com/WebCu/createratio/issues"
+  ],
+  "socialPost": "Instagram and TikTok are now supported in CreateRatio, alongside X and LinkedIn. A deliberate pause before you browse, active-time limits, and a local creation score. Enable them in Settings → Websites → Limit & track. Free and open source. https://createratio.com/",
+  "screenshots": [
+    { "id": "01-websites", "caption": "Choose your sites: X, LinkedIn, Instagram and TikTok. Instagram and TikTok are enabled for this demonstration; they start Off." },
+    { "id": "02-intention", "caption": "Make room for intention before opening Instagram. Write an intention, wait 60 seconds, then explicitly start a timed session." },
+    { "id": "03-creation-score", "caption": "See your creating-versus-consuming balance. Demonstration totals are synthetic; the creation score is approximate." }
+  ]
+}

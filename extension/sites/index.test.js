@@ -35,6 +35,11 @@ test('access lookup covers HTTP, aliases and subdomains without treating unknown
   const catalog = browserCatalog(modules());
   for (const raw of ['http://x.com/home', 'https://mobile.twitter.com/home', 'https://www.x.com/home']) assert.equal(catalog.forAccessURL(raw)?.id, 'x');
   assert.equal(catalog.forAccessURL('http://www.linkedin.com/feed/')?.id, 'linkedin');
+  for (const site of ['tiktok', 'instagram']) {
+    for (const url of [`http://${site}.com/`, `https://www.${site}.com/`, `https://m.${site}.com/`]) assert.equal(catalog.forAccessURL(url)?.id, site);
+    for (const url of [`https://${site}.com.evil.test/`, `https://not${site}.com/`, `ftp://${site}.com/`]) assert.equal(catalog.forAccessURL(url), null);
+    assert.equal(catalog.forURL(`https://m.${site}.com/`), null, 'gating subdomains does not expand creation tracking');
+  }
   for (const raw of ['https://x.com.evil.test/', 'https://notlinkedin.com/', 'ftp://x.com/', 'invalid', 'https://example.test/']) assert.equal(catalog.forAccessURL(raw), null);
   assert.equal(catalog.forURL('https://twitter.com/home'), null);
 });
