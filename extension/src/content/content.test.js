@@ -24,6 +24,18 @@ test('failed initial synchronization retries without navigation and stops empty 
   assert.equal(t.messages.length, before, 'successful synchronization must restore quiet idle');
 });
 
+test('a failed synchronization completed between interval ticks retries on the next eligible tick', async () => {
+  let release, first = true;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const t = await tracker('chrome', { async reply(message, result) {
+    if (message.type === 'snapshot' && first) { first = false; await waiting; throw new Error('Delayed startup failure'); }
+    return result;
+  } });
+  t.setNow(1); release(); await t.tick();
+  t.setNow(5000); await t.tick(); assert.equal(t.messages.length, 1);
+  t.setNow(10000); await t.tick(); assert.equal(t.messages.length, 2);
+});
+
 test('failed synchronization backs off to one request per minute and stays quiet in hidden tabs', async () => {
   const t = await tracker('chrome', { reply() { throw new Error('Worker temporarily unavailable'); } });
   for (const [time, requests] of [[5000, 2], [10000, 2], [15000, 3], [20000, 3], [35000, 4], [75000, 5], [135000, 6], [140000, 6], [195000, 7]]) {

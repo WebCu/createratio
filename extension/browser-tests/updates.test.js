@@ -63,7 +63,7 @@ test('worker replacement after committed teardown restores the same website docu
         const [tab]=await chrome.tabs.query({url:'https://x.com/home'});
         const [result]=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>globalThis.recoverySnapshotAttempts});
         return result.result>=2;
-      })()`), 'transient initialization failure retried without navigation or a focus change');
+      })()`), 'transient initialization failure retried without navigation or a focus change', 15000);
       assert.deepEqual(await evaluate(browser, site.session, '({token:documentToken,draft:document.querySelector("#draft").value})'), { token: 'preserved', draft: 'Unsaved synthetic draft' });
       const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec;})()');
       assert.ok(before > 0);
