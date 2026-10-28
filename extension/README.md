@@ -337,8 +337,9 @@ only HTTPS `instagram.com` and `www.instagram.com`. Off restores free access and
 native scrolling while retaining history and saved duration.
 
 Scoped comment Post controls and plain Enter count comments; caption-dialog Share
-counts posts. Positive Like and Save controls count without score credit. Reading
-Direct stays neutral; focused supported message editors create without submission
+counts posts, including Reels with rich-text captions. Positive Like and Save
+controls count without score credit. Reading Direct stays neutral; focused
+supported message editors create without submission
 bonuses. English labels are recognized; ambiguous controls, unsupported shortcuts,
 and upload steps without a recognized caption submit do not count. Mobile hosts
 are unsupported. Synthetic fixtures do not prove current authenticated markup or

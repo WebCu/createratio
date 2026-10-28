@@ -20,6 +20,16 @@ the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;
 missing browsers and failed checks are errors, not successful skips.
 
+CI runs browser journeys across eight independent runners, with one browser at a
+time per shard. `bin/browser-shards.json` assigns every browser test file exactly
+once; missing, duplicate, or unassigned files fail before journeys start. After
+adding or moving a browser test, update that plan and keep shard durations balanced.
+Run one shard locally with `pnpm check:browser:shard 1` (through `8`); the normal
+`pnpm check:browser` still runs the complete suite. The broader smoke runs
+separately. The existing `browser-smoke` check requires both that smoke and every
+journey shard to succeed, including when a dependency fails, is skipped, or is
+cancelled. Failed shards retain separately named evidence for seven days.
+
 `pnpm verify` runs all three completion commands in order, stopping on the first
 failure and preserving its exit code. Each invocation creates a fresh private
 temporary directory, prints its path, and saves per-stage logs plus `summary.json`.
@@ -297,7 +307,8 @@ live composing behavior, physical comfort or cross-browser compatibility.
 
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
 JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
-reject code comments with file, line and column diagnostics. An initial hashbang
+reject code comments with file, line and column diagnostics. Files are checked
+across at most four workers; any worker failure fails the command. An initial hashbang
 interpreter directive is allowed; comment-like text in strings, templates and
 regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS
 syntax check, including its wrapper bindings, to select Acorn's grammar. This
