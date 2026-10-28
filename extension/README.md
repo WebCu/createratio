@@ -76,7 +76,10 @@ polling remains limited to open extension UI. Website-time writes refresh only
 the dashboard's browsing view; countdown-only access writes do not trigger
 cross-page refreshes. Content guards check at session expiry and on focus or
 preference changes. Creation trackers deliver real measurements every five seconds,
-without empty periodic worker requests.
+without empty periodic worker requests. Failed synchronization retries only while
+focused, using the existing interval with backoff from five seconds to at most one
+request per minute. A valid snapshot clears that retry state; hidden clients without
+pending measurements remain quiet.
 
 Downloaded updates wait while extension pages or fresh creation tracking are in
 use. The popup, Settings, dashboard and access page show **Update ready**. **Update
@@ -84,6 +87,12 @@ now** requires confirmation to protect unsaved settings and intention drafts.
 Before reloading, the worker pauses content clients, drains acknowledged delivery
 and serialized writes, and checks that the website tabs have not changed. Failed
 preparation resumes tracking and leaves the update pending for a later attempt.
+Repeated preparation preserves the original activity state, and a ten-second lease
+resumes clients if preparation is abandoned. A persistent recovery marker is saved
+before client teardown. Replacement workers restore stopped clients before retrying
+an update; the marker is cleared only after successful restoration. Failed recovery
+reuses the pending-update alarm rather than adding another timer. Discarded tabs are
+excluded from live coordination and receive normal scripts when restored.
 Update installation reinjects the manifest's scripts into authorized website tabs
 without reloading their documents. Timers, listeners and observers have explicit
 cleanup; route-hook installation is idempotent. Closed, loading or inaccessible

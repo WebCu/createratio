@@ -32,6 +32,67 @@ test('automatic updates defer open extension pages and failed deliveries without
   h.state.failFlush = false; await h.updates.attempt(); assert.equal(h.calls.at(-1), 'reload');
 });
 
+test('a replacement worker restores committed clients before deferring an update for an open extension page', async () => {
+  const h = harness(); let live = true, reached;
+  const committed = new Promise(resolve => { reached = resolve; });
+  h.api.tabs.sendMessage = async (id, message) => {
+    if (!live) throw new Error('Could not establish connection. Receiving end does not exist.');
+    if (message.type === 'commit-update') live = false;
+    return { ready: true };
+  };
+  h.api.scripting.executeScript = async () => { live = true; };
+  const first = Updates.create(h.api, task => task(), async () => {
+    if (!live) { reached(); await new Promise(() => {}); }
+  });
+  void first.available({ version: '0.0.5' });
+  await committed; assert.equal(live, false);
+  h.state.pages = [{}];
+  const replacement = Updates.create(h.api, task => task(), async () => {});
+  await replacement.start();
+  assert.equal(live, true, 'a stopped website document must recover without navigation');
+  assert.equal(h.data._pendingUpdate, '0.0.5');
+  assert.equal(h.data._updateRecovery, undefined);
+  assert.equal(h.calls.includes('reload'), false);
+});
+
+test('failed recovery remains durable and retries even after the pending version was cleared', async t => {
+  const h = harness(), alarms = new Set(); let failing = true, injections = 0;
+  t.mock.method(console, 'error', () => {});
+  h.data._updateRecovery = true; h.state.pages = [{}];
+  h.api.alarms.create = async name => { alarms.add(name); };
+  h.api.alarms.clear = async name => { alarms.delete(name); };
+  h.api.tabs.sendMessage = async () => { throw new Error('Receiving end does not exist.'); };
+  h.api.scripting.executeScript = async () => { injections++; if (failing) throw new Error('Injection temporarily unavailable'); };
+  await h.updates.start();
+  assert.equal(injections, 1); assert.equal(h.data._updateRecovery, true);
+  assert.equal(alarms.has('extension-update'), true);
+  failing = false; await h.updates.attempt();
+  assert.equal(injections, 2); assert.equal(h.data._updateRecovery, undefined);
+  assert.equal(alarms.has('extension-update'), false);
+  assert.equal(h.calls.includes('reload'), false);
+});
+
+test('recovery state must be persisted before any client can be stopped', async () => {
+  const h = harness(), set = h.api.storage.local.set;
+  h.api.storage.local.set = async values => { if (values._updateRecovery) throw new Error('Storage full'); return set(values); };
+  await h.updates.available({ version: '0.0.5' });
+  assert.equal(h.calls.includes('commit-update'), false);
+  assert.equal(h.calls.includes('reload'), false);
+  assert.equal(h.calls.at(-1), 'resume-update');
+});
+
+test('discarded tabs cannot block updates or receive script reinjection', async () => {
+  const h = harness(); h.state.tabs.push({ id: 2, url: 'https://x.com/explore', status: 'complete', discarded: true });
+  h.api.tabs.sendMessage = async (id, message) => {
+    assert.notEqual(id, 2, 'discarded tabs have no live receiver');
+    h.calls.push(message.type); return { ready: true };
+  };
+  await h.updates.available({ version: '0.0.5' });
+  assert.equal(h.calls.at(-1), 'reload');
+  await h.updates.installed({ reason: 'update' });
+  assert.equal(h.calls.some(call => call.target?.tabId === 2), false);
+});
+
 test('startup cannot reinstall the version whose installation is still initializing', async () => {
   const h = harness(); let release;
   h.api.storage.local.get = () => new Promise(resolve => { release = () => resolve({ _pendingUpdate: '0.0.5' }); });

@@ -13,11 +13,11 @@
     });
   }
   function create(api, serialize, flush, environment = globalThis) {
-    let pending = null, applying = null, installedHere = false;
+    let pending = null, applying = null, installedHere = false, recovery = false;
     const entries = () => api.runtime.getManifest().content_scripts || [];
     async function tabs() {
       const patterns = [...new Set(entries().flatMap(entry => entry.matches))];
-      return patterns.length ? (await api.tabs.query({ url: patterns })).filter(tab => Number.isInteger(tab.id) && matches(tab.url, patterns)) : [];
+      return patterns.length ? (await api.tabs.query({ url: patterns })).filter(tab => Number.isInteger(tab.id) && !tab.discarded && matches(tab.url, patterns)) : [];
     }
     async function openPages() {
       if (api.runtime.getContexts) return (await api.runtime.getContexts({})).filter(context => context.contextType !== 'BACKGROUND');
@@ -35,23 +35,41 @@
       } finally { clearTimeout(timer); }
     }
     async function restore() {
+      let restored = true;
       for (const tab of await tabs()) {
         if (tab.status === 'loading') continue;
         try {
           const reply = await send(tab, { type: 'prepare-update', force: false });
           if (reply?.ready === false) continue;
-          if (reply?.ready === true && (await send(tab, { type: 'commit-update' }))?.ready !== true) continue;
+          if (reply?.ready === true && (await send(tab, { type: 'commit-update' }))?.ready !== true) { restored = false; continue; }
         } catch (error) {
           if (!/receiving end|establish connection|message port closed|context invalidated/i.test(error.message)) {
+            restored = false;
             console.error('CreateRatio: unable to prepare a website tab for recovery.', error); continue;
           }
         }
         for (const entry of entries().filter(entry => matches(tab.url, entry.matches))) {
-          await api.scripting.executeScript({ target: { tabId: tab.id }, files: entry.js, world: entry.world || 'ISOLATED' }).catch(error => console.error('CreateRatio: unable to restore an updated website tab.', error));
+          await api.scripting.executeScript({ target: { tabId: tab.id }, files: entry.js, world: entry.world || 'ISOLATED' }).catch(error => {
+            restored = false; console.error('CreateRatio: unable to restore an updated website tab.', error);
+          });
         }
       }
+      return restored;
+    }
+    async function recover() {
+      if (!recovery) return true;
+      try {
+        if (await restore()) {
+          await api.storage.local.remove('_updateRecovery'); recovery = false;
+          if (!pending) await api.alarms.clear('extension-update');
+          return true;
+        }
+      } catch (error) { console.error('CreateRatio: website recovery will retry.', error); }
+      await api.alarms.create('extension-update', { periodInMinutes: 1 });
+      return false;
     }
     async function apply(force) {
+      if (!await recover()) return { applied: false };
       if (!pending || !force && (await openPages()).length) return { applied: false };
       const clients = await tabs();
       let committed = false, reloaded = false;
@@ -63,6 +81,7 @@
         await serialize(flush);
         const current = await tabs();
         if (JSON.stringify(current.map(tab => [tab.id, tab.url]).sort()) !== JSON.stringify(clients.map(tab => [tab.id, tab.url]).sort())) return { applied: false };
+        await api.storage.local.set({ _updateRecovery: true }); recovery = true;
         committed = true;
         const stopped = await Promise.all(clients.map(tab => send(tab, { type: 'commit-update' })));
         if (stopped.some(reply => reply?.ready !== true)) return { applied: false };
@@ -73,7 +92,7 @@
       } catch (_) { return { applied: false }; }
       finally {
         if (!reloaded) {
-          if (committed) await restore();
+          if (committed) await recover();
           await Promise.all(clients.map(tab => send(tab, { type: 'resume-update' }).catch(() => {})));
         }
       }
@@ -83,10 +102,10 @@
       return applying;
     }
     async function start() {
-      const stored = await api.storage.local.get('_pendingUpdate');
+      const stored = await api.storage.local.get(['_pendingUpdate', '_updateRecovery']);
       if (installedHere) return;
-      pending = stored._pendingUpdate;
-      if (pending) { await api.alarms.create('extension-update', { periodInMinutes: 1 }); await attempt(); }
+      pending = stored._pendingUpdate; recovery = stored._updateRecovery === true;
+      if (pending || recovery) { await api.alarms.create('extension-update', { periodInMinutes: 1 }); await attempt(); }
     }
     async function available(details) {
       if (typeof details?.version !== 'string' || !/^\d+(\.\d+){0,3}$/.test(details.version)) return;
@@ -97,11 +116,12 @@
     }
     async function installed(details, initialized = Promise.resolve()) {
       if (details?.reason !== 'update') return initialized;
-      installedHere = true; pending = null;
+      installedHere = true; pending = null; recovery = true;
+      await api.storage.local.set({ _updateRecovery: true });
       await api.storage.local.remove('_pendingUpdate');
       await api.alarms.clear('extension-update');
       await initialized;
-      await restore();
+      await recover();
     }
     api.runtime.onUpdateAvailable?.addListener(details => { available(details).catch(console.error); });
     return { start, available, attempt, installed };

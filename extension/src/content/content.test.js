@@ -11,6 +11,29 @@ test('focused trackers with no fresh input do not keep the worker alive', async 
   assert.equal(t.messages.length, before);
 });
 
+test('failed initial synchronization retries without navigation and stops empty requests after recovery', async () => {
+  let failing = true;
+  const t = await tracker('chrome', { reply(message, result) { if (failing && message.type === 'snapshot') throw new Error('Worker temporarily unavailable'); return result; } });
+  assert.equal(t.messages.length, 1);
+  failing = false; t.setNow(5000); await t.tick();
+  assert.equal(t.messages.filter(message => message.type === 'snapshot').length, 2);
+  t.input(); t.setNow(10000); await t.tick();
+  assert.equal(t.packets[0].segments[0].sec, 5);
+  const before = t.messages.length;
+  t.setNow(45000); await t.tick(); t.setNow(50000); await t.tick();
+  assert.equal(t.messages.length, before, 'successful synchronization must restore quiet idle');
+});
+
+test('failed synchronization backs off to one request per minute and stays quiet in hidden tabs', async () => {
+  const t = await tracker('chrome', { reply() { throw new Error('Worker temporarily unavailable'); } });
+  for (const [time, requests] of [[5000, 2], [10000, 2], [15000, 3], [20000, 3], [35000, 4], [75000, 5], [135000, 6], [140000, 6], [195000, 7]]) {
+    t.setNow(time); await t.tick(); assert.equal(t.messages.length, requests, 'retry count at ' + time);
+  }
+  t.visible(false); await t.tick(); const before = t.messages.length;
+  t.setNow(255000); await t.tick();
+  assert.equal(t.messages.length, before);
+});
+
 test('updates defer active input, flush partial measurements and release all listeners on commit', async () => {
   const t = await tracker(); t.input(); t.setNow(2000);
   assert.equal((await t.command({ type: 'prepare-update' })).ready, false);
@@ -20,6 +43,17 @@ test('updates defer active input, flush partial measurements and release all lis
   assert.equal(t.packets.length, 1);
   await t.command({ type: 'commit-update' });
   assert.equal(t.listenerCount('wheel'), 0); assert.equal(t.listenerCount('keydown'), 0);
+});
+
+for (const active of [true, false]) test(`repeated update preparation restores the originally ${active ? 'active' : 'inactive'} document`, async () => {
+  const t = await tracker();
+  if (!active) t.event('pagehide', { persisted: true });
+  assert.equal((await t.command({ type: 'prepare-update', force: true })).ready, true);
+  assert.equal((await t.command({ type: 'prepare-update', force: true })).ready, true);
+  await t.command({ type: 'resume-update' });
+  t.setNow(5000); t.input(); t.setNow(10000); await t.tick();
+  const seconds = t.packets.flatMap(packet => packet.segments).reduce((sum, segment) => sum + segment.sec, 0);
+  assert.equal(seconds, active ? 5 : 0);
 });
 
 test('failed update delivery resumes tracking and preserves the exact retry packet', async () => {

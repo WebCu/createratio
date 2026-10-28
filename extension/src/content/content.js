@@ -16,6 +16,7 @@
   function listen(target, type, fn, options) { target.addEventListener(type, fn, options); listeners.push([target, type, fn, options]); }
   let adapter = null, failed = false;
   let refreshTimer = null, generation = null, recordingPaused = false, activeBeforeUpdate = false;
+  let syncPending = true, syncRetryAt = 0, syncRetryDelay = 5000;
   const { maxPackets: MAX_PACKETS, maxItems: MAX_ITEMS, maxSeconds: MAX_SECONDS } = C3.DELIVERY_LIMITS;
   const clicks = new WeakMap();
 
@@ -100,6 +101,7 @@
     scrollFrictionEnabled = result.settings.scrollFrictionEnabled === true;
     scrollSpeed = (100 - (result.settings.scrollFrictionStrength ?? C3.DEFAULT_SETTINGS.scrollFrictionStrength)) / 100;
     synchronizeTracking(nextEnabled, result.generation ?? null);
+    syncPending = false; syncRetryAt = 0; syncRetryDelay = 5000;
     refresh();
   }
   function pump() {
@@ -122,7 +124,11 @@
       }
     } catch (error) {
       if (!extensionAPI.runtime?.id || /context invalidated/i.test(error.message)) { stop(); }
-      else console.warn('CreateRatio: tracking will retry.', error.message);
+      else {
+        syncPending = true; syncRetryAt = performance.now() + syncRetryDelay;
+        syncRetryDelay = Math.min(syncRetryDelay * 2, 60000);
+        console.warn('CreateRatio: tracking will retry.', error.message);
+      }
     }
   }
   function flush() {
@@ -174,7 +180,7 @@
     if (stopped || updating) return;
     if (outbox.length || pageActive && document.visibilityState === 'visible' && document.hasFocus()) {
       refresh();
-      if (outbox.length || segments.length || actions.length) flush();
+      if (outbox.length || segments.length || actions.length || syncPending && performance.now() >= syncRetryAt) flush();
     }
   }, 5000);
   function stop() {
@@ -190,7 +196,9 @@
   ContentLifecycle.register('tracker', {
     async prepare(force) {
       if (!force && enabled && pageActive && document.hasFocus() && document.visibilityState === 'visible' && performance.now() - lastInput < 30000) return false;
-      settle(); resetInput(); activeBeforeUpdate = pageActive; updating = true; pageActive = false; scrollFriction.setSpeed(1);
+      settle(); resetInput();
+      if (!updating) activeBeforeUpdate = pageActive;
+      updating = true; pageActive = false; scrollFriction.setSpeed(1);
       await pump(); queuePacket(); await pump();
       return outbox.length === 0;
     },

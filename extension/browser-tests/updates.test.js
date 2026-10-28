@@ -16,6 +16,63 @@ test('a focused inactive website lets the actual worker stop with every debugger
   } finally { await browser.cleanup(); }
 });
 
+test('worker replacement after committed teardown restores the same website document without applying the update', async () => {
+  const { launch, evaluate, eventually, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
+  const browser = await launch(path.resolve(__dirname, '../../dist/chrome'), { developerMode: true });
+  try {
+    await withFailureArtifacts(browser, 'interrupted update recovery', async () => {
+      await seedAccess(browser, ['x']);
+      const settings = await browser.page(browser.origin + '/settings.html');
+      await eventually(() => evaluate(browser, settings.session, '!!document.querySelector("#track-x")'), 'Settings ready');
+      await evaluate(browser, browser.worker, 'updates.available({version:"0.0.5"})');
+      const site = await browser.page('https://x.com/home');
+      await eventually(() => evaluate(browser, site.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'website ready');
+      await eventually(() => evaluate(browser, browser.worker, '(async()=>{const [tab]=await chrome.tabs.query({url:"https://x.com/home"});return (await chrome.tabs.sendMessage(tab.id,{type:"prepare-update",force:true})).ready;})()'), 'initial tracker ready');
+      await evaluate(browser, browser.worker, '(async()=>{const [tab]=await chrome.tabs.query({url:"https://x.com/home"});await chrome.tabs.sendMessage(tab.id,{type:"resume-update"});})()');
+      await evaluate(browser, site.session, '(() => { globalThis.documentToken = "preserved"; const draft = document.createElement("textarea"); draft.id = "draft"; draft.value = "Unsaved synthetic draft"; document.body.append(draft); })()');
+      await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }, site.session);
+      await evaluate(browser, site.session, 'new Promise(resolve => setTimeout(resolve, 200))');
+      const result = await evaluate(browser, browser.worker, '(async()=>{chrome.runtime.reload=()=>{};return updates.attempt(true);})()');
+      assert.equal(result.applied, true);
+      assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("_updateRecovery").then(data=>data._updateRecovery)'), true);
+      await evaluate(browser, browser.worker, `(async()=>{
+        const [tab]=await chrome.tabs.query({url:'https://x.com/home'});
+        await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>{
+          const send=chrome.runtime.sendMessage.bind(chrome.runtime);
+          globalThis.recoverySnapshotAttempts=0;
+          chrome.runtime.sendMessage=message=>{
+            if(message.type==='snapshot' && ++globalThis.recoverySnapshotAttempts===1) return Promise.reject(new Error('Synthetic transient startup failure'));
+            return send(message);
+          };
+        }});
+      })()`);
+      const old = (await browser.cdp.send('Target.getTargets')).targetInfos.find(target => target.type === 'service_worker' && target.url.startsWith(browser.origin));
+      await browser.cdp.send('Target.detachFromTarget', { sessionId: browser.worker });
+      await browser.cdp.send('ServiceWorker.enable', {}, settings.session);
+      await browser.cdp.send('ServiceWorker.stopAllWorkers', {}, settings.session);
+      await eventually(async () => !(await browser.cdp.send('Target.getTargets')).targetInfos.some(target => target.targetId === old.targetId), 'old worker stopped');
+      const waking = evaluate(browser, settings.session, 'chrome.runtime.sendMessage({type:"snapshot"})'); waking.catch(() => {});
+      const replacement = await eventually(async () => (await browser.cdp.send('Target.getTargets')).targetInfos.find(target => target.type === 'service_worker' && target.url === old.url && target.targetId !== old.targetId), 'replacement worker');
+      const attached = await browser.cdp.send('Target.attachToTarget', { targetId: replacement.targetId, flatten: true });
+      browser.worker = attached.sessionId;
+      await browser.cdp.send('Runtime.enable', {}, browser.worker);
+      await waking;
+      await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.local.get("_updateRecovery").then(data=>!data._updateRecovery)'), 'stopped clients restored before clearing recovery state');
+      assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("_pendingUpdate").then(data=>data._pendingUpdate)'), '0.0.5');
+      await eventually(() => evaluate(browser, browser.worker, `(async()=>{
+        const [tab]=await chrome.tabs.query({url:'https://x.com/home'});
+        const [result]=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>globalThis.recoverySnapshotAttempts});
+        return result.result>=2;
+      })()`), 'transient initialization failure retried without navigation or a focus change');
+      assert.deepEqual(await evaluate(browser, site.session, '({token:documentToken,draft:document.querySelector("#draft").value})'), { token: 'preserved', draft: 'Unsaved synthetic draft' });
+      const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec;})()');
+      assert.ok(before > 0);
+      await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }, site.session);
+      await eventually(() => evaluate(browser, browser.worker, `(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec > ${before};})()`), 'recovered tracker saves new measurements');
+    });
+  } finally { await browser.cleanup(); }
+});
+
 test('a prepared extension reload preserves website drafts and resumes tracking in the same document', async () => {
   const { launch, evaluate, eventually, click, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'), { developerMode: true });

@@ -147,8 +147,11 @@ node bin/update-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/upda
 The runner alternates three runs per build, each with eight synthetic website
 tabs and Website time enabled in a fresh profile. Only the disposable manifests
 promote optional `tabs`/`idle` permissions to simulate an already-approved opt-in.
-All debugger sessions are detached during each 42-second observation. Browser-level
-target inventory observes worker shutdown without calling its APIs. Bundle hashes
+All debugger sessions are detached during each 42-second observation. When comparing
+against an already-idle baseline, append `--baseline-idle`; both builds must then
+shut down. Without that flag, the baseline must remain running and the candidate
+must shut down. Browser-level target inventory observes shutdown without calling
+worker APIs. Bundle hashes
 must remain unchanged. Reports include per-run shutdown times and summed process
 RSS; compare median and range, not a selected run. Summed RSS is not private heap,
 shared-memory-adjusted browser memory or a zero-memory claim. Store delivery,

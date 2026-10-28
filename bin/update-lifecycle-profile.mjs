@@ -44,7 +44,8 @@ async function observe(directory, label, repetition) {
 }
 
 const [baseline, candidate, output, ...extra] = process.argv.slice(2);
-if (!baseline || !candidate || !output || extra.length) throw new Error('Usage: node bin/update-lifecycle-profile.mjs BASELINE_CHROME CANDIDATE_CHROME NEW_REPORT_JSON');
+const baselineIdle = extra.length === 1 && extra[0] === '--baseline-idle';
+if (!baseline || !candidate || !output || extra.length && !baselineIdle) throw new Error('Usage: node bin/update-lifecycle-profile.mjs BASELINE_CHROME CANDIDATE_CHROME NEW_REPORT_JSON [--baseline-idle]');
 try { await stat(output); throw new Error('Report already exists'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
 const directory = await mkdtemp(join(tmpdir(), 'createratio-update-profile-'));
 try {
@@ -65,8 +66,11 @@ try {
     }
   }
   for (const [label, source] of Object.entries(sources)) if (hashes[label] !== await fingerprint(source)) throw new Error('Bundle changed during measurement: ' + label);
-  const report = { node: process.version, platform: process.platform, architecture: process.arch, hashes, fixture: 'Eight synthetic website tabs, Website time enabled; optional tabs/idle permissions granted in disposable manifests only. All debugger sessions detached during observation. Target inventory and process metrics are browser-level, not worker probes.', limitations: 'Summed process RSS is not private heap or shared-memory-adjusted browser memory. Worker shutdown is not zero extension memory. Store delivery, Firefox, sleep/wake and resource acceptance are not established.', records };
+  const report = { node: process.version, platform: process.platform, architecture: process.arch, hashes, baselineIdle, fixture: 'Eight synthetic website tabs, Website time enabled; optional tabs/idle permissions granted in disposable manifests only. All debugger sessions detached during observation. Target inventory and process metrics are browser-level, not worker probes.', limitations: 'Summed process RSS is not private heap or shared-memory-adjusted browser memory. Worker shutdown is not zero extension memory. Store delivery, Firefox, sleep/wake and resource acceptance are not established.', records };
   await mkdir(resolve(output, '..'), { recursive: true });
   await writeFile(output, JSON.stringify(report, null, 2), { flag: 'wx' });
-  if (records.some(record => record.label === 'candidate' ? record.idleAtMs === null : record.idleAtMs !== null)) throw new Error('Worker shutdown comparison failed; inspect report');
+  if (records.some(record => {
+    const expectIdle = record.label === 'candidate' || baselineIdle;
+    return expectIdle ? record.idleAtMs === null : record.idleAtMs !== null;
+  })) throw new Error('Worker shutdown comparison failed; inspect report');
 } finally { await rm(directory, { recursive: true, force: true }); }

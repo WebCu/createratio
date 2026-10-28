@@ -3,7 +3,7 @@
   if (globalThis.ContentLifecycle) return;
   const api = globalThis.browser || globalThis.chrome;
   const owners = new Map();
-  let lease = null, generation = 0, prepared = false;
+  let lease = null, generation = 0, prepared = false, preparing = false;
   function resume() {
     clearTimeout(lease); lease = null; generation++; prepared = false;
     for (const owner of owners.values()) owner.resume();
@@ -18,6 +18,8 @@
       delete globalThis.ContentLifecycle;
       return { ready: true };
     }
+    if (preparing) return { ready: false };
+    preparing = true;
     const current = ++generation;
     prepared = false; clearTimeout(lease); lease = setTimeout(resume, 10000);
     try {
@@ -29,6 +31,7 @@
       }
       prepared = true; return { ready: true };
     } catch (_) { resume(); return { ready: false }; }
+    finally { preparing = false; }
   }
   function receive(message, sender, respond) {
     if (sender.id !== api.runtime.id || !['prepare-update', 'resume-update', 'commit-update'].includes(message?.type)) return;

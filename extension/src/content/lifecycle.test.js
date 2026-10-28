@@ -33,6 +33,15 @@ test('a lost worker or cancelled preparation cannot leave trackers paused or com
   assert.equal(c.listeners.size, 1);
 });
 
+test('overlapping preparation cannot replace an unfinished readiness decision', async () => {
+  const c = client(); let release, first = true;
+  c.lifecycle.register('tracker', { async prepare() { if (first) { first = false; await new Promise(resolve => { release = resolve; }); } return true; }, resume() {}, stop() {} });
+  const pending = c.send({ type: 'prepare-update' });
+  try { assert.equal((await c.send({ type: 'prepare-update' })).ready, false); }
+  finally { await c.send({ type: 'resume-update' }); release(); await pending; }
+  assert.equal((await c.send({ type: 'commit-update' })).ready, false);
+});
+
 test('repeated injection has one message listener and commit releases all old owners', async () => {
   const c = client(); let stopped = 0;
   c.lifecycle.register('guard', { async prepare() { return true; }, resume() {}, stop() { stopped++; } });

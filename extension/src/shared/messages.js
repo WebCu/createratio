@@ -46,7 +46,7 @@
     });
   }
   function shouldRefresh(changes, area, websites = false) {
-    return area === 'local' && Object.entries(changes).some(([key, change]) => key !== '_pendingUpdate' && (websites || !key.startsWith('_websiteTime:')) && (key !== '_access'
+    return area === 'local' && Object.entries(changes).some(([key, change]) => !['_pendingUpdate', '_updateRecovery'].includes(key) && (websites || !key.startsWith('_websiteTime:')) && (key !== '_access'
       || JSON.stringify(accessPhase(change.oldValue)) !== JSON.stringify(accessPhase(change.newValue))));
   }
   function create(runtime) {
