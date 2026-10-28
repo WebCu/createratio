@@ -175,6 +175,7 @@ export async function launch(extensionPath) {
     '--host-resolver-rules=MAP * ~NOTFOUND', '--window-size=1280,900',
     `--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, 'about:blank'
   ];
+  if (process.platform === 'darwin') args.push('--use-mock-keychain');
   if (process.env.CHROMIUM_NO_SANDBOX === '1') args.push('--no-sandbox');
   const child = spawn(executable, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
   let diagnostics = '', spawnError, closed = false, cdp, socket, watchdog, browser;
@@ -392,7 +393,7 @@ async function clickElement(browser, page, locate, description) {
         if (!element.isConnected || element.disabled || element.getAttribute('aria-disabled') === 'true' || !rect.width || !rect.height) return false;
         if (['x', 'y', 'width', 'height'].some(key => before[key] !== rect[key])) return false;
         const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-        const hit = document.elementFromPoint(point.x, point.y);
+        const hit = element.getRootNode().elementFromPoint(point.x, point.y);
         return hit === element || element.contains(hit) ? point : false;
       }` }, page.session);
       if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);

@@ -24,7 +24,7 @@ class Element {
   getAttribute(name) { return this.attributes[name] ?? null; }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(type, fn) { this.listen(type, fn); }
-  attachShadow() { return this.shadow = new Element([], '', this.listen); }
+  attachShadow() { this.shadowRoot = new Element([], '', this.listen); this.shadowRoot.host = this; return this.shadowRoot; }
   remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(node => node !== this); this.isConnected = false; this.removed = true; }
 }
 function environment(url, listen = () => {}) {
@@ -48,12 +48,14 @@ function xFixture({ dialog = false, url = 'https://x.com/home', action = 'posts'
   if (action === 'quotes') scope.append(new Element(['[data-testid="quoteTweetPreview"]']));
   return { ...env, scope, editor, button, adapter: require('./x.js').create(env) };
 }
-function linkedinFixture({ url = 'https://www.linkedin.com/feed/', message = false, standalonePost = false, listen } = {}) {
+function linkedinFixture({ url = 'https://www.linkedin.com/feed/', message = false, shadow = false, standalonePost = false, listen } = {}) {
   const env = environment(url, listen);
-  const scope = env.body.append(new Element(standalonePost ? [] : [message ? '.msg-form' : '.comments-comment-box']));
+  const host = shadow ? env.body.append(new Element()) : null;
+  const shadowRoot = host?.attachShadow();
+  const scope = (shadowRoot || env.body).append(new Element(standalonePost ? [] : [message ? '.msg-form' : '.comments-comment-box']));
   const editor = scope.append(new Element(standalonePost ? ['.tiptap.ProseMirror[role="textbox"][contenteditable="true"]'] : message ? ['.msg-form__contenteditable[contenteditable="true"]', '.msg-form [contenteditable="true"]'] : ['.comments-comment-box [contenteditable="true"]']));
   const button = scope.append(new Element(['button', message ? '.msg-form__send-button' : '.comments-comment-box__submit-button'], message ? 'Send' : 'Comment'));
-  return { ...env, scope, editor, button, adapter: require('./linkedin.js').create(env) };
+  return { ...env, scope, editor, button, host, shadowRoot, adapter: require('./linkedin.js').create(env) };
 }
 function key(target, extra = {}) { return { type: 'keydown', key: 'Enter', target, ...extra }; }
 function click(target) { return { type: 'click', target }; }

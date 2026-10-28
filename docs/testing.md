@@ -222,6 +222,10 @@ and checksum. Update both together after verifying the official download and
 running the browser journeys. Regular branded Chrome may reject unpacked-extension
 launch flags; use Chromium or Chrome for Testing for this runner.
 
+On macOS, both disposable browser runners use Chromium's mock keychain rather
+than requesting access to the login keychain. This does not change macOS or
+normal-browser settings.
+
 The runner defaults to `/usr/bin/chromium` and a 90-second watchdog;
 `BROWSER_TIMEOUT_MS` can override the bounded timeout. Sandbox disabling requires
 `CHROMIUM_NO_SANDBOX=1` and is only appropriate in an isolated Linux sandbox that

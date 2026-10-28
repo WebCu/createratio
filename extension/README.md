@@ -271,9 +271,10 @@ LinkedIn's standalone post editor at `/sharing/compose` also counts as creating
 while focused. Generic rich-text fields on other routes do not count as post
 writing. This editor support measures writing time; it does not add submission
 bonuses for the redesigned composer.
-Writing direct messages counts as creating on messaging pages and in chat overlays.
-Reading messages on messaging pages stays neutral; unfocused overlays leave the
-underlying page's classification unchanged. Sending a direct message earns no
+Writing direct messages counts as creating on messaging pages and in chat overlays,
+including LinkedIn overlays inside open shadow roots. Closed shadow roots are not
+inspected. Reading messages on messaging pages stays neutral; unfocused overlays
+leave the underlying page's classification unchanged. Sending a direct message earns no
 post or comment bonus. Message text is never read or saved.
 
 Only visible, focused documents with trusted input in the last **30 seconds**
