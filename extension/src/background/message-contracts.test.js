@@ -15,6 +15,20 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(w.data.settings, undefined);
   });
 
+  test(`${browser}: only native top-level extension pages may explicitly apply an update`, async () => {
+    const w = worker({}, browser);
+    for (const page of ['popup', 'settings', 'dashboard']) {
+      assert.deepEqual(await w.send({ type: 'update-apply' }, { id: 'test-extension', frameId: 0, url: 'chrome-extension://test-extension/' + page + '.html' }), { ok: true, applied: false });
+    }
+    assert.deepEqual(await w.send({ type: 'update-apply' }, gate('x')), { ok: true, applied: false });
+    for (const sender of [
+      { id: 'test-extension', frameId: 0, tab: { id: 1 }, url: 'https://x.com/home' },
+      { id: 'test-extension', frameId: 1, url: 'chrome-extension://test-extension/settings.html' },
+      { id: 'another-extension', frameId: 0, url: 'chrome-extension://test-extension/settings.html' }
+    ]) assert.equal((await w.send({ type: 'update-apply' }, sender)).ok, false);
+    assert.deepEqual(w.errors, []);
+  });
+
   test(`${browser}: malformed delivery items cannot mutate recorded activity`, async () => {
     const w = activeWorker({}, browser);
     for (const [field, error] of [['segments', 'Invalid time segment'], ['actions', 'Action not supported on this site']]) {

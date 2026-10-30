@@ -63,8 +63,8 @@ async function score(w, expected, posts) {
   assert.equal(popup.nodes.score.textContent, expected);
   assert.equal(dashboard.nodes.score.textContent, expected);
   assert.equal(dashboard.nodes.posts.textContent, posts);
-  assert.deepEqual(popup.state.storageReads, []);
-  assert.deepEqual(dashboard.state.storageReads, []);
+  assert.deepEqual(popup.state.storageReads, ['_pendingUpdate']);
+  assert.deepEqual(dashboard.state.storageReads, ['_pendingUpdate']);
   return { popup, dashboard };
 }
 
@@ -130,15 +130,15 @@ for (const browser of ['chrome', 'browser']) {
     t.document.activeElement = t.editor;
     t.event('focusin', {});
     assert.equal((await w.send({ type: 'access-end', site: 'linkedin' }, sender('popup'))).ok, true);
-    await sample(0);
+    t.notify(); await sample(0);
     t.input();
     assert.equal(await sample(5000), 57, 'ending access stops creation tracking');
     assert.equal((await w.send({ type: 'access-goal-setting', enabled: true }, sender('settings'))).ok, true);
-    await sample(0);
+    t.notify(); await sample(0);
     t.input();
     assert.equal(await sample(5000), 62, 'above-goal access permits fresh writing without a session');
     assert.equal((await w.send({ type: 'tracking', site: 'linkedin', enabled: false }, sender('settings'))).ok, true);
-    await sample(0);
+    t.notify(); await sample(0);
     t.input();
     assert.equal(await sample(5000), 62, 'Limit & track Off cannot record writing even above the goal');
     assert.deepEqual(w.errors, []);

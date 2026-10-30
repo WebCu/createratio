@@ -136,6 +136,27 @@ There is no automated memory-budget gate: browser memory measurements and their
 acceptance remain a required contributor and maintainer review gate. A green CI
 run alone does not satisfy this section.
 
+### Update-lifecycle resource comparison
+
+Build the fixed baseline and candidate into separate directories, then run:
+
+```sh
+node bin/update-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/update-profile.json
+```
+
+The runner alternates three runs per build, each with eight synthetic website
+tabs and Website time enabled in a fresh profile. Only the disposable manifests
+promote optional `tabs`/`idle` permissions to simulate an already-approved opt-in.
+All debugger sessions are detached during each 42-second observation. When comparing
+against an already-idle baseline, append `--baseline-idle`; both builds must then
+shut down. Without that flag, the baseline must remain running and the candidate
+must shut down. Browser-level target inventory observes shutdown without calling
+worker APIs. Bundle hashes
+must remain unchanged. Reports include per-run shutdown times and summed process
+RSS; compare median and range, not a selected run. Summed RSS is not private heap,
+shared-memory-adjusted browser memory or a zero-memory claim. Store delivery,
+Firefox, real sleep/wake and resource acceptance remain separate gates.
+
 ### Scroll-friction resource comparison
 
 Build baseline and candidate Chrome bundles in separate directories, then run:
@@ -231,6 +252,10 @@ Chrome for Testing archive; the workflow is the source of truth for the version
 and checksum. Update both together after verifying the official download and
 running the browser journeys. Regular branded Chrome may reject unpacked-extension
 launch flags; use Chromium or Chrome for Testing for this runner.
+
+On macOS, both disposable browser runners use Chromium's mock keychain rather
+than requesting access to the login keychain. This does not change macOS or
+normal-browser settings.
 
 The runner defaults to `/usr/bin/chromium` and a 90-second watchdog;
 `BROWSER_TIMEOUT_MS` can override the bounded timeout. Sandbox disabling requires
@@ -549,6 +574,14 @@ Before a release, verify:
 - Store-installed Chrome feedback opens the correct public reviews page without
   activity data. Unpacked and other-browser builds omit unavailable store feedback;
   Privacy policy and Terms of use remain accessible.
+- A store-delivered update preserves synthetic measurements, preferences and
+  access budgets. With Website time enabled and its debugger detached, the worker
+  becomes inactive between alarms. **Update ready** appears in extension pages;
+  unsaved settings/intention drafts are never interrupted automatically. Active
+  tracking and failed delivery defer automatic installation. Explicit Update now
+  confirms intent, flushes pending measurements and restores tracking in existing
+  website documents without reloading them. Verify the actual store version
+  transition; a simulated available event and unpacked reload do not prove delivery.
 - Popup, Settings, dashboard, and blocked pages work with keyboard navigation,
   narrow windows, and reduced motion.
 

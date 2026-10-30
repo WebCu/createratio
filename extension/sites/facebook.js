@@ -35,8 +35,9 @@
   }
   function ownProfile(url, ownProfileURL) {
     const own = parseURL(ownProfileURL);
-    if (!own || pathOf(own) !== pathOf(url)) return false;
-    return pathOf(url) !== '/profile.php' || own.searchParams.get('id') === url.searchParams.get('id');
+    if (!own || route(own) !== 'profile') return false;
+    const profileId = profile => pathOf(profile) === '/profile.php' ? profile.searchParams.get('id') : pathOf(profile).split('/').at(-1);
+    return profileId(own) === profileId(url);
   }
   function classifyPage({ url, facebookEditorFocused = false, facebookMessageEditorFocused = false, ownProfileURL = null }) {
     const parsed = parseURL(url);

@@ -67,7 +67,7 @@ for (const adapter of ['chrome', 'browser']) {
   }
 }
 
-test('access and settings changes still reach other documents; polling updates time and history', async t => {
+test('access and settings changes reach other documents; alarms update website history', async t => {
   const scene = await documents(['settings', 'settings', 'popup', 'blocked', 'dashboard'], 'chrome', true);
   t.after(() => scene.stop());
   await settled(scene);
@@ -76,6 +76,7 @@ test('access and settings changes still reach other documents; polling updates t
   const before = accessStatus();
   scene.background.advance(5000);
   popup.timer(1000);
+  scene.background.alarm('website-time');
   await settled(scene);
   assert.notEqual(accessStatus(), before, 'scheduled refresh keeps the countdown current');
   assert.ok(scene.data['_websiteTime:' + new Date(start).toLocaleDateString('en-CA')]['x.com'] >= 5);

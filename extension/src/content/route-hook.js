@@ -1,5 +1,7 @@
 (() => {
   'use strict';
+  if (globalThis.__createRatioRouteHook) return;
+  globalThis.__createRatioRouteHook = true;
   const notify = () => window.dispatchEvent(new Event('c3:route-change'));
   for (const key of ['pushState', 'replaceState']) {
     const original = history[key];

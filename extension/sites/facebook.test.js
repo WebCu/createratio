@@ -61,6 +61,29 @@ test('Facebook own numeric and people profiles are neutral without confusing dif
   link.href = 'https://evil.test/people/Synthetic/123/'; f.document.activeElement = f.body; assert.equal(f.adapter.mode(), 'consume');
 });
 
+test('Facebook recognizes the same numeric profile across supported URL forms', () => {
+  const urls = id => [`https://facebook.com/profile.php?id=${id}`, `https://www.facebook.com/profile.php/?id=${id}&sk=about`, `https://facebook.com/people/Synthetic/${id}/`, `https://www.facebook.com/people/Another-name/${id}`];
+  for (const id of ['123', '9007199254740993']) for (const url of urls(id)) {
+    const f = fixture('comment', url);
+    const link = f.body.append(new Element(['a[aria-label="Your profile"]']));
+    for (const ownProfileURL of urls(id)) {
+      link.href = ownProfileURL;
+      assert.equal(plugin.classifyPage({ url, ownProfileURL }), 'neutral', `${url} matches ${ownProfileURL}`);
+      assert.equal(f.adapter.mode(), 'neutral');
+      f.document.activeElement = f.editor; assert.equal(f.adapter.mode(), 'create'); f.document.activeElement = f.body;
+    }
+    for (const ownProfileURL of urls(id === '123' ? '456' : '9007199254740992')) {
+      link.href = ownProfileURL;
+      assert.equal(f.adapter.mode(), 'consume', `${url} differs from ${ownProfileURL}`);
+    }
+  }
+  const f = fixture('comment', 'https://facebook.com/people/Synthetic/123/');
+  const link = f.body.append(new Element(['a[aria-label="Your profile picture"]']));
+  for (const url of ['https://evil.test/profile.php?id=123', 'http://facebook.com/profile.php?id=123', 'https://m.facebook.com/profile.php?id=123', 'https://facebook.com:8443/profile.php?id=123', 'https://user@facebook.com/profile.php?id=123', 'https://facebook.com/profile.php?id=invalid', 'https://facebook.com/?id=123', 'https://facebook.com/groups/123', 'https://facebook.com/people/Synthetic/123/extra']) {
+    link.href = url; assert.equal(f.adapter.mode(), 'consume', url);
+  }
+});
+
 test('Facebook focused scoped post and comment editors take precedence; hidden, disabled and generic editors do not', () => {
   for (const kind of ['post', 'comment']) {
     const f = fixture(kind);
@@ -144,6 +167,27 @@ test('Facebook message reading stays neutral; focused explicit composing has no 
 });
 
 for (const browser of ['chrome', 'browser']) {
+  test(`Facebook ${browser} tracker keeps mixed-form own profiles neutral with native scrolling`, async () => {
+    for (const [path, ownPath] of [['/people/Synthetic/123/', '/profile.php?id=123'], ['/profile.php?id=123', '/people/Synthetic/123/']]) {
+      let f;
+      const t = await tracker(browser, {
+        integration: plugin, url: 'https://www.facebook.com' + path,
+        snapshot: { day: {}, settings: { trackedSites: ['facebook'] } },
+        fixture({ url, listen }) {
+          f = populate(environment(url, listen));
+          const link = f.body.append(new Element(['a[aria-label="Your profile"]'])); link.href = 'https://facebook.com' + ownPath;
+          return f;
+        }
+      });
+      t.input();
+      assert.equal(t.wheel(240).defaultPrevented, false, 'own profiles keep native scrolling');
+      assert.equal(t.document.scrollingElement.scrollTop, 1000);
+      t.setNow(5000); await t.tick();
+      assert.equal(seconds(t, 'consume'), 0, 'own profiles never record consuming time');
+      assert.deepEqual(t.warnings, []);
+    }
+  });
+
   test(`Facebook actual adapter uses shared ${browser} trusted wheel/touch tracking and opt-in lifecycle`, async () => {
     let f;
     const snapshot = trackedSites => ({ day: {}, settings: { trackedSites } });

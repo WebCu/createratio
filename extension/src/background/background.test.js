@@ -620,7 +620,7 @@ test('tracking preferences reject unvetted sites, invalid flags and untrusted se
 
 
 test('access budget pauses away from the site and resumes across tabs without double counting', async () => {
-  const w = worker(); await unlock(w);
+  const w = worker({}, 'chrome', new Date(2026, 9, 11, 12).getTime()); await unlock(w);
   w.advance(600000);
   let state = (await w.send({ type: 'access-status' })).access.x;
   assert.equal(state.remainingMs, 300000, 'unused access must not expire');
@@ -645,7 +645,7 @@ test('access budget pauses away from the site and resumes across tabs without do
 
 test('navigation and closing the active tab pause access without storing tab IDs or URLs', async () => {
   for (const browser of ['chrome', 'browser']) {
-    const w = worker({}, browser); await unlock(w);
+    const w = worker({}, browser, new Date(2026, 9, 11, 12).getTime()); await unlock(w);
     w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
     w.advance(5000); w.navigate('https://example.com/private'); await w.send({ type: 'access-status' });
     w.advance(600000);
@@ -660,7 +660,7 @@ test('navigation and closing the active tab pause access without storing tab IDs
 });
 
 test('worker restart preserves the checkpointed active budget without charging browser downtime', async () => {
-  const w = worker(); await unlock(w);
+  const w = worker({}, 'chrome', new Date(2026, 9, 11, 12).getTime()); await unlock(w);
   w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
   w.advance(30000); await w.send({ type: 'access-status' });
   const resumed = worker(w.data, 'chrome', w.now + 1000000);
@@ -792,10 +792,10 @@ test('clear history resets the website time sample without backfilling the prior
   const w = worker(); w.grantWebsitePermissions(); w.activate('https://example.com');
   const sender = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };
   await w.send({ type: 'website-time-setting', enabled: true }, sender); w.advance(5000);
-  await w.send({ type: 'snapshot' }); assert.equal(w.data['_websiteTime:' + C.localDate()]['example.com'], 5);
+  w.alarm('website-time'); await w.send({ type: 'snapshot' }); assert.equal(w.data['_websiteTime:' + C.localDate()]['example.com'], 5);
   w.advance(3000); await w.send({ type: 'clear-history' }, sender);
   assert.equal(w.data['_websiteTime:' + C.localDate()], undefined); assert.equal(w.data._websiteTimeEnabled, true);
-  w.advance(2000); await w.send({ type: 'snapshot' });
+  w.advance(2000); w.alarm('website-time'); await w.send({ type: 'snapshot' });
   assert.equal(w.data['_websiteTime:' + C.localDate()]['example.com'], 2);
 });
 

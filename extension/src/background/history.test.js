@@ -422,7 +422,7 @@ test('worker accrues numeric creation and website totals from malformed saved nu
     w.activate('https://example.test/');
     const initial = await w.send({ type: 'snapshot' });
     assert.equal(initial.websiteTimeEnabled, true);
-    w.advance(5000);
+    w.advance(5000); w.alarm('website-time');
     const response = await w.send({ type: 'ingest', id: 'fresh', generation: initial.generation, site: 'x', segments: [{ date, mode: 'consume', sec: 5 }], actions: [{ date, action: 'quotes' }] });
     assert.equal(response.ok, true);
     assert.deepEqual(response.day.x, { ...C3.emptyStats(), consumeSec: 5, createSec: 2, posts: 1, quotes: 1, unknown: 'saved' });
