@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../../core/core.js');
 const integrations = require('../../sites/index.js');
-const { Element } = require('../../sites/test-support.js');
+const { Element, linkedinFixture } = require('../../sites/test-support.js');
 const { tracker } = require('../tests/content-harness.js');
 test('an unusable ingest acknowledgement retains the exact queued packet for retry', async () => {
   for (const browser of ['chrome', 'browser']) {
@@ -417,6 +417,53 @@ test('LinkedIn DM writing retains idle, trusted-input, focus, visibility and acc
     const blocked = await tracker('chrome', { url, message: true, snapshot });
     blocked.route(url, true); blocked.input(); blocked.setNow(5000); await blocked.tick();
     assert.deepEqual(blocked.packets, [], 'blocked and disabled sites cannot record DMs');
+  }
+});
+
+test('LinkedIn shadow DM writing switches to reading, closes and resumes without submission credit', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const path of ['/feed/', '/in/another/']) {
+      let f;
+      const t = await tracker(browser, { url: 'https://www.linkedin.com' + path, fixture: options => (f = linkedinFixture({ ...options, message: true, shadow: true })) });
+      const focus = node => {
+        f.document.activeElement = f.host; f.shadowRoot.activeElement = node;
+        t.event('focusin', { target: f.host });
+      };
+      focus(f.editor); t.input(); t.setNow(5000); await t.tick();
+      assert.equal(seconds(t, 'create'), 5, `${browser} ${path}`);
+      focus(f.button); t.setNow(10000); await t.tick();
+      assert.equal(seconds(t, 'create'), 5, 'reading is not creation');
+      assert.equal(seconds(t, 'consume'), 5);
+      t.event('keydown', { isTrusted: true, key: 'Enter', target: f.host });
+      t.event('click', { isTrusted: true, target: f.host });
+      assert.deepEqual(t.packets.flatMap(p => p.actions), []);
+      focus(null); t.setNow(15000); await t.tick();
+      assert.equal(seconds(t, 'create'), 5, 'closing does not continue creation');
+      focus(f.editor); t.input(); t.setNow(20000); await t.tick();
+      assert.equal(seconds(t, 'create'), 10, 'returning resumes creation');
+      assert.equal(t.wheel(100).defaultPrevented, false, 'writing keeps native scrolling');
+    }
+  }
+});
+test('LinkedIn shadow DM writing preserves trusted-input, idle, focus, visibility, access and disabled protections', async () => {
+  let f;
+  const options = { url: 'https://www.linkedin.com/feed/', fixture: options => (f = linkedinFixture({ ...options, message: true, shadow: true })) };
+  const t = await tracker('chrome', options);
+  f.document.activeElement = f.host; f.shadowRoot.activeElement = f.editor; t.event('focusin', {});
+  t.input(false); t.setNow(5000); await t.tick(); assert.equal(seconds(t, 'create'), 0);
+  t.input();
+  for (let n = 10000; n <= 40000; n += 5000) { t.setNow(n); await t.tick(); }
+  assert.equal(seconds(t, 'create'), 30);
+  t.input(); t.focus(false); t.setNow(45000); await t.tick(); assert.equal(seconds(t, 'create'), 30);
+  t.focus(true); t.visible(false); t.setNow(50000); await t.tick(); assert.equal(seconds(t, 'create'), 30);
+  for (const snapshot of [
+    { day: {}, settings: C.DEFAULT_SETTINGS, access: { linkedin: { enabled: true, remainingMs: 0 } } },
+    { day: {}, settings: { ...C.DEFAULT_SETTINGS, trackedSites: [] } }
+  ]) {
+    const blocked = await tracker('chrome', { ...options, snapshot });
+    f.document.activeElement = f.host; f.shadowRoot.activeElement = f.editor; blocked.event('focusin', {});
+    blocked.input(); blocked.setNow(5000); await blocked.tick();
+    assert.deepEqual(blocked.packets, []);
   }
 });
 
