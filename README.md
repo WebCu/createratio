@@ -20,6 +20,8 @@ Switching away pauses the timer.
   creation tracking and shared Slow scrolling. Saved On/Off choices are kept.
 - **Facebook:** opt into creating/consuming tracking and shared Slow scrolling.
   No access gate or session timer is added; the integration starts Off.
+- **YouTube:** opt into creating/consuming tracking and shared Slow scrolling.
+  No access gate or session timer is added; the integration starts Off.
 - **Optional extras:** track time across websites or save your access intentions.
   Both are off by default.
 - **Private by default:** no extension account, analytics, telemetry, or activity
