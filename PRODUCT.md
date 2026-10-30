@@ -14,8 +14,10 @@ web
 ## Users
 
 Anyone who wants to create more than they consume online. There is no narrower
-professional or demographic audience. Site integrations support X, LinkedIn,
-and opt-in, tracking-only YouTube without an access gate.
+professional or demographic audience. Site integrations support timed access and
+creation tracking on X, LinkedIn, TikTok and Instagram, plus opt-in, tracking-only
+Facebook and YouTube without access gates. TikTok, Instagram, Facebook and YouTube
+start Off; saved site choices persist.
 
 ## Product Purpose
 
@@ -42,7 +44,9 @@ quality.
 - On gated sites, users write an intention, wait, and explicitly confirm access.
   Active-time budgets pause when users switch away. Users can change session
   durations or turn a site's **Limit & track** off.
-- The popup shows today's score and access controls; Settings owns preferences;
+- The popup shows today's score and access controls, without time editing.
+  Settings groups site switches, session times and optional preferences into
+  focused expandable sections;
   the dashboard provides history, charts, and exports.
 - Users must save drafts before installation or access expiry: open gated-site
   tabs redirect to the blocked page.

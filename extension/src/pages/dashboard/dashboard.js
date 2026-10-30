@@ -4,6 +4,10 @@ const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
 let reportURL = null, reportTimer = null, reportVersion = 0;
+function nextDay() {
+  const now = new Date();
+  setTimeout(() => { nextDay(); void refresh(true); }, new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime() + 100);
+}
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function svgElement(tag, attrs = {}, text) {
@@ -44,7 +48,7 @@ function renderWebsites(days) {
   const total = rows.reduce((sum, [, sec]) => sum + sec, 0);
   $('website-total').textContent = WebTime.duration(total);
   $('website-count').textContent = `${rows.length} website${rows.length === 1 ? '' : 's'}`;
-  $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. Updates every few seconds.' : 'Website time is off. Previously recorded browsing time is kept.';
+  $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. Updates as you browse.' : 'Website time is off. Previously recorded browsing time is kept.';
   $('website-empty').hidden = rows.length > 0;
   $('website-empty').textContent = websiteTimeEnabled ? 'No time in this period yet. Use a website to start.' : 'Enable Website time in Settings to record browsing time across all sites.';
   $('website-sites').replaceChildren();
@@ -163,7 +167,6 @@ $('website-export').addEventListener('click', () => exportHistory('websites'));
 $('export').addEventListener('click', () => exportHistory('ratio'));
 extensionAPI.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && Object.hasOwn(changes, '_historyReset')) { reportVersion++; sharing.clear(); }
-  if (RuntimeMessages.shouldRefresh(changes, area)) void refresh();
+  if (RuntimeMessages.shouldRefresh(changes, area, activeView === 'websites')) void refresh(true);
 });
-setInterval(refresh, 5000);
-void refresh();
+nextDay(); void refresh();

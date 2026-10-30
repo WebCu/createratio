@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const C = require('../../core/core.js');
 const C3Sites = require('../../sites/index.js');
 const MessageContracts = require('./message-contracts.js');
-const { worker, gate, intent, popupSender } = require('../tests/background-harness.js');
+const { worker, gate, intent, popupSender, rulesFor } = require('../tests/background-harness.js');
 const now = new Date(2026, 9, 11, 12).getTime();
 
 function blocker(data = {}, browser = 'chrome', core = C) {
@@ -80,7 +80,7 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(w.alarms['access-x'], undefined);
     assert.deepEqual(w.data._intentions, intentions);
     assert.equal(w.data[date].x.posts, 1);
-    assert.deepEqual(w.rules.map(rule => rule.id), [101, 104]);
+    assert.deepEqual(rulesFor(w).map(rule => rule.id), [101, 104]);
     const settingWrite = w.calls.findIndex(call => call.type === 'local.set');
     const reconciliation = w.calls.findIndex(call => call.type === 'session.get');
     assert.ok(settingWrite < reconciliation);
@@ -88,7 +88,7 @@ for (const browser of ['chrome', 'browser']) {
     assert.deepEqual(structuredClone(await w.handle(tracking('x', true), popupSender)), { ok: true });
     assert.deepEqual(w.data.settings.trackedSites, ['x', 'linkedin']);
     assert.equal(w.tabs[0].url, gate('x').url);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
     assert.equal((await w.handle({ type: 'access-status' })).access.x.remainingMs, 0);
   });
 
@@ -110,7 +110,7 @@ test('tracking accepts vetted integrations independently of whole-site gate supp
   const w = blocker({}, 'chrome', core);
   assert.equal((await w.handle(tracking('vetted', true), popupSender)).ok, true);
   assert.deepEqual(w.data.settings.trackedSites, ['x', 'linkedin', 'vetted']);
-  assert.deepEqual(w.rules, []);
+  assert.deepEqual(rulesFor(w), []);
 });
 
 test('failed initial tracking persistence neither reconciles nor attempts rollback', async () => {
@@ -157,7 +157,7 @@ test('tracking rollback restores preferences but does not refund a session alrea
   await assert.rejects(w.handle(tracking(), popupSender), error => error === failure);
   assert.deepEqual(w.data.settings, C.DEFAULT_SETTINGS);
   assert.equal(w.data._access.x, undefined);
-  assert.deepEqual(w.rules, []);
+  assert.deepEqual(rulesFor(w), []);
 });
 
 test('ending access revokes rules before persistence, alarm clearing and tab redirects', async () => {
@@ -191,7 +191,7 @@ test('invalid restored session dates cannot grant a daily refill or retain acces
     const state = (await w.handle({ type: 'access-status' })).access.x;
     assert.equal(state.remainingMs, 0, JSON.stringify(date));
     assert.equal(state.refilledAt, 0);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
     assert.equal(w.alarms['access-midnight'], undefined);
     await assert.rejects(w.handle({ type: 'access-open', site: 'x' }, gate('x')), /Finish the waiting period/);
   }
@@ -215,7 +215,7 @@ for (const browser of ['chrome', 'browser']) {
       assert.equal(result.access.x.requestExpiresAt, 0);
       assert.equal(w.errors.length, 0);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
-      assert.deepEqual(w.rules, []);
+      assert.deepEqual(rulesFor(w), []);
       const begin = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
       assert.equal(begin.ok, true);
       assert.equal(begin.access.x.readyAt, now + 60000);
@@ -240,7 +240,7 @@ test('malformed restored access containers and entries fail closed without worke
     const result = await w.send({ type: 'access-status' });
     assert.equal(result.ok, true);
     assert.equal(result.access.x.remainingMs, 0);
-    assert.deepEqual(w.rules, []);
+    assert.deepEqual(rulesFor(w), []);
     assert.equal(w.errors.length, 0);
     const begin = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
     assert.equal(begin.ok, true);
@@ -257,7 +257,7 @@ test('invalid restored session numbers cannot revive access through legacy deadl
       const result = await w.handle({ type: 'access-status' });
       assert.equal(result.access.x.remainingMs, 0, field + ': ' + String(invalid));
       assert.equal(result.access.x.refilledAt, 0);
-      assert.deepEqual(w.rules, []);
+      assert.deepEqual(rulesFor(w), []);
       assert.equal(w.alarms['access-midnight'], undefined);
     }
   }

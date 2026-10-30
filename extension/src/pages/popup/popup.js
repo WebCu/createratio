@@ -2,9 +2,9 @@
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
-let refreshing = false;
+let refreshing = false, refreshFailed = false;
 const accessControls = new Map();
-function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
+function error(message = '') { $('error').textContent = message; $('error').hidden = !message; refreshFailed = false; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function createAccessControl(site, state) {
   const row = document.createElement('div'); row.className = 'access-row';
@@ -14,7 +14,7 @@ function createAccessControl(site, state) {
   name.textContent = state.name; label.append(name, status);
   const button = document.createElement('button');
   button.setAttribute('aria-describedby', status.id);
-  const control = { label, status, button, state, busy: false };
+  const control = { row, label, status, button, state, busy: false };
   button.addEventListener('click', async () => {
     control.busy = true; button.disabled = true;
     try {
@@ -37,6 +37,7 @@ function renderAccess(access) {
     if (!control) { control = createAccessControl(site, state); accessControls.set(site, control); }
     control.state = state;
     const { status, button } = control;
+    control.row.setAttribute('data-state', state.enabled === false ? 'off' : state.goalAllowed || state.remainingMs > 0 ? 'open' : 'blocked');
     const open = state.remainingMs > 0;
     const left = state.expiresAt ? Math.max(0, state.expiresAt - Date.now()) : state.remainingMs;
     const seconds = Math.ceil(left / 1000);
@@ -61,8 +62,8 @@ async function refresh() {
   try {
     const snapshot = await messages.send({ type: 'snapshot' }, 'Unable to load your data.');
     render(snapshot);
-    error();
-  } catch (e) { error(e.message); } finally { refreshing = false; }
+    if (refreshFailed) error();
+  } catch (e) { error(e.message); refreshFailed = true; } finally { refreshing = false; }
 }
 $('settings').disabled = false;
 $('settings').addEventListener('click', async () => {

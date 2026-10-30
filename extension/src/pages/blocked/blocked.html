@@ -4,12 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Site blocked - CreateRatio</title>
-  <link rel="stylesheet" href="blocked.css"><link rel="stylesheet" href="refill.css">
+  <link rel="stylesheet" href="blocked.css"><link rel="stylesheet" href="refill.css"><link rel="stylesheet" href="update-notice.css">
 </head>
 <body>
   <header><a class="brand" href="dashboard.html" aria-label="CreateRatio dashboard"><span class="mark" aria-hidden="true">&gt;</span><span>CreateRatio<small>Create &gt; Consume</small></span></a><nav aria-label="Extension pages"><a href="dashboard.html">Dashboard</a><a href="settings.html">Settings</a></nav></header>
   <main>
     <section class="intro" aria-labelledby="heading">
+      <aside id="update-notice" class="update-notice" aria-label="Extension update" hidden><div><strong>Update ready</strong><p id="update-status" role="status">Installs automatically when CreateRatio is not in use.</p></div><button id="update-apply" type="button">Update now</button></aside>
       <p class="state"><span aria-hidden="true"></span><span id="state-text" role="status" aria-label="Site access status">Blocked by default</span></p>
       <h1 id="heading">The feed can wait. You’ve got this.</h1>
       <p class="description" id="description">Set an intention, take the full minute, then choose whether to open the site.</p>
@@ -44,6 +45,6 @@
     </section>
   </main>
   <footer><span>Private and local. No account. No tracking outside your browser.</span><div class="footer-links"><a href="https://createratio.com/privacy.html" target="_blank" rel="noopener noreferrer">Privacy policy</a><span>This is a pause, not a punishment.</span></div></footer>
-  <script src="sites.js"></script><script src="core.js"></script><script src="messages.js"></script><script src="refill.js"></script><script src="blocked.js"></script>
+  <script src="sites.js"></script><script src="core.js"></script><script src="messages.js"></script><script src="update-notice.js"></script><script src="refill.js"></script><script src="blocked.js"></script>
 </body>
 </html>

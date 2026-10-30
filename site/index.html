@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="CreateRatio blocks X and LinkedIn by default, adds a deliberate pause before configurable active-tab access, and tracks creating versus consuming locally.">
+  <meta name="description" content="Create more on X, LinkedIn, Instagram and TikTok. CreateRatio combines intentional access, active-time limits and private local creation tracking. Enable Instagram and TikTok in Settings.">
   <meta name="theme-color" content="#f9f9fc">
   <title>CreateRatio - Create &gt; Consume</title>
   <link rel="canonical" href="https://createratio.com/">
@@ -15,7 +15,7 @@
     "@type": "SoftwareApplication",
     "name": "CreateRatio",
     "url": "https://createratio.com/",
-    "description": "A browser extension for intentional X and LinkedIn access and local creating-versus-consuming measurements.",
+    "description": "A browser extension for intentional access to X, LinkedIn, Instagram and TikTok and local creating-versus-consuming measurements. Instagram and TikTok are opt-in.",
     "applicationCategory": "ProductivityApplication",
     "applicationSubCategory": "Browser extension",
     "softwareRequirements": "Requires Chrome 111+, Firefox 140+, or an Edge source build.",
@@ -39,7 +39,7 @@
     <div class="arrival-stage">
       <header class="arrival-header">
         <a class="brand" href="./" aria-label="CreateRatio home"><span class="brand-mark" aria-hidden="true">&gt;</span>CreateRatio</a>
-        <p>A browser extension for intentional X and LinkedIn browsing.</p>
+        <p>Intentional browsing on X, LinkedIn, Instagram and TikTok.<br><a href="#latest" data-release-link>Instagram and TikTok are here.</a></p>
       </header>
       <div class="attention-orbit" aria-hidden="true"></div>
       <div class="distractions" aria-hidden="true">
@@ -70,11 +70,15 @@
     </header>
 
     <main id="main" tabindex="-1">
+      <aside class="release-note" id="latest" aria-labelledby="release-title" data-release-announcement>
+        <h2 id="release-title">Instagram and TikTok are here.</h2>
+        <div><p>The same deliberate pause, active-time limits and local creation tracking, now on Instagram and TikTok alongside X and LinkedIn.</p><p>Instagram and TikTok start Off. In Settings → Websites, turn on Limit &amp; track for each site you want. Your saved choices stay yours.</p><a href="#install">Get CreateRatio</a></div>
+      </aside>
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="intro">This is your space. Make something of it.</p>
           <h1 id="hero-title">Create more.<br>Consume less.</h1>
-          <p class="description">Track active creating versus consuming with a daily score.</p>
+          <p class="description">A daily creation score for X, LinkedIn, Instagram and TikTok. More intention, less endless scrolling.</p>
           <ol class="access-sequence">
             <li>Write an intention.</li>
             <li>Wait the full 60 seconds.</li>
@@ -114,7 +118,8 @@
       <section class="install" id="install" aria-labelledby="install-title">
         <div class="install-copy">
           <h2 id="install-title">Start with a small extension.</h2>
-          <p>Get CreateRatio from the Chrome Web Store or Firefox Add-ons. No developer tools needed. Save your X and LinkedIn drafts before installing: existing tabs are redirected to the access gate.</p>
+          <p>Get CreateRatio from the Chrome Web Store or Firefox Add-ons. No developer tools needed. Save your X and LinkedIn drafts before installing: existing tabs are redirected to the access gate. Save Instagram and TikTok drafts before enabling them, too.</p>
+          <p>To add Instagram or TikTok, open CreateRatio’s <strong>Settings → Websites</strong> and turn on <strong>Limit &amp; track</strong> for that site. Both start Off. Turning a site Off removes limits and stops new creation-score measurements, without deleting history.</p>
           <div class="actions" data-install-actions>
             <a class="button" data-browser="chrome" href="https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk">Add to Chrome</a>
             <a class="button" data-browser="firefox" href="https://addons.mozilla.org/en-US/firefox/addon/createratio/">Add to Firefox</a>
@@ -147,7 +152,7 @@ pnpm install --frozen-lockfile
 pnpm build</code></pre>
             <ol>
               <li><strong>Chrome 111+ or Edge:</strong> open <code>chrome://extensions</code> or <code>edge://extensions</code>, enable <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select <code>dist/chrome</code> or <code>dist/edge</code>.</li>
-              <li><strong>Firefox 140+:</strong> open <code>about:debugging#/runtime/this-firefox</code>, choose <strong>Load Temporary Add-on</strong>, select <code>dist/firefox/manifest.json</code>, then refresh your X and LinkedIn tabs.</li>
+              <li><strong>Firefox 140+:</strong> open <code>about:debugging#/runtime/this-firefox</code>, choose <strong>Load Temporary Add-on</strong>, select <code>dist/firefox/manifest.json</code>, then refresh your enabled site tabs.</li>
             </ol>
             <p>The temporary Firefox source install is removed when Firefox restarts; use the Firefox Add-ons listing above for a permanent installation. Edge is available as a development build, not a store release.</p>
             <p><a href="https://github.com/WebCu/createratio/blob/main/extension/README.md">Read the full installation guide</a></p>

@@ -158,11 +158,15 @@ export function devToolsEndpoint(contents) {
   return `ws://127.0.0.1:${port}${path}`;
 }
 
-export async function launch(extensionPath) {
+export async function launch(extensionPath, options = {}) {
   extensionPath = resolve(extensionPath);
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
   const workerURL = extensionWorkerURL(extensionPath, manifest);
   const directory = await mkdtemp(join(tmpdir(), 'createratio-browser-'));
+  if (options.developerMode) {
+    await mkdir(join(directory, 'profile', 'Default'), { recursive: true });
+    await writeFile(join(directory, 'profile', 'Default', 'Preferences'), JSON.stringify({ extensions: { ui: { developer_mode: true } } }));
+  }
   const executable = process.env.CHROMIUM_PATH || process.env.CHROMIUM || '/usr/bin/chromium';
   const args = [
     `--user-data-dir=${join(directory, 'profile')}`, '--remote-debugging-port=0',
@@ -175,6 +179,7 @@ export async function launch(extensionPath) {
     '--host-resolver-rules=MAP * ~NOTFOUND', '--window-size=1280,900',
     `--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, 'about:blank'
   ];
+  if (process.platform === 'darwin') args.push('--use-mock-keychain');
   if (process.env.CHROMIUM_NO_SANDBOX === '1') args.push('--no-sandbox');
   const child = spawn(executable, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
   let diagnostics = '', spawnError, closed = false, cdp, socket, watchdog, browser;
@@ -334,6 +339,13 @@ export async function seedAccess(browser, sites, settings) {
   })()`);
 }
 
+export async function openSettingsSection(browser, page, name) {
+  const selector = '#' + name + '-settings';
+  await eventually(() => evaluate(browser, page.session, `!!document.querySelector(${JSON.stringify(selector)}) && !!document.querySelector('#accessMinutes-default')`), name + ' settings section ready');
+  if (!await evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`)) await click(browser, page, selector + ' > summary');
+  await eventually(() => evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`), name + ' settings section open');
+}
+
 export async function waitForEnabledControl(browser, page, selector, timeout) {
   return eventually(() => evaluate(browser, page.session, `(() => {
     const control = document.querySelector(${JSON.stringify(selector)});
@@ -385,7 +397,7 @@ async function clickElement(browser, page, locate, description) {
         if (!element.isConnected || element.disabled || element.getAttribute('aria-disabled') === 'true' || !rect.width || !rect.height) return false;
         if (['x', 'y', 'width', 'height'].some(key => before[key] !== rect[key])) return false;
         const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-        const hit = document.elementFromPoint(point.x, point.y);
+        const hit = element.getRootNode().elementFromPoint(point.x, point.y);
         return hit === element || element.contains(hit) ? point : false;
       }` }, page.session);
       if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);

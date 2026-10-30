@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "CreateRatio",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Create > Consume. Block X and LinkedIn, unlock for configurable active-tab time, and track creating versus consuming.",
   "minimum_chrome_version": "111",
-  "permissions": ["storage", "alarms", "declarativeNetRequestWithHostAccess"],
+  "permissions": ["storage", "alarms", "declarativeNetRequestWithHostAccess", "scripting"],
   "optional_permissions": ["tabs", "idle"],
   "host_permissions": [],
   "declarative_net_request": { "rule_resources": [{ "id": "site-blocking", "enabled": true, "path": "block-rules.json" }] },
@@ -14,9 +14,9 @@
   "action": { "default_popup": "popup.html", "default_title": "CreateRatio", "default_icon": {"16":"icons/icon16.png","32":"icons/icon32.png","48":"icons/icon48.png","128":"icons/icon128.png"} },
   "icons": {"16":"icons/icon16.png","32":"icons/icon32.png","48":"icons/icon48.png","128":"icons/icon128.png"},
   "content_scripts": [
-    { "matches": [], "js": ["sites.js", "messages.js", "access-guard.js"], "run_at": "document_start" },
+    { "matches": [], "js": ["sites.js", "messages.js", "lifecycle.js", "access-guard.js"], "run_at": "document_start" },
     { "matches": [], "js": ["route-hook.js"], "run_at": "document_start", "world": "MAIN" },
-    { "matches": [], "js": ["sites.js", "core.js", "messages.js", "dom.js", "scroll-friction.js", "content.js"], "run_at": "document_idle" }
+    { "matches": [], "js": ["sites.js", "core.js", "messages.js", "dom.js", "scroll-friction.js", "lifecycle.js", "content.js"], "run_at": "document_idle" }
   ],
   "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'" }
 }

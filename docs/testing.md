@@ -20,6 +20,16 @@ the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;
 missing browsers and failed checks are errors, not successful skips.
 
+CI runs browser journeys across eight independent runners, with one browser at a
+time per shard. `bin/browser-shards.json` assigns every browser test file exactly
+once; missing, duplicate, or unassigned files fail before journeys start. After
+adding or moving a browser test, update that plan and keep shard durations balanced.
+Run one shard locally with `pnpm check:browser:shard 1` (through `8`); the normal
+`pnpm check:browser` still runs the complete suite. The broader smoke runs
+separately. The existing `browser-smoke` check requires both that smoke and every
+journey shard to succeed, including when a dependency fails, is skipped, or is
+cancelled. Failed shards retain separately named evidence for seven days.
+
 `pnpm verify` runs all three completion commands in order, stopping on the first
 failure and preserving its exit code. Each invocation creates a fresh private
 temporary directory, prints its path, and saves per-stage logs plus `summary.json`.
@@ -126,6 +136,27 @@ There is no automated memory-budget gate: browser memory measurements and their
 acceptance remain a required contributor and maintainer review gate. A green CI
 run alone does not satisfy this section.
 
+### Update-lifecycle resource comparison
+
+Build the fixed baseline and candidate into separate directories, then run:
+
+```sh
+node bin/update-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/update-profile.json
+```
+
+The runner alternates three runs per build, each with eight synthetic website
+tabs and Website time enabled in a fresh profile. Only the disposable manifests
+promote optional `tabs`/`idle` permissions to simulate an already-approved opt-in.
+All debugger sessions are detached during each 42-second observation. When comparing
+against an already-idle baseline, append `--baseline-idle`; both builds must then
+shut down. Without that flag, the baseline must remain running and the candidate
+must shut down. Browser-level target inventory observes shutdown without calling
+worker APIs. Bundle hashes
+must remain unchanged. Reports include per-run shutdown times and summed process
+RSS; compare median and range, not a selected run. Summed RSS is not private heap,
+shared-memory-adjusted browser memory or a zero-memory claim. Store delivery,
+Firefox, real sleep/wake and resource acceptance remain separate gates.
+
 ### Scroll-friction resource comparison
 
 Build baseline and candidate Chrome bundles in separate directories, then run:
@@ -222,6 +253,10 @@ and checksum. Update both together after verifying the official download and
 running the browser journeys. Regular branded Chrome may reject unpacked-extension
 launch flags; use Chromium or Chrome for Testing for this runner.
 
+On macOS, both disposable browser runners use Chromium's mock keychain rather
+than requesting access to the login keychain. This does not change macOS or
+normal-browser settings.
+
 The runner defaults to `/usr/bin/chromium` and a 90-second watchdog;
 `BROWSER_TIMEOUT_MS` can override the bounded timeout. Sandbox disabling requires
 `CHROMIUM_NO_SANDBOX=1` and is only appropriate in an isolated Linux sandbox that
@@ -293,7 +328,8 @@ live composing behavior, physical comfort or cross-browser compatibility.
 
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
 JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
-reject code comments with file, line and column diagnostics. An initial hashbang
+reject code comments with file, line and column diagnostics. Files are checked
+across at most four workers; any worker failure fails the command. An initial hashbang
 interpreter directive is allowed; comment-like text in strings, templates and
 regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS
 syntax check, including its wrapper bindings, to select Acorn's grammar. This
@@ -450,7 +486,9 @@ screenshots, credentials, or publisher-dashboard information.
 
 Before a release, verify:
 
-- X/Twitter aliases and LinkedIn block, while unrelated sites remain accessible.
+- Enabled X/Twitter aliases, LinkedIn, TikTok and Instagram block, including HTTP/S
+  subdomains, while unrelated sites remain accessible. TikTok and Instagram start
+  Off; saved choices survive updates. Verify browser approval of expanded hosts.
 - Reloading preserves the 60-second wait; only explicit confirmation unlocks.
 - Access budgets are shared per site, pause on tab/window changes, survive
   restarts, refill at local midnight, and revoke access at expiry or manual end.
@@ -484,6 +522,14 @@ Before a release, verify:
   physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
+- All four popup rows show current access without session-time editors.
+  Settings opens Websites initially; Browsing, Privacy and Your data open through
+  native section summaries, closing the previous section. Verify keyboard access,
+  320px layouts, reduced motion and forced colors. Duration menus support presets,
+  inherited Default and on-demand Custom edits from 1–240 whole minutes. Verify
+  Save/Cancel, invalid input, failed saves, focused drafts across polling and
+  retained arbitrary durations after reload. Saving affects new sessions/refills,
+  not the current budget; Off disables editing without deleting saved times.
 - Available tracking-only integrations start Off and have no access gates or
   session timers. Their compact Settings switches persist independently; enabling
   applies the shared Slow scrolling preference on consuming pages, while editors,
@@ -526,7 +572,16 @@ Before a release, verify:
   and never appears in CSV exports.
 - Retention and size limits remove oldest history without altering preferences.
 - Store-installed Chrome feedback opens the correct public reviews page without
-  activity data. Unpacked builds show feedback as unavailable.
+  activity data. Unpacked and other-browser builds omit unavailable store feedback;
+  Privacy policy and Terms of use remain accessible.
+- A store-delivered update preserves synthetic measurements, preferences and
+  access budgets. With Website time enabled and its debugger detached, the worker
+  becomes inactive between alarms. **Update ready** appears in extension pages;
+  unsaved settings/intention drafts are never interrupted automatically. Active
+  tracking and failed delivery defer automatic installation. Explicit Update now
+  confirms intent, flushes pending measurements and restores tracking in existing
+  website documents without reloading them. Verify the actual store version
+  transition; a simulated available event and unpacked reload do not prove delivery.
 - Popup, Settings, dashboard, and blocked pages work with keyboard navigation,
   narrow windows, and reduced motion.
 
