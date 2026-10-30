@@ -6,5 +6,5 @@
   ["scroll-app-shell.test.js", "refresh.test.js", "export-reset.test.js", "settings-feedback.test.js"],
   ["popup-share.test.js", "smoke.test.js", "share-memory.test.js"],
   ["instagram.test.js", "tracker-idle.test.js", "agent-ui.test.js", "export-rollover.test.js"],
-  ["tiktok.test.js", "scroll-friction.test.js", "harness-readiness.test.js"]
+  ["tiktok.test.js", "facebook.test.js", "scroll-friction.test.js", "harness-readiness.test.js"]
 ]

@@ -18,6 +18,8 @@ Switching away pauses the timer.
 - **TikTok and Instagram:** start Off. Enable **Limit & track** in Settings for
   the same intention, wait and active-time limits as X and LinkedIn, alongside
   creation tracking and shared Slow scrolling. Saved On/Off choices are kept.
+- **Facebook:** opt into creating/consuming tracking and shared Slow scrolling.
+  No access gate or session timer is added; the integration starts Off.
 - **Optional extras:** track time across websites or save your access intentions.
   Both are off by default.
 - **Private by default:** no extension account, analytics, telemetry, or activity

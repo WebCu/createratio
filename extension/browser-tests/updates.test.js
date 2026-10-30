@@ -18,7 +18,9 @@ test('a focused inactive website lets the actual worker stop with every debugger
 
 test('worker replacement after committed teardown restores the same website document without applying the update', async () => {
   const { launch, evaluate, eventually, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
+  const { scrollFixture } = await import('./scrolling.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'), { developerMode: true });
+  const scrolling = scrollFixture(browser);
   try {
     await withFailureArtifacts(browser, 'interrupted update recovery', async () => {
       await seedAccess(browser, ['x']);
@@ -41,8 +43,13 @@ test('worker replacement after committed teardown restores the same website docu
           const send=chrome.runtime.sendMessage.bind(chrome.runtime);
           globalThis.recoverySnapshotAttempts=0;
           chrome.runtime.sendMessage=message=>{
-            if(message.type==='snapshot' && ++globalThis.recoverySnapshotAttempts===1) return Promise.reject(new Error('Synthetic transient startup failure'));
-            return send(message);
+            if(message.type!=='snapshot') return send(message);
+            const attempt=++globalThis.recoverySnapshotAttempts;
+            if(attempt===1) return Promise.reject(new Error('Synthetic transient startup failure'));
+            return send(message).then(async reply=>{
+              if(attempt===2) await new Promise(resolve=>setTimeout(resolve,500));
+              return reply;
+            });
           };
         }});
       })()`);
@@ -67,6 +74,7 @@ test('worker replacement after committed teardown restores the same website docu
       assert.deepEqual(await evaluate(browser, site.session, '({token:documentToken,draft:document.querySelector("#draft").value})'), { token: 'preserved', draft: 'Unsaved synthetic draft' });
       const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec;})()');
       assert.ok(before > 0);
+      await eventually(() => scrolling.isEnabled(site), 'recovered tracker applies preferences before new input');
       await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }, site.session);
       await eventually(() => evaluate(browser, browser.worker, `(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec > ${before};})()`), 'recovered tracker saves new measurements');
     });

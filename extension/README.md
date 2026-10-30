@@ -1,7 +1,8 @@
 # CreateRatio browser extension
 
 A dependency-free Manifest V3 extension for intentional access and local
-creating-versus-consuming tracking on X, LinkedIn, TikTok and Instagram.
+creating-versus-consuming tracking on X, LinkedIn, TikTok and Instagram, with an
+opt-in, tracking-only Facebook integration.
 
 ## Layout and installation
 
@@ -289,6 +290,7 @@ Old Twitter URLs must redirect to X first.
 | LinkedIn | Feed and other personal/company/school profiles | Focused post, comment, or direct-message editors |
 | TikTok | For You, Following, Explore, Search, tags, music, profiles, videos and photos | Focused comment, upload-caption, or message editors |
 | Instagram | Feed, Explore, Search, Reels, tagged feeds, posts, stories and profiles | Focused comment, dialog-caption, or message editors |
+| Facebook | Home, Watch feed, reels, group feeds/posts, supported permalink and numeric-profile routes | Focused post-dialog, comment, or messaging-page editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
 cannot be identified, profiles default to consuming. Editors take precedence;
@@ -370,6 +372,21 @@ bonuses. English labels are recognized; ambiguous controls, unsupported shortcut
 and upload steps without a recognized caption submit do not count. Mobile hosts
 are unsupported. Synthetic fixtures do not prove current authenticated markup or
 publication.
+
+### Facebook tracking
+
+Facebook starts Off under **Settings → Websites → Tracking only**. It uses the
+exact HTTPS hosts `facebook.com` and `www.facebook.com`, with no access gate or
+session timer. Enabling applies the shared Slow scrolling preference on consuming
+pages. Off restores native scrolling and retains history.
+
+A scoped create-post dialog's Post control counts posts; scoped comment/reply
+submits and plain Enter in comment editors count comments. Reactions, shares,
+editing, and opening a composer do not count as submissions. Reading messages is
+neutral; supported focused messaging-page editors create without submit bonuses.
+English labels are recognized. Vanity-profile routes, separate Messenger hosts,
+mobile hosts, and shadow-root-only editors are unsupported. Synthetic fixtures
+do not prove current authenticated markup or publication.
 
 ## Optional all-website time
 
@@ -476,8 +493,10 @@ Required permissions are `storage`, `alarms`, and
 `declarativeNetRequestWithHostAccess`, plus `scripting` to restore CreateRatio's
 own scripts in already-authorized tabs after updates. Host access is limited to HTTP/S X, Twitter
 aliases, LinkedIn, TikTok and Instagram, including their subdomains, for access
-gating. Creation tracking still uses each site's exact HTTPS hosts. This expanded
-TikTok/Instagram scope can require browser approval when updating.
+gating. Creation tracking still uses each site's exact HTTPS hosts. Facebook adds
+only exact HTTPS root and `www.` host permissions, not HTTP or wildcard subdomains.
+The expanded TikTok/Instagram scope and new Facebook hosts can require browser
+approval when updating.
 Optional `tabs` and `idle` permissions are requested only for
 all-website time. No browser-history or all-sites host permission is requested.
 Chromium restricts aggregate storage to trusted extension contexts; Firefox's

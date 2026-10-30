@@ -47,7 +47,7 @@ test('all browser bundles include the exact shared core and every referenced ass
     assert.deepEqual(manifest.optional_permissions, ['tabs', 'idle']);
     assert.ok((await fs.stat(path.join(output, 'web-time.js'))).isFile());
     const trackingHosts = require('../../sites/index.js').sites.filter(site => !site.gated).flatMap(site => site.hosts);
-    assert.deepEqual(manifest.host_permissions, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com'].flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']));
+    assert.deepEqual(manifest.host_permissions, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com'].flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']).concat(trackingHosts.map(host => 'https://' + host + '/*')));
     for (const entry of manifest.content_scripts.slice(1)) for (const host of trackingHosts) assert.ok(entry.matches.includes('https://' + host + '/*'));
     for (const host of trackingHosts) assert.ok(!manifest.content_scripts[0].matches.includes('https://' + host + '/*'), 'tracking-only hosts do not get access guards');
     assert.deepEqual(manifest.declarative_net_request.rule_resources, [{ id: 'site-blocking', enabled: true, path: 'block-rules.json' }]);

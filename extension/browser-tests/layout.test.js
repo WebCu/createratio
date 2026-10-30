@@ -148,12 +148,14 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       await noOverflow(page);
     });
     await journey('all four site menus and switches persist at narrow widths without exposing custom fields', async () => {
-      const catalog = require('../sites/index.js').sites;
+      const sites = require('../sites/index.js').sites;
+      const catalog = sites.filter(site => site.gated), trackingOnly = sites.filter(site => !site.gated);
       for (const width of [320, 390]) {
         const page = await pageAt('/settings.html', width);
         await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings select").length === 4'), 'catalog menus rendered');
-        assert.equal(await inspect(page, 'document.querySelector("#tracking-only-section").hidden'), true);
+        assert.equal(await inspect(page, 'document.querySelector("#tracking-only-section").hidden'), trackingOnly.length === 0);
         assert.deepEqual(await inspect(page, '[...document.querySelectorAll("#site-settings > li")].map(row => row.dataset.site)'), catalog.map(site => site.id));
+        assert.deepEqual(await inspect(page, '[...document.querySelectorAll("#tracking-only-settings > li")].map(row => row.dataset.site)'), trackingOnly.map(site => site.id));
         assert.equal(await inspect(page, '[...document.querySelectorAll("input[type=number]")].filter(input => input.getClientRects().length).length'), 0);
         for (const { id, name } of catalog.filter(site => !site.defaultEnabled)) {
           assert.equal(await inspect(page, `document.querySelector('#track-${id}').checked`), false);
@@ -179,7 +181,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       }
     });
     await journey('Settings duration menus save presets, arbitrary custom times and inherited defaults without altering current budgets', async () => {
-      const sites = require('../sites/index.js').sites;
+      const sites = require('../sites/index.js').sites.filter(site => site.gated);
       await seedAccess(browser, sites.map(site => site.id), { trackedSites: sites.map(site => site.id), accessMinutes: 5, siteOverrides: {}, allowAboveGoal: false });
       const page = await pageAt('/settings.html', 1000);
       await eventually(() => inspect(page, '!!document.querySelector("#accessMinutes-default")'), 'Settings ready');

@@ -7,9 +7,10 @@ const Sites = require('../../sites/index.js');
 const { tracker } = require('./content-harness.js');
 const { worker, popupSender, unlock } = require('./background-harness.js');
 
-function gatedPlatform({ id: site, url, neutral: neutralPath }) {
+function platformTracking({ id: site, url, neutral: neutralPath, gated }) {
   for (const browser of ['chrome', 'browser']) {
-    test(`${browser}: ${site} opts into the shared gated time and scrolling lifecycle`, async () => {
+    test(`${browser}: ${site} opts into the shared ${gated ? 'gated' : 'tracking-only'} time and scrolling lifecycle`, async () => {
+      assert.equal(Sites.get(site).access !== undefined, gated);
       const t = await tracker(browser, { url, fixture: ({ url, listen }) => environment(url, listen) });
       const consumed = () => t.packets.flatMap(packet => packet.segments).reduce((sum, segment) => sum + (segment.mode === 'consume' ? segment.sec : 0), 0);
       t.input(); t.setNow(5000); await t.tick();
@@ -57,10 +58,14 @@ function gatedPlatform({ id: site, url, neutral: neutralPath }) {
       const enabled = await w.send({ type: 'tracking', site, enabled: true }, popupSender);
       assert.equal(enabled.ok, true);
       assert.ok(enabled.settings.trackedSites.includes(site));
-      assert.equal(enabled.access[site].remainingMs, 0, 'enabling starts blocked');
-      assert.equal((await w.send(packet, sender)).ok, true);
-      assert.equal(w.data[date], undefined, 'blocked sites cannot record measurements');
-      await unlock(w, site);
+      if (gated) {
+        assert.equal(enabled.access[site].remainingMs, 0, 'enabling starts blocked');
+        assert.equal((await w.send(packet, sender)).ok, true);
+        assert.equal(w.data[date], undefined, 'blocked sites cannot record measurements');
+        await unlock(w, site);
+      } else {
+        assert.equal(Object.hasOwn(enabled.access, site), false, 'tracking-only integrations never acquire an access budget');
+      }
       assert.ok(Sites.get(site).actions.includes('comments'));
       const unsupported = C.FIELDS.find(field => !field.endsWith('Sec') && !Sites.get(site).actions.includes(field));
       assert.ok(unsupported, 'fixture can test an undeclared action');
@@ -87,4 +92,7 @@ function gatedPlatform({ id: site, url, neutral: neutralPath }) {
   }
 }
 
-module.exports = { gatedPlatform };
+module.exports = {
+  gatedPlatform: platform => platformTracking({ ...platform, gated: true }),
+  trackingOnlyPlatform: platform => platformTracking({ ...platform, gated: false })
+};

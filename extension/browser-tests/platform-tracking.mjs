@@ -11,7 +11,9 @@ export async function platformJourney(platform) {
         const metadata = await evaluate(browser, browser.worker, `C3.SITES.find(site => site.id === ${id})`);
         assert.ok(metadata, `${platform.name} must be registered in the built catalog`);
         assert.equal(metadata.defaultEnabled, false);
-        assert.equal(metadata.gated, true);
+        const gated = platform.gated ?? true;
+        assert.equal(metadata.gated, gated);
+        const trackingSwitch = (gated ? 'Limit & track' : 'Track creating & consuming') + ' on ' + platform.name;
         assert.deepEqual(metadata.hosts, [platform.id + '.com', 'www.' + platform.id + '.com']);
         await evaluate(browser, browser.worker, `globalThis.platformSnapshots = 0;
           chrome.runtime.onMessage.addListener((message, sender) => {
@@ -41,20 +43,25 @@ export async function platformJourney(platform) {
         assert.equal(await wheel(-240), -240);
         await click(browser, page, '#submit-comment');
         assert.equal((await totals()).comments || 0, 0, 'default Off cannot record a submit');
-        await clickByRole(browser, settings, 'switch', 'Limit & track on ' + platform.name);
+        await clickByRole(browser, settings, 'switch', trackingSwitch);
         await eventually(() => evaluate(browser, settings.session, `document.querySelector(${JSON.stringify(toggle)}).checked && !document.querySelector(${JSON.stringify(toggle)}).disabled && document.querySelector('#save-status').textContent.includes('Your history is kept.')`), 'tracking enabled through Settings');
         await activatePage();
-        await eventually(() => evaluate(browser, page.session, `location.href === ${JSON.stringify(browser.origin + '/blocked.html?site=' + platform.id)} && !document.querySelector('#begin')?.disabled`), 'enabling redirects the open site to its gate');
-        await click(browser, page, '#reason');
-        await browser.cdp.send('Input.insertText', { text: 'Write a thoughtful synthetic comment, then leave.' }, page.session);
-        await click(browser, page, '#begin');
-        const request = await eventually(() => evaluate(browser, browser.worker, `chrome.storage.local.get('_access').then(data => data._access?.[${id}]?.readyAt && data._access[${id}])`), 'real 60-second wait saved');
-        assert.equal(await evaluate(browser, page.session, 'document.querySelector("#open").disabled'), true);
-        await browser.setTime(request.readyAt + 100);
-        await eventually(() => evaluate(browser, page.session, '!document.querySelector("#open").disabled'), 'explicit access confirmation ready');
-        await click(browser, page, '#open');
-        await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.readyState === "complete"'), 'confirmed access reaches the synthetic site');
-        await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(markup)}`);
+        if (gated) {
+          await eventually(() => evaluate(browser, page.session, `location.href === ${JSON.stringify(browser.origin + '/blocked.html?site=' + platform.id)} && !document.querySelector('#begin')?.disabled`), 'enabling redirects the open site to its gate');
+          await click(browser, page, '#reason');
+          await browser.cdp.send('Input.insertText', { text: 'Write a thoughtful synthetic comment, then leave.' }, page.session);
+          await click(browser, page, '#begin');
+          const request = await eventually(() => evaluate(browser, browser.worker, `chrome.storage.local.get('_access').then(data => data._access?.[${id}]?.readyAt && data._access[${id}])`), 'real 60-second wait saved');
+          assert.equal(await evaluate(browser, page.session, 'document.querySelector("#open").disabled'), true);
+          await browser.setTime(request.readyAt + 100);
+          await eventually(() => evaluate(browser, page.session, '!document.querySelector("#open").disabled'), 'explicit access confirmation ready');
+          await click(browser, page, '#open');
+          await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.readyState === "complete"'), 'confirmed access reaches the synthetic site');
+          await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(markup)}`);
+        } else {
+          assert.equal(await evaluate(browser, page.session, 'location.href'), platform.url, 'tracking-only activation never redirects to an access gate');
+          assert.equal(await evaluate(browser, browser.worker, `chrome.storage.local.get('_access').then(data => Object.hasOwn(data._access || {}, ${id}))`), false, 'tracking-only activation never creates an access session');
+        }
         await eventually(listenerEnabled, 'enabled consuming feed has scroll resistance');
         assert.equal(await wheel(240), 120, '50% resistance halves a 240px wheel');
         assert.equal(await wheel(-240), -120);
@@ -85,7 +92,7 @@ export async function platformJourney(platform) {
         await eventually(listenerEnabled, 'returning to feed restores resistance');
         assert.equal((await totals()).comments, 1, 'unsupported route cannot submit comments');
         await openSettingsSection(browser, settings, 'websites');
-        await clickByRole(browser, settings, 'switch', 'Limit & track on ' + platform.name);
+        await clickByRole(browser, settings, 'switch', trackingSwitch);
         await eventually(() => evaluate(browser, settings.session, `!document.querySelector(${JSON.stringify(toggle)}).checked && !document.querySelector(${JSON.stringify(toggle)}).disabled && document.querySelector('#save-status').textContent.includes('Your history is kept.')`), 'tracking disabled through Settings');
         await activatePage();
         await eventually(async () => !await listenerEnabled(), 'Off removes scroll resistance');
