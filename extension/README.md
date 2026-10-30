@@ -70,9 +70,34 @@ The reply adapter refuses malformed successes before queues acknowledge packets
 or access pages navigate. Access eligibility and browser permissions remain
 execution-time checks, not cached validation results.
 
-Pages poll for countdown and website-time updates. Storage notifications refresh
-access phase changes, preferences, creation activity, and history resets; countdown-only
-access writes and website-time accrual do not trigger cross-page refreshes.
+Settings and the dashboard refresh from storage changes instead of polling the
+worker. The dashboard also refreshes at local midnight. Popup and access-page
+polling remains limited to open extension UI. Website-time writes refresh only
+the dashboard's browsing view; countdown-only access writes do not trigger
+cross-page refreshes. Content guards check at session expiry and on focus or
+preference changes. Creation trackers deliver real measurements every five seconds,
+without empty periodic worker requests. Failed synchronization retries only while
+focused, using the existing interval with backoff from five seconds to at most one
+request per minute. A valid snapshot clears that retry state; hidden clients without
+pending measurements remain quiet.
+
+Downloaded updates wait while extension pages or fresh creation tracking are in
+use. The popup, Settings, dashboard and access page show **Update ready**. **Update
+now** requires confirmation to protect unsaved settings and intention drafts.
+Before reloading, the worker pauses content clients, drains acknowledged delivery
+and serialized writes, and checks that the website tabs have not changed. Failed
+preparation resumes tracking and leaves the update pending for a later attempt.
+Repeated preparation preserves the original activity state, and a ten-second lease
+resumes clients if preparation is abandoned. A persistent recovery marker is saved
+before client teardown. Replacement workers restore stopped clients before retrying
+an update; the marker is cleared only after successful restoration. Failed recovery
+reuses the pending-update alarm rather than adding another timer. Discarded tabs are
+excluded from live coordination and receive normal scripts when restored.
+Update installation reinjects the manifest's scripts into authorized website tabs
+without reloading their documents. Timers, listeners and observers have explicit
+cleanup; route-hook installation is idempotent. Closed, loading or inaccessible
+tabs rely on normal navigation injection. Chrome controls store availability and
+downloads; unpacked installations do not receive store updates.
 
 Owning data modules normalize restored records separately from new commands.
 History reads normalize copies without rewriting saved records; numeric strings
@@ -115,7 +140,8 @@ sequenceDiagram
 Closures, adapters, queues, and timers do not survive worker replacement.
 Preferences, access budgets, receipts, and histories are reconstructed from
 `storage.local`; the `storage.session` initialization marker distinguishes worker
-replacement from a browser restart. Website-time sampling starts fresh.
+replacement from a browser restart. Website-time checkpoints survive worker dormancy in `storage.session`, but not
+browser restarts or extension updates.
 
 ## Using the extension
 
@@ -353,8 +379,11 @@ and preserves recorded totals.
 
 Only the active HTTP/HTTPS tab in a focused normal window counts. Tracking pauses
 when the computer is idle for 30 seconds or locked. Private tabs, background tabs,
-browser pages, and extension pages are excluded. Timing is approximate;
-sleep gaps, backward clock changes, and restarts are not backfilled.
+browser pages, and extension pages are excluded. Timing is approximate. Tab, focus and idle changes checkpoint elapsed time; a
+one-minute alarm checkpoints uninterrupted browsing without keeping the worker
+alive. Alarms over 15 seconds late, gaps over 75 seconds, backward clock changes
+and browser restarts are not backfilled. Sleep/wake detection remains best-effort;
+closing the browser can lose the last uncheckpointed interval.
 
 The dashboard offers today, seven-day, and 30-day domain totals. `www.` is grouped
 with the bare hostname; other subdomains stay separate. Tracking starts at opt-in
@@ -444,7 +473,8 @@ optional intention history saves the text you explicitly submit. Nothing uses
 `storage.sync`.
 
 Required permissions are `storage`, `alarms`, and
-`declarativeNetRequestWithHostAccess`. Host access is limited to HTTP/S X, Twitter
+`declarativeNetRequestWithHostAccess`, plus `scripting` to restore CreateRatio's
+own scripts in already-authorized tabs after updates. Host access is limited to HTTP/S X, Twitter
 aliases, LinkedIn, TikTok and Instagram, including their subdomains, for access
 gating. Creation tracking still uses each site's exact HTTPS hosts. This expanded
 TikTok/Instagram scope can require browser approval when updating.

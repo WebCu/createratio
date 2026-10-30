@@ -118,7 +118,7 @@ for (const browser of ['chrome', 'browser']) {
     assert.notEqual(data._historyGeneration, 'old');
     assert.deepEqual(data['_websiteTime:' + date], {});
     q.state.failRemove = false; q.state.capacity = Infinity;
-    w.advance(3000);
+    w.advance(3000); w.alarm('website-time');
     const snapshot = await w.send({ type: 'snapshot' });
     assert.equal(snapshot.ok, true); assert.equal(snapshot.websiteTimeEnabled, true);
     assert.deepEqual(data['_websiteTime:' + date], { 'example.test': 3 });

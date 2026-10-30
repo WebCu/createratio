@@ -285,5 +285,5 @@ $('clear-history').addEventListener('click', async () => {
   } catch (e) { error(e.message); } finally { $('clear-history').disabled = false; }
 });
 extensionAPI.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
-setInterval(refresh, 5000);
+addEventListener('focus', refresh);
 void refresh();

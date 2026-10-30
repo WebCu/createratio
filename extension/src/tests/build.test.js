@@ -43,7 +43,7 @@ test('all browser bundles include the exact shared core and every referenced ass
     for (const asset of assets) assert.ok((await fs.stat(path.join(output, asset))).isFile(), `${browser}: ${asset}`);
     assert.equal(await fs.readFile(path.join(output, 'core.js'), 'utf8'), core);
     assert.equal(await fs.readFile(path.join(output, 'LICENSE'), 'utf8'), license);
-    assert.deepEqual(manifest.permissions, ['storage', 'alarms', 'declarativeNetRequestWithHostAccess']);
+    assert.deepEqual(manifest.permissions, ['storage', 'alarms', 'declarativeNetRequestWithHostAccess', 'scripting']);
     assert.deepEqual(manifest.optional_permissions, ['tabs', 'idle']);
     assert.ok((await fs.stat(path.join(output, 'web-time.js'))).isFile());
     const trackingHosts = require('../../sites/index.js').sites.filter(site => !site.gated).flatMap(site => site.hosts);
@@ -61,7 +61,7 @@ test('all browser bundles include the exact shared core and every referenced ass
     assert.equal(rules[4].condition.resourceTypes, undefined, 'block all non-navigation requests, not just frames');
     assert.match(manifest.content_security_policy.extension_pages, /connect-src 'none'/);
     assert.equal(manifest.content_scripts[0].run_at, 'document_start');
-    assert.deepEqual(manifest.content_scripts[0].js, ['sites.js', 'messages.js', 'access-guard.js']);
+    assert.deepEqual(manifest.content_scripts[0].js, ['sites.js', 'messages.js', 'lifecycle.js', 'access-guard.js']);
     assert.equal(manifest.content_scripts[1].world, 'MAIN');
     assert.equal(manifest.content_scripts[2].js.indexOf('sites.js') < manifest.content_scripts[2].js.indexOf('core.js'), true);
     assert.equal(manifest.content_scripts[2].js.indexOf('core.js') < manifest.content_scripts[2].js.indexOf('messages.js'), true);
@@ -176,7 +176,7 @@ test('browser manifests differ only in Firefox platform settings and background 
   assert.deepEqual(manifests.chrome, manifests.edge);
   assert.deepEqual(manifests.chrome.background, { service_worker: 'background.js' });
   const firefox = manifests.firefox;
-  assert.deepEqual(firefox.background, { scripts: ['sites.js', 'core.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'background.js'] });
+  assert.deepEqual(firefox.background, { scripts: ['sites.js', 'core.js', 'messages.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'updates.js', 'background.js'] });
   assert.equal(firefox.minimum_chrome_version, undefined);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.deepEqual(firefox.browser_specific_settings.gecko.data_collection_permissions.required, ['none']);

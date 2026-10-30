@@ -90,7 +90,7 @@ for (const browser of ['chrome', 'browser']) {
     await drain();
     assert.equal(w.data[date].x.posts, 1);
     assert.equal((await w.send({ type: 'clear-history' }, popupSender)).ok, true);
-    await t.tick(); await drain();
+    t.notify(); await t.tick(); await drain();
     t.setNow(20); w.advance(20);
     t.event('click', { isTrusted: true, target: t.button });
     await drain();

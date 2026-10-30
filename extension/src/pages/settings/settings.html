@@ -4,11 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Settings - CreateRatio</title>
-  <link rel="stylesheet" href="popup.css"><link rel="stylesheet" href="page.css">
+  <link rel="stylesheet" href="popup.css"><link rel="stylesheet" href="page.css"><link rel="stylesheet" href="update-notice.css">
 </head>
 <body class="extension-page settings-page">
   <header><a class="extension-brand" href="dashboard.html" aria-label="CreateRatio dashboard"><span class="mark" aria-hidden="true">&gt;</span><strong class="brand-name">CreateRatio</strong></a><nav aria-label="Extension pages"><a href="dashboard.html">Dashboard</a><a href="settings.html" aria-current="page">Settings</a></nav></header>
   <main>
+    <aside id="update-notice" class="update-notice" aria-label="Extension update" hidden><div><strong>Update ready</strong><p id="update-status" role="status">Installs automatically when CreateRatio is not in use.</p></div><button id="update-apply" type="button">Update now</button></aside>
     <div class="page-heading settings-heading"><h1>Settings</h1><p>Changes save automatically</p></div>
     <details id="websites-settings" class="settings-section" name="settings-group" open>
       <summary><h2 id="site-settings-title">Websites</h2><span>Access limits and session times for your sites.</span></summary>
@@ -68,6 +69,6 @@
     <section class="feedback" aria-label="Feedback"><a id="feedback" data-store="chrome" hidden role="link" aria-disabled="true" tabindex="-1" target="_blank" rel="noopener noreferrer" aria-describedby="feedback-privacy">Send feedback <span aria-hidden="true">↗</span></a><p id="feedback-privacy" hidden></p><p><a href="https://createratio.com/privacy.html" target="_blank" rel="noopener noreferrer">Privacy policy</a> · <a href="https://createratio.com/terms.html" target="_blank" rel="noopener noreferrer">Terms of use</a></p></section>
   </main>
   <footer><span>Create &gt; Consume. Private by design. No account needed.</span></footer>
-  <script src="feedback.js"></script><script src="sites.js"></script><script src="core.js"></script><script src="web-time.js"></script><script src="messages.js"></script><script src="settings.js"></script>
+  <script src="feedback.js"></script><script src="sites.js"></script><script src="core.js"></script><script src="web-time.js"></script><script src="messages.js"></script><script src="update-notice.js"></script><script src="settings.js"></script>
 </body>
 </html>
