@@ -13,13 +13,13 @@ test('agents discover site-specific actions and complete the existing access UI 
   try {
     await withFailureArtifacts(browser, 'agent accessibility journey', async () => {
       const popup = await browser.page(browser.origin + '/popup.html');
-      await eventually(() => inspect(popup, 'document.querySelectorAll(".access-row button").length === 6'), 'popup loaded');
+      await eventually(() => inspect(popup, 'document.querySelectorAll(".access-row button").length === 7'), 'popup loaded');
       for (const site of ['X', 'LinkedIn']) {
         const button = await find(popup, 'button', `Request access to ${site}`);
         assert.equal(button.description?.value, 'Blocked');
         await find(popup, 'group', `${site} access`);
       }
-      for (const site of ['TikTok', 'Instagram', 'Facebook']) {
+      for (const site of ['TikTok', 'Instagram', 'Facebook', 'YouTube', 'Reddit']) {
         await find(popup, 'group', `${site} access`);
         assert.equal((await find(popup, 'button', `Open site: ${site}`)).description?.value, 'Limit & track off');
         assert.equal((await nodes(popup)).some(node => node.role?.value === 'spinbutton' || node.role?.value === 'combobox'), false);

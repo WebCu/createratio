@@ -1,7 +1,7 @@
 [
   ["updates.test.js"],
   ["linkedin.test.js", "share-card.test.js", "report.test.js"],
-  ["scroll-body-layout.test.js", "export-receipts.test.js", "input.test.js"],
+  ["scroll-body-layout.test.js", "export-receipts.test.js", "input.test.js", "reddit.test.js"],
   ["scroll-body-overflow.test.js", "layout.test.js"],
   ["scroll-app-shell.test.js", "refresh.test.js", "export-reset.test.js", "settings-feedback.test.js"],
   ["popup-share.test.js", "smoke.test.js", "share-memory.test.js"],

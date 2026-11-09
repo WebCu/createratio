@@ -54,11 +54,13 @@ test('built extension keeps focused settings, narrow tasks and history readable'
     await journey('popup shows all access actions without session-time controls', async () => {
       for (const width of [400, 320]) {
         const page = await pageAt('/popup.html', width);
-        await eventually(() => inspect(page, 'document.querySelectorAll(".access-row").length === 6'), 'popup populated');
+        await eventually(() => inspect(page, 'document.querySelectorAll(".access-row").length === 7'), 'popup populated');
         assert.equal(await inspect(page, 'document.querySelectorAll("#access-sites input, #access-sites select").length'), 0);
         const sizes = await inspect(page, '[...document.querySelectorAll("#date, .caption, .goal small, .blocking .section-label > span, .access-row small, .popup-links a, .popup-links button")].map(element => parseFloat(getComputedStyle(element).fontSize))');
         assert.ok(sizes.every(size => size >= 12));
-        if (width === 400) assert.equal(await inspect(page, '(() => { const bottom = document.querySelector("main").getBoundingClientRect().bottom; return [...document.querySelectorAll(".access-row")].every(row => row.getBoundingClientRect().bottom <= bottom); })()'), true);
+        const lastAction = await findByRole(browser, page, 'button', 'Open site: Reddit');
+        await browser.cdp.send('DOM.focus', { backendNodeId: lastAction.backendDOMNodeId }, page.session);
+        assert.equal(await inspect(page, '(() => { const main = document.querySelector("main").getBoundingClientRect(); const button = document.activeElement.getBoundingClientRect(); const footer = document.querySelector("footer").getBoundingClientRect(); return document.activeElement.closest(".access-row") === document.querySelector(".access-row:last-child") && button.top >= main.top && button.bottom <= main.bottom && main.bottom <= footer.top && footer.bottom <= innerHeight; })()'), true, 'keyboard focus reveals the last action without covering the persistent footer');
         await noOverflow(page);
       }
     });
@@ -96,7 +98,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       await browser.cdp.send('Page.navigate', { url: browser.origin + '/settings.html' }, page.session);
       await eventually(() => inspect(page, 'globalThis.snapshotHeld === true'), 'initial snapshot held');
       await openSettingsSection(browser, page, 'data');
-      assert.equal(await inspect(page, 'document.querySelectorAll("#site-settings select").length'), 6);
+      assert.equal(await inspect(page, 'document.querySelectorAll("#site-settings select").length'), 7);
       assert.equal(await inspect(page, 'document.querySelector("#data-settings").open'), true);
       assert.ok(await findByRole(browser, page, 'button', 'Clear history'));
     });
@@ -152,7 +154,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       const catalog = sites.filter(site => site.gated), trackingOnly = sites.filter(site => !site.gated);
       for (const width of [320, 390]) {
         const page = await pageAt('/settings.html', width);
-        await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings select").length === 6'), 'catalog menus rendered');
+        await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings select").length === 7'), 'catalog menus rendered');
         assert.equal(await inspect(page, 'document.querySelector("#tracking-only-section").hidden'), trackingOnly.length === 0);
         assert.deepEqual(await inspect(page, '[...document.querySelectorAll("#site-settings > li")].map(row => row.dataset.site)'), catalog.map(site => site.id));
         assert.deepEqual(await inspect(page, '[...document.querySelectorAll("#tracking-only-settings > li")].map(row => row.dataset.site)'), trackingOnly.map(site => site.id));
@@ -164,7 +166,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
           await eventually(() => inspect(page, `document.querySelector('#track-${id}').checked && !document.querySelector('#accessMinutes-site-${id}').disabled`), name + ' enabled');
         }
         await browser.cdp.send('Page.reload', {}, page.session);
-        await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings input:checked").length === 6'), 'saved switches survive reload');
+        await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings input:checked").length === 7'), 'saved switches survive reload');
         for (const { id, name } of catalog.filter(site => !site.defaultEnabled)) {
           await clickByRole(browser, page, 'switch', 'Limit & track on ' + name);
           await eventually(() => inspect(page, `!document.querySelector('#track-${id}').checked && !document.querySelector('#track-${id}').disabled`), name + ' disabled');

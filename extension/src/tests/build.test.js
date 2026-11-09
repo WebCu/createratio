@@ -47,18 +47,18 @@ test('all browser bundles include the exact shared core and every referenced ass
     assert.deepEqual(manifest.optional_permissions, ['tabs', 'idle']);
     assert.ok((await fs.stat(path.join(output, 'web-time.js'))).isFile());
     const trackingHosts = require('../../sites/index.js').sites.filter(site => !site.gated).flatMap(site => site.hosts);
-    assert.deepEqual(manifest.host_permissions, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com'].flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']).concat(trackingHosts.map(host => 'https://' + host + '/*')));
+    assert.deepEqual(manifest.host_permissions, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'reddit.com'].flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']).concat(trackingHosts.map(host => 'https://' + host + '/*')));
     for (const entry of manifest.content_scripts.slice(1)) for (const host of trackingHosts) assert.ok(entry.matches.includes('https://' + host + '/*'));
     for (const host of trackingHosts) assert.ok(!manifest.content_scripts[0].matches.includes('https://' + host + '/*'), 'tracking-only hosts do not get access guards');
     assert.deepEqual(manifest.declarative_net_request.rule_resources, [{ id: 'site-blocking', enabled: true, path: 'block-rules.json' }]);
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
-    assert.equal(rules.length, 7);
-    assert.deepEqual(rules.slice(0, 6).map(rule => rule.action.redirect.extensionPath), ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube'].map(site => '/blocked.html?site=' + site));
+    assert.equal(rules.length, 8);
+    assert.deepEqual(rules.slice(0, 7).map(rule => rule.action.redirect.extensionPath), ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit'].map(site => '/blocked.html?site=' + site));
     assert.ok(rules.every(rule => rule.priority === 1));
-    assert.equal(rules[6].action.type, 'block');
-    assert.deepEqual(rules[6].condition.excludedResourceTypes, ['main_frame']);
-    assert.deepEqual(rules[6].condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com']);
-    assert.equal(rules[6].condition.resourceTypes, undefined, 'block all non-navigation requests, not just frames');
+    assert.equal(rules[7].action.type, 'block');
+    assert.deepEqual(rules[7].condition.excludedResourceTypes, ['main_frame']);
+    assert.deepEqual(rules[7].condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'reddit.com']);
+    assert.equal(rules[7].condition.resourceTypes, undefined, 'block all non-navigation requests, not just frames');
     assert.match(manifest.content_security_policy.extension_pages, /connect-src 'none'/);
     assert.equal(manifest.content_scripts[0].run_at, 'document_start');
     assert.deepEqual(manifest.content_scripts[0].js, ['sites.js', 'messages.js', 'lifecycle.js', 'access-guard.js']);
@@ -217,7 +217,7 @@ test('blocking rules are generated from registered site modules without shipping
   const x = require('../../sites/x.js');
   const linkedin = require('../../sites/linkedin.js');
   const originalX = x.access, originalLinkedin = linkedin.access;
-  const others = ['tiktok', 'instagram', 'facebook', 'youtube'].map(id => require('../../sites/' + id + '.js'));
+  const others = ['tiktok', 'instagram', 'facebook', 'youtube', 'reddit'].map(id => require('../../sites/' + id + '.js'));
   const originalOthers = others.map(plugin => plugin.access);
   try {
     for (const plugin of others) delete plugin.access;
@@ -291,7 +291,7 @@ test('new gated and tracking-only modules need only site files and catalog regis
     }
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
     assert.equal(rules.find(rule => rule.id === 9).action.redirect.extensionPath, '/blocked.html?site=example');
-    assert.deepEqual(rules.at(-1).condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'example.test', 'alias.test']);
+    assert.deepEqual(rules.at(-1).condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'reddit.com', 'example.test', 'alias.test']);
     const context = vm.createContext({ URL });
     for (const file of ['sites.js', 'core.js']) vm.runInContext(await fs.readFile(path.join(output, file), 'utf8'), context);
     assert.equal(context.C3Sites.forAccessURL('http://mobile.alias.test/').id, 'example');

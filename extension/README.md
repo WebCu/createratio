@@ -1,7 +1,7 @@
 # CreateRatio browser extension
 
 A dependency-free Manifest V3 extension for intentional access and local
-creating-versus-consuming tracking on X, LinkedIn, TikTok, Instagram, Facebook and YouTube.
+creating-versus-consuming tracking on X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit.
 
 ## Layout and installation
 
@@ -213,10 +213,10 @@ history remain. Off discards the current budget and waiting request, including
 its midnight refill. Re-enabling requires a fresh intention and wait unless
 optional above-goal access applies. Fresh trusted input is required to measure.
 
-TikTok, Instagram, Facebook and YouTube start Off. Enable **Limit & track** in Settings
+TikTok, Instagram, Facebook, YouTube and Reddit start Off. Enable **Limit & track** in Settings
 to use the same intention, wait and active-time budgets as X and LinkedIn. Saved
 On/Off choices are preserved, including previously enabled tracking choices;
-enabled TikTok, Instagram, Facebook and YouTube sites require access sessions. Save drafts
+enabled TikTok, Instagram, Facebook, YouTube and Reddit sites require access sessions. Save drafts
 before updating.
 
 New vetted integrations start disabled; arbitrary domains or user scripts cannot
@@ -292,6 +292,7 @@ Old Twitter URLs must redirect to X first.
 | Instagram | Feed, Explore, Search, Reels, tagged feeds, posts, stories and profiles | Focused comment, dialog-caption, or message editors |
 | Facebook | Home, Watch feed, reels, group feeds/posts, supported permalink and numeric-profile routes | Focused post-dialog, comment, or messaging-page editors |
 | YouTube | Home, watch, Shorts, search, playlists, supported feeds and channels | Focused comment editors |
+| Reddit | Home, community feeds, search, threads and profiles | Focused post, comment, or message-compose editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
 cannot be identified, profiles default to consuming. Editors take precedence;
@@ -340,6 +341,22 @@ Charts show active time without action credits.
 
 See the [core contract](core/README.md) and [integration interface](sites/README.md)
 for contributor-facing details.
+
+### Reddit tracking
+
+Reddit starts Off under **Settings → Websites → Reddit → Limit & track**. Enabling
+adds the shared intention, wait and active-time budget, plus creation tracking and
+Slow scrolling. Blocking covers HTTP/S `reddit.com` and its subdomains; creation
+tracking uses only HTTPS `reddit.com` and `www.reddit.com`. Off restores free
+access and native scrolling while retaining history and saved duration.
+
+Scoped Post/Submit clicks count posts and Comment/Reply clicks count comments.
+Only recognized forms and light-DOM composers are supported. Message-compose
+editors create without submit bonuses; inbox/chat/settings/moderation routes
+stay neutral. English labels are recognized. Old/new/mobile/chat subdomains,
+shadow-root-only editors, unverified editor shortcuts, votes and awards are
+unsupported. Synthetic fixtures do not prove current authenticated markup or
+publication.
 
 ### TikTok tracking
 
@@ -512,7 +529,7 @@ optional intention history saves the text you explicitly submit. Nothing uses
 Required permissions are `storage`, `alarms`, and
 `declarativeNetRequestWithHostAccess`, plus `scripting` to restore CreateRatio's
 own scripts in already-authorized tabs after updates. Host access is limited to HTTP/S X, Twitter
-aliases, LinkedIn, TikTok, Instagram, Facebook and YouTube, including their subdomains,
+aliases, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit, including their subdomains,
 for access gating. Creation tracking still uses each site's exact HTTPS hosts.
 Expanded host scope can require browser approval when updating.
 Optional `tabs` and `idle` permissions are requested only for
