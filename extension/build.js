@@ -7,13 +7,13 @@ const { sites, get, validRedirectRuleId } = require('./sites/index.js');
 const { FIELDS } = require('./core/core.js');
 const SITE_SCRIPTS = [...sites.map(site => `sites/${site.id}.js`), 'sites/index.js'];
 const ASSETS = [
-  'background/background.js', 'background/history.js', 'background/web-time.js', 'background/blocker.js', 'background/message-contracts.js',
-  'content/access-guard.js', 'content/content.js', 'content/dom.js', 'content/route-hook.js', 'content/scroll-friction.js',
+  'background/background.js', 'background/updates.js', 'background/history.js', 'background/web-time.js', 'background/blocker.js', 'background/message-contracts.js',
+  'content/access-guard.js', 'content/lifecycle.js', 'content/content.js', 'content/dom.js', 'content/route-hook.js', 'content/scroll-friction.js',
   'pages/blocked/blocked.html', 'pages/blocked/blocked.css', 'pages/blocked/blocked.js',
   'pages/popup/popup.html', 'pages/popup/popup.js',
   'pages/settings/settings.html', 'pages/settings/settings.js',
   'pages/dashboard/dashboard.html', 'pages/dashboard/dashboard.js', 'pages/dashboard/report.js', 'pages/dashboard/share-card.js',
-  'shared/refill.css', 'shared/refill.js', 'shared/feedback.js', 'shared/messages.js', 'shared/share.js', 'shared/popup.css', 'shared/page.css',
+  'shared/update-notice.js', 'shared/update-notice.css', 'shared/refill.css', 'shared/refill.js', 'shared/feedback.js', 'shared/messages.js', 'shared/share.js', 'shared/popup.css', 'shared/page.css',
   'icons/icon16.png', 'icons/icon32.png', 'icons/icon48.png', 'icons/icon128.png'
 ];
 
@@ -56,7 +56,7 @@ async function build(browser, outputRoot = path.join(__dirname, '..', 'dist')) {
   if (!rules.length) delete manifest.declarative_net_request;
   if (browser === 'firefox') {
     delete manifest.minimum_chrome_version;
-    manifest.background = { scripts: ['sites.js', 'core.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'background.js'] };
+    manifest.background = { scripts: ['sites.js', 'core.js', 'messages.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'updates.js', 'background.js'] };
     manifest.browser_specific_settings = {
       gecko: {
         id: 'create-greater-consume@createratio',

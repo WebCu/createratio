@@ -107,6 +107,13 @@ Chrome's Google federation must permit `release` and `workflow_dispatch` on
 version tags; see [Chrome setup](chrome-web-store.md#one-time-setup). GitHub
 secrets and variables alone do not establish this provider-side permission.
 
+## Website and listing assets
+
+For a feature launch, update `marketing/release.json` and run `pnpm marketing`
+to refresh the website announcement, listing copy and synthetic-data screenshots.
+Review and publish these separately for each store; package submission does not
+update listing images. See the [listing kit guide](marketing.md).
+
 ## Human validation gate
 
 Keep each selected store's `chrome-web-store` or `firefox-addons` approval pending

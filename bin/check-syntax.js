@@ -2,6 +2,7 @@
 const { execFileSync, spawnSync } = require('node:child_process');
 const { existsSync, readFileSync, realpathSync } = require('node:fs');
 const path = require('node:path');
+const { Worker, isMainThread, workerData } = require('node:worker_threads');
 const { parse } = require('acorn');
 
 function packageType(file) {
@@ -49,16 +50,35 @@ function checkSyntax(files) {
   return files.length;
 }
 
-if (require.main === module) {
+async function checkSyntaxParallel(files) {
+  if (files.length < 2) return checkSyntax(files);
+  const groups = Array.from({ length: Math.min(4, files.length) }, () => []);
+  files.forEach((file, index) => groups[index % groups.length].push(file));
+  const workers = groups.map(group => new Worker(__filename, { workerData: group }));
   try {
-    const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
-    const inventory = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.js', '*.mjs', '*.cjs'], { cwd: root, encoding: 'utf8' });
-    const files = [...new Set(inventory.split('\0').filter(Boolean))].sort().map(file => path.join(root, file)).filter(file => existsSync(file));
-    console.log(`${checkSyntax(files)} JavaScript syntax checks passed; no code comments.`);
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 1;
+    await Promise.all(workers.map(worker => new Promise((resolve, reject) => {
+      worker.once('error', reject);
+      worker.once('exit', code => code === 0 ? resolve() : reject(new Error(`Syntax worker exited ${code}`)));
+    })));
+    return files.length;
+  } finally {
+    await Promise.all(workers.map(worker => worker.terminate()));
   }
 }
 
-module.exports = { checkSyntax };
+async function main() {
+  const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+  const inventory = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.js', '*.mjs', '*.cjs'], { cwd: root, encoding: 'utf8' });
+  const files = [...new Set(inventory.split('\0').filter(Boolean))].sort().map(file => path.join(root, file)).filter(file => existsSync(file));
+  console.log(`${await checkSyntaxParallel(files)} JavaScript syntax checks passed; no code comments.`);
+}
+
+if (require.main === module) {
+  if (!isMainThread) checkSyntax(workerData);
+  else main().catch(error => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { checkSyntax, checkSyntaxParallel };

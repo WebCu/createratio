@@ -115,6 +115,12 @@ test('storage refreshes distinguish access phases from countdown-only writes', (
   assert.equal(RuntimeMessages.shouldRefresh(notification({ x: { readyAt: 100000, requestExpiresAt: 700000 } }, {}), 'local'), true);
 });
 
+test('update coordination metadata does not trigger unrelated page refreshes', () => {
+  for (const key of ['_pendingUpdate', '_updateRecovery']) {
+    assert.equal(RuntimeMessages.shouldRefresh({ [key]: { newValue: true } }, 'local'), false);
+  }
+});
+
 test('website-time buckets wait for polling without suppressing preferences, history resets, or creation activity', () => {
   const websites = { '_websiteTime:2026-10-11': { oldValue: { 'example.test': 1 }, newValue: { 'example.test': 2 } } };
   assert.equal(RuntimeMessages.shouldRefresh(websites, 'local'), false);

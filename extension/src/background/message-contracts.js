@@ -37,6 +37,12 @@
     function preferencesSender(sender) {
       if (!topPage(sender, ['popup', 'settings'])) throw refuse('Preferences must come from the extension settings page');
     }
+    function updateSender(sender) {
+      if (topPage(sender, ['popup', 'settings', 'dashboard'])) return;
+      let site;
+      try { site = new URL(sender?.url).searchParams.get('site'); } catch (_) {}
+      blocked(sender, site);
+    }
     function preferences(message, sender) {
       preferencesSender(sender);
       switch (message.type) {
@@ -86,7 +92,7 @@
       } else blocked(sender, message.site);
       if (!gated.has(message.site)) throw refuse('Unsupported site');
     }
-    return { read, creationSender, packet, preferencesSender, preferences, history, intentions, blocked, session };
+    return { read, creationSender, packet, preferencesSender, updateSender, preferences, history, intentions, blocked, session };
   }
   return { create, refuse };
 });

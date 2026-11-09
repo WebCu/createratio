@@ -5,7 +5,7 @@ const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 
 test('pending HTML exports cannot download activity after Clear history', async t => {
-  const { launch, evaluate, eventually, click, withFailureArtifacts } = await import('./chromium.mjs');
+  const { launch, evaluate, eventually, click, withFailureArtifacts, openSettingsSection } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   const { cdp } = browser;
   const inspect = (page, source) => evaluate(browser, page.session, source);
@@ -18,6 +18,7 @@ test('pending HTML exports cannot download activity after Clear history', async 
     const dashboard = await browser.page('about:blank'), settings = await browser.page(browser.origin + '/settings.html');
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: 'globalThis.setInterval = () => 0;' }, dashboard.session);
     await eventually(() => inspect(settings, '!!document.querySelector("#clear-history")'), 'Settings loaded');
+    await openSettingsSection(browser, settings, 'data');
     const date = await evaluate(browser, browser.worker, 'C3.localDate()');
     for (const range of ['today', 'week']) await t.test(range, () => withFailureArtifacts(browser, `HTML ${range} reset race`, async () => {
       await evaluate(browser, browser.worker, `chrome.storage.local.set(${JSON.stringify({ [date]: { x: { createSec: 180, consumeSec: 60, posts: 1 } } })})`);

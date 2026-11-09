@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { evaluate, eventually } from './chromium.mjs';
+import { fileURLToPath } from 'node:url';
+import { evaluate, eventually, launch, seedAccess, withFailureArtifacts } from './chromium.mjs';
 
 export function scrollFixture(browser) {
   const contexts = new Map();
@@ -69,4 +70,34 @@ export function scrollFixture(browser) {
     await verify(page, targets.map(target => ({ ...target, distance: 240 })));
   }
   return { isEnabled, setEnabled, distance, verify, assertNative };
+}
+
+export async function bodyScrollJourney(label, htmlStyle, bodyStyle, surface, rulesDelayMs = 0) {
+  const browser = await launch(fileURLToPath(new URL('../../dist/chrome', import.meta.url)));
+  try {
+    await withFailureArtifacts(browser, `body scrolling: ${label}`, async () => {
+      const scroll = scrollFixture(browser);
+      if (rulesDelayMs) await evaluate(browser, browser.worker, `(() => {
+        const update = chrome.declarativeNetRequest.updateSessionRules.bind(chrome.declarativeNetRequest);
+        chrome.declarativeNetRequest.updateSessionRules = async options => {
+          await new Promise(resolve => setTimeout(resolve, ${rulesDelayMs}));
+          return update(options);
+        };
+      })()`);
+      await seedAccess(browser, ['linkedin'], { scrollFrictionEnabled: false });
+      const page = await browser.page('https://www.linkedin.com/feed/');
+      await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'synthetic feed loaded');
+      await browser.cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, page.session);
+      const fixture = `<style>html,body{height:100%;margin:0}html{${htmlStyle}}body{overflow:auto;${bodyStyle}}#panel{height:500px;width:200px;overflow:auto}</style><div id="panel"><div style="height:4000px">Synthetic panel</div></div><div style="height:20000px">Synthetic feed</div>`;
+      await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(fixture)}`);
+      const targets = [
+        { selector: surface, distance: 120, stationary: [surface === 'body' ? 'html' : 'body', '#panel'] },
+        { selector: '#panel', point: { x: 100, y: 100 }, distance: 240, stationary: ['html', 'body'] }
+      ];
+      await scroll.assertNative(page, targets);
+      await scroll.setEnabled(page, true);
+      await scroll.verify(page, targets);
+      assert.deepEqual(browser.errors, []);
+    });
+  } finally { await browser.cleanup(); }
 }

@@ -4,11 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Dashboard - CreateRatio</title>
-  <link rel="stylesheet" href="popup.css"><link rel="stylesheet" href="page.css">
+  <link rel="stylesheet" href="popup.css"><link rel="stylesheet" href="page.css"><link rel="stylesheet" href="update-notice.css">
 </head>
 <body class="extension-page dashboard-page">
   <header><a class="extension-brand" href="dashboard.html" aria-label="CreateRatio dashboard"><span class="mark" aria-hidden="true">&gt;</span><span><strong class="brand-name">CreateRatio</strong><span class="eyebrow">Create &gt; Consume</span></span></a><nav aria-label="Extension pages"><a href="dashboard.html" aria-current="page">Dashboard</a><a href="settings.html">Settings</a></nav></header>
   <main>
+    <aside id="update-notice" class="update-notice" aria-label="Extension update" hidden><div><strong>Update ready</strong><p id="update-status" role="status">Installs automatically when CreateRatio is not in use.</p></div><button id="update-apply" type="button">Update now</button></aside>
     <div class="page-heading"><h1>Your dashboard</h1><p>Creating, consuming, and the time behind both. All on this device.</p></div>
     <nav class="view-nav" aria-label="Activity views"><button id="ratio-view" aria-pressed="true" aria-controls="ratio-panel">Creation score</button><button id="websites-view" aria-pressed="false" aria-controls="websites-panel">Website time</button><button id="intentions-view" aria-pressed="false" aria-controls="intentions-panel">Intentions</button></nav>
     <section id="websites-panel" hidden aria-labelledby="websites-title">
@@ -64,6 +65,6 @@
     <p id="error" role="alert" hidden></p>
   </main>
   <footer><span>Private by design. No account needed.</span><button id="export" disabled>Export activity CSV <span aria-hidden="true">↓</span></button></footer>
-  <script src="sites.js"></script><script src="core.js"></script><script src="web-time.js"></script><script src="messages.js"></script><script src="report.js"></script><script src="share-card.js"></script><script src="share.js"></script><script src="dashboard.js"></script>
+  <script src="sites.js"></script><script src="core.js"></script><script src="web-time.js"></script><script src="messages.js"></script><script src="update-notice.js"></script><script src="report.js"></script><script src="share-card.js"></script><script src="share.js"></script><script src="dashboard.js"></script>
 </body>
 </html>

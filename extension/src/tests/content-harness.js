@@ -9,7 +9,7 @@ const { Element, xFixture, linkedinFixture } = require('../../sites/test-support
 
 async function tracker(browser = 'chrome', options = {}) {
   let now = 0, focused = true, interval;
-  const base = new Date(2026, 9, 11, 12).getTime(), events = {}, packets = [];
+  const base = new Date(2026, 9, 11, 12).getTime(), events = {}, packets = [], messages = [], runtimeListeners = new Set();
   function listen(type, fn) { if (!(events[type] ||= []).includes(fn)) events[type].push(fn); }
   function unlisten(type, fn) { events[type] = (events[type] || []).filter(listener => listener !== fn); }
   const elements = [], warnings = [];
@@ -29,11 +29,12 @@ async function tracker(browser = 'chrome', options = {}) {
     }, C3Sites: { ...integrations, get: id => options.integration?.id === id ? options.integration : integrations.get(id), forURL: raw => options.integration || integrations.forURL(raw) }, URL,
     ScrollFriction: require('../content/scroll-friction.js'),
     C3_DOM: require('../content/dom.js'), Element, getComputedStyle: node => ({ ...fixture.getComputedStyle(node), overflowY: node.style.overflowY || 'visible', overflowX: node.style.overflowX || 'visible' }),
-    document: doc, location, window: { addEventListener: listen },
+    document: doc, location, window: { addEventListener: listen, removeEventListener: unlisten },
     crypto: { randomUUID: () => crypto.randomUUID() }, performance: { now: () => now }, Date: { now: () => base + now }, console: { ...console, warn(...args) { warnings.push(args); } },
     MutationObserver: class { observe() {} disconnect() {} },
     setInterval(fn) { interval = fn; return 1; }, clearInterval() {}, setTimeout() { return 1; }, clearTimeout() {},
-    [browser]: { runtime: { id: 'extension', onMessage: { addListener() {} }, async sendMessage(message) {
+    [browser]: { runtime: { id: 'extension', onMessage: { addListener(fn) { runtimeListeners.add(fn); }, removeListener(fn) { runtimeListeners.delete(fn); } }, async sendMessage(message) {
+      messages.push(structuredClone(message));
       if (options.forward) return options.forward(message);
       if (message.type === 'ingest') {
         options.attempts?.push(structuredClone(message));
@@ -50,11 +51,14 @@ async function tracker(browser = 'chrome', options = {}) {
     } } }
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/messages.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../content/lifecycle.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../content/content.js'), 'utf8'), context);
   options.beforeReady?.((type, event) => { for (const fn of events[type] || []) fn({ type, ...event }); });
   await new Promise(resolve => setImmediate(resolve));
   return {
-    packets, elements, warnings, document: doc, editor: fixture.editor, button: fixture.button,
+    packets, messages, elements, warnings, document: doc, editor: fixture.editor, button: fixture.button,
+    notify() { for (const listener of runtimeListeners) listener({ type: 'refresh' }, { id: 'extension' }, () => {}); },
+    command(message) { return new Promise(resolve => { for (const listener of runtimeListeners) listener(message, { id: 'extension' }, resolve); }); },
     listenerCount: type => (events[type] || []).length,
     wheel(deltaY, extra = {}) {
       const event = { type: 'wheel', isTrusted: true, cancelable: true, defaultPrevented: false, deltaY, deltaX: 0, deltaMode: 0, target: fixture.body,
@@ -63,7 +67,7 @@ async function tracker(browser = 'chrome', options = {}) {
       for (const fn of [...events.wheel || []]) fn(event);
       return event;
     },
-    setSnapshot(value) { snapshot = value; }, event(type, event) { for (const fn of events[type] || []) fn({ type, ...event }); }, setNow(n) { now = n; }, input(trusted = true) { for (const fn of events.keydown) fn({ isTrusted: trusted }); },
+    setSnapshot(value) { snapshot = value; for (const listener of runtimeListeners) listener({ type: 'refresh' }, { id: 'extension' }, () => {}); }, event(type, event) { for (const fn of events[type] || []) fn({ type, ...event }); }, setNow(n) { now = n; }, input(trusted = true) { for (const fn of events.keydown) fn({ isTrusted: trusted }); },
     focus(value) { focused = value; for (const fn of events[value ? 'focus' : 'blur']) fn({}); },
     visible(value) { doc.visibilityState = value ? 'visible' : 'hidden'; for (const fn of events.visibilitychange) fn({}); },
     route(url, create) { location.href = url; location.pathname = new URL(url).pathname; doc.activeElement = create ? fixture.editor : fixture.body; for (const fn of events['c3:route-change']) fn({}); },

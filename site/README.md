@@ -88,6 +88,14 @@ It is guidance, not an API or a guarantee that an AI service will use it.
 All three files ship in static builds and source/Docker previews; keep them current
 with product changes. The guide never exposes local extension data.
 
+## Announcements and listing screenshots
+
+Edit `marketing/release.json` and run `pnpm marketing` from the repository root
+to update the static launch announcement and generate store copy, a social post,
+and real extension screenshots with synthetic data. Review outputs in
+`dist/marketing/`; nothing is published automatically. See the
+[listing kit guide](../docs/marketing.md) for capture requirements and publication.
+
 ## Analytics
 
 `analytics.js` loads the official `@plausible-analytics/tracker` only on

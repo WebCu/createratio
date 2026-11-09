@@ -79,6 +79,42 @@ test('focused direct-message editors create on messaging routes and in feed or p
     assert.equal(submit(f), null, 'sending a DM is not a post or comment');
   }
 });
+test('floating message editors follow focus through open shadow roots without creating while reading or closed', () => {
+  for (const path of ['/feed/', '/in/another/']) {
+    const f = linkedinFixture({ url: 'https://www.linkedin.com' + path, message: true, shadow: true });
+    f.document.activeElement = f.host;
+    f.shadowRoot.activeElement = f.editor;
+    assert.equal(f.adapter.mode(), 'create', path);
+    f.shadowRoot.activeElement = f.editor.append(new Element());
+    assert.equal(f.adapter.mode(), 'create', 'nested editor focus');
+    f.shadowRoot.activeElement = f.button;
+    assert.equal(f.adapter.mode(), 'consume', 'reading inside the same shadow host');
+    assert.equal(f.adapter.action(click(f.host)), null, 'retargeted DM click earns no submission credit');
+    assert.equal(f.adapter.action(click(f.button)), null);
+    assert.equal(submit(f), null);
+    f.shadowRoot.activeElement = f.editor;
+    assert.equal(f.adapter.mode(), 'create', 'returning to writing');
+    f.shadowRoot.activeElement = null;
+    assert.equal(f.adapter.mode(), 'consume', 'closed overlay');
+    f.shadowRoot.activeElement = f.editor;
+    for (const node of [f.host, f.editor]) {
+      node.style.display = 'none'; assert.equal(f.adapter.mode(), 'consume');
+      node.style.display = 'block'; node.attributes['aria-hidden'] = 'true'; assert.equal(f.adapter.mode(), 'consume');
+      delete node.attributes['aria-hidden'];
+      node.isConnected = false; assert.equal(f.adapter.mode(), 'consume');
+      node.isConnected = true;
+    }
+    const outer = f.body.append(new Element());
+    outer.shadowRoot = { activeElement: f.host };
+    f.document.activeElement = outer;
+    assert.equal(f.adapter.mode(), 'create', 'nested open shadow roots');
+    outer.style.display = 'none'; assert.equal(f.adapter.mode(), 'consume', 'hidden outer host');
+    outer.style.display = 'block'; f.editor.selectors = new Set(['[contenteditable="false"]']);
+    assert.equal(f.adapter.mode(), 'consume', 'read-only message editor');
+    f.editor.selectors = new Set(['[role="textbox"][contenteditable="true"]']);
+    assert.equal(f.adapter.mode(), 'consume', 'unrelated shadow textbox');
+  }
+});
 test('message selectors require editable, visible, focused message fields', () => {
   const f = linkedinFixture({ url: 'https://www.linkedin.com/messaging/thread/synthetic-thread/', message: true });
   f.document.activeElement = f.editor;

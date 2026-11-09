@@ -69,9 +69,9 @@ test('built LinkedIn post composer records trusted writing as creating time', as
   } finally { await browser.cleanup(); }
 });
 
-for (const route of ['/messaging/thread/synthetic-thread/', '/feed/']) {
-  test(`built LinkedIn integration records focused DM writing on ${route} without submission bonuses`, async () => {
-    const { launch, evaluate, eventually, click, withFailureArtifacts } = await import('./chromium.mjs');
+for (const [route, shadow] of [['/messaging/thread/synthetic-thread/', false], ['/feed/', false], ['/feed/', true], ['/in/synthetic-profile/', true]]) {
+  test(`built LinkedIn integration records focused ${shadow ? 'shadow ' : ''}DM writing on ${route} without submission bonuses`, async () => {
+    const { launch, evaluate, eventually, click, clickByRole, withFailureArtifacts } = await import('./chromium.mjs');
     const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
     try {
       await withFailureArtifacts(browser, 'LinkedIn direct-message creation time', async () => {
@@ -91,12 +91,35 @@ for (const route of ['/messaging/thread/synthetic-thread/', '/feed/']) {
         const page = await browser.page('https://www.linkedin.com' + route);
         await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#synthetic-site") && document.hasFocus() && !document.hidden'), 'synthetic LinkedIn page is focused');
         await eventually(() => evaluate(browser, browser.worker, 'linkedinSnapshots > 0'), 'LinkedIn creation tracker has access preferences');
-        await evaluate(browser, page.session, `document.body.innerHTML = '<form class="msg-form"><div id="message" class="msg-form__contenteditable" contenteditable="true" role="textbox" aria-label="Write a message" style="min-height:80px;border:1px solid"></div><button id="send" type="button" class="msg-form__send-button">Send</button></form>'`);
-        await click(browser, page, '#message');
+        await evaluate(browser, page.session, `(() => {
+          document.body.innerHTML = '<div id="overlay"></div><button id="close" type="button">Close conversation</button>';
+          const host = document.querySelector('#overlay');
+          const root = ${shadow} ? host.attachShadow({ mode: 'open' }) : host;
+          root.innerHTML = '<form class="msg-form"><div id="message" class="msg-form__contenteditable" contenteditable="true" role="textbox" aria-label="Write a message" style="min-height:80px;border:1px solid"></div><button id="send" type="button" class="msg-form__send-button">Send</button></form>';
+          document.querySelector('#close').addEventListener('click', () => host.remove());
+        })()`);
+        const root = shadow ? 'document.querySelector("#overlay").shadowRoot' : 'document';
+        await clickByRole(browser, page, 'textbox', 'Write a message');
         await browser.cdp.send('Input.insertText', { text: 'Synthetic connection message; never sent.' }, page.session);
-        await eventually(() => evaluate(browser, page.session, 'document.activeElement.id === "message" && document.querySelector("#message").textContent.includes("Synthetic connection")'), 'trusted input reaches the focused DM editor');
+        await eventually(() => evaluate(browser, page.session, `${root}.activeElement?.id === 'message' && ${root}.querySelector('#message').textContent.includes('Synthetic connection')`), 'trusted input reaches the focused DM editor');
         await eventually(async () => (await totals()).createSec > 0, `DM writing saves creation time on ${route}`);
-        await click(browser, page, '#send');
+        const writing = await totals();
+        await clickByRole(browser, page, 'button', 'Send');
+        if (shadow) {
+          await eventually(async () => (await totals()).consumeSec > (writing.consumeSec || 0), 'reading inside the shadow overlay returns to consumption');
+          const reading = await totals();
+          await new Promise(resolve => setTimeout(resolve, 5500));
+          assert.equal((await totals()).createSec, reading.createSec, 'reading does not keep accumulating creation');
+          await clickByRole(browser, page, 'textbox', 'Write a message');
+          await browser.cdp.send('Input.insertText', { text: ' More synthetic writing.' }, page.session);
+          await eventually(async () => (await totals()).createSec > reading.createSec, 'returning to shadow writing resumes creation');
+          await click(browser, page, '#close');
+          await eventually(() => evaluate(browser, page.session, '!document.querySelector("#overlay")'), 'closing removes the shadow overlay');
+          await new Promise(resolve => setTimeout(resolve, 5500));
+          const closed = await totals();
+          await new Promise(resolve => setTimeout(resolve, 5500));
+          assert.equal((await totals()).createSec, closed.createSec, 'closing stops creation');
+        }
         const activity = await totals();
         for (const action of ['posts', 'comments', 'replies']) assert.equal(activity[action] || 0, 0, 'DMs do not earn submission bonuses');
         assert.deepEqual(browser.errors, []);

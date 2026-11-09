@@ -1,4 +1,4 @@
 'use strict';
-const { trackingOnlyPlatform } = require('./platform-tracking.js');
+const { gatedPlatform } = require('./platform-tracking.js');
 
-trackingOnlyPlatform({"id": "reddit", "url": "https://www.reddit.com/r/synthetic/comments/abc123/synthetic/", "neutral": "/settings"});
+gatedPlatform({"id": "reddit", "url": "https://www.reddit.com/r/synthetic/comments/abc123/synthetic/", "neutral": "/settings"});

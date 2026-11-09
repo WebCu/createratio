@@ -107,6 +107,8 @@ with tempfile.TemporaryDirectory(prefix="createratio-chromium-") as directory:
         "--disable-extensions-except=" + str(bundle),
         "--load-extension=" + str(bundle), "about:blank",
     ]
+    if sys.platform == "darwin":
+        arguments.append("--use-mock-keychain")
     if os.environ.get("CHROMIUM_NO_SANDBOX") == "1":
         arguments.append("--no-sandbox")
     with (profile / "chromium.log").open("w+") as log:

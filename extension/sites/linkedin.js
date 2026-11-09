@@ -73,11 +73,20 @@
       }
       return null;
     }
+    function focusedElement() {
+      let focused = document.activeElement;
+      while (focused?.shadowRoot?.activeElement) {
+        if (!dom.visible(focused)) return null;
+        focused = focused.shadowRoot.activeElement;
+      }
+      return focused;
+    }
     return {
       mode() {
-        const standalonePostEditor = /^\/sharing\/compose\/?$/.test(location.pathname) ? dom.closest(document.activeElement, selectors.standalonePostEditor) : null;
-        const editor = dom.closest(document.activeElement, selectors.editor) || dom.closest(document.activeElement, selectors.messageEditor) || standalonePostEditor;
-        return classifyPage({ url: location.href, linkedinEditorFocused: !!editor && dom.visible(editor) && dom.visible(document.activeElement), ownProfilePath: dom.ownProfilePath(selectors.ownProfileLink) });
+        const focused = focusedElement();
+        const standalonePostEditor = /^\/sharing\/compose\/?$/.test(location.pathname) ? dom.closest(focused, selectors.standalonePostEditor) : null;
+        const editor = dom.closest(focused, selectors.editor) || dom.closest(focused, selectors.messageEditor) || standalonePostEditor;
+        return classifyPage({ url: location.href, linkedinEditorFocused: !!editor && dom.visible(editor) && dom.visible(focused), ownProfilePath: dom.ownProfilePath(selectors.ownProfileLink) });
       },
       action(event) {
         if (event.type === 'keydown') {

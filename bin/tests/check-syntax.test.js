@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
-const { checkSyntax } = require('../check-syntax.js');
+const { checkSyntax, checkSyntaxParallel } = require('../check-syntax.js');
 
 function fixture(t) {
   const directory = mkdtempSync(path.join(tmpdir(), 'createratio-syntax-'));
@@ -22,6 +22,43 @@ test('syntax checks nested JavaScript modules without executing them', t => {
   const files = ['a.js', 'nested/b.js', 'nested/c.mjs', 'nested/d.cjs'].map(file => path.join(directory, file));
   assert.equal(checkSyntax(files), 4);
 });
+
+test('parallel syntax checks parse every file without executing it', async t => {
+  const directory = fixture(t);
+  const sources = {
+    'throw.js': 'throw new Error("Must not execute");',
+    'implicit.js': 'const require = 1; await / a // b;',
+    'module.mjs': 'export const value = await Promise.resolve(1);',
+    'commonjs.cjs': 'module.exports = new.target; return;'
+  };
+  const files = Object.entries(sources).map(([name, source]) => {
+    const file = path.join(directory, name);
+    writeFileSync(file, source);
+    return file;
+  });
+  assert.equal(await checkSyntaxParallel(files), 4);
+  assert.equal(await checkSyntaxParallel([]), 0);
+});
+
+for (const [source, expected] of [
+  ['const =;', /SyntaxError/],
+  ['const value = 1; // forbidden', /Code comments are not allowed/],
+  [null, /Syntax check failed/]
+]) {
+  test(`parallel syntax checks propagate ${expected} from any worker`, async t => {
+    const directory = fixture(t);
+    const files = Array.from({ length: 4 }, (_, index) => {
+      const file = path.join(directory, `file-${index}.js`);
+      if (index < 3 || source !== null) writeFileSync(file, index === 3 ? source : 'const value = 1;');
+      return file;
+    });
+    await assert.rejects(checkSyntaxParallel(files), error => {
+      assert.match(error.message, expected);
+      assert.ok(error.message.includes(files[3]), error.message);
+      return true;
+    });
+  });
+}
 
 test('syntax checks reject invalid JavaScript and identify its file', t => {
   const directory = fixture(t);

@@ -19,12 +19,20 @@ function fixture(kind = 'comment', url = 'https://www.reddit.com/r/synthetic/com
 }
 function seconds(t, mode) { return t.packets.flatMap(p => p.segments).filter(s => s.mode === mode).reduce((total, s) => total + s.sec, 0); }
 
-test('Reddit publishes a synchronous, opt-in, tracking-only module without the old host', () => {
+test('Reddit publishes a synchronous, opt-in module with explicit access policy', () => {
   assert.equal(plugin.id, 'reddit');
   assert.deepEqual(plugin.hosts, ['reddit.com', 'www.reddit.com']);
   assert.deepEqual(plugin.actions, ['posts', 'comments']);
   assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
-  assert.equal(Object.hasOwn(plugin, 'access'), false);
+  assert.deepEqual(plugin.access.domains, ['reddit.com']);
+  assert.equal(plugin.access.home, 'https://www.reddit.com/');
+  assert.deepEqual(plugin.access.unrestrictedRules.map(rule => rule.condition), [
+    { requestDomains: ['reddit.com'], resourceTypes: ['main_frame'] },
+    { requestDomains: ['reddit.com'], excludedResourceTypes: ['main_frame'] }
+  ]);
+  assert.deepEqual(plugin.access.sessionRules.map(rule => rule.condition), [
+    { requestDomains: ['reddit.com'], excludedResourceTypes: ['sub_frame'] }
+  ]);
   const context = vm.createContext({});
   vm.runInContext(fs.readFileSync(require.resolve('./reddit.js'), 'utf8'), context);
   assert.equal(context.C3_SITE_MODULES.reddit.id, plugin.id);

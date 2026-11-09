@@ -5,6 +5,17 @@
 })(globalThis, function () {
   'use strict';
   const hosts = ['reddit.com', 'www.reddit.com'];
+  const domains = ['reddit.com'], navigationId = 111, resourceId = 112;
+  const access = {
+    domains, home: 'https://www.reddit.com/', redirectRuleId: 6, ruleIds: [navigationId, resourceId],
+    unrestrictedRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
+      { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
+    ],
+    sessionRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] } }
+    ]
+  };
   const selectors = {
     postScope: ['form[action="/api/submit"]', 'shreddit-post-composer'],
     postEditor: ['textarea[name="title"]', 'input[name="title"]', 'textarea[name="text"]', 'input[name="url"]', '[contenteditable="true"][role="textbox"]'],
@@ -86,5 +97,5 @@
       }
     };
   }
-  return { id: 'reddit', name: 'Reddit', hosts, actions: ['posts', 'comments'], classifyPage, create };
+  return { id: 'reddit', name: 'Reddit', hosts, access, actions: ['posts', 'comments'], classifyPage, create };
 });
