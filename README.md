@@ -8,14 +8,14 @@ intention, wait 60 seconds, then confirm access for five active minutes by defau
 Switching away pauses the timer.
 
 - **Intentional access:** configurable session times and a **Limit & track**
-  switch for X, LinkedIn, TikTok, Instagram, Facebook and Reddit. Turning it off removes
+  switch for X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit. Turning it off removes
   access restrictions and stops new creation-score measurements without deleting history.
 - **A daily creation score:** compares creating time and credit for posts,
   replies, and comments against consuming time. See the
   [measurement rules and limitations](extension/README.md#measurement-and-score).
 - **Scroll friction:** wheel/trackpad scrolling on consuming pages moves half
   as far by default. Tune the resistance or turn it off in Settings.
-- **TikTok, Instagram, Facebook and Reddit:** start Off. Enable **Limit & track** in
+- **TikTok, Instagram, Facebook, YouTube and Reddit:** start Off. Enable **Limit & track** in
   Settings for the same intention, wait and active-time limits as X and LinkedIn, alongside
   creation tracking and shared Slow scrolling. Saved On/Off choices are kept.
 - **Optional extras:** track time across websites or save your access intentions.

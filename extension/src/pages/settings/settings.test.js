@@ -305,7 +305,7 @@ test('gated rows combine creation tracking and access limits without selectors o
 test('opt-in sites share the same Limit & track rows and session controls', async () => {
   const p = settingsPage(); await p.ready();
   const rows = p.nodes['site-settings'].children;
-  for (const id of ['tiktok', 'instagram', 'facebook', 'reddit']) {
+  for (const id of ['tiktok', 'instagram', 'facebook', 'youtube', 'reddit']) {
     assert.ok(rows.some(row => row.attributes['data-site'] === id), id + ' appears in the main website list');
     const c = controls(p, id);
     assert.equal(c.tracking.attributes['aria-label'], 'Limit & track on ' + C3.SITES.find(site => site.id === id).name);

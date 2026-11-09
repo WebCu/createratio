@@ -1,7 +1,7 @@
 # CreateRatio browser extension
 
 A dependency-free Manifest V3 extension for intentional access and local
-creating-versus-consuming tracking on X, LinkedIn, TikTok, Instagram, Facebook and Reddit.
+creating-versus-consuming tracking on X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit.
 
 ## Layout and installation
 
@@ -213,10 +213,10 @@ history remain. Off discards the current budget and waiting request, including
 its midnight refill. Re-enabling requires a fresh intention and wait unless
 optional above-goal access applies. Fresh trusted input is required to measure.
 
-TikTok, Instagram, Facebook and Reddit start Off. Enable **Limit & track** in Settings
+TikTok, Instagram, Facebook, YouTube and Reddit start Off. Enable **Limit & track** in Settings
 to use the same intention, wait and active-time budgets as X and LinkedIn. Saved
 On/Off choices are preserved, including previously enabled tracking choices;
-enabled TikTok, Instagram, Facebook and Reddit sites require access sessions. Save drafts
+enabled TikTok, Instagram, Facebook, YouTube and Reddit sites require access sessions. Save drafts
 before updating.
 
 New vetted integrations start disabled; arbitrary domains or user scripts cannot
@@ -291,6 +291,7 @@ Old Twitter URLs must redirect to X first.
 | TikTok | For You, Following, Explore, Search, tags, music, profiles, videos and photos | Focused comment, upload-caption, or message editors |
 | Instagram | Feed, Explore, Search, Reels, tagged feeds, posts, stories and profiles | Focused comment, dialog-caption, or message editors |
 | Facebook | Home, Watch feed, reels, group feeds/posts, supported permalink and numeric-profile routes | Focused post-dialog, comment, or messaging-page editors |
+| YouTube | Home, watch, Shorts, search, playlists, supported feeds and channels | Focused comment editors |
 | Reddit | Home, community feeds, search, threads and profiles | Focused post, comment, or message-compose editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
@@ -408,6 +409,22 @@ English labels are recognized. Vanity-profile routes, separate Messenger hosts,
 mobile hosts, and shadow-root-only editors are unsupported. Synthetic fixtures
 do not prove current authenticated markup or publication.
 
+### YouTube tracking
+
+YouTube starts Off under **Settings → Websites**. **Limit & track** enables the
+same intention, wait and active-time budget as the other sites, with creation
+tracking and shared Slow scrolling. Access gating covers HTTP/S `youtube.com`
+and its subdomains; creation tracking uses only the exact HTTPS hosts
+`youtube.com` and `www.youtube.com`. Off restores unrestricted access and native
+scrolling, stops new creation measurements, and preserves history and saved duration.
+
+A visible focused `ytd-commentbox` editor counts as creating. Scoped comment-submit
+clicks count comments, not proof of publication. Keyboard editor shortcuts, likes,
+video uploads, YouTube Studio, mobile hosts, and ambiguous/multiple editors are
+unsupported. Playback without recent trusted input is not continuous watch-time
+measurement. Settings/account/auth routes remain neutral. Synthetic fixtures do
+not prove current authenticated markup.
+
 ## Optional all-website time
 
 Enable **Website time** in Settings and approve optional `tabs` and `idle`
@@ -512,8 +529,8 @@ optional intention history saves the text you explicitly submit. Nothing uses
 Required permissions are `storage`, `alarms`, and
 `declarativeNetRequestWithHostAccess`, plus `scripting` to restore CreateRatio's
 own scripts in already-authorized tabs after updates. Host access is limited to HTTP/S X, Twitter
-aliases, LinkedIn, TikTok, Instagram, Facebook and Reddit, including their subdomains, for
-access gating. Creation tracking still uses each site's exact HTTPS hosts.
+aliases, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit, including their subdomains,
+for access gating. Creation tracking still uses each site's exact HTTPS hosts.
 Expanded host scope can require browser approval when updating.
 Optional `tabs` and `idle` permissions are requested only for
 all-website time. No browser-history or all-sites host permission is requested.

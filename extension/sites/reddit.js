@@ -5,9 +5,9 @@
 })(globalThis, function () {
   'use strict';
   const hosts = ['reddit.com', 'www.reddit.com'];
-  const domains = ['reddit.com'], navigationId = 111, resourceId = 112;
+  const domains = ['reddit.com'], navigationId = 113, resourceId = 114;
   const access = {
-    domains, home: 'https://www.reddit.com/', redirectRuleId: 6, ruleIds: [navigationId, resourceId],
+    domains, home: 'https://www.reddit.com/', redirectRuleId: 7, ruleIds: [navigationId, resourceId],
     unrestrictedRules: [
       { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
       { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
