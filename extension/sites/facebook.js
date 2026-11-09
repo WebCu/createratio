@@ -5,6 +5,17 @@
 })(globalThis, function () {
   'use strict';
   const hosts = ['facebook.com', 'www.facebook.com'];
+  const domains = ['facebook.com'], navigationId = 109, resourceId = 110;
+  const access = {
+    domains, home: 'https://www.facebook.com/', redirectRuleId: 5, ruleIds: [navigationId, resourceId],
+    unrestrictedRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
+      { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
+    ],
+    sessionRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] } }
+    ]
+  };
   const selectors = {
     postScope: ['[role="dialog"][aria-label="Create post"]', '[role="dialog"][aria-label="Create a post"]'],
     postEditor: ['[role="textbox"][contenteditable="true"][data-lexical-editor="true"]'],
@@ -112,5 +123,5 @@
       }
     };
   }
-  return { id: 'facebook', name: 'Facebook', hosts, actions: ['posts', 'comments'], classifyPage, create };
+  return { id: 'facebook', name: 'Facebook', hosts, access, actions: ['posts', 'comments'], classifyPage, create };
 });
