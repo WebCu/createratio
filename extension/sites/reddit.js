@@ -89,8 +89,8 @@
         if (!usable(button)) return null;
         const scope = dom.closest(button, [config.scopes.join(',')]);
         if (!scope) return null;
-        const editor = dom.find(scope, config.editors);
-        if (!usable(editor) || dom.closest(editor, [config.scopes.join(',')]) !== scope) return null;
+        const editor = Array.from(scope.querySelectorAll(config.editors.join(','))).find(node => usable(node) && dom.closest(node, [config.scopes.join(',')]) === scope);
+        if (!editor) return null;
         const label = dom.label(button) || button.getAttribute('value');
         if (!config.labels.includes(label)) return null;
         return { button, action: config.action, submission: true };

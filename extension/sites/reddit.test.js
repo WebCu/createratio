@@ -138,6 +138,25 @@ test('Reddit actions require scoped positive post/comment submits, not open, edi
   }
 });
 
+for (const kind of ['post', 'comment']) for (const preceding of ['read-only', 'nested']) {
+  test(`Reddit ${kind} submission skips a preceding ${preceding} editor`, () => {
+    const env = environment(kind === 'post' ? 'https://www.reddit.com/submit/' : 'https://www.reddit.com/');
+    const scope = env.body.append(new Element([kind === 'post' ? 'form[action="/api/submit"]' : 'form[action="/api/comment"]']));
+    const editorSelector = kind === 'post' ? 'textarea[name="title"]' : 'textarea[name="text"]';
+    const firstScope = preceding === 'nested' ? scope.append(new Element([kind === 'post' ? 'shreddit-post-composer' : 'shreddit-composer'])) : scope;
+    const first = firstScope.append(new Element([editorSelector]));
+    first.readOnly = preceding === 'read-only';
+    const editor = scope.append(new Element([editorSelector]));
+    const button = scope.append(new Element(['button'], kind === 'post' ? 'Post' : 'Comment'));
+    const adapter = plugin.create(env);
+    env.document.activeElement = editor;
+    assert.equal(adapter.mode(), 'create');
+    assert.deepEqual(adapter.action(click(button)), { button, action: kind === 'post' ? 'posts' : 'comments', submission: true });
+    editor.disabled = true;
+    assert.equal(adapter.action(click(button)), null, 'ineligible editors cannot authorize a submission without a usable editor in this composer');
+  });
+}
+
 test('Reddit submission lookup does not borrow an editor from a different or nested composer', () => {
   const f = fixture();
   f.editor.isConnected = false;
