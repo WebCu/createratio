@@ -97,11 +97,11 @@ test('popup animates a daily refill once without replacing the countdown or acce
   await button.fire('click'); await p.ready();
   assert.equal(label.children.length, 2); assert.equal(button.textContent, 'Request access');
 });
-test('popup exposes all four access actions without session-time editing', async () => {
+test('popup exposes all five access actions without session-time editing', async () => {
   const p = page('popup'); await p.ready();
   p.state.access = Object.fromEntries(C3.SITES.filter(site => site.gated).map(site => [site.id, accessState(site.id, { remainingMs: 60000 })]));
   p.change(); await p.ready();
-  assert.equal(p.nodes['access-sites'].children.length, 4);
+  assert.equal(p.nodes['access-sites'].children.length, 5);
   for (const site of C3.SITES) assert.equal(p.nodes['session-time-' + site.id], undefined);
   assert.equal(p.messages.some(message => message.type === 'access-duration'), false);
   await p.nodes.settings.fire('click'); assert.equal(p.state.optionsOpened, 1);

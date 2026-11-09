@@ -19,12 +19,15 @@ function fixture(kind = 'comment', url = 'https://www.facebook.com/') {
 }
 function seconds(t, mode) { return t.packets.flatMap(p => p.segments).filter(s => s.mode === mode).reduce((total, s) => total + s.sec, 0); }
 
-test('Facebook publishes a synchronous, opt-in, tracking-only module in Node and the browser', () => {
+test('Facebook publishes a synchronous, opt-in module with explicit access policy in Node and the browser', () => {
   assert.equal(plugin.id, 'facebook');
   assert.deepEqual(plugin.hosts, ['facebook.com', 'www.facebook.com']);
   assert.deepEqual(plugin.actions, ['posts', 'comments']);
   assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
-  assert.equal(Object.hasOwn(plugin, 'access'), false);
+  assert.deepEqual(plugin.access.domains, ['facebook.com']);
+  assert.equal(plugin.access.home, 'https://www.facebook.com/');
+  assert.equal(plugin.access.sessionRules.some(rule => rule.condition.excludedResourceTypes?.includes('sub_frame')), true);
+  assert.equal(plugin.access.unrestrictedRules.some(rule => rule.condition.excludedResourceTypes?.includes('main_frame')), true);
   const context = vm.createContext({});
   vm.runInContext(fs.readFileSync(require.resolve('./facebook.js'), 'utf8'), context);
   assert.equal(context.C3_SITE_MODULES.facebook.id, plugin.id);
