@@ -486,9 +486,10 @@ screenshots, credentials, or publisher-dashboard information.
 
 Before a release, verify:
 
-- Enabled X/Twitter aliases, LinkedIn, TikTok and Instagram block, including HTTP/S
-  subdomains, while unrelated sites remain accessible. TikTok and Instagram start
-  Off; saved choices survive updates. Verify browser approval of expanded hosts.
+- Enabled X/Twitter aliases, LinkedIn, TikTok, Instagram, Facebook and YouTube block,
+  including HTTP/S subdomains, while unrelated sites remain accessible. TikTok,
+  Instagram, Facebook and YouTube start Off; saved choices survive updates. Verify browser
+  approval of expanded hosts.
 - Reloading preserves the 60-second wait; only explicit confirmation unlocks.
 - Access budgets are shared per site, pause on tab/window changes, survive
   restarts, refill at local midnight, and revoke access at expiry or manual end.
@@ -522,7 +523,7 @@ Before a release, verify:
   physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
-- All four popup rows show current access without session-time editors.
+- All six popup rows show current access without session-time editors.
   Settings opens Websites initially; Browsing, Privacy and Your data open through
   native section summaries, closing the previous section. Verify keyboard access,
   320px layouts, reduced motion and forced colors. Duration menus support presets,

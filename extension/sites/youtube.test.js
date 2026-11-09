@@ -20,7 +20,7 @@ function fixture(url = 'https://www.youtube.com/watch?v=synthetic') {
   return { ...env, ...addComment(env), adapter: plugin.create(env) };
 }
 function selection(enabled) {
-  return { day: {}, settings: { ...C.DEFAULT_SETTINGS, trackedSites: enabled ? ['youtube'] : [] }, access: {} };
+  return { day: {}, settings: { ...C.DEFAULT_SETTINGS, trackedSites: enabled ? ['youtube'] : [] }, access: { youtube: { enabled, remainingMs: enabled ? 300000 : 0 } } };
 }
 async function youtubeTracker(browser, { enabled = true, ...options } = {}) {
   const fixtures = [];
@@ -54,13 +54,18 @@ const unsupported = [
   '/@synthetic/videos/unknown', '/c', '/user'
 ];
 
-test('YouTube publishes a tracking-only opt-in module in Node and the browser', () => {
+test('YouTube publishes an opt-in module with explicit access policy in Node and the browser', () => {
   assert.equal(plugin.id, 'youtube');
   assert.equal(plugin.name, 'YouTube');
   assert.deepEqual(plugin.hosts, ['youtube.com', 'www.youtube.com']);
   assert.deepEqual(plugin.actions, ['comments']);
   assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
-  assert.equal(Object.hasOwn(plugin, 'access'), false);
+  assert.deepEqual(plugin.access.domains, ['youtube.com']);
+  assert.equal(plugin.access.home, 'https://www.youtube.com/');
+  assert.equal(plugin.access.redirectRuleId, 6);
+  assert.deepEqual(plugin.access.ruleIds, [111, 112]);
+  assert.equal(plugin.access.sessionRules.some(rule => rule.condition.excludedResourceTypes?.includes('sub_frame')), true);
+  assert.equal(plugin.access.unrestrictedRules.some(rule => rule.condition.excludedResourceTypes?.includes('main_frame')), true);
   const context = vm.createContext({ URL });
   vm.runInContext(fs.readFileSync(require.resolve('./youtube.js'), 'utf8'), context);
   const published = context.C3_SITE_MODULES.youtube;
@@ -256,7 +261,7 @@ for (const browser of ['chrome', 'browser']) {
   }
 
   test(`${browser} YouTube is opt-in and disable/re-enable requires fresh input`, async () => {
-    const t = await youtubeTracker(browser, { snapshot: { day: {}, settings: C.DEFAULT_SETTINGS, access: {} } });
+    const t = await youtubeTracker(browser, { snapshot: selection(false) });
     t.input(); t.event('click', { isTrusted: true, target: new Element(['button', '#submit-button button']) });
     t.setNow(5000); await t.tick();
     assert.equal(t.fixtures.length, 0);

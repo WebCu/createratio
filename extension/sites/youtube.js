@@ -5,6 +5,17 @@
 })(globalThis, function () {
   'use strict';
   const hosts = ['youtube.com', 'www.youtube.com'];
+  const domains = ['youtube.com'], navigationId = 111, resourceId = 112;
+  const access = {
+    domains, home: 'https://www.youtube.com/', redirectRuleId: 6, ruleIds: [navigationId, resourceId],
+    unrestrictedRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
+      { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
+    ],
+    sessionRules: [
+      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] } }
+    ]
+  };
   const selectors = {
     composer: ['ytd-commentbox'],
     editor: ['#contenteditable-root[contenteditable="true"]'],
@@ -58,5 +69,5 @@
       }
     };
   }
-  return { id: 'youtube', name: 'YouTube', hosts, actions: ['comments'], classifyPage, create };
+  return { id: 'youtube', name: 'YouTube', hosts, access, actions: ['comments'], classifyPage, create };
 });

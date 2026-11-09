@@ -302,6 +302,24 @@ test('gated rows combine creation tracking and access limits without selectors o
   for (const id of ['settings-overview', 'tracking-sites', 'access-site', 'nudge-site', 'nudgeEnabled-default', 'nudgeMinutes-default']) assert.equal(p.nodes[id], undefined);
   assert.equal(controls(p).tracking, undefined); assert.equal(controls(p).reset, undefined); assert.ok(p.messages.every(message => message.type === 'snapshot'));
 });
+test('opt-in sites have the same Limit & track rows and session controls', async () => {
+  const p = settingsPage(); await p.ready();
+  const rows = p.nodes['site-settings'].children;
+  for (const id of ['tiktok', 'instagram', 'facebook', 'youtube']) {
+    assert.ok(rows.some(row => row.attributes['data-site'] === id), id + ' appears in the main website list');
+    const c = controls(p, id);
+    assert.equal(c.tracking.attributes['aria-label'], 'Limit & track on ' + C3.SITES.find(site => site.id === id).name);
+    assert.equal(c.tracking.checked, false);
+    assert.deepEqual(value(p, id), [5, 'From Default']);
+    assert.equal(c.access.disabled, true);
+    p.toggle(id, true); await p.ready();
+    assert.equal(c.access.disabled, false);
+    c.access.value = '12'; await c.access.fire('change'); await p.ready();
+    p.toggle(id, false); await p.ready();
+    assert.deepEqual(value(p, id), [12, 'Custom']);
+    assert.equal(c.access.disabled, true);
+  }
+});
 test('session times show inheritance and are inactive when Limit & track is Off', async () => {
   const p = settingsPage(); await p.ready();
   p.setSettings({ ...C3.DEFAULT_SETTINGS, trackedSites: ['linkedin'], siteOverrides: { x: { accessMinutes: 2 } } }); p.change(); await p.ready();

@@ -5,16 +5,16 @@ const path = require('node:path');
 
 test('built Facebook preserves opt-in scrolling, focused writing and submitted history', async () => {
   const { platformJourney } = await import('./platform-tracking.mjs');
-  await platformJourney({"id": "facebook", "name": "Facebook", "gated": false, "url": "https://www.facebook.com/", "neutral": "/settings", "markup": "<form id=\"composer\"><div role=\"textbox\" contenteditable=\"true\" aria-label=\"Write a comment...\"></div><button id=\"submit-comment\" type=\"button\" aria-label=\"Comment\">Comment</button></form>", "editor": "form [role=\"textbox\"][contenteditable=\"true\"][aria-label=\"Write a comment...\"]"});
+  await platformJourney({"id": "facebook", "name": "Facebook", "gated": true, "url": "https://www.facebook.com/", "neutral": "/settings", "markup": "<form id=\"composer\"><div role=\"textbox\" contenteditable=\"true\" aria-label=\"Write a comment...\"></div><button id=\"submit-comment\" type=\"button\" aria-label=\"Comment\">Comment</button></form>", "editor": "form [role=\"textbox\"][contenteditable=\"true\"][aria-label=\"Write a comment...\"]"});
 });
 
 test('built Facebook keeps equivalent own-profile URLs on native scrolling', async () => {
-  const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
+  const { launch, evaluate, eventually, withFailureArtifacts, seedAccess } = await import('./chromium.mjs');
   const { scrollFixture } = await import('./scrolling.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   try {
     await withFailureArtifacts(browser, 'Facebook mixed-form own profiles', async () => {
-      await evaluate(browser, browser.worker, 'chrome.storage.local.set({ settings: { ...C3.DEFAULT_SETTINGS, trackedSites: ["facebook"] } })');
+      await seedAccess(browser, ['facebook'], { trackedSites: ['facebook'] });
       const scrolling = scrollFixture(browser);
       for (const [route, ownRoute] of [['/people/Synthetic/123/', '/profile.php?id=123'], ['/profile.php?id=123', '/people/Synthetic/123/']]) {
         const page = await browser.page('https://www.facebook.com' + route);
