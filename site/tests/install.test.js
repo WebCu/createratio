@@ -20,7 +20,6 @@ function verifyInstallation(html) {
       'installation has plain Chrome and Firefox links that work without JavaScript');
   }
   assert.match(hero, /href="#install">Other browsers &amp; source<\/a>/);
-  assert.match(install, /Save (?:any |your )?X and LinkedIn drafts before installing/);
   assert.match(install, /<details>\s*<summary>Build from source/);
   assert.match(install, /https:\/\/github\.com\/WebCu\/createratio\.git/);
   for (const bundle of ['dist/chrome', 'dist/edge', 'dist/firefox/manifest.json']) {

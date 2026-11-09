@@ -16,7 +16,7 @@ web
 Anyone who wants to create more than they consume online. There is no narrower
 professional or demographic audience. Site integrations support timed access and
 creation tracking on X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit.
-TikTok, Instagram, Facebook, YouTube and Reddit start Off; saved site choices persist.
+All seven start with Limit & track On for fresh installs; existing saved site choices persist.
 
 ## Product Purpose
 

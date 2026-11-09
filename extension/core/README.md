@@ -21,14 +21,15 @@ available-site switches and new collection validation, never permission to displ
 saved history. Contributions are reviewed through GitHub; see
 [Site integrations](../sites/README.md) and [Contributing](../../CONTRIBUTING.md).
 
-`DEFAULT_SETTINGS.trackedSites` enables X and LinkedIn by default.
+`DEFAULT_SETTINGS.trackedSites` enables all seven supported platforms by default,
+as declared by each module's `defaultEnabled` flag.
 `trackingEnabled(site, settings)` uses that default when the preference is absent
 and respects an empty list (all tracking disabled). Malformed non-array saved
 selections, including `null`, resolve to all sites Off; only a missing preference
 uses catalog defaults. Normalization does not overwrite saved preferences.
 Tracking preferences
-do not filter historical aggregates or CSV exports. New catalog entries start
-disabled; the extension user decides which integrations to activate.
+do not filter historical aggregates or CSV exports. Saved selections never gain
+new catalog entries automatically; users can independently enable or disable sites.
 
 `siteForURL` delegates supported HTTPS lookup to the catalog. `classifyPage` is a
 compatibility entry point delegating opaque route/editor state to the selected

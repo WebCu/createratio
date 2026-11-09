@@ -21,11 +21,11 @@ function seconds(t, mode) {
   return t.packets.flatMap(packet => packet.segments).filter(segment => segment.mode === mode).reduce((sum, segment) => sum + segment.sec, 0);
 }
 
-test('TikTok publishes an opt-in module with explicit access policy in Node and the browser', () => {
+test('TikTok publishes a default-on module with explicit access policy in Node and the browser', () => {
   assert.equal(plugin.id, 'tiktok');
   assert.equal(plugin.name, 'TikTok');
   assert.deepEqual(plugin.hosts, ['tiktok.com', 'www.tiktok.com']);
-  assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
+  assert.equal(plugin.defaultEnabled, true);
   assert.deepEqual(plugin.access.domains, ['tiktok.com']);
   assert.equal(plugin.access.home, 'https://www.tiktok.com/');
   assert.equal(plugin.access.sessionRules.some(rule => rule.condition.excludedResourceTypes?.includes('sub_frame')), true);
@@ -188,7 +188,7 @@ test('TikTok counts only explicit positive light controls, never composer or sha
 });
 
 for (const browser of ['chrome', 'browser']) {
-  test(`TikTok real adapter uses shared trusted wheel/touch tracking, opt-in and submission deduplication (${browser})`, async () => {
+  test(`TikTok real adapter uses shared trusted wheel/touch tracking, disable/re-enable and submission deduplication (${browser})`, async () => {
     let mounted, creations = 0;
     const integration = { ...plugin, create(env) { creations++; mounted = mount(env); return mounted.adapter; } };
     const options = { url: 'https://tiktok.com/@sample/video/123', integration, snapshot: { day: {}, settings: { ...C.DEFAULT_SETTINGS, trackedSites: [] } } };

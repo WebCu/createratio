@@ -123,5 +123,5 @@
       }
     };
   }
-  return { id: 'facebook', name: 'Facebook', hosts, access, actions: ['posts', 'comments'], classifyPage, create };
+  return { id: 'facebook', name: 'Facebook', hosts, defaultEnabled: true, access, actions: ['posts', 'comments'], classifyPage, create };
 });

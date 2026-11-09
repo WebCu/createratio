@@ -145,7 +145,7 @@ test('slow scrolling defaults on, saves independently and restores failed or mal
   assert.equal(input.checked, false); assert.equal(input.disabled, false);
   assert.equal(p.state.requested, 0);
   assert.deepEqual(p.notifications, [{ id: 1, type: 'refresh' }, { id: 2, type: 'refresh' }]);
-  assert.deepEqual(p.settings.trackedSites, ['x', 'linkedin']);
+  assert.deepEqual(p.settings.trackedSites, C3.SITES.map(site => site.id));
   assert.equal(p.data[C3.localDate()].x.consumeSec, 60);
   p.fail = true; input.checked = true; await input.fire('change');
   assert.equal(input.checked, false); assert.equal(input.disabled, false); assert.equal(p.nodes.error.textContent, 'Could not save.');
@@ -302,17 +302,15 @@ test('gated rows combine creation tracking and access limits without selectors o
   for (const id of ['settings-overview', 'tracking-sites', 'access-site', 'nudge-site', 'nudgeEnabled-default', 'nudgeMinutes-default']) assert.equal(p.nodes[id], undefined);
   assert.equal(controls(p).tracking, undefined); assert.equal(controls(p).reset, undefined); assert.ok(p.messages.every(message => message.type === 'snapshot'));
 });
-test('opt-in sites share the same Limit & track rows and session controls', async () => {
+test('all supported sites start On and retain session times when disabled', async () => {
   const p = settingsPage(); await p.ready();
   const rows = p.nodes['site-settings'].children;
   for (const id of ['tiktok', 'instagram', 'facebook', 'youtube', 'reddit']) {
     assert.ok(rows.some(row => row.attributes['data-site'] === id), id + ' appears in the main website list');
     const c = controls(p, id);
     assert.equal(c.tracking.attributes['aria-label'], 'Limit & track on ' + C3.SITES.find(site => site.id === id).name);
-    assert.equal(c.tracking.checked, false);
+    assert.equal(c.tracking.checked, true);
     assert.deepEqual(value(p, id), [5, 'From Default']);
-    assert.equal(c.access.disabled, true);
-    p.toggle(id, true); await p.ready();
     assert.equal(c.access.disabled, false);
     c.access.value = '12'; await c.access.fire('change'); await p.ready();
     p.toggle(id, false); await p.ready();

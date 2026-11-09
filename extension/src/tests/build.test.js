@@ -299,7 +299,7 @@ test('new gated and tracking-only modules need only site files and catalog regis
     assert.equal(context.C3.siteForURL('https://reading.test/'), 'reading');
     assert.equal(context.C3.SITES.find(site => site.id === 'example').gated, true);
     assert.equal(context.C3.SITES.find(site => site.id === 'reading').gated, false);
-    assert.deepEqual(Array.from(context.C3.DEFAULT_SETTINGS.trackedSites), ['x', 'linkedin']);
+    assert.deepEqual(Array.from(context.C3.DEFAULT_SETTINGS.trackedSites), ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit']);
   }
 });
 

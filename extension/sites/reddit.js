@@ -97,5 +97,5 @@
       }
     };
   }
-  return { id: 'reddit', name: 'Reddit', hosts, access, actions: ['posts', 'comments'], classifyPage, create };
+  return { id: 'reddit', name: 'Reddit', hosts, defaultEnabled: true, access, actions: ['posts', 'comments'], classifyPage, create };
 });

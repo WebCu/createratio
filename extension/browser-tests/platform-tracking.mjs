@@ -10,7 +10,7 @@ export async function platformJourney(platform) {
         const id = JSON.stringify(platform.id);
         const metadata = await evaluate(browser, browser.worker, `C3.SITES.find(site => site.id === ${id})`);
         assert.ok(metadata, `${platform.name} must be registered in the built catalog`);
-        assert.equal(metadata.defaultEnabled, false);
+        assert.equal(metadata.defaultEnabled, true);
         const gated = platform.gated ?? true;
         assert.equal(metadata.gated, gated);
         const trackingSwitch = (gated ? 'Limit & track' : 'Track creating & consuming') + ' on ' + platform.name;
@@ -24,12 +24,21 @@ export async function platformJourney(platform) {
         const settings = await browser.page(browser.origin + '/settings.html');
         const toggle = '#track-' + platform.id;
         await eventually(() => evaluate(browser, settings.session, `document.querySelector(${JSON.stringify(toggle)})?.disabled === false`), 'Settings tracking switch ready');
-        assert.equal(await evaluate(browser, settings.session, `document.querySelector(${JSON.stringify(toggle)}).checked`), false);
+        assert.equal(await evaluate(browser, settings.session, `document.querySelector(${JSON.stringify(toggle)}).checked`), true);
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-enabled").checked'), true);
         assert.equal(await evaluate(browser, settings.session, 'document.querySelector("#scroll-friction-strength").value'), '50');
         const page = await browser.page(platform.url);
+        if (gated) {
+          await eventually(() => evaluate(browser, page.session, `location.href === ${JSON.stringify(browser.origin + '/blocked.html?site=' + platform.id)}`), 'fresh profile blocks the site by default');
+        }
+        await clickByRole(browser, settings, 'switch', trackingSwitch);
+        await eventually(() => evaluate(browser, settings.session, `!document.querySelector(${JSON.stringify(toggle)}).checked && !document.querySelector(${JSON.stringify(toggle)}).disabled`), 'user turns tracking Off');
+        await browser.cdp.send('Page.reload', {}, settings.session);
+        await eventually(() => evaluate(browser, settings.session, `document.querySelector(${JSON.stringify(toggle)})?.checked === false && !document.querySelector(${JSON.stringify(toggle)}).disabled`), 'saved Off survives Settings reload');
+        await browser.cdp.send('Page.navigate', { url: platform.url }, page.session);
+        await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
         await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site") && document.readyState === "complete" && document.hasFocus()'), 'offline real-host fixture ready');
-        await eventually(() => evaluate(browser, browser.worker, 'platformSnapshots > 0'), 'built tracker read default Off preferences');
+        await eventually(() => evaluate(browser, browser.worker, 'platformSnapshots > 0'), 'built tracker read saved Off preferences');
         const markup = '<style>html{scroll-behavior:auto}body{margin:0;min-height:20000px}#composer{display:block;position:fixed;top:25px;left:25px;width:380px;padding:20px;background:white;border:1px solid}textarea,[contenteditable="true"]{display:block;box-sizing:border-box;width:340px;min-height:80px;border:1px solid}button{min-height:42px;margin-top:12px}</style><h1>Offline synthetic feed</h1>' + platform.markup;
         await evaluate(browser, page.session, `document.body.innerHTML = ${JSON.stringify(markup)}`);
         const listenerEnabled = () => scrolling.isEnabled(page);
@@ -39,10 +48,10 @@ export async function platformJourney(platform) {
         }
         const wheel = delta => scrolling.distance(page, 'html', delta, { x: 700, y: 400 });
         assert.equal(await listenerEnabled(), false);
-        assert.equal(await wheel(240), 240, 'default Off scrolls natively');
+        assert.equal(await wheel(240), 240, 'saved Off scrolls natively');
         assert.equal(await wheel(-240), -240);
         await click(browser, page, '#submit-comment');
-        assert.equal((await totals()).comments || 0, 0, 'default Off cannot record a submit');
+        assert.equal((await totals()).comments || 0, 0, 'saved Off cannot record a submit');
         await clickByRole(browser, settings, 'switch', trackingSwitch);
         await eventually(() => evaluate(browser, settings.session, `document.querySelector(${JSON.stringify(toggle)}).checked && !document.querySelector(${JSON.stringify(toggle)}).disabled && document.querySelector('#save-status').textContent.includes('Your history is kept.')`), 'tracking enabled through Settings');
         await activatePage();

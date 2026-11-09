@@ -109,7 +109,7 @@ test('tracking accepts vetted integrations independently of whole-site gate supp
   const core = { ...C, SITES: [...C.SITES, { id: 'vetted' }] };
   const w = blocker({}, 'chrome', core);
   assert.equal((await w.handle(tracking('vetted', true), popupSender)).ok, true);
-  assert.deepEqual(w.data.settings.trackedSites, ['x', 'linkedin', 'vetted']);
+  assert.deepEqual(w.data.settings.trackedSites, [...C.DEFAULT_SETTINGS.trackedSites, 'vetted']);
   assert.deepEqual(rulesFor(w), []);
 });
 
@@ -133,7 +133,7 @@ test('failed tracking reconciliation restores exact prior preferences before ret
     await assert.rejects(w.handle(tracking(), popupSender), error => error === failure);
     assert.deepEqual(w.data.settings, settings || C.DEFAULT_SETTINGS);
     assert.equal(w.data._access.x.remainingMs, 240000);
-    assert.deepEqual(writes(w).map(change => change.settings), [{ ...C.DEFAULT_SETTINGS, ...settings, trackedSites: ['linkedin'] }, settings || C.DEFAULT_SETTINGS]);
+    assert.deepEqual(writes(w).map(change => change.settings), [{ ...C.DEFAULT_SETTINGS, ...settings, trackedSites: (settings?.trackedSites || C.DEFAULT_SETTINGS.trackedSites).filter(id => id !== 'x') }, settings || C.DEFAULT_SETTINGS]);
     const updates = w.calls.flatMap((call, index) => call.type === 'rules.update' ? [index] : []);
     const rollback = w.calls.findIndex(call => call.type === 'local.set' && call.value.settings.trackedSites.includes('x'));
     assert.ok(updates[0] < rollback && rollback < updates[1]);
@@ -147,7 +147,7 @@ test('a failed tracking rollback write supersedes reconciliation failure and pre
   w.failNext('local.set', rollback, 2);
   await assert.rejects(w.handle(tracking(), popupSender), error => error === rollback);
   assert.equal(w.calls.filter(call => call.type === 'session.get').length, 1);
-  assert.deepEqual(w.data.settings.trackedSites, ['linkedin']);
+  assert.deepEqual(w.data.settings.trackedSites, C.DEFAULT_SETTINGS.trackedSites.filter(id => id !== 'x'));
 });
 
 test('tracking rollback restores preferences but does not refund a session already discarded before a later failure', async () => {

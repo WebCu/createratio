@@ -69,5 +69,5 @@
       }
     };
   }
-  return { id: 'youtube', name: 'YouTube', hosts, access, actions: ['comments'], classifyPage, create };
+  return { id: 'youtube', name: 'YouTube', hosts, defaultEnabled: true, access, actions: ['comments'], classifyPage, create };
 });

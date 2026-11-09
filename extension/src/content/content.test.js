@@ -682,7 +682,7 @@ test('broken adapter creation pauses only that site until reload without changin
   assert.deepEqual(broken.packets, []); assert.equal(broken.warnings.length, 1);
   const healthy = await linkedinTracker(); healthy.input(); healthy.setNow(5000); await healthy.tick();
   assert.equal(seconds(healthy, 'consume'), 5); assert.deepEqual(healthy.warnings, []);
-  assert.deepEqual(snapshot.settings.trackedSites, ['x', 'linkedin']);
+  assert.deepEqual(snapshot.settings.trackedSites, C.SITES.map(site => site.id));
 });
 test('throwing or invalid mode/action recognition pauses the adapter and drops unsaved activity', async () => {
   for (const failure of ['throw-mode', 'invalid-mode', 'throw-action', 'invalid-action', 'invalid-button']) {
