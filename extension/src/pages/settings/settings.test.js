@@ -302,10 +302,10 @@ test('gated rows combine creation tracking and access limits without selectors o
   for (const id of ['settings-overview', 'tracking-sites', 'access-site', 'nudge-site', 'nudgeEnabled-default', 'nudgeMinutes-default']) assert.equal(p.nodes[id], undefined);
   assert.equal(controls(p).tracking, undefined); assert.equal(controls(p).reset, undefined); assert.ok(p.messages.every(message => message.type === 'snapshot'));
 });
-test('Facebook has the same Limit & track row and session controls as Instagram and TikTok', async () => {
+test('opt-in sites have the same Limit & track rows and session controls', async () => {
   const p = settingsPage(); await p.ready();
   const rows = p.nodes['site-settings'].children;
-  for (const id of ['tiktok', 'instagram', 'facebook']) {
+  for (const id of ['tiktok', 'instagram', 'facebook', 'youtube']) {
     assert.ok(rows.some(row => row.attributes['data-site'] === id), id + ' appears in the main website list');
     const c = controls(p, id);
     assert.equal(c.tracking.attributes['aria-label'], 'Limit & track on ' + C3.SITES.find(site => site.id === id).name);

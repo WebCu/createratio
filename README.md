@@ -15,7 +15,7 @@ Switching away pauses the timer.
   [measurement rules and limitations](extension/README.md#measurement-and-score).
 - **Scroll friction:** wheel/trackpad scrolling on consuming pages moves half
   as far by default. Tune the resistance or turn it off in Settings.
-- **TikTok, Instagram and Facebook:** start Off. Enable **Limit & track** in
+- **TikTok, Instagram, Facebook and YouTube:** start Off. Enable **Limit & track** in
   Settings for the same intention, wait and active-time limits as X and LinkedIn, alongside
   creation tracking and shared Slow scrolling. Saved On/Off choices are kept.
 - **Optional extras:** track time across websites or save your access intentions.

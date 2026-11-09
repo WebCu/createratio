@@ -155,7 +155,7 @@ remains in aggregate totals, charts, badges, per-site rows and CSV; a removed si
 uses its stable ID as a fallback display label and cannot record new activity.
 
 Tracking support does not automatically add an access gate. X, LinkedIn, TikTok,
-Instagram and Facebook have explicit gate support: their **Limit & track** switch
+Instagram, Facebook and YouTube have explicit gate support: their **Limit & track** switch
 enables timed access and creation-score measurements together. Their domains,
 home URLs, rule IDs, and iframe-specific allow rules live in their site modules. Shared code enforces
 access timing and applies their policies.

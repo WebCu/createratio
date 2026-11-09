@@ -15,8 +15,8 @@ web
 
 Anyone who wants to create more than they consume online. There is no narrower
 professional or demographic audience. Site integrations support timed access and
-creation tracking on X, LinkedIn, TikTok, Instagram and Facebook. TikTok,
-Instagram and Facebook start Off; saved site choices persist.
+creation tracking on X, LinkedIn, TikTok, Instagram, Facebook and YouTube. TikTok,
+Instagram, Facebook and YouTube start Off; saved site choices persist.
 
 ## Product Purpose
 
