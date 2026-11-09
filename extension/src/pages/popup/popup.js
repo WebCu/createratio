@@ -2,17 +2,19 @@
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
-let refreshing = false;
+let refreshing = false, refreshFailed = false;
 const accessControls = new Map();
-function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
+function error(message = '') { $('error').textContent = message; $('error').hidden = !message; refreshFailed = false; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function createAccessControl(site, state) {
   const row = document.createElement('div'); row.className = 'access-row';
+  row.setAttribute('role', 'group'); row.setAttribute('aria-label', state.name + ' access');
   const label = document.createElement('span'), name = document.createElement('strong'), status = document.createElement('small');
-  label.className = 'refill-target';
+  label.className = 'refill-target'; status.id = 'access-status-' + site;
   name.textContent = state.name; label.append(name, status);
   const button = document.createElement('button');
-  const control = { label, status, button, state, busy: false };
+  button.setAttribute('aria-describedby', status.id);
+  const control = { row, label, status, button, state, busy: false };
   button.addEventListener('click', async () => {
     control.busy = true; button.disabled = true;
     try {
@@ -35,11 +37,13 @@ function renderAccess(access) {
     if (!control) { control = createAccessControl(site, state); accessControls.set(site, control); }
     control.state = state;
     const { status, button } = control;
+    control.row.setAttribute('data-state', state.enabled === false ? 'off' : state.goalAllowed || state.remainingMs > 0 ? 'open' : 'blocked');
     const open = state.remainingMs > 0;
     const left = state.expiresAt ? Math.max(0, state.expiresAt - Date.now()) : state.remainingMs;
     const seconds = Math.ceil(left / 1000);
     status.textContent = state.enabled === false ? 'Limit & track off' : state.goalAllowed ? 'Open · above daily goal' : open ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} left${state.expiresAt ? '' : ' · paused'}` : state.readyAt ? 'Access requested' : 'Blocked';
     button.textContent = state.enabled === false || state.goalAllowed ? 'Open site' : open ? 'End session' : 'Request access';
+    button.setAttribute('aria-label', state.enabled === false || state.goalAllowed ? 'Open site: ' + state.name : open ? 'End session for ' + state.name : 'Request access to ' + state.name);
     button.disabled = control.busy;
     RefillAnimation.render(control.label, state.goalAllowed ? { ...state, remainingMs: 0 } : state);
   }
@@ -58,14 +62,18 @@ async function refresh() {
   try {
     const snapshot = await messages.send({ type: 'snapshot' }, 'Unable to load your data.');
     render(snapshot);
-    error();
-  } catch (e) { error(e.message); } finally { refreshing = false; }
+    if (refreshFailed) error();
+  } catch (e) { error(e.message); refreshFailed = true; } finally { refreshing = false; }
 }
 $('settings').disabled = false;
 $('settings').addEventListener('click', async () => {
   try { await extensionAPI.runtime.openOptionsPage(); }
   catch (e) { error(e.message); }
 });
-extensionAPI.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
+const sharing = SocialSharing.mount({ messages, range: () => 'today', error(message = '') { $('share-error').textContent = message; $('share-error').hidden = !message; } });
+extensionAPI.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) sharing.clear();
+  if (RuntimeMessages.shouldRefresh(changes, area)) void refresh();
+});
 setInterval(refresh, 1000);
 void refresh();

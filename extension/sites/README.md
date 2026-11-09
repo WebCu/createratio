@@ -13,7 +13,9 @@ ship, not which integrations a user activates. Users independently enable or
 disable available sites in Settings; their choices persist locally.
 
 X and LinkedIn declare `defaultEnabled: true` in their modules. New integrations
-omit this flag and start disabled until the user enables them. Adding a module
+omit this flag and start disabled until the user enables them. Tracking-only
+integrations share the existing Slow scrolling preference on consuming pages
+without declaring access gates. Adding a module
 file without registering it does not ship or activate it.
 
 ## Plugin interface
@@ -152,10 +154,10 @@ its generated bundle code, rules, matches, and permissions. Recorded history
 remains in aggregate totals, charts, badges, per-site rows and CSV; a removed site
 uses its stable ID as a fallback display label and cannot record new activity.
 
-Tracking support does not automatically add an access gate. X and LinkedIn have
-explicit gate support: their **Limit & track** switch enables timed access and
-creation-score measurements together. Their domains, home URLs, rule IDs, and
-iframe-specific allow rules live in their site modules. Shared code enforces
+Tracking support does not automatically add an access gate. X, LinkedIn, TikTok,
+Instagram, Facebook and YouTube have explicit gate support: their **Limit & track** switch
+enables timed access and creation-score measurements together. Their domains,
+home URLs, rule IDs, and iframe-specific allow rules live in their site modules. Shared code enforces
 access timing and applies their policies.
 
 ## Tests and leverage

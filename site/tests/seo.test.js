@@ -75,12 +75,12 @@ test('homepage social metadata and site identity agree with its search metadata'
   assert.deepEqual(metadata(html, 'name', 'twitter:description'), [description]);
   const scripts = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
   assert.equal(scripts.length, 1, 'static structured data is available without JavaScript');
-  const website = JSON.parse(scripts[0][1]);
-  assert.equal(website['@context'], 'https://schema.org');
-  assert.equal(website['@type'], 'WebSite');
-  assert.equal(website.url, canonical(html));
-  assert.deepEqual(metadata(html, 'property', 'og:site_name'), [website.name]);
-  assert.ok(website.name.trim().length > 0);
+  const application = JSON.parse(scripts[0][1]);
+  assert.equal(application['@context'], 'https://schema.org');
+  assert.equal(application['@type'], 'SoftwareApplication');
+  assert.equal(application.url, canonical(html));
+  assert.deepEqual(metadata(html, 'property', 'og:site_name'), [application.name]);
+  assert.ok(application.name.trim().length > 0);
 });
 
 test('source and built previews deliver crawl files covering exactly the published canonicals', async t => {

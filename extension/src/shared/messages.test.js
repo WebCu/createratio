@@ -80,6 +80,26 @@ test('snapshot and ingest acknowledgements are usable without optional delivery 
   }
 });
 
+test('scroll-friction saves require a complete snapshot with a persisted boolean preference', async () => {
+  for (const settings of [{}, { scrollFrictionEnabled: 'true' }, { scrollFrictionEnabled: 1 }, { scrollFrictionEnabled: null }]) {
+    await assert.rejects(client({ ...snapshot, settings }).send({ type: 'scroll-friction-setting' }, 'Not saved.'), { message: 'Not saved.' });
+  }
+  for (const enabled of [true, false]) {
+    const reply = { ...snapshot, settings: { scrollFrictionEnabled: enabled } };
+    assert.equal(await client(reply).send({ type: 'scroll-friction-setting' }, 'Not saved.'), reply);
+  }
+});
+test('resistance acknowledgements require a validated persisted strength when the command supplies one', async () => {
+  const command = { type: 'scroll-friction-setting', enabled: true, strength: 75 };
+  for (const strength of [undefined, null, '75', 0, -5, 5, 25, 45, 99, 100, 77, 75.5]) {
+    const reply = { ...snapshot, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: strength } };
+    await assert.rejects(client(reply).send(command, 'Not saved.'), { message: 'Not saved.' });
+  }
+  for (const strength of [50, 75, 95]) {
+    const reply = { ...snapshot, settings: { scrollFrictionEnabled: true, scrollFrictionStrength: strength } };
+    assert.equal(await client(reply).send({ ...command, strength }, 'Not saved.'), reply);
+  }
+});
 test('storage refreshes distinguish access phases from countdown-only writes', () => {
   const running = { remainingMs: 60000, expiresAt: 100000, date: '2026-10-11', refilledAt: 40000 };
   const notification = (oldValue, newValue) => ({ _access: { oldValue, newValue } });
@@ -93,6 +113,12 @@ test('storage refreshes distinguish access phases from countdown-only writes', (
   assert.equal(RuntimeMessages.shouldRefresh(notification({}, { x: running }), 'local'), true);
   assert.equal(RuntimeMessages.shouldRefresh(notification({ x: { ...running, expiresAt: 0 } }, { x: running }), 'local'), true);
   assert.equal(RuntimeMessages.shouldRefresh(notification({ x: { readyAt: 100000, requestExpiresAt: 700000 } }, {}), 'local'), true);
+});
+
+test('update coordination metadata does not trigger unrelated page refreshes', () => {
+  for (const key of ['_pendingUpdate', '_updateRecovery']) {
+    assert.equal(RuntimeMessages.shouldRefresh({ [key]: { newValue: true } }, 'local'), false);
+  }
 });
 
 test('website-time buckets wait for polling without suppressing preferences, history resets, or creation activity', () => {

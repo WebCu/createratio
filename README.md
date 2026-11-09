@@ -8,13 +8,18 @@ intention, wait 60 seconds, then confirm access for five active minutes by defau
 Switching away pauses the timer.
 
 - **Intentional access:** configurable session times and a **Limit & track**
-  switch for each supported site. Turning it off removes access restrictions
-  and stops new creation-score measurements without deleting history.
+  switch for X, LinkedIn, TikTok, Instagram and Facebook. Turning it off removes
+  access restrictions and stops new creation-score measurements without deleting history.
 - **A daily creation score:** compares creating time and credit for posts,
   replies, and comments against consuming time. See the
   [measurement rules and limitations](extension/README.md#measurement-and-score).
-- **Optional extras:** track time across websites or save your access
-  intentions. Both features are off by default.
+- **Scroll friction:** wheel/trackpad scrolling on consuming pages moves half
+  as far by default. Tune the resistance or turn it off in Settings.
+- **TikTok, Instagram, Facebook and YouTube:** start Off. Enable **Limit & track** in
+  Settings for the same intention, wait and active-time limits as X and LinkedIn, alongside
+  creation tracking and shared Slow scrolling. Saved On/Off choices are kept.
+- **Optional extras:** track time across websites or save your access intentions.
+  Both are off by default.
 - **Private by default:** no extension account, analytics, telemetry, or activity
   uploads. The landing website uses separate, disclosed analytics.
 
@@ -120,12 +125,14 @@ for Docker previews, analytics, and static builds.
 
 ## Release
 
-See the [Chrome Web Store release guide](docs/chrome-web-store.md) for packaging,
-permission justifications, privacy disclosures, and manual release checks.
-Push a matching `vMAJOR.MINOR.PATCH` tag on a commit in `main` history to run CI,
-package Chrome, and request store-release approval. After approval, GitHub Actions
-submits the package for Google review and publication on approval. This requires
-the one-time infrastructure and publisher setup in the guide.
+Use `pnpm release prepare patch` from clean, current `main` to synchronize the
+extension versions and open a version PR. After merging that PR, run
+`pnpm release publish` from updated `main` to create a GitHub Release with
+generated change notes and the matching tag. Publishing the release triggers
+GitHub Actions to test and package Chrome and Firefox, then request separate
+store approvals before submitting each package. Stores control their own review
+and publication timing. See the [release guide](docs/releases.md) for setup,
+manual checks, package inspection and recovery.
 Keep the deployed `/privacy.html`, `/terms.html`, and store disclosures current
 when releasing updates.
 

@@ -58,7 +58,7 @@ test('dashboard requests only the active website range and refreshes after a rap
   assert.equal(p.nodes['website-total'].textContent, '2m 0s');
   p.nodes['website-range'].value = 'today'; p.nodes['website-range'].fire('change'); await p.ready();
   assert.deepEqual(p.messages.filter(message => message.type === 'history').at(-1), { type: 'history', kind: 'websites', range: 'today' });
-  assert.deepEqual(p.state.storageReads, []);
+  assert.deepEqual(p.state.storageReads, ['_pendingUpdate']);
 });
 test('storage changes caused by a snapshot do not create a refresh feedback loop', async () => {
   const p = page('dashboard'); await p.ready();

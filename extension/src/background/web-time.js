@@ -37,17 +37,16 @@
     }
     return rows.join('\r\n') + '\r\n';
   }
-  function create(api, serialize, core, history, timers = globalThis) {
-    let enabled = false, previous = null, interval = null;
+  function create(api, serialize, core, history) {
+    let enabled = false, previous = null;
     async function allowed() { return !!api.permissions && await api.permissions.contains(PERMISSIONS); }
-    function resetTimer() {
-      if (interval !== null) timers.clearInterval(interval);
-      interval = enabled ? timers.setInterval(() => schedule(tick), 5000) : null;
+    async function checkpoint() {
+      await api.storage.session?.set({ _websiteTimeSample: previous });
     }
     function schedule(task) { return serialize(task).catch(error => console.error('CreateRatio website time:', error)); }
     async function accrue(now) {
       const old = previous; previous = null;
-      if (!old || now <= old.at || now - old.at > 15000) return;
+      if (!old || typeof old.domain !== 'string' || !Number.isFinite(old.at) || now <= old.at || now - old.at > 75000) return;
       await history.recordWebsiteTime(old.domain, core.splitInterval(old.at, now));
     }
     async function sample(now) {
@@ -57,32 +56,36 @@
       const domain = !tab?.incognito && domainForURL(tab?.url);
       if (domain) previous = { domain, at: now };
     }
-    async function tick() {
+    async function tick(alarm = {}) {
       if (!enabled) return;
       if (!await allowed()) {
-        previous = null; enabled = false; resetTimer();
+        previous = null; enabled = false; await checkpoint();
         await api.storage.local.set({ _websiteTimeEnabled: false });
         await api.alarms.clear('website-time');
         return;
       }
       const now = Date.now();
+      if (Number.isFinite(alarm.scheduledTime) && now - alarm.scheduledTime > 15000) previous = null;
       await accrue(now);
       await sample(now);
+      await checkpoint();
     }
     async function updateMonitoring() {
-      resetTimer();
       if (!enabled) {
         await api.alarms.clear('website-time');
+        await checkpoint();
         return;
       }
       api.idle.setDetectionInterval(30);
-      await api.alarms.create('website-time', { periodInMinutes: 1 });
-      await sample(Date.now());
+      if (!await api.alarms.get?.('website-time')) await api.alarms.create('website-time', { periodInMinutes: 1 });
+      if (!previous) await sample(Date.now());
+      await checkpoint();
     }
-    async function start() {
-      previous = null;
+    async function start(reset = false) {
+      previous = reset ? null : (await api.storage.session?.get('_websiteTimeSample'))?._websiteTimeSample || null;
       const stored = await api.storage.local.get('_websiteTimeEnabled');
       enabled = stored._websiteTimeEnabled === true && await allowed();
+      if (!enabled) previous = null;
       await updateMonitoring();
     }
     async function setEnabled(value) {

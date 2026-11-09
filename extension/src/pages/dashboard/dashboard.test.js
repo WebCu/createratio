@@ -44,7 +44,7 @@ test('switching to intentions requests only that view and leaves range-based his
   const p = dashboard({ [C3.localDate()]: { x: { consumeSec: 60 } }, _websiteTime: { [C3.localDate()]: { 'example.com': 120 } }, _intentions: [{ site: 'x', reason: 'Reply to a colleague', requestedAt: 1 }] });
   p.nodes['intentions-view'].fire('click'); await p.ready();
   assert.equal(p.messages.at(-1).type, 'access-history-list');
-  assert.equal(p.nodes['intention-list'].children.length, 1); assert.deepEqual(p.state.storageReads, []);
+  assert.equal(p.nodes['intention-list'].children.length, 1); assert.deepEqual(p.state.storageReads, ['_pendingUpdate']);
   p.nodes['websites-view'].fire('click'); await p.ready();
   assert.equal(p.nodes['website-total'].textContent, '2m 0s');
   p.nodes['ratio-view'].fire('click'); await p.ready();
@@ -92,6 +92,150 @@ test('dashboard exports both existing CSV formats without changing recorded hist
   assert.match(await p.blobs[0].text(), /consume/); assert.match(await p.blobs[1].text(), /example\.com/); assert.deepEqual(p.data, data);
   for (const blob of p.blobs) assert.equal((await blob.text()).includes('Private intention text'), false);
 });
+test('dashboard downloads daily and weekly readable reports without changing history or exporting intentions', async () => {
+  const today = C3.localDate(), first = C3.recentDates()[0], older = C3.recentDates(8)[0];
+  const data = { [today]: { x: { createSec: 60, consumeSec: 120, posts: 1 } }, [first]: { retired: { createSec: 120 } }, [older]: { older: { createSec: 99999 } }, _intentions: [{ reason: 'Private intention text', site: 'x', requestedAt: 1 }] };
+  const before = structuredClone(data), p = dashboard(data); await p.ready();
+  p.nodes['report-range'].value = 'today';
+  await p.nodes['report-export'].fire('click');
+  assert.deepEqual(p.messages.at(-1), { type: 'history', kind: 'ratio', range: 'today' });
+  assert.equal(p.state.downloads[0].filename, `CreateRatio-report-${today}.html`);
+  assert.equal(p.blobs[0].type, 'text/html;charset=utf-8');
+  const daily = await p.blobs[0].text();
+  assert.match(daily, /<dt>Creating<\/dt><dd>1\.0m<\/dd>/);
+  assert.match(daily, /<dt>Period creation score<\/dt><dd>1\.50<\/dd>/);
+  assert.equal(daily.includes(first), false);
+  p.nodes['report-range'].value = 'week';
+  await p.nodes['report-export'].fire('click');
+  assert.deepEqual(p.messages.at(-1), { type: 'history', kind: 'ratio', range: 'week' });
+  assert.equal(p.state.downloads[1].filename, `CreateRatio-report-${first}-to-${today}.html`);
+  const weekly = await p.blobs[1].text();
+  assert.match(weekly, /<dt>Creating<\/dt><dd>3\.0m<\/dd>/);
+  assert.match(weekly, /retired \(unavailable\)/);
+  assert.equal(weekly.includes(older), false);
+  for (const blob of p.blobs) assert.equal((await blob.text()).includes('Private intention text'), false);
+  assert.deepEqual(p.data, before);
+  assert.equal(p.nodes['report-export'].disabled, false);
+});
+for (const range of ['today', 'week']) for (const step of [2000, -2000]) {
+  test(`${range} report rejects a history reply after the local date moves ${step > 0 ? 'forward' : 'backward'} and can be retried`, async () => {
+    let now = (step > 0 ? new Date(2026, 11, 31, 23, 59, 59) : new Date(2027, 0, 1, 0, 0, 1)).getTime();
+    const dates = C3.recentDates(range === 'today' ? 1 : 7, new Date(now));
+    const days = Object.fromEntries(dates.map(date => [date, { x: { createSec: 120, consumeSec: 60, posts: 1 } }]));
+    const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
+    p.nodes['report-range'].value = range;
+    p.state.replies.set('history', { ok: true, days });
+    const release = p.holdMessage('history');
+    const exporting = p.nodes['report-export'].fire('click');
+    now += step; release(); await exporting;
+    assert.equal(p.blobs.length, 0, 'a rollover must not download an empty or truncated report');
+    assert.deepEqual(p.state.downloads, []);
+    assert.equal(p.nodes.error.textContent, 'The local date changed while loading history. Please try again.');
+    assert.equal(p.nodes['report-export'].disabled, false);
+    const today = C3.localDate(new Date(now));
+    p.state.replies.set('history', { ok: true, days: { [today]: { x: { createSec: 180, consumeSec: 120 } } } });
+    await p.nodes['report-export'].fire('click');
+    assert.match(await p.blobs[0].text(), /<dt>Creating<\/dt><dd>3\.0m<\/dd>/);
+    const selected = C3.recentDates(range === 'today' ? 1 : 7, new Date(now));
+    assert.equal(p.state.downloads[0].filename, `CreateRatio-report-${selected[0]}${range === 'week' ? '-to-' + today : ''}.html`);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+}
+test('a same-day delayed report keeps the date captured when export started', async () => {
+  const started = new Date(2026, 5, 15, 9).getTime();
+  let now = started;
+  const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
+  p.state.replies.set('history', { ok: true, days: { [C3.localDate(new Date(started))]: { x: { createSec: 120 } } } });
+  const release = p.holdMessage('history');
+  const exporting = p.nodes['report-export'].fire('click');
+  now += 3600000; release(); await exporting;
+  assert.equal(p.blobs.length, 1);
+  assert.ok((await p.blobs[0].text()).includes(`Generated locally on ${new Date(started).toLocaleString()}.`));
+});
+for (const range of ['today', 'week']) {
+  test(`${range} report rejects a pre-reset history reply and retry exports only cleared history`, async () => {
+    const now = new Date(2026, 5, 15, 12).getTime(), today = C3.localDate(new Date(now));
+    const data = { [today]: { x: { createSec: 180, consumeSec: 60, posts: 1 } } };
+    const p = page('dashboard', data, false, { now: () => now }); await p.ready();
+    p.nodes['report-range'].value = range;
+    p.state.replies.set('history', { ok: true, days: structuredClone(data) });
+    const release = p.holdMessage('history');
+    const exporting = p.nodes['report-export'].fire('click');
+    delete data[today];
+    p.change({ _historyGeneration: { oldValue: 'before-clear', newValue: 'after-clear' }, _historyReset: { oldValue: false, newValue: true } });
+    await p.ready(); release(); await exporting;
+    assert.equal(p.blobs.length, 0, 'cleared activity must never become an HTML download');
+    assert.deepEqual(p.state.downloads, []);
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    assert.equal(p.nodes['report-export'].disabled, false);
+    p.state.replies.delete('history');
+    await p.nodes['report-export'].fire('click');
+    assert.equal(p.blobs.length, 1);
+    assert.match(await p.blobs[0].text(), /<dt>Creating<\/dt><dd>0\.0m<\/dd>/);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+}
+test('receipt-window rollover does not cancel an in-flight HTML snapshot', async () => {
+  const now = new Date(2026, 5, 15, 12).getTime(), today = C3.localDate(new Date(now));
+  const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
+  p.state.replies.set('history', { ok: true, days: { [today]: { x: { createSec: 180 } } } });
+  const release = p.holdMessage('history'), exporting = p.nodes['report-export'].fire('click');
+  p.change({ _historyGeneration: { oldValue: 'before-rollover', newValue: 'after-rollover' }, _receipts: { newValue: ['new-packet'] } });
+  await p.ready(); release(); await exporting;
+  assert.equal(p.blobs.length, 1);
+  assert.match(await p.blobs[0].text(), /<dt>Creating<\/dt><dd>3\.0m<\/dd>/);
+});
+test('report export prevents duplicate requests and recovers after loading failures', async () => {
+  const p = dashboard(); await p.ready(); p.nodes['report-range'].value = 'today';
+  const release = p.holdMessage('history'), before = p.messages.length;
+  const exporting = p.nodes['report-export'].fire('click');
+  assert.equal(p.nodes['report-export'].disabled, true);
+  await p.nodes['report-export'].fire('click');
+  assert.equal(p.messages.length, before + 1);
+  release(); await exporting;
+  p.state.replies.set('history', { ok: true });
+  await p.nodes['report-export'].fire('click');
+  assert.equal(p.blobs.length, 1);
+  assert.equal(p.nodes.error.textContent, 'Unable to export report.');
+  assert.equal(p.nodes['report-export'].disabled, false);
+  p.state.replies.delete('history');
+  p.state.rejections.set('history', new Error('Worker disconnected.'));
+  await p.nodes['report-export'].fire('click');
+  assert.equal(p.blobs.length, 1);
+  assert.equal(p.nodes.error.textContent, 'Worker disconnected.');
+  p.state.rejections.delete('history');
+  await p.nodes['report-export'].fire('click');
+  assert.equal(p.blobs.length, 2);
+  assert.equal(p.nodes.error.hidden, true);
+});
+test('repeated report downloads retain only one temporary URL and release it after ten seconds', async () => {
+  const p = dashboard(); await p.ready();
+  const reportTimers = () => [...p.timeouts].filter(([, timer]) => timer.ms === 10000);
+  for (let i = 0; i < 5; i++) {
+    await p.nodes['report-export'].fire('click');
+    assert.equal(reportTimers().length, 1);
+    assert.equal(p.timeouts.size, 2, 'one report cleanup and one local-midnight refresh');
+    assert.equal(p.revokedURLs.length, i);
+  }
+  p.runTimeout(reportTimers()[0][0]);
+  assert.equal(reportTimers().length, 0);
+  assert.deepEqual(p.revokedURLs, p.state.downloads.map(download => download.url));
+});
+test('share-card history failures never expose a stale preview and allow retrying', async () => {
+  const p = dashboard(); await p.ready();
+  p.state.replies.set('history', { ok: true });
+  await p.nodes['share-create'].fire('click');
+  assert.equal(p.nodes.error.textContent, 'Unable to create share card.');
+  assert.equal(p.nodes['share-result'].hidden, true);
+  assert.equal(p.nodes['share-download'].disabled, true);
+  assert.equal(p.nodes['share-create'].disabled, false);
+  assert.equal(p.blobs.length, 0);
+  p.state.replies.delete('history');
+  p.state.rejections.set('history', new Error('Worker disconnected.'));
+  await p.nodes['share-create'].fire('click');
+  assert.equal(p.nodes.error.textContent, 'Worker disconnected.');
+  assert.equal(p.nodes['share-create'].disabled, false);
+});
 test('dashboard distinguishes creation-score measurements from all-site browsing time', () => {
   const html = fs.readFileSync(path.join(__dirname, 'dashboard.html'), 'utf8');
   assert.match(html, /id="ratio-view"[^>]*>Creation score/); assert.match(html, /id="websites-view"[^>]*>Website time/);
@@ -102,7 +246,7 @@ test('dashboard sends no preference messages or permission requests', async () =
   const p = dashboard(); await p.ready(); p.refresh(); await p.ready();
   assert.ok(p.messages.every(m => ['snapshot', 'history'].includes(m.type))); assert.equal(p.state.requested, 0);
   assert.ok(p.messages.filter(m => m.type === 'history').every(m => m.kind === 'ratio' && m.range === 'week'));
-  assert.deepEqual(p.state.storageReads, []);
+  assert.deepEqual(p.state.storageReads, ['_pendingUpdate']);
   assert.equal(p.nodes['access-minutes'], undefined); assert.equal(p.nodes['website-time-enabled'], undefined);
 });
 test('a view switch during history loading discards the stale render and loads the selected view', async () => {

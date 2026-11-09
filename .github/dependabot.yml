@@ -21,9 +21,6 @@ updates:
     directory: '/'
     schedule:
       interval: weekly
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
     open-pull-requests-limit: 10
     reviewers:
       - webcu

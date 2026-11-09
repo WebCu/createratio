@@ -1,19 +1,9 @@
 const { readFileSync } = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const { setTimeout } = require('node:timers/promises');
+const { releaseVersion, sourceVersion, compareVersions } = require('./release.js');
 
 const extensionId = 'kopbjmlmjpnkekffalpbjfhmbhgbgamk';
-
-function releaseVersion(tag, versions) {
-  const version = /^v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$/.exec(tag || '')?.[1];
-  if (!version || version.split('.').some(part => Number(part) > 65535) || version === '0.0.0') {
-    throw new Error('Release tag must be vMAJOR.MINOR.PATCH with a valid Chrome version.');
-  }
-  if (!versions.length || versions.some(value => value !== version)) {
-    throw new Error('Release tag and all package/manifest versions must match.');
-  }
-  return version;
-}
 
 function validateConfiguration({ publisherId, itemId, token }) {
   if (!/^[A-Za-z0-9-]+$/.test(publisherId || '') || publisherId.startsWith('SET')) {
@@ -21,16 +11,6 @@ function validateConfiguration({ publisherId, itemId, token }) {
   }
   if (itemId !== extensionId) throw new Error('CWS_EXTENSION_ID must target the existing CreateRatio extension.');
   if (!token) throw new Error('A Chrome Web Store access token is required.');
-}
-
-function compareVersions(left, right) {
-  const a = left.split('.').map(Number);
-  const b = right.split('.').map(Number);
-  for (let index = 0; index < Math.max(a.length, b.length); index++) {
-    const difference = (a[index] || 0) - (b[index] || 0);
-    if (difference) return difference;
-  }
-  return 0;
 }
 
 async function submitRelease(configuration, fetchRequest = fetch, wait = setTimeout) {
@@ -79,9 +59,7 @@ async function main() {
   const command = process.argv[2];
   const tag = process.env.GITHUB_REF_NAME;
   if (command === 'validate') {
-    const versions = ['package.json', 'extension/package.json', 'extension/src/manifest.json']
-      .map(file => JSON.parse(readFileSync(file, 'utf8')).version);
-    process.stdout.write(`Validated release ${releaseVersion(tag, versions)}.\n`);
+    process.stdout.write(`Validated release ${releaseVersion(tag, [sourceVersion()])}.\n`);
     return;
   }
   const configuration = {

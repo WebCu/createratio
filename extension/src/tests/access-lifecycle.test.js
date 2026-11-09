@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../../core/core.js');
-const { worker, unlock, gate, popupSender } = require('./background-harness.js');
+const { worker, unlock, gate, popupSender, intent, rulesFor } = require('./background-harness.js');
 const start = new Date(2026, 9, 11, 12).getTime();
 const status = async (w, expectedErrors = 0) => {
   const result = await w.send({ type: 'access-status' });
@@ -12,6 +12,47 @@ const status = async (w, expectedErrors = 0) => {
 };
 
 for (const browser of ['chrome', 'browser']) {
+  for (const site of ['x', 'linkedin', 'tiktok', 'instagram']) {
+    test(`${browser}: ${site} shares intention, wait, custom time, pause, expiry and Off behavior`, async () => {
+      const w = worker({ settings: { trackedSites: [site], siteOverrides: { [site]: { accessMinutes: 2 } } } }, browser, start);
+      let access = await status(w);
+      assert.ok(access[site], `${site} needs an access gate`);
+      assert.equal(access[site].remainingMs, 0);
+      assert.deepEqual(rulesFor(w, [site]), []);
+      const home = access[site].home;
+      w.tabs.push({ id: 1, url: home });
+      assert.equal((await w.send({ type: 'access-begin', site, reason: intent }, gate(site))).ok, true);
+      assert.equal((await w.send({ type: 'access-open', site }, gate(site))).ok, false);
+      w.advance(60000);
+      assert.equal((await status(w))[site].remainingMs, 0, 'waiting alone never unlocks');
+      assert.equal((await w.send({ type: 'access-open', site }, gate(site))).ok, true);
+      w.activate(home);
+      assert.equal((await status(w))[site].remainingMs, 120000);
+      assert.deepEqual(rulesFor(w, [site]), require('../../sites/index.js').get(site).access.sessionRules);
+      w.advance(15000); w.blur();
+      assert.equal((await status(w))[site].remainingMs, 105000);
+      w.advance(30000);
+      assert.equal((await status(w))[site].remainingMs, 105000, 'away time does not spend budget');
+      w.activate(home); access = await status(w);
+      w.advance(access[site].remainingMs + 1);
+      assert.equal((await status(w))[site].remainingMs, 0);
+      assert.equal(w.tabs[0].url, gate(site).url);
+      assert.deepEqual(rulesFor(w, [site]), []);
+      w.advance(86400000);
+      assert.equal((await status(w))[site].remainingMs, 120000, 'daily refill uses the saved per-site duration');
+      assert.equal((await w.send({ type: 'access-end', site }, popupSender)).ok, true);
+      assert.equal(w.data._access[site], undefined);
+      assert.equal((await w.send({ type: 'tracking', site, enabled: false }, popupSender)).ok, true);
+      access = await status(w);
+      assert.equal(access[site].enabled, false);
+      assert.equal(access[site].sessionMinutes, 2);
+      assert.equal(w.data._access[site], undefined);
+      assert.deepEqual(rulesFor(w, [site]), require('../../sites/index.js').get(site).access.unrestrictedRules);
+      assert.equal((await w.send({ type: 'tracking', site, enabled: true }, popupSender)).ok, true);
+      assert.equal((await status(w))[site].remainingMs, 0, 're-enabling starts blocked');
+      assert.deepEqual(rulesFor(w, [site]), []);
+    });
+  }
   test(`${browser}: worker replacement charges the active deadline and repeated wakes cannot refill it`, async () => {
     const session = {};
     const first = worker({}, browser, start - 60000, { session });
@@ -99,7 +140,7 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(access.x.remainingMs, 0);
     assert.equal(access.x.expiresAt, 0);
     assert.equal(wake.alarms['access-x'], undefined);
-    assert.deepEqual(wake.rules, []);
+    assert.deepEqual(rulesFor(wake), []);
     assert.equal(wake.tabs[0].url, gate('x').url);
     assert.equal(wake.tabs[1].url, gate('x').url);
     assert.equal(wake.tabs[2].url, 'https://x.com.evil.test/');

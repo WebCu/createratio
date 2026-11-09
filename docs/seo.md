@@ -10,7 +10,8 @@ Keep public pages identifiable, linkable, and readable by browsers and crawlers.
 - Keep essential content and installation links in HTML without JavaScript.
   Use clear language and verified product claims.
 - Keep homepage Open Graph and Twitter text aligned with page metadata.
-  Static `WebSite` JSON-LD identifies the site.
+  Preserve the homepage's static `SoftwareApplication` JSON-LD and keep its
+  name and URL consistent with the social metadata and canonical URL.
 - When adding or removing a page, update `site/build.js`, the public allowlist
   in `site/dev-server.js`, Docker mounts, and `site/sitemap.xml`. Use only
   canonical URLs in the sitemap. Omit `lastmod` unless a meaningful
@@ -37,4 +38,4 @@ canonical and JSON-LD, not just the local source.
 
 - [Google: canonical URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
 - [Google: sitemap guidance](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)
-- [Google: site-name structured data](https://developers.google.com/search/docs/appearance/site-names)
+- [Schema.org: SoftwareApplication](https://schema.org/SoftwareApplication)

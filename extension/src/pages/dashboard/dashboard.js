@@ -3,6 +3,11 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
+let reportURL = null, reportTimer = null, reportVersion = 0;
+function nextDay() {
+  const now = new Date();
+  setTimeout(() => { nextDay(); void refresh(true); }, new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime() + 100);
+}
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function svgElement(tag, attrs = {}, text) {
@@ -43,7 +48,7 @@ function renderWebsites(days) {
   const total = rows.reduce((sum, [, sec]) => sum + sec, 0);
   $('website-total').textContent = WebTime.duration(total);
   $('website-count').textContent = `${rows.length} website${rows.length === 1 ? '' : 's'}`;
-  $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. Updates every few seconds.' : 'Website time is off. Previously recorded browsing time is kept.';
+  $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. Updates as you browse.' : 'Website time is off. Previously recorded browsing time is kept.';
   $('website-empty').hidden = rows.length > 0;
   $('website-empty').textContent = websiteTimeEnabled ? 'No time in this period yet. Use a website to start.' : 'Enable Website time in Settings to record browsing time across all sites.';
   $('website-sites').replaceChildren();
@@ -135,8 +140,33 @@ async function exportHistory(kind) {
     setTimeout(() => URL.revokeObjectURL(url), 10000); error();
   } catch (e) { error(e.message); }
 }
+const sharing = SocialSharing.mount({ messages, range: () => $('report-range').value, error });
+$('report-range').addEventListener('change', sharing.clear);
+$('report-export').addEventListener('click', async () => {
+  const button = $('report-export');
+  if (button.disabled) return;
+  const range = $('report-range').value, version = reportVersion;
+  button.disabled = true; $('report-status').textContent = '';
+  try {
+    const now = new Date(), date = C3.localDate(now);
+    const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to export report.');
+    if (version !== reportVersion) throw new Error('History changed while loading. Please try again.');
+    if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
+    const report = CreationReport.create(data.days, range, now);
+    clearTimeout(reportTimer);
+    if (reportURL) URL.revokeObjectURL(reportURL);
+    reportURL = URL.createObjectURL(new Blob([report.html], { type: 'text/html;charset=utf-8' }));
+    reportTimer = setTimeout(() => { URL.revokeObjectURL(reportURL); reportURL = null; reportTimer = null; }, 10000);
+    const link = document.createElement('a'); link.href = reportURL;
+    link.download = report.filename; document.body.append(link); link.click(); link.remove();
+    error(); $('report-status').textContent = 'Report download started. Open the HTML file to review, print, or save as PDF.';
+  } catch (e) { error(e.message); }
+  finally { button.disabled = false; }
+});
 $('website-export').addEventListener('click', () => exportHistory('websites'));
 $('export').addEventListener('click', () => exportHistory('ratio'));
-extensionAPI.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
-setInterval(refresh, 5000);
-void refresh();
+extensionAPI.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) { reportVersion++; sharing.clear(); }
+  if (RuntimeMessages.shouldRefresh(changes, area, activeView === 'websites')) void refresh(true);
+});
+nextDay(); void refresh();

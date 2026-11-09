@@ -15,7 +15,7 @@ Keep [AGENTS.md](AGENTS.md) as an entry point, not a second rulebook.
   data.
 - **Speed and lightness.** CreateRatio should feel instant and use minimal
   memory, CPU, and battery. Tracking must not slow down browsing. Intentional
-  pauses support deliberate choices; software delays do not.
+  friction supports deliberate choices; software delays do not.
 - **Free and sustainable.** Our browser extensions and their future
   improvements stay free and open source. Donations and optional paid products
   or services may fund the project, without weakening the free extensions or
@@ -34,9 +34,10 @@ Keep [AGENTS.md](AGENTS.md) as an entry point, not a second rulebook.
   real user pain point it solves. Consider whether it can replace an existing
   feature instead of adding another one. Prefer improving what already exists
   when that solves the problem.
-- **Keep users in control.** Users must always be able to choose whether to
-  enable or disable a feature. New functionality must not be forced on them.
-  No forced accounts or artificial lock-in.
+- **Opinionated defaults, user control.** Build for the maintainer's own
+  create-more workflow first. Intentional friction can be on by default; users
+  can tune or disable it. Preserve saved choices. No forced accounts or
+  artificial lock-in.
 
 For feature proposals, explain the user pain point, why the simplest existing
 solution is insufficient, whether an existing feature can be removed, and how
@@ -48,13 +49,6 @@ For extension source or test moves, packaged-path changes, or manifest changes,
 read the [extension layout and packaged-path contract](extension/README.md#layout-and-installation).
 Search references across the whole repo, including shared test harnesses and
 `extension/sites/test-support.js`.
-
-## Website metadata and crawlability
-
-Website PRs follow the [metadata and crawlability checks](docs/seo.md): preserve
-canonical URLs, descriptive metadata, working links, and crawler access.
-Automated checks cover source and built previews; deployed responses still need
-verification.
 
 ## Website integrations
 
@@ -108,9 +102,9 @@ The build packages registered modules into `sites.js`; unregistered code and
 colocated tests do not ship. See [Site integrations](extension/sites/README.md)
 for selector changes, editing, removal, failure isolation, and ownership rules.
 
-Tracking support does **not** automatically add whole-site blocking. X and
-LinkedIn have explicit gate support: **Limit & track** enables their gate and
-creation-score measurements together. Adding a gate is a separate product
+Tracking support does **not** automatically add whole-site blocking. X, LinkedIn,
+TikTok, Instagram, Facebook and YouTube have explicit gate support: **Limit & track**
+enables their gate and creation-score measurements together. Adding a gate is a separate product
 change: declare its domains, home URL, stable rule IDs, and allow rules in the
 site module's optional `access` interface, with colocated policy tests. Shared
 access code, Settings, and the build discover gate support through the catalog.

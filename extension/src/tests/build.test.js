@@ -43,26 +43,31 @@ test('all browser bundles include the exact shared core and every referenced ass
     for (const asset of assets) assert.ok((await fs.stat(path.join(output, asset))).isFile(), `${browser}: ${asset}`);
     assert.equal(await fs.readFile(path.join(output, 'core.js'), 'utf8'), core);
     assert.equal(await fs.readFile(path.join(output, 'LICENSE'), 'utf8'), license);
-    assert.deepEqual(manifest.permissions, ['storage', 'alarms', 'declarativeNetRequestWithHostAccess']);
+    assert.deepEqual(manifest.permissions, ['storage', 'alarms', 'declarativeNetRequestWithHostAccess', 'scripting']);
     assert.deepEqual(manifest.optional_permissions, ['tabs', 'idle']);
     assert.ok((await fs.stat(path.join(output, 'web-time.js'))).isFile());
-    assert.deepEqual(manifest.host_permissions, ['http://*.x.com/*', 'https://*.x.com/*', 'http://*.twitter.com/*', 'https://*.twitter.com/*', 'http://*.linkedin.com/*', 'https://*.linkedin.com/*']);
+    const trackingHosts = require('../../sites/index.js').sites.filter(site => !site.gated).flatMap(site => site.hosts);
+    assert.deepEqual(manifest.host_permissions, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com'].flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']).concat(trackingHosts.map(host => 'https://' + host + '/*')));
+    for (const entry of manifest.content_scripts.slice(1)) for (const host of trackingHosts) assert.ok(entry.matches.includes('https://' + host + '/*'));
+    for (const host of trackingHosts) assert.ok(!manifest.content_scripts[0].matches.includes('https://' + host + '/*'), 'tracking-only hosts do not get access guards');
     assert.deepEqual(manifest.declarative_net_request.rule_resources, [{ id: 'site-blocking', enabled: true, path: 'block-rules.json' }]);
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
-    assert.equal(rules.length, 3);
-    assert.deepEqual(rules.slice(0, 2).map(rule => rule.action.redirect.extensionPath), ['/blocked.html?site=x', '/blocked.html?site=linkedin']);
+    assert.equal(rules.length, 7);
+    assert.deepEqual(rules.slice(0, 6).map(rule => rule.action.redirect.extensionPath), ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube'].map(site => '/blocked.html?site=' + site));
     assert.ok(rules.every(rule => rule.priority === 1));
-    assert.equal(rules[2].action.type, 'block');
-    assert.deepEqual(rules[2].condition.excludedResourceTypes, ['main_frame']);
-    assert.deepEqual(rules[2].condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com']);
-    assert.equal(rules[2].condition.resourceTypes, undefined, 'block all non-navigation requests, not just frames');
+    assert.equal(rules[6].action.type, 'block');
+    assert.deepEqual(rules[6].condition.excludedResourceTypes, ['main_frame']);
+    assert.deepEqual(rules[6].condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com']);
+    assert.equal(rules[6].condition.resourceTypes, undefined, 'block all non-navigation requests, not just frames');
     assert.match(manifest.content_security_policy.extension_pages, /connect-src 'none'/);
     assert.equal(manifest.content_scripts[0].run_at, 'document_start');
-    assert.deepEqual(manifest.content_scripts[0].js, ['sites.js', 'messages.js', 'access-guard.js']);
+    assert.deepEqual(manifest.content_scripts[0].js, ['sites.js', 'messages.js', 'lifecycle.js', 'access-guard.js']);
     assert.equal(manifest.content_scripts[1].world, 'MAIN');
     assert.equal(manifest.content_scripts[2].js.indexOf('sites.js') < manifest.content_scripts[2].js.indexOf('core.js'), true);
     assert.equal(manifest.content_scripts[2].js.indexOf('core.js') < manifest.content_scripts[2].js.indexOf('messages.js'), true);
     assert.equal(manifest.content_scripts[2].js.indexOf('messages.js') < manifest.content_scripts[2].js.indexOf('content.js'), true);
+    assert.ok(manifest.content_scripts[2].js.includes('scroll-friction.js'));
+    assert.ok(manifest.content_scripts[2].js.indexOf('scroll-friction.js') < manifest.content_scripts[2].js.indexOf('content.js'));
     for (const html of [settings, dashboard, popup, blocked]) {
       const pageScripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]);
       assert.ok(pageScripts.includes('messages.js'));
@@ -123,19 +128,21 @@ test('every bundle links to the hosted privacy policy in a separate tab and remo
   }
 });
 
-test('all distributions use CreateRatio 0.0.1 with Create > Consume as the supporting tagline', async t => {
+test('all distributions share the source version and use Create > Consume as the supporting tagline', async t => {
   const root = await temporaryOutput(t);
+  const version = JSON.parse(await fs.readFile(path.join(__dirname, '../manifest.json'), 'utf8')).version;
+  assert.match(version, /^\d+\.\d+\.\d+$/);
   for (const packagePath of ['../../../package.json', '../../package.json']) {
     const metadata = JSON.parse(await fs.readFile(path.join(__dirname, packagePath), 'utf8'));
     assert.equal(metadata.name, 'createratio');
-    assert.equal(metadata.version, '0.0.1');
+    assert.equal(metadata.version, version);
     assert.equal(metadata.license, 'MIT');
   }
   for (const browser of BROWSERS) {
     const output = await build(browser, root);
     const manifest = JSON.parse(await fs.readFile(path.join(output, 'manifest.json'), 'utf8'));
     assert.equal(manifest.name, 'CreateRatio');
-    assert.equal(manifest.version, '0.0.1');
+    assert.equal(manifest.version, version);
     assert.equal(manifest.action.default_title, 'CreateRatio');
     assert.match(manifest.description, /^Create > Consume\./);
     const popup = await fs.readFile(path.join(output, 'popup.html'), 'utf8');
@@ -143,7 +150,7 @@ test('all distributions use CreateRatio 0.0.1 with Create > Consume as the suppo
     assert.doesNotMatch(popup, /LOCAL ONLY/);
     assert.match(popup, /<h1>CreateRatio<\/h1><p class="eyebrow">Create &gt; Consume<\/p>/);
     const dashboardScript = await fs.readFile(path.join(output, 'dashboard.js'), 'utf8');
-    const filenames = [...dashboardScript.matchAll(/link\.download = ([^;]+);/g)].flatMap(([, expression]) =>
+    const filenames = [...dashboardScript.matchAll(/link\.download = (`[^`]+`);/g)].flatMap(([, expression]) =>
       [false, true].map(websites => vm.runInNewContext(expression, {
         websites, C3: { localDate: () => '2026-01-02' }
       })));
@@ -169,7 +176,7 @@ test('browser manifests differ only in Firefox platform settings and background 
   assert.deepEqual(manifests.chrome, manifests.edge);
   assert.deepEqual(manifests.chrome.background, { service_worker: 'background.js' });
   const firefox = manifests.firefox;
-  assert.deepEqual(firefox.background, { scripts: ['sites.js', 'core.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'background.js'] });
+  assert.deepEqual(firefox.background, { scripts: ['sites.js', 'core.js', 'messages.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'updates.js', 'background.js'] });
   assert.equal(firefox.minimum_chrome_version, undefined);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.deepEqual(firefox.browser_specific_settings.gecko.data_collection_permissions.required, ['none']);
@@ -210,7 +217,10 @@ test('blocking rules are generated from registered site modules without shipping
   const x = require('../../sites/x.js');
   const linkedin = require('../../sites/linkedin.js');
   const originalX = x.access, originalLinkedin = linkedin.access;
+  const others = ['tiktok', 'instagram', 'facebook', 'youtube'].map(id => require('../../sites/' + id + '.js'));
+  const originalOthers = others.map(plugin => plugin.access);
   try {
+    for (const plugin of others) delete plugin.access;
     x.access = { ...originalX, redirectRuleId: 7, domains: ['example.test', 'alias.test'] };
     delete linkedin.access;
     const output = await build('chrome', root);
@@ -225,6 +235,7 @@ test('blocking rules are generated from registered site modules without shipping
   } finally {
     x.access = originalX;
     linkedin.access = originalLinkedin;
+    others.forEach((plugin, index) => { plugin.access = originalOthers[index]; });
   }
 });
 
@@ -236,7 +247,7 @@ test('new gated and tracking-only modules need only site files and catalog regis
   await fs.writeFile(path.join(extension, 'sites/example.js'), `(function (root) {
     const domains = ['example.test', 'alias.test'];
     const access = {
-      domains, home: 'https://example.test/write', redirectRuleId: 4, ruleIds: [201, 202],
+      domains, home: 'https://example.test/write', redirectRuleId: 9, ruleIds: [201, 202],
       unrestrictedRules: [
         { id: 201, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
         { id: 202, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
@@ -258,7 +269,7 @@ test('new gated and tracking-only modules need only site files and catalog regis
   })(globalThis);`);
   const catalogPath = path.join(extension, 'sites/index.js');
   const catalog = await fs.readFile(catalogPath, 'utf8');
-  await fs.writeFile(catalogPath, catalog.replace("const catalog = [{ id: 'x' }, { id: 'linkedin' }];", "const catalog = [{ id: 'x' }, { id: 'linkedin' }, { id: 'example' }, { id: 'reading' }];"));
+  await fs.writeFile(catalogPath, catalog.replace(/const catalog = (\[[^\n]+\]);/, (_, entries) => "const catalog = " + entries.slice(0, -1) + ", { id: 'example' }, { id: 'reading' }];"));
   const { build: fixtureBuild } = require(path.join(extension, 'build.js'));
   for (const browser of BROWSERS) {
     const output = await fixtureBuild(browser, path.join(root, 'output'));
@@ -279,8 +290,8 @@ test('new gated and tracking-only modules need only site files and catalog regis
       assert.ok(!entry.matches.includes('https://alias.test/*'));
     }
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
-    assert.equal(rules.find(rule => rule.id === 4).action.redirect.extensionPath, '/blocked.html?site=example');
-    assert.deepEqual(rules.at(-1).condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'example.test', 'alias.test']);
+    assert.equal(rules.find(rule => rule.id === 9).action.redirect.extensionPath, '/blocked.html?site=example');
+    assert.deepEqual(rules.at(-1).condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'example.test', 'alias.test']);
     const context = vm.createContext({ URL });
     for (const file of ['sites.js', 'core.js']) vm.runInContext(await fs.readFile(path.join(output, file), 'utf8'), context);
     assert.equal(context.C3Sites.forAccessURL('http://mobile.alias.test/').id, 'example');

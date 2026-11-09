@@ -186,17 +186,18 @@ test('freshness binds the tested SHA and step-scoped token after file preparatio
 test('public legal policies ship through both website deployment and local preview', t => {
   const compose = readFileSync(path.join(__dirname, '../../../docker-compose.yml'), 'utf8');
   const homepage = readFileSync(path.join(__dirname, '../../../site/index.html'), 'utf8');
-  const { buildSite } = require('../../../site/build.js');
-  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-policy-site-'));
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-public-assets-'));
   t.after(() => fs.rmSync(output, { recursive: true, force: true }));
-  buildSite(output);
+  require('../../../site/build.js').buildSite(output);
   assert.match(workflow, /run: node site\/build\.js/);
   assert.match(workflow, /cp dist\/site\/\*/);
   assert.ok(workflow.indexOf('run: node site/build.js') < workflow.indexOf('cp dist/site/*'));
+  for (const name of ['privacy.html', 'terms.html', 'llms.txt', 'robots.txt', 'sitemap.xml']) {
+    assert.equal(readFileSync(path.join(output, name), 'utf8'), readFileSync(path.join(__dirname, '../../../site', name), 'utf8'));
+    assert.ok(compose.includes(`./site/${name}:/srv/www/${name}:ro`));
+  }
   assert.match(compose, /\.\/site\/browser-install\.js:\/srv\/www\/browser-install\.js:ro/);
   for (const page of ['privacy', 'terms']) {
-    assert.deepEqual(readFileSync(path.join(output, `${page}.html`)),
-      readFileSync(path.join(__dirname, '../../../site', `${page}.html`)));
     assert.match(compose, new RegExp(`\\./site/${page}\\.html:/srv/www/${page}\\.html:ro`));
     assert.match(homepage, new RegExp(`href="${page}\\.html"`));
   }

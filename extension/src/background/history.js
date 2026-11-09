@@ -98,7 +98,7 @@
       const stored = await storage.get(null);
       const keys = Object.keys(stored).filter(key => dateForKey(key) || key === '_websiteTime');
       if (generation !== undefined) {
-        const reset = { _historyGeneration: generation };
+        const reset = { _historyGeneration: generation, _historyReset: stored._historyReset !== true };
         try { await storage.set(reset); }
         catch (error) {
           if (error.name !== 'QuotaExceededError' && error.message !== 'Resource::kQuotaBytes quota exceeded' && !/\bQUOTA_BYTES(?:_PER_ITEM)?(?: quota)? exceeded\b/i.test(error.message)) throw error;

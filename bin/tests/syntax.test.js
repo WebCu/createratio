@@ -46,6 +46,19 @@ for (const tracked of [false, true]) {
   });
 }
 
+for (const tracked of [false, true]) {
+  test(`comments in ${tracked ? 'tracked' : 'untracked'} input fail the command`, t => {
+    const directory = repository(t);
+    fs.writeFileSync(path.join(directory, 'comment.js'), 'const value = 1;\n/* not allowed */\n');
+    if (tracked) execFileSync('git', ['add', 'comment.js'], { cwd: directory });
+    const result = check(directory);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /comment\.js:2:1/);
+    assert.match(result.stderr, /Code comments are not allowed/);
+    assert.doesNotMatch(result.stdout, /checks passed/);
+  });
+}
+
 for (const name of ['module.mjs', 'module.cjs', '.hidden/invalid.js']) {
   test(`syntax inventory includes ${name}`, t => {
     const directory = repository(t);

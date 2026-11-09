@@ -8,10 +8,12 @@
   const SITES = integrations.sites;
   const ACCESS_LIMITS = { minMinutes: 1, maxMinutes: 240 };
   const INTENTION_LIMITS = { minLength: 20, maxLength: 280 };
+  const SCROLL_FRICTION_LIMITS = { minStrength: 50, maxStrength: 95, step: 5 };
   const DELIVERY_LIMITS = { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 };
   function validIntention(value) { return typeof value === 'string' && value.length <= INTENTION_LIMITS.maxLength && value.trim().length >= INTENTION_LIMITS.minLength; }
   function validAccessMinutes(value) { return Number.isInteger(value) && value >= ACCESS_LIMITS.minMinutes && value <= ACCESS_LIMITS.maxMinutes; }
-  const DEFAULT_SETTINGS = { accessMinutes: 5, dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
+  function validScrollFrictionStrength(value) { return Number.isInteger(value) && value >= SCROLL_FRICTION_LIMITS.minStrength && value <= SCROLL_FRICTION_LIMITS.maxStrength && value % SCROLL_FRICTION_LIMITS.step === 0; }
+  const DEFAULT_SETTINGS = { accessMinutes: 5, dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, scrollFrictionEnabled: true, scrollFrictionStrength: 50, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
   function isRecord(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function trackingSelection(settings) {
     const selected = isRecord(settings) ? settings.trackedSites : undefined;
@@ -23,7 +25,9 @@
     resolved.dailyTarget = dailyTarget(settings);
     resolved.trackedSites = trackingSelection(settings).filter(site => typeof site === 'string');
     if (!validAccessMinutes(resolved.accessMinutes)) resolved.accessMinutes = DEFAULT_SETTINGS.accessMinutes;
-    for (const key of ['allowAboveGoal', 'intentionHistoryEnabled']) if (typeof resolved[key] !== 'boolean') resolved[key] = DEFAULT_SETTINGS[key];
+    if (resolved.scrollFrictionStrength === 0) resolved.scrollFrictionEnabled = false;
+    if (!validScrollFrictionStrength(resolved.scrollFrictionStrength)) resolved.scrollFrictionStrength = DEFAULT_SETTINGS.scrollFrictionStrength;
+    for (const key of ['allowAboveGoal', 'intentionHistoryEnabled', 'scrollFrictionEnabled']) if (typeof resolved[key] !== 'boolean') resolved[key] = DEFAULT_SETTINGS[key];
     delete resolved.nudgeEnabled; delete resolved.nudgeMinutes;
     if (Object.hasOwn(resolved, 'siteOverrides')) resolved.siteOverrides = Object.fromEntries(Object.entries(isRecord(resolved.siteOverrides) ? resolved.siteOverrides : {}).filter(([, preferences]) => isRecord(preferences)).map(([site, preferences]) => {
       const overrides = { ...preferences };
@@ -119,5 +123,5 @@
     }
     return rows.join('\r\n') + '\r\n';
   }
-  return { FIELDS, SITES, ACCESS_LIMITS, INTENTION_LIMITS, DELIVERY_LIMITS, validAccessMinutes, validIntention, DEFAULT_SETTINGS, settingsSnapshot, siteSettings, updatePreferences, trackingEnabled, recordedSites, emptyStats, statsSnapshot, aggregate, score, validDailyTarget, dailyTarget, scoreColor, badgeText, localDate, validLocalDate, recentDates, siteForURL, classifyPage, activeMillis, splitInterval, csv };
+  return { FIELDS, SITES, ACCESS_LIMITS, INTENTION_LIMITS, DELIVERY_LIMITS, SCROLL_FRICTION_LIMITS, validScrollFrictionStrength, validAccessMinutes, validIntention, DEFAULT_SETTINGS, settingsSnapshot, siteSettings, updatePreferences, trackingEnabled, recordedSites, emptyStats, statsSnapshot, aggregate, score, validDailyTarget, dailyTarget, scoreColor, badgeText, localDate, validLocalDate, recentDates, siteForURL, classifyPage, activeMillis, splitInterval, csv };
 });

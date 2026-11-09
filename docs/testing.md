@@ -20,6 +20,28 @@ the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;
 missing browsers and failed checks are errors, not successful skips.
 
+CI runs browser journeys across eight independent runners, with one browser at a
+time per shard. `bin/browser-shards.json` assigns every browser test file exactly
+once; missing, duplicate, or unassigned files fail before journeys start. After
+adding or moving a browser test, update that plan and keep shard durations balanced.
+Run one shard locally with `pnpm check:browser:shard 1` (through `8`); the normal
+`pnpm check:browser` still runs the complete suite. The broader smoke runs
+separately. The existing `browser-smoke` check requires both that smoke and every
+journey shard to succeed, including when a dependency fails, is skipped, or is
+cancelled. Failed shards retain separately named evidence for seven days.
+
+`pnpm verify` runs all three completion commands in order, stopping on the first
+failure and preserving its exit code. Each invocation creates a fresh private
+temporary directory, prints its path, and saves per-stage logs plus `summary.json`.
+The summary records the starting commit, working-tree dirty state, and actual Node
+and pnpm versions. Unavailable Git or package-manager metadata is recorded as
+`null`, not inferred from another checkout. Metadata and release-smoke preflight
+Git reads disable optional locks so stat-cache refreshes cannot rewrite the
+caller's index.
+Later stages are marked **not-run**, with no log file; output from an earlier run
+is never reused. Keep these artifacts outside Git and remove them when no longer
+needed. Existing browser-failure artifacts remain under `BROWSER_ARTIFACT_DIR`.
+
 ## Strategy and completion
 
 Use a testing-trophy shape, not fixed test percentages:
@@ -114,6 +136,73 @@ There is no automated memory-budget gate: browser memory measurements and their
 acceptance remain a required contributor and maintainer review gate. A green CI
 run alone does not satisfy this section.
 
+### Update-lifecycle resource comparison
+
+Build the fixed baseline and candidate into separate directories, then run:
+
+```sh
+node bin/update-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/update-profile.json
+```
+
+The runner alternates three runs per build, each with eight synthetic website
+tabs and Website time enabled in a fresh profile. Only the disposable manifests
+promote optional `tabs`/`idle` permissions to simulate an already-approved opt-in.
+All debugger sessions are detached during each 42-second observation. When comparing
+against an already-idle baseline, append `--baseline-idle`; both builds must then
+shut down. Without that flag, the baseline must remain running and the candidate
+must shut down. Browser-level target inventory observes shutdown without calling
+worker APIs. Bundle hashes
+must remain unchanged. Reports include per-run shutdown times and summed process
+RSS; compare median and range, not a selected run. Summed RSS is not private heap,
+shared-memory-adjusted browser memory or a zero-memory claim. Store delivery,
+Firefox, real sleep/wake and resource acceptance remain separate gates.
+
+### Scroll-friction resource comparison
+
+Build baseline and candidate Chrome bundles in separate directories, then run:
+
+```sh
+node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-document.json document
+node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-app-shell.json app-shell
+node bin/scroll-friction-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/scroll-body.json body
+```
+
+This uses the same disposable Chromium runner and sandbox settings as the browser
+journeys. Each layout alternates three runs per build with eight synthetic site
+tabs, 30 preference/SPA-route cycles, 100 measured trusted wheel inputs, and six
+seconds hidden. The app-shell fixture locks a document that still has a scroll
+range and scrolls a fixed inner container instead. The body fixture scrolls the
+body independently inside a locked root. Before timing, 61 additional wheel
+inputs exercise initial handling, every re-enable, and 30 DOM replacements
+(including the body element itself in that workload). Assertions verify distance
+scaling survives those transitions and DOM-node/listener counts do not accumulate.
+It waits for the foreground wheel listener to match each preference before
+sampling. It records bundle bytes, wheel listeners, GC-retained active-page isolate
+heap and DOM counters, an uninjected fixture control, and page script/task/layout
+durations. The active isolate measurement is not total browser RAM or a sum across
+tabs. CDP wheel-input
+elapsed time includes browser dispatch/acknowledgement overhead; it is not user
+input latency. Idle request counts do not prove worker shutdown. Compare medians
+and ranges, check lifecycle growth, and apply the resource review gate above.
+Keep the resulting JSON outside Git. Output files must be new; interrupted or
+failed output cannot pass the report formatter or reuse old evidence.
+Each run loads a disposable copy so Chromium's generated rule caches cannot
+modify the input bundles. Reports fingerprint every input bundle file and the
+profiling/runner source; changes during collection fail the run.
+
+Generate tables from the complete reports rather than copying measurements:
+
+```sh
+node bin/scroll-profile-report.mjs /tmp/scroll-document.json /tmp/scroll-app-shell.json /tmp/scroll-body.json > /tmp/scroll-report.md
+```
+
+The formatter reports medians and ranges with bundle/workload hashes, environment,
+observation times and limitations. It rejects incomplete runs, inconsistent
+inventories, duplicate layouts, mixed environments/workloads/bundles, inconsistent
+wheel distances for the same bundle and layout, and failed lifecycle invariants.
+Distinct bundles or layouts may intentionally produce different scroll distances.
+Hashes identify measured inputs, not an inferred source commit. The report does not grant resource acceptance; keep it outside Git too.
+
 ## Reference tracer bullets
 
 The first two examples deepen existing features rather than add functionality:
@@ -164,6 +253,10 @@ and checksum. Update both together after verifying the official download and
 running the browser journeys. Regular branded Chrome may reject unpacked-extension
 launch flags; use Chromium or Chrome for Testing for this runner.
 
+On macOS, both disposable browser runners use Chromium's mock keychain rather
+than requesting access to the login keychain. This does not change macOS or
+normal-browser settings.
+
 The runner defaults to `/usr/bin/chromium` and a 90-second watchdog;
 `BROWSER_TIMEOUT_MS` can override the bounded timeout. Sandbox disabling requires
 `CHROMIUM_NO_SANDBOX=1` and is only appropriate in an isolated Linux sandbox that
@@ -173,6 +266,31 @@ receive synthetic offline HTML. Trusted CDP input drives the actual extension UI
 waiting for painted, stable geometry and a matching hit target before dispatch.
 The tests shift `Date` in pages and the worker to check the 60-second wait and
 expiry without minute-long sleeps; native timers and monotonic time remain real.
+
+Use `findByRole(browser, page, role, name)` and `clickByRole(...)` from
+`extension/browser-tests/chromium.mjs` for accessibility-driven journeys. Names
+normalize whitespace, hidden nodes are excluded, and duplicate matches fail rather
+than choosing a row. Both role/name and selector clicks share painted geometry,
+disabled-state, hit-target, and trusted-input handling. Inspect new-tab results
+with `Target.getTargets`; the runner does not enable target-discovery events.
+
+For fixtures that seed access rather than exercise the gate UI, use
+`seedAccess(browser, sites, settings)` from the same runner. It waits for access
+rules after storage changes before navigation. Use `waitForEnabledControl` for
+native controls; absent, disabled and aria-disabled elements are not ready.
+
+For scroll-surface fixtures, construct `scrollFixture(browser)` from
+`extension/browser-tests/scrolling.mjs` before opening the page. Define the page,
+panel and stationary surfaces, prove native Off distances with `assertNative`,
+then enable resistance and verify the expected distances. Measurements reject
+unreachable starting positions and unsettled scrolling. Keep untouched-default
+journeys separate: observe defaults before helpers save any preference.
+
+Run HTML/CSS audits against generated pages such as `dist/chrome/settings.html`
+after `pnpm build:chrome`. Source HTML references the flat packaged layout, so
+shared stylesheets intentionally do not resolve beside `extension/src/pages/`.
+Audit the built assets rather than treating missing source-relative CSS as a
+product defect.
 
 Failed journeys save browser version, page/worker clocks, URLs, DOM, screenshots,
 console/exception events, requested/actual trusted input targets, access state,
@@ -190,21 +308,133 @@ accounts, submit real posts, or establish Firefox/Edge compatibility. DOM
 fixtures, controlled clocks, and simulated worker replacement cannot prove
 operating-system sleep/wake behavior. Keep those release checks manual.
 
+### Live scroll geometry
+
+When a current site behaves differently from synthetic fixtures, review
+[`bin/scroll-geometry.js`](../bin/scroll-geometry.js) and run it manually in that
+tab's DevTools Console. It returns JSON containing numeric viewport/scroll
+geometry, a bounded ancestor path and allowlisted layout styles. It reads no
+page text, input values, URLs, IDs, classes or arbitrary attribute values; it
+writes no storage, clipboard or network data. Custom tag names and unknown style
+values are suppressed. Review the JSON before sharing it.
+
+If browser automation encounters an operating-system permission denial, stop
+that connection attempt and use this manual diagnostic or report access blocked.
+Do not bypass permissions or attach the synthetic failure-capture harness to an
+authenticated profile. Geometry can help reproduce a layout; it cannot establish
+live composing behavior, physical comfort or cross-browser compatibility.
+
 ## Verification guards
 
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
-JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it. `pnpm check` runs it before tests and builds.
+JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
+reject code comments with file, line and column diagnostics. Files are checked
+across at most four workers; any worker failure fails the command. An initial hashbang
+interpreter directive is allowed; comment-like text in strings, templates and
+regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS
+syntax check, including its wrapper bindings, to select Acorn's grammar. This
+guard covers JavaScript only, not CSS, HTML or other languages. `pnpm check` runs it before tests and builds.
 The pre-commit hook checks staged whitespace, including newly added files.
-`pnpm check` rejects Git-tracked root `.pi` configuration, even if force-added while ignored; ignored or untracked personal files remain allowed.
+`pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
+paths, including skill-directory symlinks and files force-added while ignored.
+Ignored or untracked personal files remain allowed.
 
-To print a verification log without swallowing its exit code, including an
-expected failing test:
+For a focused command, use a new log directory and retain the exit code:
 
 ```sh
-if pnpm check > /tmp/createratio-check.log 2>&1; then status=0; else status=$?; fi
-tail -n 40 /tmp/createratio-check.log
+logs=$(mktemp -d "${TMPDIR:-/tmp}/createratio-check.XXXXXX")
+if pnpm check > "$logs/check.log" 2>&1; then status=0; else status=$?; fi
+printf 'Verification log: %s\n' "$logs/check.log"
+tail -n 40 "$logs/check.log"
 exit "$status"
 ```
+
+## Release automation
+
+`pnpm check` includes release-command, package-reproduction and store-submission
+tests. Workflow tests exercise the submission conditions for published releases and
+manual Chrome-only, Firefox-only and both-store runs. They execute the real tag
+guard in disposable Git history, including branch, ancestry, version and browser
+refusals. They do not dispatch GitHub Actions or verify live Google federation.
+These tests additionally require Git, `zip` and `unzip` on PATH. Release
+command tests use disposable real Git repositories and local remotes; GitHub CLI
+and local-check subprocesses are substituted at their external boundaries. Git
+URL queries map only the fixture's approved local transport to the official URL;
+all other Git operations are real and restricted to file transport. Tests reject
+alternate push URLs and URL rewrites before creating branches or tags. With
+automatic tag following and mirror settings enabled, they verify the complete
+remote ref set: preparation adds only its branch, publication only its version
+tag, and unrelated local refs remain local. GitHub Release creation is substituted;
+tests check generated-note/verified-tag options, authentication refusal, and
+recovery after release creation fails without moving its tag. They never push to the actual
+repository or publish a store version.
+
+The package test extracts the generated reviewer-source archive, rebuilds Firefox
+with the real build script, and compares every generated file against the packaged
+bundle. It also runs the real build tests with a different synchronized version,
+preventing fixed-version expectations from blocking preparation. It checks archive
+contents, checksums, stale-output removal, dirty
+source refusal and tag/commit mismatches. Store API tests substitute HTTP only,
+covering version/pending-submission guards, authentication, validation polling,
+write failures and refusal paths. Those tests do not establish live credentials,
+provider acceptance or publication.
+
+`pnpm check:release` requires Git, `tar`, `zip`, `unzip` and a clean committed
+checkout. It exercises the real prepare/check/merge/publish/package journey in a disposable repository. It reuses
+installed dependencies, substitutes GitHub CLI and only the approved local Git
+transport, and permits file transport only. Automatic tag following and mirror
+mode are enabled to verify that unrelated tags remain local. Logs and the result
+summary stay in a fresh temporary directory. Native fetch permits only loopback
+hosts and rejects every redirect, including caller-requested redirect following;
+requests and string URLs use the same restriction. No store endpoints are called. CI
+runs this separately from `pnpm check` to avoid recursive verification.
+
+Before approving each store deployment, test its exact extracted artifact in the
+relevant browser and complete the manual extension checks below. Verify Chrome
+and Firefox submission results separately. A successful job reports submission;
+each store controls review, signing and public availability. See
+[releases](releases.md) for commands, approval and recovery.
+
+### Store-integration acceptance
+
+Human validation is a release gate, not a CI result. Keep a new integration's
+acceptance incomplete until a maintainer has supervised its first real release.
+Do not create a test version or push a tag merely to test credentials. That first
+release needs explicit authorization, followed by each store's environment
+approval; approving one store does not approve the other.
+
+Before approving a store job:
+
+1. Download that run's artifact. Record its tag, source commit and archive hashes
+   from `release.txt` and `SHA256SUMS`; verify the hashes locally with
+   `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum --check SHA256SUMS` on Linux.
+   Test a disposable extracted copy in the actual target browser and complete the
+   [extension checklist](#extension). For Firefox, use a supported real Firefox
+   version, not Chromium emulation, and reproduce the bundle using the
+   [reviewer-source instructions](firefox-add-ons.md#reproduce-the-firefox-package-from-reviewer-source).
+2. In the owning developer dashboard, check the existing listing, intended version,
+   permissions, license and disclosures. Record browser/OS versions, test outcomes
+   and remaining limitations against those exact hashes in a private release note.
+   Use only a sanitized reference in the deployment approval comment. Never attach
+   credentials, activity data or publisher-dashboard captures to the repository.
+   Secret-name presence and dashboard login do not prove API authentication.
+
+For the first explicitly authorized real release:
+
+3. Supervise the approved job. Its authenticated read-only preflight must succeed
+   before upload; check the upload/validation and version-creation results in the
+   relevant dashboard. For Firefox, confirm the intended listed version and
+   attached reviewer source. Record each store's result separately. On rejection,
+   authentication failure or an ambiguous write, stop and inspect the dashboard;
+   do not approve another store as a workaround or blindly resubmit.
+4. After signing/review and availability, install the store-delivered extension in
+   a disposable profile. Verify its ID and version, behavior and update continuity
+   using synthetic saved preferences. Only then record end-to-end integration
+   acceptance. A submitted version awaiting review is not a verified installation.
+
+The package job links this gate beside the source commit and checksums before
+approval. Environment approval authorizes real writes; it is not evidence that
+subsequent authentication, store review or installation has already succeeded.
 
 ## Refactor equivalence
 
@@ -256,7 +486,10 @@ screenshots, credentials, or publisher-dashboard information.
 
 Before a release, verify:
 
-- X/Twitter aliases and LinkedIn block, while unrelated sites remain accessible.
+- Enabled X/Twitter aliases, LinkedIn, TikTok, Instagram, Facebook and YouTube block,
+  including HTTP/S subdomains, while unrelated sites remain accessible. TikTok,
+  Instagram, Facebook and YouTube start Off; saved choices survive updates. Verify browser
+  approval of expanded hosts.
 - Reloading preserves the 60-second wait; only explicit confirmation unlocks.
 - Access budgets are shared per site, pause on tab/window changes, survive
   restarts, refill at local midnight, and revoke access at expiry or manual end.
@@ -269,11 +502,63 @@ Before a release, verify:
   budget or pending wait, unless optional above-goal access applies.
 - Midnight refills use each site's override or current inherited Default. Off
   cancels refills; above-goal access never re-enables measurement on Off sites.
+- Slow scrolling starts on at 50% resistance when no choice is saved. Existing
+  Off choices and valid strengths must survive upgrades and restarts. The slider
+  adjusts resistance from 50–95% in five-point steps; even Light halves movement.
+  Saved positive strengths below 50% resolve to 50% without enabling an Off choice.
+  Verify drag previews do not save until release, keyboard adjustments retain
+  focus, fast changes retain only the latest pending choice, failures restore
+  confirmed values, and reloading or toggling Off preserves the chosen strength.
+  Saved zero resolves to Off with 50% ready for re-enabling. At Off or Limit & track
+  Off, already-open tabs scroll natively. Verify real mouse wheels and trackpads,
+  both directions, fractional movement, zoom, horizontal gestures, nested panels,
+  editors, messaging, route changes, and page focus. On app-shell pages whose only
+  scroll surface is an inner container, verify it slows even when the document
+  has a scroll range but its overflow is hidden or clipped. Panels inside it must
+  stay native even above half the viewport height. Cover independently scrolling
+  bodies and both propagated and non-propagated body overflow, including hidden
+  or clipped bodies with auto-overflow or contained roots. Keyboard, touch, and scrollbar
+  navigation must stay native. Check the Settings switch and slider with keyboard
+  input at narrow widths, with reduced motion and with forced colors. Synthetic Chromium tests do not establish
+  physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
+- All six popup rows show current access without session-time editors.
+  Settings opens Websites initially; Browsing, Privacy and Your data open through
+  native section summaries, closing the previous section. Verify keyboard access,
+  320px layouts, reduced motion and forced colors. Duration menus support presets,
+  inherited Default and on-demand Custom edits from 1–240 whole minutes. Verify
+  Save/Cancel, invalid input, failed saves, focused drafts across polling and
+  retained arbitrary durations after reload. Saving affects new sessions/refills,
+  not the current budget; Off disables editing without deleting saved times.
+- Available tracking-only integrations start Off and have no access gates or
+  session timers. Their compact Settings switches persist independently; enabling
+  applies the shared Slow scrolling preference on consuming pages, while editors,
+  messaging, unsupported routes and Off retain native scrolling. Verify documented
+  submit controls in each current logged-in UI. Disabling preserves history and
+  stops new measurements. Check exact HTTPS hosts and update-permission prompts.
 - Idle, focus, navigation, midnight, and sleep/wake boundaries do not backfill time.
 - All-website permission denial leaves tracking off; opt-in records only focused
   domain/time totals; disabling removes permissions and preserves totals.
+- Daily and last-seven-day share-card previews match recorded totals, download
+  real 1200 × 1200 PNGs, and have readable branding and time/score caveats at feed
+  size. Captions include the public CreateRatio link but no site names or private
+  details. Check clipboard success/denial, PNG encoding failure, stale requests,
+  repeated preview cleanup, and preview removal on period changes/history resets.
+  The canvas preview must match downloaded PNG pixels, retain only one drawing
+  surface, avoid decoding PNG URLs, and release its backing dimensions on clearing
+  or encoding failure. Include changing totals when repeating previews.
+  Ready and pending PNG previews and pending HTML exports must survive normal
+  receipt-window rollover; only an explicit history reset invalidates them.
+  Sharing is manual and never opens a posting flow automatically.
+- Daily and last-seven-day HTML reports download with the selected local dates,
+  match dashboard totals, and print/save as PDF offline. Check empty history,
+  narrow layouts, keyboard selection, removed integrations, and that neither
+  website time nor saved intentions appear. A local-date change during either
+  PNG or HTML history loading must show a retry message without generating an
+  artifact; retry must use the new period. A history reset during HTML history
+  loading must also block the pre-reset response; retry must export only the
+  remaining history. Activity and website CSV exports remain unchanged.
 - Activity and website CSV exports work. Confirmed clearing removes histories,
   cancellation preserves them, and settings/access boundaries stay unchanged.
   Pending measurements from open tabs or failed deliveries cannot restore cleared
@@ -288,7 +573,16 @@ Before a release, verify:
   and never appears in CSV exports.
 - Retention and size limits remove oldest history without altering preferences.
 - Store-installed Chrome feedback opens the correct public reviews page without
-  activity data. Unpacked builds show feedback as unavailable.
+  activity data. Unpacked and other-browser builds omit unavailable store feedback;
+  Privacy policy and Terms of use remain accessible.
+- A store-delivered update preserves synthetic measurements, preferences and
+  access budgets. With Website time enabled and its debugger detached, the worker
+  becomes inactive between alarms. **Update ready** appears in extension pages;
+  unsaved settings/intention drafts are never interrupted automatically. Active
+  tracking and failed delivery defer automatic installation. Explicit Update now
+  confirms intent, flushes pending measurements and restores tracking in existing
+  website documents without reloading them. Verify the actual store version
+  transition; a simulated available event and unpacked reload do not prove delivery.
 - Popup, Settings, dashboard, and blocked pages work with keyboard navigation,
   narrow windows, and reduced motion.
 
@@ -297,13 +591,6 @@ validation, current logged-in selectors, and real sleep/wake behavior remain
 release checks, not guarantees from unit tests.
 
 ## Website
-
-Website PRs also follow the [metadata and crawlability checks](seo.md).
-`pnpm check` includes built-page metadata/canonical checks, sitemap coverage,
-static site identity/social metadata, and crawl-file delivery in source and built
-previews. Run `node --test site/tests/seo.test.js` for the focused loop. The
-releasing maintainer still verifies deployed HTTP responses and headers; local
-tests do not prove live CDN behavior.
 
 Verify forward/backward scrolling, narrow and mobile layouts, keyboard navigation,
 skip links, direct anchors, reduced motion, and disabled JavaScript. Primary

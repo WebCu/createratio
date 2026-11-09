@@ -78,16 +78,27 @@ the free extension from any future optional paid service. See the
 [release guide](../docs/chrome-web-store.md); verify both deployed HTTPS URLs
 before release and use the privacy URL in Chrome Web Store.
 
-## Metadata and crawlability
+## AI and crawler discovery
 
-The homepage includes descriptive search/social metadata and static `WebSite`
-JSON-LD. All public pages declare canonical production URLs. `robots.txt`
-allows crawling and points to `sitemap.xml`, which lists the canonical pages.
-Both files ship in the build and work in local previews.
+The homepage includes a canonical URL and static SoftwareApplication JSON-LD.
+`/llms.txt`, linked in the head and footer, summarizes verified product behavior,
+installation, privacy, and the existing extension UI workflow for browser agents.
+It is guidance, not an API or a guarantee that an AI service will use it.
+`/robots.txt` permits crawling and points to `/sitemap.xml` for public HTML pages.
+All three files ship in static builds and source/Docker previews; keep them current
+with product changes. The guide never exposes local extension data.
 
-Follow the [metadata and crawlability checks](../docs/seo.md) for PR and
-post-deployment verification. `site/tests/seo.test.js` covers metadata and
-crawl-file regressions in PR CI; deployed responses still need verification.
+Follow the [metadata and crawlability checklist](../docs/seo.md) when changing
+public pages. Run `node --test site/tests/seo.test.js` for metadata, canonical,
+and sitemap regression checks; deployed response checks remain separate.
+
+## Announcements and listing screenshots
+
+Edit `marketing/release.json` and run `pnpm marketing` from the repository root
+to update the static launch announcement and generate store copy, a social post,
+and real extension screenshots with synthetic data. Review outputs in
+`dist/marketing/`; nothing is published automatically. See the
+[listing kit guide](../docs/marketing.md) for capture requirements and publication.
 
 ## Analytics
 

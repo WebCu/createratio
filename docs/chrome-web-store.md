@@ -4,28 +4,20 @@ CreateRatio is published on the
 [Chrome Web Store](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk).
 Use this guide to verify and release updates to that listing.
 
-## Tagged releases
+## GitHub releases
 
-`.github/workflows/release-chrome.yml` runs on pushed `vMAJOR.MINOR.PATCH`
-tags. The tagged commit must belong to `main` history. The tag must match
-`package.json`, `extension/package.json`, and `extension/src/manifest.json`.
-Use numeric components from 0 through 65535, without leading zeroes or prerelease
-suffixes. Each upload must have a version newer than the published package.
+Use the shared [Chrome and Firefox release workflow](releases.md) to prepare a
+version PR and publish its GitHub Release with generated change notes after merge. The workflow retains its existing
+`.github/workflows/release-chrome.yml` filename for Google's federated trust,
+but builds both store packages and submits them in independent approval jobs.
+For a Chrome-only update, use the [manual release option](releases.md#release-to-one-store)
+with `browser=chrome`; the Firefox submission job is skipped.
 
-After merging the version change and completing the manual checks below:
-
-```sh
-git tag v0.0.2 <merged-commit>
-git push origin v0.0.2
-```
-
-The workflow runs the full reusable CI, including both browser checks, then
-builds and archives only `dist/chrome`. Its `chrome-store-package` artifact
-contains the exact ZIP, SHA-256 checksum, tag, and source commit for 30 days.
-Download that artifact and inspect an extracted QA copy before approving the
-`chrome-web-store` environment. Approval confirms the manual release checklist,
-including current store disclosures and deployed legal pages. Approval does not
-replace those checks.
+Download the `browser-store-packages` artifact and inspect an extracted copy of
+`createratio-chrome.zip` before approving `chrome-web-store`. The artifact also
+contains Firefox and reviewer-source archives, checksums, tag and source commit.
+Approval confirms the manual release checklist, including current store
+disclosures and deployed legal pages. Approval does not replace those checks.
 
 After approval, the job verifies the checksum, exchanges GitHub OIDC for a
 short-lived Google token, uploads the archive, waits for upload processing, and
@@ -40,8 +32,9 @@ change permissions, or cancel an existing pending/staged submission.
 The release workflow requires:
 
 - A dedicated Google project, store service account, and federation restricted
-  to this repository's immutable ID, tag pushes, release workflow, and
-  `chrome-web-store` environment.
+  to this repository's immutable ID, version tags, release workflow, and
+  `chrome-web-store` environment. Allow only the `release` and `workflow_dispatch`
+  events for automatic and manually targeted releases.
 - A `chrome-web-store` environment with owner approval, tag-only deployment
   policy, the pinned Google authentication action allowed, and four non-secret
   variables: `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID`,
@@ -51,6 +44,13 @@ The release workflow requires:
   for the corresponding environment variables. Missing values and setup
   placeholders fail before authentication or upload. There are no OAuth refresh
   tokens or service-account keys to store in GitHub.
+
+Before the next automatic Chrome release, the federation owner must replace its
+`push` event allowance with `release` and retain `workflow_dispatch` for manually
+targeted releases. A release event still uses the version tag ref. Preserve all
+repository, workflow, tag and environment restrictions. Repository changes do
+not update Google IAM, and existing GitHub variable names do not prove this
+permission is configured.
 
 Google's [service-account setup](https://developer.chrome.com/docs/webstore/service-accounts)
 and [API guide](https://developer.chrome.com/docs/webstore/using-api) describe the
@@ -157,7 +157,7 @@ HTTP/HTTPS tabs. Verify that privacy links open the public HTTPS policy.
 Send feedback is unavailable in
 unpacked builds; verify its reviews link after store installation. Signed-in
 posting checks require the reviewer's own account, never supplied credentials.
-Tagged releases submit through the approved workflow above. Manual dashboard
+Published GitHub Releases submit through the approved workflow above. Manual dashboard
 submission remains available for recovery.
 
 ## Store requirements

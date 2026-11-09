@@ -59,6 +59,49 @@ test('daily target resolves the current setting with safe defaults for legacy or
   }
 });
 
+test('scroll friction defaults on without replacing saved choices or resistance', () => {
+  for (const settings of [undefined, {}, { accessMinutes: 12 }]) {
+    assert.equal(C.settingsSnapshot(settings).scrollFrictionEnabled, true);
+    assert.equal(C.settingsSnapshot(settings).scrollFrictionStrength, 50);
+  }
+  for (const enabled of [false, true]) for (const strength of [50, 75, 90, 95]) {
+    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
+    for (const resolved of [C.settingsSnapshot(settings), C.updatePreferences(settings, { accessMinutes: 12 })]) {
+      assert.equal(resolved.scrollFrictionEnabled, enabled);
+      assert.equal(resolved.scrollFrictionStrength, strength);
+    }
+    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
+  }
+});
+test('saved zero resistance resolves to Off without mutating preferences', () => {
+  for (const enabled of [undefined, false, true]) {
+    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: 0 };
+    for (const saved of [settings, C.updatePreferences(settings, { accessMinutes: 12 })]) {
+      const resolved = C.settingsSnapshot(saved);
+      assert.equal(resolved.scrollFrictionEnabled, false); assert.equal(resolved.scrollFrictionStrength, 50);
+    }
+    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: 0 });
+  }
+});
+test('saved strengths below the new minimum resolve to 50% without enabling an Off choice', () => {
+  for (const enabled of [false, true]) for (const strength of [5, 25, 45]) {
+    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
+    const resolved = C.settingsSnapshot(settings);
+    assert.equal(resolved.scrollFrictionEnabled, enabled); assert.equal(resolved.scrollFrictionStrength, 50);
+    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
+  }
+});
+test('scroll resistance accepts only 50–95% in five-point steps', () => {
+  assert.equal(C.settingsSnapshot({ scrollFrictionEnabled: true }).scrollFrictionStrength, 50);
+  for (const strength of [50, 55, 75, 90, 95]) {
+    assert.equal(C.validScrollFrictionStrength(strength), true);
+    assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, strength);
+  }
+  for (const strength of [undefined, null, false, true, '75', 0, -5, 5, 25, 45, 49, 96, 99, 100, 1, 50.5, NaN, Infinity, [], {}]) {
+    assert.equal(C.validScrollFrictionStrength(strength), false);
+    assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, 50);
+  }
+});
 test('access minutes require a numeric whole number within the access limits', () => {
   assert.deepEqual(C.ACCESS_LIMITS, { minMinutes: 1, maxMinutes: 240 });
   for (const value of [1, 5, 120, 240]) assert.equal(C.validAccessMinutes(value), true);
@@ -259,11 +302,15 @@ test('retired nudge preferences cannot be changed or used as site access limits'
   const settings = C.siteSettings('x', stored);
   assert.equal(settings.accessMinutes, 12); assert.equal(settings.nudgeEnabled, undefined); assert.deepEqual(settings.siteOverrides, {});
 });
-test('CSV exports all date buckets and both sites, excluding internal keys', () => {
+test('CSV exports all date buckets and catalog sites, excluding internal keys', () => {
   const output = C.csv({ settings: C.DEFAULT_SETTINGS, _receipts: ['abc'], '2026-10-11': { x: { consumeSec: 120, posts: 1, quotes: 1 } }, '2026-10-10': {} });
-  const lines = output.trim().split('\r\n'); assert.equal(lines.length, 5);
-  assert.match(lines[1], /^2026-10-10,x,/); assert.match(lines[3], /^2026-10-11,x,120\.000,0\.000,1,/);
-  assert.match(lines[3], /,1\.000$/); assert.ok(!output.includes('settings')); assert.ok(!output.includes('abc'));
+  const lines = output.trim().split('\r\n'); assert.equal(lines.length, 1 + 2 * C.SITES.length);
+  for (const date of ['2026-10-10', '2026-10-11']) {
+    assert.deepEqual(lines.slice(1).filter(line => line.startsWith(date + ',')).map(line => line.split(',')[1]), C.SITES.map(site => site.id));
+  }
+  const recorded = lines.find(line => line.startsWith('2026-10-11,x,'));
+  assert.match(recorded, /^2026-10-11,x,120\.000,0\.000,1,/);
+  assert.match(recorded, /,1\.000$/); assert.ok(!output.includes('settings')); assert.ok(!output.includes('abc'));
 });
 test('tracking defaults enable X and LinkedIn and an empty selection disables all sites', () => {
   assert.deepEqual(C.DEFAULT_SETTINGS.trackedSites, ['x', 'linkedin']);

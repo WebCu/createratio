@@ -37,6 +37,12 @@
     function preferencesSender(sender) {
       if (!topPage(sender, ['popup', 'settings'])) throw refuse('Preferences must come from the extension settings page');
     }
+    function updateSender(sender) {
+      if (topPage(sender, ['popup', 'settings', 'dashboard'])) return;
+      let site;
+      try { site = new URL(sender?.url).searchParams.get('site'); } catch (_) {}
+      blocked(sender, site);
+    }
     function preferences(message, sender) {
       preferencesSender(sender);
       switch (message.type) {
@@ -53,6 +59,10 @@
         case 'access-history-setting':
           if (typeof message.enabled !== 'boolean') throw refuse('Enable or disable intention history');
           break;
+        case 'scroll-friction-setting':
+          if (typeof message.enabled !== 'boolean') throw refuse('Enable or disable scroll friction');
+          if (message.strength !== undefined && !core.validScrollFrictionStrength(message.strength)) throw refuse(`Choose scroll resistance from ${core.SCROLL_FRICTION_LIMITS.minStrength}–${core.SCROLL_FRICTION_LIMITS.maxStrength}% in steps of ${core.SCROLL_FRICTION_LIMITS.step}`);
+          break;
         case 'website-time-setting':
           if (typeof message.enabled !== 'boolean') throw refuse('Invalid website tracking setting');
           break;
@@ -60,7 +70,8 @@
       }
     }
     function history(message, sender) {
-      if (!topPage(sender, ['dashboard', 'settings'])) throw refuse('History must come from an extension page');
+      const popupToday = topPage(sender, ['popup']) && message.kind === 'ratio' && message.range === 'today';
+      if (!popupToday && !topPage(sender, ['dashboard', 'settings'])) throw refuse('History must come from an extension page');
       if (!['ratio', 'websites'].includes(message.kind) || !['today', 'week', 'month'].includes(message.range)) throw refuse('Invalid history range');
     }
     function intentions(sender) {
@@ -81,7 +92,7 @@
       } else blocked(sender, message.site);
       if (!gated.has(message.site)) throw refuse('Unsupported site');
     }
-    return { read, creationSender, packet, preferencesSender, preferences, history, intentions, blocked, session };
+    return { read, creationSender, packet, preferencesSender, updateSender, preferences, history, intentions, blocked, session };
   }
   return { create, refuse };
 });

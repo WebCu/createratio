@@ -9,6 +9,7 @@ const assets = {
   '/index.html': { filename: 'index.html', contentType: 'text/html; charset=utf-8' },
   '/privacy.html': { filename: 'privacy.html', contentType: 'text/html; charset=utf-8' },
   '/terms.html': { filename: 'terms.html', contentType: 'text/html; charset=utf-8' },
+  '/llms.txt': { filename: 'llms.txt', contentType: 'text/plain; charset=utf-8' },
   '/robots.txt': { filename: 'robots.txt', contentType: 'text/plain; charset=utf-8' },
   '/sitemap.xml': { filename: 'sitemap.xml', contentType: 'application/xml; charset=utf-8' },
   '/styles.css': { filename: 'styles.css', contentType: 'text/css; charset=utf-8' },

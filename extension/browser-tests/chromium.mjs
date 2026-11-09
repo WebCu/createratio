@@ -5,6 +5,9 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import integrations from '../sites/index.js';
+
+const syntheticHosts = new Set([...integrations.sites.flatMap(site => site.hosts), 'twitter.com', 'www.twitter.com']);
 
 export async function eventually(check, description, timeout = 10000) {
   const deadline = Date.now() + timeout;
@@ -148,11 +151,22 @@ export function workerTarget(targets, url) {
   return matches[0];
 }
 
-export async function launch(extensionPath) {
+export function devToolsEndpoint(contents) {
+  const [port, path] = contents.trim().split(/\r?\n/);
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) return null;
+  if (!/^\/devtools\/browser\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(path ?? '')) return null;
+  return `ws://127.0.0.1:${port}${path}`;
+}
+
+export async function launch(extensionPath, options = {}) {
   extensionPath = resolve(extensionPath);
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
   const workerURL = extensionWorkerURL(extensionPath, manifest);
   const directory = await mkdtemp(join(tmpdir(), 'createratio-browser-'));
+  if (options.developerMode) {
+    await mkdir(join(directory, 'profile', 'Default'), { recursive: true });
+    await writeFile(join(directory, 'profile', 'Default', 'Preferences'), JSON.stringify({ extensions: { ui: { developer_mode: true } } }));
+  }
   const executable = process.env.CHROMIUM_PATH || process.env.CHROMIUM || '/usr/bin/chromium';
   const args = [
     `--user-data-dir=${join(directory, 'profile')}`, '--remote-debugging-port=0',
@@ -165,6 +179,7 @@ export async function launch(extensionPath) {
     '--host-resolver-rules=MAP * ~NOTFOUND', '--window-size=1280,900',
     `--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, 'about:blank'
   ];
+  if (process.platform === 'darwin') args.push('--use-mock-keychain');
   if (process.env.CHROMIUM_NO_SANDBOX === '1') args.push('--no-sandbox');
   const child = spawn(executable, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
   let diagnostics = '', spawnError, closed = false, cdp, socket, watchdog, browser;
@@ -212,8 +227,7 @@ export async function launch(extensionPath) {
     const endpoint = await eventually(async () => {
       if (spawnError) throw Object.assign(spawnError, { fatal: true });
       if (child.exitCode !== null) throw Object.assign(new Error(`Chromium exited ${child.exitCode}: ${diagnostics}`), { fatal: true });
-      const [port, path] = (await readFile(join(directory, 'profile', 'DevToolsActivePort'), 'utf8')).trim().split('\n');
-      return `ws://127.0.0.1:${port}${path}`;
+      return devToolsEndpoint(await readFile(join(directory, 'profile', 'DevToolsActivePort'), 'utf8'));
     }, `Chromium startup (${executable})`);
     socket = new WebSocket(endpoint);
     await new Promise((resolve, reject) => {
@@ -232,7 +246,7 @@ export async function launch(extensionPath) {
     cdp.on('Page.frameNavigated', (event, session) => record('navigation', { url: event.frame.url }, session));
     cdp.on('Fetch.requestPaused', (event, session) => {
       const url = new URL(event.request.url);
-      const synthetic = event.resourceType === 'Document' && ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com', 'www.linkedin.com'].includes(url.hostname);
+      const synthetic = event.resourceType === 'Document' && syntheticHosts.has(url.hostname);
       const operation = synthetic
         ? cdp.send('Fetch.fulfillRequest', { requestId: event.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from('<!doctype html><html><head><title>Synthetic offline site</title></head><body><h1 id="synthetic-site">Offline synthetic site</h1><p>No login, posting, or remote requests.</p></body></html>').toString('base64') }, session)
         : cdp.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' }, session);
@@ -312,23 +326,85 @@ export async function evaluate(browser, session, expression) {
   return result.result.value;
 }
 
+export async function seedAccess(browser, sites, settings) {
+  await evaluate(browser, browser.worker, `(async () => {
+    const seed = { _access: Object.fromEntries(${JSON.stringify(sites)}.map(site => [site, { remainingMs: 300000, date: C3.localDate() }])) };
+    const preferences = ${JSON.stringify(settings ?? null)};
+    if (preferences) {
+      const { settings = {} } = await chrome.storage.local.get('settings');
+      seed.settings = { ...settings, ...preferences };
+    }
+    await chrome.storage.local.set(seed);
+    await SiteAccess.reconcile();
+  })()`);
+}
+
+export async function openSettingsSection(browser, page, name) {
+  const selector = '#' + name + '-settings';
+  await eventually(() => evaluate(browser, page.session, `!!document.querySelector(${JSON.stringify(selector)}) && !!document.querySelector('#accessMinutes-default')`), name + ' settings section ready');
+  if (!await evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`)) await click(browser, page, selector + ' > summary');
+  await eventually(() => evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`), name + ' settings section open');
+}
+
+export async function waitForEnabledControl(browser, page, selector, timeout) {
+  return eventually(() => evaluate(browser, page.session, `(() => {
+    const control = document.querySelector(${JSON.stringify(selector)});
+    return control?.disabled === false && control.getAttribute('aria-disabled') !== 'true';
+  })()`), `enabled control ${selector}`, timeout);
+}
+
+export async function accessibilityNodes(browser, page) {
+  const { nodes } = await browser.cdp.send('Accessibility.getFullAXTree', {}, page.session);
+  return nodes.filter(node => !node.ignored);
+}
+
+export async function findByRole(browser, page, role, name) {
+  const normalize = value => (value || '').trim().replace(/\s+/g, ' ');
+  const matches = (await accessibilityNodes(browser, page)).filter(node => node.role?.value === role && normalize(node.name?.value) === normalize(name));
+  if (matches.length !== 1) throw Object.assign(new Error(`Expected one ${role} named ${name}; found ${matches.length}`), { fatal: matches.length > 1 });
+  return matches[0];
+}
+
 export async function click(browser, page, selector) {
+  return clickElement(browser, page, async () => {
+    const { result } = await browser.cdp.send('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(selector)})` }, page.session);
+    return result;
+  }, selector);
+}
+
+export async function clickByRole(browser, page, role, name) {
+  return clickElement(browser, page, async () => {
+    const node = await findByRole(browser, page, role, name);
+    const { object } = await browser.cdp.send('DOM.resolveNode', { backendNodeId: node.backendDOMNodeId }, page.session);
+    return object;
+  }, `${role} named ${name}`);
+}
+
+async function clickElement(browser, page, locate, description) {
   await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
-  const point = await eventually(() => evaluate(browser, page.session, `(async () => {
-    const element = document.querySelector(${JSON.stringify(selector)});
-    if (!element || element.disabled || !element.getClientRects().length) return false;
-    element.scrollIntoView({ block: 'center', behavior: 'instant' });
-    const before = element.getBoundingClientRect();
-    await new Promise(requestAnimationFrame);
-    await new Promise(requestAnimationFrame);
-    const rect = element.getBoundingClientRect();
-    if (!element.isConnected || element.disabled || !rect.width || !rect.height) return false;
-    if (['x', 'y', 'width', 'height'].some(key => before[key] !== rect[key])) return false;
-    const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-    const hit = document.elementFromPoint(point.x, point.y);
-    return hit === element || element.contains(hit) ? point : false;
-  })()`), `stable clickable ${selector}`);
-  browser.events?.push({ type: 'input-request', details: { selector, point }, session: page.session, at: Date.now() });
+  const point = await eventually(async () => {
+    const { objectId } = await locate();
+    if (!objectId) return false;
+    try {
+      const result = await browser.cdp.send('Runtime.callFunctionOn', { objectId, awaitPromise: true, returnByValue: true, functionDeclaration: `async function() {
+        const element = this;
+        if (element.disabled || element.getAttribute('aria-disabled') === 'true' || !element.getClientRects().length) return false;
+        element.scrollIntoView({ block: 'center', behavior: 'instant' });
+        const before = element.getBoundingClientRect();
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+        const rect = element.getBoundingClientRect();
+        if (!element.isConnected || element.disabled || element.getAttribute('aria-disabled') === 'true' || !rect.width || !rect.height) return false;
+        if (['x', 'y', 'width', 'height'].some(key => before[key] !== rect[key])) return false;
+        const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+        const hit = element.getRootNode().elementFromPoint(point.x, point.y);
+        return hit === element || element.contains(hit) ? point : false;
+      }` }, page.session);
+      if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
+      return result.result.value;
+    } finally { await browser.cdp.send('Runtime.releaseObject', { objectId }, page.session).catch(() => {}); }
+  }, `stable clickable ${description}`);
+  browser.events?.push({ type: 'input-request', details: { selector: description, point }, session: page.session, at: Date.now() });
   await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point }, page.session);
   await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point }, page.session);
   await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point }, page.session);
