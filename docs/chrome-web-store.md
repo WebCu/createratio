@@ -56,6 +56,9 @@ Google's [service-account setup](https://developer.chrome.com/docs/webstore/serv
 and [API guide](https://developer.chrome.com/docs/webstore/using-api) describe the
 provider-side requirements. Do not put credentials in this repository.
 
+Submission failures identify the operation and HTTP status in the Actions log
+and error annotation, with bounded, credential-redacted store validation details
+when available. Non-JSON responses and unrecognized fields are not dumped.
 If a run fails after upload or submission, inspect the dashboard before retrying.
 The script does not retry write requests, cancel reviews, or overwrite pending
 submissions. A rerun can require dashboard recovery or a new version; do not move

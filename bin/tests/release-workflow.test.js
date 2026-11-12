@@ -72,7 +72,7 @@ test('manual and automatic release guards validate the selected tag before any s
     fs.writeFileSync(path.join(directory, file), JSON.stringify({ version: '1.2.3' }));
   }
   fs.mkdirSync(path.join(directory, 'bin'));
-  for (const file of ['release.js', 'chrome-store-release.js']) fs.copyFileSync(path.join(root, 'bin', file), path.join(directory, 'bin', file));
+  for (const file of ['release.js', 'chrome-store-release.js', 'store-errors.js']) fs.copyFileSync(path.join(root, 'bin', file), path.join(directory, 'bin', file));
   git('init', '--initial-branch=main');
   git('config', 'commit.gpgsign', 'false');
   git('add', '.');

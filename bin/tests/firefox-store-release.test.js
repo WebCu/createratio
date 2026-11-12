@@ -153,7 +153,7 @@ test('HTTP and ambiguous network failures are not retried and never expose crede
   }), error => {
     assert.equal(error.message.includes(configuration.apiKey), false);
     assert.equal(error.message.includes(configuration.apiSecret), false);
-    return /Mozilla request failed/.test(error.message);
+    return /Mozilla listing check failed/.test(error.message);
   });
   assert.equal(calls, 1);
 });
