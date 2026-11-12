@@ -2,6 +2,7 @@ const { readFileSync } = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const { setTimeout } = require('node:timers/promises');
 const { releaseVersion, sourceVersion, compareVersions } = require('./release.js');
+const { storeError, storeHttpError, reportStoreFailure } = require('./store-errors.js');
 
 const extensionId = 'kopbjmlmjpnkekffalpbjfhmbhgbgamk';
 
@@ -18,18 +19,24 @@ async function submitRelease(configuration, fetchRequest = fetch, wait = setTime
   const { publisherId, itemId, token, version, archive } = configuration;
   const item = `publishers/${publisherId}/items/${itemId}`;
   const base = 'https://chromewebstore.googleapis.com';
-  async function request(url, method = 'GET', body, contentType = 'application/json') {
-    const response = await fetchRequest(url, {
-      method,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
-      body,
-      signal: AbortSignal.timeout(60000),
-      redirect: 'error'
-    });
-    if (!response.ok) throw new Error(`Chrome Web Store request failed (HTTP ${response.status}); inspect the Developer Dashboard before retrying.`);
-    return response.json();
+  async function request(operation, url, method = 'GET', body, contentType = 'application/json') {
+    let response;
+    try {
+      response = await fetchRequest(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
+        body,
+        signal: AbortSignal.timeout(60000),
+        redirect: 'error'
+      });
+    } catch {
+      throw storeError('Chrome Web Store', operation, 'network error or timeout');
+    }
+    if (!response.ok) throw await storeHttpError('Chrome Web Store', operation, response, [token]);
+    try { return await response.json(); } catch { throw storeError('Chrome Web Store', operation, 'invalid JSON response'); }
   }
-  const status = await request(`${base}/v2/${item}:fetchStatus`);
+  const status = await request('status check', `${base}/v2/${item}:fetchStatus`);
+  if (!status || typeof status !== 'object' || Array.isArray(status)) throw storeError('Chrome Web Store', 'status check', 'invalid response');
   if (status.takenDown || status.warned) throw new Error('Resolve the store policy warning or takedown before releasing.');
   if (['PENDING_REVIEW', 'STAGED'].includes(status.submittedItemRevisionStatus?.state)) {
     throw new Error('A submission is already pending or staged; inspect the Developer Dashboard.');
@@ -39,19 +46,22 @@ async function submitRelease(configuration, fetchRequest = fetch, wait = setTime
       throw new Error('Release version must be newer than the published version.');
     }
   }
-  const upload = await request(`${base}/upload/v2/${item}:upload`, 'POST', archive, 'application/zip');
+  const upload = await request('upload', `${base}/upload/v2/${item}:upload`, 'POST', archive, 'application/zip');
+  if (!upload || typeof upload !== 'object' || Array.isArray(upload)) throw storeError('Chrome Web Store', 'upload', 'invalid response');
   if (upload.crxVersion && upload.crxVersion !== version) throw new Error('Uploaded version does not match the release tag.');
+  let processing = upload;
   let state = upload.uploadState;
   for (let attempt = 0; state === 'IN_PROGRESS' && attempt < 30; attempt++) {
     await wait(5000);
-    state = (await request(`${base}/v2/${item}:fetchStatus`)).lastAsyncUploadState;
+    processing = await request('upload processing status', `${base}/v2/${item}:fetchStatus`);
+    state = processing?.lastAsyncUploadState;
   }
   if (state === 'IN_PROGRESS') throw new Error('Store upload processing timed out; inspect the Developer Dashboard before retrying.');
-  if (state !== 'SUCCEEDED') throw new Error('Store upload did not succeed; refusing submission.');
-  const published = await request(`${base}/v2/${item}:publish`, 'POST', JSON.stringify({
+  if (state !== 'SUCCEEDED') throw storeError('Chrome Web Store', 'upload processing', 'unsuccessful upload; refusing submission', processing, [token]);
+  const published = await request('submission', `${base}/v2/${item}:publish`, 'POST', JSON.stringify({
     publishType: 'DEFAULT_PUBLISH', skipReview: false, blockOnWarnings: true
   }));
-  if (!['PENDING_REVIEW', 'PUBLISHED'].includes(published.state)) throw new Error('Unexpected store submission state; inspect the Developer Dashboard.');
+  if (!['PENDING_REVIEW', 'PUBLISHED'].includes(published?.state)) throw storeError('Chrome Web Store', 'submission', 'unexpected state', published, [token]);
   return published.state;
 }
 
@@ -88,9 +98,6 @@ async function main() {
     : `Version ${version} submitted for review; it will publish after Google approves.\n`);
 }
 
-if (require.main === module) main().catch(error => {
-  process.stderr.write(`${error.message}\n`);
-  process.exitCode = 1;
-});
+if (require.main === module) main().catch(error => reportStoreFailure(error, 'Chrome Web Store release failed'));
 
 module.exports = { releaseVersion, validateConfiguration, submitRelease };
