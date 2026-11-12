@@ -128,9 +128,9 @@ test('every bundle links to the hosted privacy policy in a separate tab and remo
   }
 });
 
-test('all distributions share the source version and use Create > Consume as the supporting tagline', async t => {
+test('all distributions share source metadata and use Create > Consume as the supporting UI tagline', async t => {
   const root = await temporaryOutput(t);
-  const version = JSON.parse(await fs.readFile(path.join(__dirname, '../manifest.json'), 'utf8')).version;
+  const { version, description } = JSON.parse(await fs.readFile(path.join(__dirname, '../manifest.json'), 'utf8'));
   assert.match(version, /^\d+\.\d+\.\d+$/);
   for (const packagePath of ['../../../package.json', '../../package.json']) {
     const metadata = JSON.parse(await fs.readFile(path.join(__dirname, packagePath), 'utf8'));
@@ -144,7 +144,7 @@ test('all distributions share the source version and use Create > Consume as the
     assert.equal(manifest.name, 'CreateRatio');
     assert.equal(manifest.version, version);
     assert.equal(manifest.action.default_title, 'CreateRatio');
-    assert.match(manifest.description, /^Create > Consume\./);
+    assert.equal(manifest.description, description);
     const popup = await fs.readFile(path.join(output, 'popup.html'), 'utf8');
     assert.match(popup, /<title>CreateRatio<\/title>/);
     assert.doesNotMatch(popup, /LOCAL ONLY/);
