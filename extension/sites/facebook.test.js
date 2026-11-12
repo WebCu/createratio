@@ -19,11 +19,11 @@ function fixture(kind = 'comment', url = 'https://www.facebook.com/') {
 }
 function seconds(t, mode) { return t.packets.flatMap(p => p.segments).filter(s => s.mode === mode).reduce((total, s) => total + s.sec, 0); }
 
-test('Facebook publishes a synchronous, opt-in module with explicit access policy in Node and the browser', () => {
+test('Facebook publishes a synchronous, default-on module with explicit access policy in Node and the browser', () => {
   assert.equal(plugin.id, 'facebook');
   assert.deepEqual(plugin.hosts, ['facebook.com', 'www.facebook.com']);
   assert.deepEqual(plugin.actions, ['posts', 'comments']);
-  assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
+  assert.equal(plugin.defaultEnabled, true);
   assert.deepEqual(plugin.access.domains, ['facebook.com']);
   assert.equal(plugin.access.home, 'https://www.facebook.com/');
   assert.equal(plugin.access.sessionRules.some(rule => rule.condition.excludedResourceTypes?.includes('sub_frame')), true);
@@ -191,7 +191,7 @@ for (const browser of ['chrome', 'browser']) {
     }
   });
 
-  test(`Facebook actual adapter uses shared ${browser} trusted wheel/touch tracking and opt-in lifecycle`, async () => {
+  test(`Facebook actual adapter uses shared ${browser} trusted wheel/touch tracking and disable/re-enable lifecycle`, async () => {
     let f;
     const snapshot = trackedSites => ({ day: {}, settings: { trackedSites } });
     const t = await tracker(browser, { integration: plugin, fixture({ url, listen }) { f = populate(environment(url, listen)); return f; }, url: 'https://www.facebook.com/', snapshot: snapshot([]) });

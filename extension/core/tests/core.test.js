@@ -312,11 +312,11 @@ test('CSV exports all date buckets and catalog sites, excluding internal keys', 
   assert.match(recorded, /^2026-10-11,x,120\.000,0\.000,1,/);
   assert.match(recorded, /,1\.000$/); assert.ok(!output.includes('settings')); assert.ok(!output.includes('abc'));
 });
-test('tracking defaults enable X and LinkedIn and an empty selection disables all sites', () => {
-  assert.deepEqual(C.DEFAULT_SETTINGS.trackedSites, ['x', 'linkedin']);
+test('tracking defaults enable all seven supported sites and an empty selection disables all sites', () => {
+  assert.deepEqual(C.DEFAULT_SETTINGS.trackedSites, ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit']);
   for (const { id } of C.SITES) {
-    assert.equal(C.trackingEnabled(id), ['x', 'linkedin'].includes(id));
-    assert.equal(C.trackingEnabled(id, { nudgeEnabled: true }), ['x', 'linkedin'].includes(id));
+    assert.equal(C.trackingEnabled(id), true);
+    assert.equal(C.trackingEnabled(id, { nudgeEnabled: true }), true);
     assert.equal(C.trackingEnabled(id, { trackedSites: [] }), false);
   }
   assert.equal(C.trackingEnabled('x', { trackedSites: ['linkedin'] }), false);
@@ -337,9 +337,9 @@ test('malformed saved tracking selections recover to Off without changing missin
     assert.equal(snapshot.unknown, 'keep');
     assert.deepEqual(saved, original);
   }
-  assert.deepEqual(C.settingsSnapshot().trackedSites, ['x', 'linkedin']);
-  assert.deepEqual(C.settingsSnapshot({ accessMinutes: 12 }).trackedSites, ['x', 'linkedin']);
-  assert.deepEqual(C.settingsSnapshot({ trackedSites: undefined }).trackedSites, ['x', 'linkedin']);
+  assert.deepEqual(C.settingsSnapshot().trackedSites, C.DEFAULT_SETTINGS.trackedSites);
+  assert.deepEqual(C.settingsSnapshot({ accessMinutes: 12 }).trackedSites, C.DEFAULT_SETTINGS.trackedSites);
+  assert.deepEqual(C.settingsSnapshot({ trackedSites: undefined }).trackedSites, C.DEFAULT_SETTINGS.trackedSites);
   assert.equal(C.trackingEnabled('x', { trackedSites: undefined }), true);
 });
 test('default activation follows module declarations without treating familiar IDs specially', () => {
@@ -354,6 +354,14 @@ test('default activation follows module declarations without treating familiar I
   assert.equal(context.C3.trackingEnabled('x', { trackedSites: ['x'] }), true);
 });
 
+test('saved site choices never gain newly available integrations', () => {
+  for (const trackedSites of [[], ['x', 'linkedin'], ['reddit'], ['x', 'instagram', 'retired']]) {
+    const saved = { trackedSites: [...trackedSites], accessMinutes: 12 };
+    assert.deepEqual(C.settingsSnapshot(saved).trackedSites, trackedSites);
+    for (const { id } of C.SITES) assert.equal(C.trackingEnabled(id, saved), trackedSites.includes(id));
+    assert.deepEqual(saved.trackedSites, trackedSites);
+  }
+});
 test('newly available integrations stay disabled until selected', () => {
   C.SITES.push({ id: 'example' });
   try {

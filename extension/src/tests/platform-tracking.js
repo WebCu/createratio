@@ -9,9 +9,10 @@ const { worker, popupSender, unlock } = require('./background-harness.js');
 
 function platformTracking({ id: site, url, neutral: neutralPath, gated }) {
   for (const browser of ['chrome', 'browser']) {
-    test(`${browser}: ${site} opts into the shared ${gated ? 'gated' : 'tracking-only'} time and scrolling lifecycle`, async () => {
+    test(`${browser}: ${site} preserves the shared ${gated ? 'gated' : 'tracking-only'} time and scrolling lifecycle through disable/re-enable`, async () => {
       assert.equal(Sites.get(site).access !== undefined, gated);
-      const t = await tracker(browser, { url, fixture: ({ url, listen }) => environment(url, listen) });
+      const off = { ...C.DEFAULT_SETTINGS, trackedSites: [] };
+      const t = await tracker(browser, { url, snapshot: { day: {}, settings: off }, fixture: ({ url, listen }) => environment(url, listen) });
       const consumed = () => t.packets.flatMap(packet => packet.segments).reduce((sum, segment) => sum + (segment.mode === 'consume' ? segment.sec : 0), 0);
       t.input(); t.setNow(5000); await t.tick();
       assert.equal(consumed(), 0);
@@ -36,12 +37,12 @@ function platformTracking({ id: site, url, neutral: neutralPath, gated }) {
       assert.equal(t.wheel(-240).defaultPrevented, true);
       assert.equal(t.document.scrollingElement.scrollTop, 1000);
       for (let cycle = 0; cycle < 10; cycle++) {
-        t.setSnapshot({ day: {}, settings: C.DEFAULT_SETTINGS }); await t.tick();
+        t.setSnapshot({ day: {}, settings: off }); await t.tick();
         assert.equal(t.listenerCount('wheel'), 1);
         t.setSnapshot({ day: {}, settings }); await t.tick();
         assert.equal(t.listenerCount('wheel'), 2, 're-enabling never accumulates listeners');
       }
-      t.setSnapshot({ day: {}, settings: C.DEFAULT_SETTINGS }); await t.tick();
+      t.setSnapshot({ day: {}, settings: off }); await t.tick();
       t.input(); t.setNow(20000); await t.tick();
       assert.equal(consumed(), 5);
       assert.equal(t.wheel(240).defaultPrevented, false);
@@ -54,7 +55,7 @@ function platformTracking({ id: site, url, neutral: neutralPath, gated }) {
       const sender = { id: 'test-extension', tab: { id: 1 }, frameId: 0, url };
       const packet = { type: 'ingest', id: site + '-packet', site, segments: [{ date, mode: 'consume', sec: 5 }], actions: [{ date, action: 'comments' }] };
       assert.equal((await w.send(packet, sender)).ok, true);
-      assert.equal(w.data[date], undefined, 'new platforms do not record by default');
+      assert.equal(w.data[date], undefined, 'blocked sites cannot record without an access session');
       const enabled = await w.send({ type: 'tracking', site, enabled: true }, popupSender);
       assert.equal(enabled.ok, true);
       assert.ok(enabled.settings.trackedSites.includes(site));

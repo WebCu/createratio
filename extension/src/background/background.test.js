@@ -306,15 +306,15 @@ test('a new unblock records a refill timestamp but repeated confirmation does no
   assert.equal(repeated.access.x.refilledAt, refilledAt);
   assert.equal(repeated.access.x.remainingMs, 300000);
 });
-test('X and LinkedIn start blocked while opt-in TikTok and Instagram remain unrestricted', async () => {
+test('all seven sites start enabled and blocked without an access session', async () => {
   for (const browser of ['chrome', 'browser']) {
     const w = worker({}, browser), result = await w.send({ type: 'access-status' });
     assert.equal(result.ok, true);
-    for (const site of ['x', 'linkedin']) assert.equal(result.access[site].expiresAt, 0);
-    assert.deepEqual(rulesFor(w), []);
-    for (const site of ['tiktok', 'instagram']) {
-      assert.equal(result.access[site].enabled, false);
-      assert.deepEqual(rulesFor(w, [site]), require('../../sites/index.js').get(site).access.unrestrictedRules);
+    for (const { id } of C.SITES) {
+      assert.equal(result.access[id].enabled, true, id);
+      assert.equal(result.access[id].remainingMs, 0, id);
+      assert.equal(result.access[id].expiresAt, 0, id);
+      assert.deepEqual(rulesFor(w, [id]), [], id);
     }
   }
 });
@@ -509,7 +509,7 @@ test('settings page in a tab can save all preferences but spoofed pages and subf
     assert.equal((await w.send(message, sender)).ok, true);
   }
   assert.equal(w.data.settings.siteOverrides.x.accessMinutes, 2); assert.equal(w.data.settings.accessMinutes, 12);
-  assert.deepEqual(w.data.settings.trackedSites, ['linkedin']); assert.equal(w.data._websiteTimeEnabled, true);
+  assert.deepEqual(w.data.settings.trackedSites, C.DEFAULT_SETTINGS.trackedSites.filter(id => id !== 'x')); assert.equal(w.data._websiteTimeEnabled, true);
 });
 
 test('slow scrolling rejects foreign, content and framed senders and non-boolean preferences', async () => {
@@ -565,10 +565,10 @@ test('saved zero resistance stays Off until enabled with a valid strength, inclu
     assert.equal(result.scrollFrictionEnabled, true); assert.equal(result.scrollFrictionStrength, 50);
   }
 });
-test('fresh profiles track X and LinkedIn by default', async () => {
+test('fresh profiles track all seven sites by default', async () => {
   const w = worker();
   const result = await w.send({ type: 'snapshot' });
-  assert.deepEqual(result.settings.trackedSites, ['x', 'linkedin']);
+  assert.deepEqual(result.settings.trackedSites, C.SITES.map(site => site.id));
   assert.equal(result.settings.nudgeMinutes, undefined); assert.equal(result.settings.nudgeEnabled, undefined);
 });
 test('turning Limit & track off drops time and actions, preserves history, and unblocks the site', async () => {
@@ -576,7 +576,7 @@ test('turning Limit & track off drops time and actions, preserves history, and u
   await w.send(packet('before'));
   const result = await w.send(tracking('x', false), popupSender);
   assert.equal(result.ok, true);
-  assert.deepEqual(result.settings.trackedSites, ['linkedin']);
+  assert.deepEqual(result.settings.trackedSites, C.DEFAULT_SETTINGS.trackedSites.filter(id => id !== 'x'));
   assert.equal(result.access.x.expiresAt, 0);
   assert.equal(result.day.x.consumeSec, 5);
   const after = packet('disabled'); after.actions = [{ date: C.localDate(), action: 'posts' }];
@@ -591,13 +591,12 @@ test('turning Limit & track off drops time and actions, preserves history, and u
   await restarted.send(tracking('x', true), popupSender); await unlock(restarted);
   await restarted.send(packet('enabled'));
   assert.equal(w.data[C.localDate()].x.consumeSec, 10);
-  assert.deepEqual((await restarted.send({ type: 'snapshot' })).settings.trackedSites, ['x', 'linkedin']);
+  assert.deepEqual((await restarted.send({ type: 'snapshot' })).settings.trackedSites, C.DEFAULT_SETTINGS.trackedSites);
 });
 test('all creation tracking can be disabled; concurrent access changes preserve the selection', async () => {
   const w = worker();
   const results = await Promise.all([
-    w.send(tracking('x', false), popupSender),
-    w.send(tracking('linkedin', false), popupSender),
+    ...C.SITES.map(({ id }) => w.send(tracking(id, false), popupSender)),
     w.send({ type: 'access-duration', minutes: 7 }, popupSender)
   ]);
   assert.ok(results.every(result => result.ok));
@@ -606,6 +605,22 @@ test('all creation tracking can be disabled; concurrent access changes preserve 
   assert.equal((await w.send(packet('no-tracking'))).ok, true);
   assert.equal(w.data[C.localDate()], undefined);
   assert.equal(C.csv(w.data).trim().split('\r\n').length, 1);
+});
+test('saved site selections survive initialization, restart and unrelated preference changes', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const trackedSites of [[], ['x', 'linkedin'], ['reddit'], ['tiktok', 'instagram', 'facebook', 'youtube']]) {
+      const data = { settings: { trackedSites: [...trackedSites], accessMinutes: 12 } };
+      const w = worker(data, browser);
+      w.startup();
+      await w.send({ type: 'access-duration', minutes: 7 }, popupSender);
+      const restarted = worker(data, browser, w.now);
+      restarted.startup();
+      const result = await restarted.send({ type: 'snapshot' });
+      assert.deepEqual(result.settings.trackedSites, trackedSites);
+      assert.deepEqual(data.settings.trackedSites, trackedSites);
+      for (const { id } of C.SITES) assert.equal(result.access[id].enabled, trackedSites.includes(id), id);
+    }
+  }
 });
 test('tracking preferences reject unvetted sites, invalid flags and untrusted senders', async () => {
   const w = worker();
@@ -701,7 +716,7 @@ test('concurrent site preferences preserve siblings, creation tracking, history 
   ]);
   assert.ok(results.every(result => result.ok));
   assert.deepEqual(w.data.settings.siteOverrides, { x: { accessMinutes: 2, nudgeEnabled: false, nudgeMinutes: 3 }, linkedin: { accessMinutes: 20 } });
-  assert.deepEqual(w.data.settings.trackedSites, ['linkedin']);
+  assert.deepEqual(w.data.settings.trackedSites, C.DEFAULT_SETTINGS.trackedSites.filter(id => id !== 'x'));
   await w.send({ type: 'access-duration', site: 'x', minutes: null }, popupSender);
   assert.deepEqual(w.data.settings.siteOverrides.x, { nudgeEnabled: false, nudgeMinutes: 3 });
   assert.equal(C.siteSettings('x', w.data.settings).accessMinutes, 15); assert.equal(C.siteSettings('x', w.data.settings).nudgeEnabled, undefined);

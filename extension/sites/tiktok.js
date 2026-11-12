@@ -101,5 +101,5 @@
       }
     };
   }
-  return { id: 'tiktok', name: 'TikTok', hosts, access, actions: ['posts', 'comments', 'likes', 'bookmarks'], classifyPage, create };
+  return { id: 'tiktok', name: 'TikTok', hosts, defaultEnabled: true, access, actions: ['posts', 'comments', 'likes', 'bookmarks'], classifyPage, create };
 });

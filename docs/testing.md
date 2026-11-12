@@ -488,7 +488,8 @@ Before a release, verify:
 
 - Enabled X/Twitter aliases, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit block,
   including HTTP/S subdomains, while unrelated sites remain accessible. TikTok,
-  Instagram, Facebook, YouTube and Reddit start Off; saved choices survive updates. Verify browser
+  Instagram, Facebook, YouTube and Reddit all start On for fresh installs; saved On/Off
+  choices survive updates without adding sites to an existing selection. Verify browser
   approval of expanded hosts.
 - Reloading preserves the 60-second wait; only explicit confirmation unlocks.
 - Access budgets are shared per site, pause on tab/window changes, survive

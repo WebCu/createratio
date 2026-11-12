@@ -25,8 +25,8 @@ when capabilities change.
 
 `pnpm marketing:assets` rebuilds Chrome, refreshes the text kit and generates:
 
-- `dist/marketing/screenshots/01-websites.png`: four supported sites, enabled
-  for demonstration. Instagram and TikTok start Off in the actual defaults.
+- `dist/marketing/screenshots/01-websites.png`: all seven supported sites, enabled
+  as on a fresh install. Existing saved On/Off choices are preserved.
 - `02-intention.png`: the real Instagram access gate with a synthetic intention.
 - `03-creation-score.png`: the real dashboard with synthetic daily totals.
 - `manifest.json`: extension version, Chromium version, copy fingerprint,

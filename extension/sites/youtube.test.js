@@ -54,12 +54,12 @@ const unsupported = [
   '/@synthetic/videos/unknown', '/c', '/user'
 ];
 
-test('YouTube publishes an opt-in module with explicit access policy in Node and the browser', () => {
+test('YouTube publishes a default-on module with explicit access policy in Node and the browser', () => {
   assert.equal(plugin.id, 'youtube');
   assert.equal(plugin.name, 'YouTube');
   assert.deepEqual(plugin.hosts, ['youtube.com', 'www.youtube.com']);
   assert.deepEqual(plugin.actions, ['comments']);
-  assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
+  assert.equal(plugin.defaultEnabled, true);
   assert.deepEqual(plugin.access.domains, ['youtube.com']);
   assert.equal(plugin.access.home, 'https://www.youtube.com/');
   assert.equal(plugin.access.redirectRuleId, 6);
@@ -260,7 +260,7 @@ for (const browser of ['chrome', 'browser']) {
     });
   }
 
-  test(`${browser} YouTube is opt-in and disable/re-enable requires fresh input`, async () => {
+  test(`${browser} YouTube disable/re-enable requires fresh input`, async () => {
     const t = await youtubeTracker(browser, { snapshot: selection(false) });
     t.input(); t.event('click', { isTrusted: true, target: new Element(['button', '#submit-button button']) });
     t.setNow(5000); await t.tick();

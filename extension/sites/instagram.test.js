@@ -21,10 +21,10 @@ function seconds(t, mode) {
   return t.packets.flatMap(packet => packet.segments).filter(segment => segment.mode === mode).reduce((sum, segment) => sum + segment.sec, 0);
 }
 
-test('Instagram publishes an opt-in module with explicit access policy in Node and the browser', () => {
+test('Instagram publishes a default-on module with explicit access policy in Node and the browser', () => {
   assert.equal(plugin.id, 'instagram'); assert.equal(plugin.name, 'Instagram');
   assert.deepEqual(plugin.hosts, ['instagram.com', 'www.instagram.com']);
-  assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
+  assert.equal(plugin.defaultEnabled, true);
   assert.deepEqual(plugin.access.domains, ['instagram.com']);
   assert.equal(plugin.access.home, 'https://www.instagram.com/');
   assert.equal(plugin.access.sessionRules.some(rule => rule.condition.excludedResourceTypes?.includes('sub_frame')), true);
@@ -261,7 +261,7 @@ for (const browser of ['chrome', 'browser']) {
     assert.deepEqual(t.warnings, []);
   });
 
-  test(`Instagram real adapter uses shared trusted wheel/touch tracking, opt-in and submission deduplication (${browser})`, async () => {
+  test(`Instagram real adapter uses shared trusted wheel/touch tracking, disable/re-enable and submission deduplication (${browser})`, async () => {
     let mounted, creations = 0;
     const integration = { ...plugin, create(env) { creations++; mounted = mount(env); return mounted.adapter; } };
     const t = await tracker(browser, { url: 'https://instagram.com/p/synthetic/', integration, snapshot: { day: {}, settings: { ...C.DEFAULT_SETTINGS, trackedSites: [] } } });

@@ -207,20 +207,19 @@ or when disabled, normal gates return unless a timed budget still has time.
 
 ### Tracking choices
 
-X and LinkedIn start with **Limit & track** On. Off removes the site's gate,
+All seven supported platforms start with **Limit & track** On for fresh installs.
+Existing saved On/Off choices are preserved. Off removes the site's gate,
 wait, timer, and new creation-score measurements together. Saved duration and
 history remain. Off discards the current budget and waiting request, including
 its midnight refill. Re-enabling requires a fresh intention and wait unless
 optional above-goal access applies. Fresh trusted input is required to measure.
 
-TikTok, Instagram, Facebook, YouTube and Reddit start Off. Enable **Limit & track** in Settings
-to use the same intention, wait and active-time budgets as X and LinkedIn. Saved
-On/Off choices are preserved, including previously enabled tracking choices;
-enabled TikTok, Instagram, Facebook, YouTube and Reddit sites require access sessions. Save drafts
-before updating.
+All seven use the same intention, wait and active-time budgets. Manage each site's
+**Limit & track** in Settings. Enabled sites require access sessions. Save drafts
+before installing or enabling a site.
 
-New vetted integrations start disabled; arbitrary domains or user scripts cannot
-be added from the UI. Integrations without explicit gate support appear under
+Integrations declare their default activation; saved site selections never gain
+new sites automatically. Arbitrary domains or user scripts cannot be added from the UI. Integrations without explicit gate support appear under
 **Tracking only**. Enabling one measures supported creating/consuming time and
 submit interactions and applies the shared Slow scrolling preference. It never
 adds an access gate, intention, wait, or session timer. Off stops measurements and
@@ -344,9 +343,9 @@ for contributor-facing details.
 
 ### Reddit tracking
 
-Reddit starts Off under **Settings → Websites → Reddit → Limit & track**. Enabling
-adds the shared intention, wait and active-time budget, plus creation tracking and
-Slow scrolling. Blocking covers HTTP/S `reddit.com` and its subdomains; creation
+Reddit starts On for fresh installs under **Settings → Websites → Reddit → Limit & track**.
+It uses the shared intention, wait and active-time budget, plus creation tracking and
+Slow scrolling. Existing saved choices are preserved. Blocking covers HTTP/S `reddit.com` and its subdomains; creation
 tracking uses only HTTPS `reddit.com` and `www.reddit.com`. Off restores free
 access and native scrolling while retaining history and saved duration.
 
@@ -360,8 +359,9 @@ publication.
 
 ### TikTok tracking
 
-TikTok starts Off under **Settings → Websites → TikTok → Limit & track**. Enabling adds the shared
-intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+TikTok starts On for fresh installs under **Settings → Websites → TikTok → Limit & track**.
+It uses the shared intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Existing saved choices are preserved.
 Blocking covers HTTP/S `tiktok.com` and its subdomains; creation tracking uses only
 HTTPS `tiktok.com` and `www.tiktok.com`. Off restores free access and native
 scrolling while retaining history and saved duration.
@@ -376,8 +376,9 @@ synthetic fixtures do not prove current authenticated markup or publication.
 
 ### Instagram tracking
 
-Instagram starts Off under **Settings → Websites → Instagram → Limit & track**. Enabling adds the shared
-intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Instagram starts On for fresh installs under **Settings → Websites → Instagram → Limit & track**.
+It uses the shared intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Existing saved choices are preserved.
 Blocking covers HTTP/S `instagram.com` and its subdomains; creation tracking uses
 only HTTPS `instagram.com` and `www.instagram.com`. Off restores free access and
 native scrolling while retaining history and saved duration.
@@ -393,9 +394,9 @@ publication.
 
 ### Facebook tracking
 
-Facebook starts Off under **Settings → Websites**, alongside Instagram and TikTok.
-Its **Limit & track** switch enables the same intention, wait, session-time controls
-and active-time budget. Access gating covers HTTP/S `facebook.com` and its
+Facebook starts On for fresh installs under **Settings → Websites**; existing saved choices
+are preserved. Its **Limit & track** switch controls the same intention, wait, session-time
+controls and active-time budget. Access gating covers HTTP/S `facebook.com` and its
 subdomains; creation tracking uses only the exact HTTPS hosts `facebook.com` and
 `www.facebook.com`. Enabling applies the shared Slow scrolling preference on
 consuming pages during access. Off restores unrestricted access and native
@@ -411,9 +412,9 @@ do not prove current authenticated markup or publication.
 
 ### YouTube tracking
 
-YouTube starts Off under **Settings → Websites**. **Limit & track** enables the
-same intention, wait and active-time budget as the other sites, with creation
-tracking and shared Slow scrolling. Access gating covers HTTP/S `youtube.com`
+YouTube starts On for fresh installs under **Settings → Websites**; existing saved choices
+are preserved. **Limit & track** controls the same intention, wait and active-time budget
+as the other sites, with creation tracking and shared Slow scrolling. Access gating covers HTTP/S `youtube.com`
 and its subdomains; creation tracking uses only the exact HTTPS hosts
 `youtube.com` and `www.youtube.com`. Off restores unrestricted access and native
 scrolling, stops new creation measurements, and preserves history and saved duration.

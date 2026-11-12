@@ -108,5 +108,5 @@
       }
     };
   }
-  return { id: 'instagram', name: 'Instagram', hosts, access, actions: ['posts', 'comments', 'likes', 'bookmarks'], classifyPage, create };
+  return { id: 'instagram', name: 'Instagram', hosts, defaultEnabled: true, access, actions: ['posts', 'comments', 'likes', 'bookmarks'], classifyPage, create };
 });

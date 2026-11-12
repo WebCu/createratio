@@ -12,8 +12,9 @@ and access code never branch on its site ID.
 ship, not which integrations a user activates. Users independently enable or
 disable available sites in Settings; their choices persist locally.
 
-X and LinkedIn declare `defaultEnabled: true` in their modules. New integrations
-omit this flag and start disabled until the user enables them. Tracking-only
+All seven supported platforms declare `defaultEnabled: true` in their modules,
+so fresh installs start with Limit & track On. Saved selections are preserved
+without automatically adding sites. Omitting the flag defaults an integration to Off. Tracking-only
 integrations share the existing Slow scrolling preference on consuming pages
 without declaring access gates. Adding a module
 file without registering it does not ship or activate it.

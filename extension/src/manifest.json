@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CreateRatio",
   "version": "0.0.5",
-  "description": "Create > Consume. Block X and LinkedIn, unlock for configurable active-tab time, and track creating versus consuming.",
+  "description": "Create > Consume. X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit: timed access and private local creation tracking.",
   "minimum_chrome_version": "111",
   "permissions": ["storage", "alarms", "declarativeNetRequestWithHostAccess", "scripting"],
   "optional_permissions": ["tabs", "idle"],

@@ -38,7 +38,7 @@ try {
   await browser.setTime(new Date(2026, 2, 9, 12).getTime());
   await evaluate(browser, browser.worker, `(async () => {
     const { settings } = await chrome.storage.local.get('settings');
-    await chrome.storage.local.set({ settings: { ...settings, trackedSites: ['x', 'linkedin', 'tiktok', 'instagram'], allowAboveGoal: false, intentionHistoryEnabled: false }, _websiteTimeEnabled: false,
+    await chrome.storage.local.set({ settings: { ...settings, trackedSites: C3.SITES.map(site => site.id), allowAboveGoal: false, intentionHistoryEnabled: false }, _websiteTimeEnabled: false,
       [C3.localDate()]: {
         x: { createSec: 900, consumeSec: 600, posts: 1 },
         linkedin: { createSec: 900, consumeSec: 600, comments: 1 },
@@ -69,13 +69,13 @@ try {
     await writeFile(join(temporary, filename), bytes);
     captures.push({ filename, caption: release.screenshots[index].caption, sha256: digest(bytes), width: 1280, height: 800 });
   };
-  await open('/settings.html', 'document.querySelectorAll("#site-settings input:checked").length === 4');
+  await open('/settings.html', 'document.querySelectorAll("#site-settings input:checked").length === 7');
   await capture(0);
   await open('/blocked.html?site=instagram', '!document.querySelector("#begin").disabled && !document.querySelector("#request").hidden && document.title === "Instagram blocked - CreateRatio"');
   await clickByRole(browser, page, 'textbox', 'What do you need to do?');
   await browser.cdp.send('Input.insertText', { text: 'Share the photos from my latest project.' }, page.session);
   await capture(1);
-  await open('/dashboard.html', 'document.querySelectorAll("#sites tr").length === 4 && document.querySelector("#create-min").textContent === "48.0m"');
+  await open('/dashboard.html', 'document.querySelectorAll("#sites tr").length === 7 && document.querySelector("#create-min").textContent === "48.0m"');
   await capture(2);
   assert.deepEqual(browser.errors, []);
   assert.deepEqual(await inventory(bundle), bundleHashes, 'Bundle changed during capture.');
@@ -83,7 +83,7 @@ try {
   await writeFile(join(temporary, 'manifest.json'), JSON.stringify({
     version: manifest.version, browser: await browser.cdp.send('Browser.getVersion'),
     releaseSHA256: marketing.releaseFingerprint(release), synthetic: true,
-    note: 'Actual Chrome build in a disposable offline profile. Instagram and TikTok enabled for demonstration; both start Off. Not Firefox validation.',
+    note: 'Actual Chrome build in a disposable offline profile. All seven sites enabled as on a fresh install; existing saved choices are preserved. Not Firefox validation.',
     bundleSHA256: bundleHashes, screenshots: captures
   }, null, 2) + '\n');
   await rm(join(output, 'screenshots'), { recursive: true, force: true });

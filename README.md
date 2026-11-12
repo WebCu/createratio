@@ -3,7 +3,8 @@
 **Create > Consume.**
 
 A free, open-source browser extension that helps you spend more time creating
-and less time consuming. X and LinkedIn are blocked by default. Write an
+and less time consuming. X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit
+are blocked by default on a fresh install. Write an
 intention, wait 60 seconds, then confirm access for five active minutes by default.
 Switching away pauses the timer.
 
@@ -15,9 +16,9 @@ Switching away pauses the timer.
   [measurement rules and limitations](extension/README.md#measurement-and-score).
 - **Scroll friction:** wheel/trackpad scrolling on consuming pages moves half
   as far by default. Tune the resistance or turn it off in Settings.
-- **TikTok, Instagram, Facebook, YouTube and Reddit:** start Off. Enable **Limit & track** in
-  Settings for the same intention, wait and active-time limits as X and LinkedIn, alongside
-  creation tracking and shared Slow scrolling. Saved On/Off choices are kept.
+- **All seven platforms start On:** each uses the same intention, wait and active-time
+  limits, alongside creation tracking and shared Slow scrolling. Turn **Limit & track**
+  Off for any site in Settings. Existing saved On/Off choices are kept.
 - **Optional extras:** track time across websites or save your access intentions.
   Both are off by default.
 - **Private by default:** no extension account, analytics, telemetry, or activity

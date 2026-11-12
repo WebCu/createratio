@@ -19,11 +19,11 @@ function fixture(kind = 'comment', url = 'https://www.reddit.com/r/synthetic/com
 }
 function seconds(t, mode) { return t.packets.flatMap(p => p.segments).filter(s => s.mode === mode).reduce((total, s) => total + s.sec, 0); }
 
-test('Reddit publishes a synchronous, opt-in module with explicit access policy', () => {
+test('Reddit publishes a synchronous, default-on module with explicit access policy', () => {
   assert.equal(plugin.id, 'reddit');
   assert.deepEqual(plugin.hosts, ['reddit.com', 'www.reddit.com']);
   assert.deepEqual(plugin.actions, ['posts', 'comments']);
-  assert.equal(Object.hasOwn(plugin, 'defaultEnabled'), false);
+  assert.equal(plugin.defaultEnabled, true);
   assert.deepEqual(plugin.access.domains, ['reddit.com']);
   assert.equal(plugin.access.home, 'https://www.reddit.com/');
   assert.deepEqual(plugin.access.unrestrictedRules.map(rule => rule.condition), [
@@ -189,7 +189,7 @@ test('Reddit DM composing is scoped to its compose form and earns no submission 
 });
 
 for (const browser of ['chrome', 'browser']) {
-  test(`Reddit actual adapter uses shared ${browser} trusted wheel/touch tracking and opt-in lifecycle`, async () => {
+  test(`Reddit actual adapter uses shared ${browser} trusted wheel/touch tracking and disable/re-enable lifecycle`, async () => {
     let f;
     const snapshot = trackedSites => ({ day: {}, settings: { trackedSites } });
     const t = await tracker(browser, { integration: plugin, fixture({ url, listen }) { f = populate(environment(url, listen)); return f; }, url: 'https://www.reddit.com/r/synthetic/comments/abc123/title/', snapshot: snapshot([]) });
