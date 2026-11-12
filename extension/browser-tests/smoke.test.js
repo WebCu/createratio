@@ -1,8 +1,45 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { access, readFile } = require('node:fs/promises');
+const { access, mkdtemp, readFile, realpath, rm, writeFile } = require('node:fs/promises');
 const path = require('node:path');
+const { tmpdir } = require('node:os');
+const { build } = require('../build.js');
+
+async function waitForGate(browser, page) {
+  const { evaluate, eventually, waitForEnabledControl } = await import('./chromium.mjs');
+  await eventually(() => evaluate(browser, page.session, `location.href === ${JSON.stringify(browser.origin + '/blocked.html?site=x')}`), 'actual blocked-page redirect');
+  await waitForEnabledControl(browser, page, '#begin');
+}
+
+test('gate readiness waits for missing and disabled controls before keyboard input', async t => {
+  const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
+  const directory = await mkdtemp(path.join(tmpdir(), 'createratio-gate-readiness-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const bundle = await build('chrome', await realpath(directory));
+  const file = path.join(bundle, 'blocked.html');
+  const html = await readFile(file, 'utf8');
+  await writeFile(file, html.slice(0, html.indexOf('<main>')) + '</body></html>');
+  const browser = await launch(bundle);
+  try {
+    await withFailureArtifacts(browser, 'gate controls readiness', async () => {
+      const page = await browser.page(browser.origin + '/blocked.html?site=x');
+      await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("header")'), 'gate header delivered without controls');
+      const ready = waitForGate(browser, page);
+      ready.catch(() => {});
+      assert.equal(await Promise.race([ready.then(() => true), new Promise(resolve => setTimeout(() => resolve(false), 200))]), false, 'missing controls must not authorize keyboard input');
+      await writeFile(file, html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ''));
+      await browser.cdp.send('Page.reload', {}, page.session);
+      await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && document.querySelector("#begin")?.disabled === true'), 'disabled controls delivered without initialization');
+      assert.equal(await Promise.race([ready.then(() => true), new Promise(resolve => setTimeout(() => resolve(false), 200))]), false, 'disabled controls must not authorize keyboard input');
+      await writeFile(file, html);
+      await browser.cdp.send('Page.reload', {}, page.session);
+      await ready;
+      assert.equal(await evaluate(browser, page.session, 'document.querySelector("#reason").disabled'), false);
+      assert.equal(await evaluate(browser, page.session, 'document.activeElement.tagName'), 'BODY');
+    });
+  } finally { await browser.cleanup(); }
+});
 
 test('built Chromium extension: access gates and history controls', async t => {
   const { launch, evaluate, eventually, click, withFailureArtifacts, openSettingsSection } = await import('./chromium.mjs');
@@ -13,7 +50,7 @@ test('built Chromium extension: access gates and history controls', async t => {
   const inspect = (page, source) => evaluate(browser, page.session, source);
   const storage = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(null)');
   const navigate = (page, url) => cdp.send('Page.navigate', { url }, page.session);
-  const atGate = page => eventually(() => inspect(page, `location.href === ${JSON.stringify(browser.origin + '/blocked.html?site=x')} && !document.querySelector('#begin')?.disabled`), 'actual blocked-page redirect');
+  const atGate = page => waitForGate(browser, page);
   const visible = (page, selector) => inspect(page, `!!document.querySelector(${JSON.stringify(selector)})?.getClientRects().length`);
   const text = (page, selector) => inspect(page, `document.querySelector(${JSON.stringify(selector)})?.textContent`);
   const expectText = (page, selector, expected) => eventually(async () => await text(page, selector) === expected, `${selector} displays ${expected}`);
