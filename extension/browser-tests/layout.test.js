@@ -98,7 +98,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       await browser.cdp.send('Page.navigate', { url: browser.origin + '/settings.html' }, page.session);
       await eventually(() => inspect(page, 'globalThis.snapshotHeld === true'), 'initial snapshot held');
       await openSettingsSection(browser, page, 'data');
-      assert.equal(await inspect(page, 'document.querySelectorAll("#site-settings select").length'), 7);
+      assert.equal(await inspect(page, 'document.querySelectorAll("#site-settings select").length'), 14);
       assert.equal(await inspect(page, 'document.querySelector("#data-settings").open'), true);
       assert.ok(await findByRole(browser, page, 'button', 'Clear history'));
     });
@@ -154,7 +154,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       const catalog = sites.filter(site => site.gated), trackingOnly = sites.filter(site => !site.gated);
       for (const width of [320, 390]) {
         const page = await pageAt('/settings.html', width);
-        await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings select").length === 7'), 'catalog menus rendered');
+        await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings select").length === 14'), 'catalog menus rendered');
         assert.equal(await inspect(page, 'document.querySelector("#tracking-only-section").hidden'), trackingOnly.length === 0);
         assert.deepEqual(await inspect(page, '[...document.querySelectorAll("#site-settings > li")].map(row => row.dataset.site)'), catalog.map(site => site.id));
         assert.deepEqual(await inspect(page, '[...document.querySelectorAll("#tracking-only-settings > li")].map(row => row.dataset.site)'), trackingOnly.map(site => site.id));
