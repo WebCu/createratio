@@ -35,7 +35,7 @@ function remaining(ms) { const seconds = Math.max(0, Math.ceil(ms / 1000)); retu
 function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
-  const waiting = !active && access.readyAt > 0 && access.requestExpiresAt > now;
+  const waiting = !active && access.readyAt > 0;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
   $('session-step').textContent = `Open a ${access.sessionMinutes}-minute session.`;
   $('heading').textContent = active ? `${access.name} is open.` : blockedLine;

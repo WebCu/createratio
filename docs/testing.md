@@ -491,7 +491,8 @@ Before a release, verify:
   Instagram, Facebook, YouTube and Reddit all start On for fresh installs; saved On/Off
   choices survive updates without adding sites to an existing selection. Verify browser
   approval of expanded hosts.
-- Reloading preserves the 60-second wait; only explicit confirmation unlocks.
+- Reloading preserves the 60-second wait. Returning after a long absence still
+  offers confirmation; only explicit confirmation unlocks.
 - Access budgets are shared per site, pause on tab/window changes, survive
   restarts, refill at local midnight, and revoke access at expiry or manual end.
   A worker wake deducts elapsed active time; actual browser downtime does not.

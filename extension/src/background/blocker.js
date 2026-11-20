@@ -1,6 +1,6 @@
 'use strict';
 const SiteAccess = (() => {
-  const WAIT_MS = 60000, REQUEST_MS = 600000;
+  const WAIT_MS = 60000, LEGACY_CONFIRM_WINDOW_MS = 600000;
   const MAX_BUDGET_MS = C3.ACCESS_LIMITS.maxMinutes * 60000;
   function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function accessState(value) { return record(value) ? value : {}; }
@@ -25,10 +25,16 @@ const SiteAccess = (() => {
     const remainingMs = Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0;
     const expiresAt = remainingMs && entry.expiresAt > now ? entry.expiresAt : 0;
     const readyAt = !remainingMs && validWait(entry, now) ? entry.readyAt : 0;
-    return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, requestExpiresAt: readyAt ? entry.requestExpiresAt : 0, refilledAt: entry.refilledAt || 0, waitSeconds: WAIT_MS / 1000, sessionMinutes: minutes };
+    return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, refilledAt: entry.refilledAt || 0, waitSeconds: WAIT_MS / 1000, sessionMinutes: minutes };
   }
   function validWait(entry, now) {
-    return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && Number.isFinite(entry.requestExpiresAt) && entry.requestExpiresAt > entry.readyAt && entry.requestExpiresAt > now && entry.requestExpiresAt - entry.readyAt <= REQUEST_MS && entry.readyAt <= now + WAIT_MS;
+    return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && entry.readyAt <= now + WAIT_MS;
+  }
+  function restoreWait(entry, now) {
+    const { readyAt, requestExpiresAt } = entry;
+    if (!validWait(entry, now) || (Object.hasOwn(entry, 'requestExpiresAt')
+      && (!Number.isFinite(requestExpiresAt) || requestExpiresAt <= readyAt || requestExpiresAt - readyAt > LEGACY_CONFIRM_WINDOW_MS))) delete entry.readyAt;
+    delete entry.requestExpiresAt;
   }
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
@@ -77,7 +83,7 @@ const SiteAccess = (() => {
         delete entry.remainingMs;
         await api.alarms.clear('access-' + site);
       }
-      if (!validWait(entry, now)) { delete entry.readyAt; delete entry.requestExpiresAt; }
+      restoreWait(entry, now);
     }
     const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
     if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules))) await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: Object.keys(SITES).flatMap(ruleIds), addRules: rules });
@@ -141,7 +147,7 @@ const SiteAccess = (() => {
     if (!C3.validIntention(message.reason)) return { ok: false, error: `Write a specific intention of ${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters.` };
     if (state.remainingMs || state.readyAt) return;
     const site = message.site, access = accessState(stored._access);
-    access[site] = { readyAt: now + WAIT_MS, requestExpiresAt: now + WAIT_MS + REQUEST_MS };
+    access[site] = { readyAt: now + WAIT_MS };
     const changes = { _access: access };
     if (stored.settings?.intentionHistoryEnabled === true) changes._intentions = [...savedIntentions(stored._intentions), { site, reason: message.reason.trim(), requestedAt: now }].slice(-100);
     await api.storage.local.set(changes);

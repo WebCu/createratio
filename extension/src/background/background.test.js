@@ -430,15 +430,14 @@ test('concurrent gates share a wait and repeated opens cannot extend a session',
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).access.x.remainingMs, 280000);
   assert.equal((await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'))).access.x.remainingMs, 280000);
 });
-test('wait survives a worker restart but abandoned requests expire', async () => {
-  const first = worker();
-  await first.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-  const restarted = worker(first.data, 'chrome', first.now + 60000);
-  assert.equal((await restarted.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
-  const abandoned = worker();
-  await abandoned.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-  abandoned.advance(660000);
-  assert.equal((await abandoned.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+test('a legacy wait that outlasts its old deadline stays ready without retaining the deadline', async () => {
+  const readyAt = worker().now - 3600000;
+  const w = worker({ _access: { x: { readyAt, requestExpiresAt: readyAt + 600000 } } });
+  assert.equal((await w.send({ type: 'access-status' })).access.x.readyAt, readyAt);
+  assert.deepEqual(w.data._access.x, { readyAt });
+  assert.deepEqual(rulesFor(w), []);
+  assert.equal((await w.send({ type: 'access-cancel', site: 'x' }, gate('x'))).access.x.readyAt, 0);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
 });
 test('expiry revokes access and redirects all matching open tabs, not unrelated sites', async () => {
   const w = worker(); await unlock(w);

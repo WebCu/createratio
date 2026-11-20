@@ -64,7 +64,7 @@ for (const browser of ['chrome', 'browser']) {
       { remainingMs: 1e20, expiresAt: 0 },
       { expiresAt: now + 241 * 60000 },
       { readyAt: 1, requestExpiresAt: now + 365 * 86400000 },
-      { readyAt: now + 60001, requestExpiresAt: now + 660001 },
+      { readyAt: now + 60001 },
       { readyAt: now - 1, requestExpiresAt: now + 600000 }
     ];
     for (const entry of entries) {
@@ -110,7 +110,7 @@ for (const browser of ['chrome', 'browser']) {
       const day = { x: { consumeSec: 10 } }, intentions = [{ site: 'retired', reason: 'Legacy reason', requestedAt: 0 }];
       const websiteKey = '_websiteTime:' + date;
       const w = worker({ settings: structuredClone(settings), [date]: structuredClone(day), _intentions: structuredClone(intentions), [websiteKey]: { 'saved.test': 7 },
-        _access: { x: { remainingMs: 120000 }, linkedin: { readyAt: now + 60000, requestExpiresAt: now + 660000 } } }, browser, now);
+        _access: { x: { remainingMs: 120000 }, linkedin: { readyAt: now + 60000 } } }, browser, now);
       const snapshot = await w.send({ type: 'snapshot' }, popupSender);
       assert.equal(snapshot.ok, true);
       assert.deepEqual(snapshot.settings.trackedSites, []);

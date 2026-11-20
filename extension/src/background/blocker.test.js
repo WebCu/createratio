@@ -203,7 +203,6 @@ for (const browser of ['chrome', 'browser']) {
     const entries = [
       ...invalid.map(readyAt => ({ readyAt, requestExpiresAt: now + 600000 })),
       ...invalid.map(requestExpiresAt => ({ readyAt: now - 1, requestExpiresAt })),
-      { readyAt: now - 1 },
       { requestExpiresAt: now + 600000 },
       { readyAt: now + 120000, requestExpiresAt: now + 60000 }
     ];
@@ -212,7 +211,6 @@ for (const browser of ['chrome', 'browser']) {
       const result = await w.send({ type: 'access-status' });
       assert.equal(result.ok, true);
       assert.equal(result.access.x.readyAt, 0);
-      assert.equal(result.access.x.requestExpiresAt, 0);
       assert.equal(w.errors.length, 0);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       assert.deepEqual(rulesFor(w), []);
@@ -302,7 +300,7 @@ test('valid restored paused budgets and waits remain unchanged and exhausted ses
   const date = C.localDate(new Date(now));
   const entries = [
     { remainingMs: 120000, expiresAt: 0, refilledAt: 0, date },
-    { readyAt: now + 30000, requestExpiresAt: now + 630000 },
+    { readyAt: now + 30000 },
     { date, refilledAt: now - 600000 }
   ];
   for (const entry of entries) {
