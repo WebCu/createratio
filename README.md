@@ -67,7 +67,12 @@ pnpm build
 Load generated bundles, not source directories. After rebuilding, reload the
 extension in the browser's extensions manager. Individual builds are available
 through `pnpm build:chrome`, `pnpm build:edge`, and `pnpm build:firefox`.
-Source-built Edge and Firefox bundles have not yet been live-browser validated.
+On 2026-11-20, source-built bundles at `bb07674` were validated live on Microsoft
+Edge Stable 142.0.3595.94 and Firefox 160.0.1 against signed-out YouTube: blocking,
+intention entry and a real 60-second wait (premature click rejected), a 5-minute
+active budget pausing off-tab, score dashboard recording consumption, **End
+session** re-blocking, and **Limit & track** Off persisting. Store-published builds,
+signed-in/authenticated YouTube, and trackpad gestures were not covered.
 
 See the [extension guide](extension/README.md) for settings, permissions,
 measurement rules, and limitations.
