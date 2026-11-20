@@ -557,7 +557,8 @@ LinkedIn frames initiated by LinkedIn itself.
 
 Chromium blocking has prior live-browser coverage. On 2026-11-20, source-built
 bundles at `bb07674` were validated live on Microsoft Edge Stable 142.0.3595.94
-and Firefox 160.0.1 against signed-out YouTube: blocking, intention entry and a
+and 158.0.4370.33 (both passed the same flows), alongside Firefox 160.0.1, against
+signed-out YouTube: blocking, intention entry and a
 real 60-second wait (premature click rejected), a 5-minute active budget pausing
 off-tab, score dashboard recording consumption, **End session** re-blocking, and
 **Limit & track** Off persisting. Store-published builds, signed-in/authenticated
