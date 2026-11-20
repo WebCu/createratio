@@ -52,13 +52,14 @@ function renderWebsites(days) {
   $('website-empty').hidden = rows.length > 0;
   $('website-empty').textContent = websiteTimeEnabled ? 'No time in this period yet. Use a website to start.' : 'Enable Website time in Settings to record browsing time across all sites.';
   $('website-sites').replaceChildren();
-  for (const [domain, sec] of rows) {
+  const shares = WebTime.shares(rows);
+  rows.forEach(([domain, sec], index) => {
     const row = document.createElement('tr'), name = document.createElement('td'), time = document.createElement('td'), share = document.createElement('td');
     name.textContent = domain;
     const bar = document.createElement('span'); bar.style.width = `${sec / total * 100}%`; bar.setAttribute('aria-hidden', 'true'); name.append(bar);
-    time.textContent = WebTime.duration(sec); share.textContent = `${Math.round(sec / total * 100)}%`;
+    time.textContent = WebTime.duration(sec); share.textContent = `${shares[index]}%`;
     row.append(name, time, share); $('website-sites').append(row);
-  }
+  });
   $('website-export').disabled = false;
 }
 function renderIntentions() {

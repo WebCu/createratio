@@ -21,6 +21,15 @@
     }
     return [...totals].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }
+  function shares(rows) {
+    const total = rows.reduce((sum, [, sec]) => sum + sec, 0);
+    const exact = rows.map(([, sec]) => total > 0 ? sec / total * 100 : 0);
+    const percents = exact.map(Math.floor);
+    const missing = total > 0 ? 100 - percents.reduce((sum, value) => sum + value, 0) : 0;
+    const byRemainder = exact.map((value, index) => index).sort((a, b) => exact[b] - percents[b] - (exact[a] - percents[a]) || a - b);
+    for (const index of byRemainder.slice(0, missing)) percents[index] += 1;
+    return percents;
+  }
   function duration(sec) {
     const seconds = Math.floor(sec);
     if (seconds < 60) return `${seconds}s`;
@@ -105,5 +114,5 @@
     api.permissions?.onRemoved.addListener(() => schedule(tick));
     return { start, tick, setEnabled, get enabled() { return enabled; } };
   }
-  return { PERMISSIONS, domainForURL, summarize, duration, csv, create };
+  return { PERMISSIONS, domainForURL, summarize, shares, duration, csv, create };
 });
