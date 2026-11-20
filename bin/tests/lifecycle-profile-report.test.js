@@ -16,7 +16,7 @@ function fixture(workload = 'settings') {
     environment: { node: 'v24.20.0', platform: 'darwin', architecture: 'arm64', osRelease: '25.1.0' },
     runs: [['baseline', 1], ['candidate', 1], ['candidate', 2], ['baseline', 2], ['baseline', 3], ['candidate', 3]].map(([variant, repetition]) => ({
       variant, repetition, workload, tabCount, cycles: workload === 'settings' ? 12 : 3, bundleSha256: bundle.sha256, browser: 'Chrome/156.0.8078.4',
-      checkpoints: (workload === 'settings' ? [0, 6, 12] : [0, 1, 2, 3]).map(cycle => ({ cycle, samples: Array.from({ length: tabCount }, (_, index) => sample(index)) })),
+      checkpoints: (workload === 'settings' ? [[0, 'initial'], [6, 'before-navigation'], [6, 'after-navigation'], [12, 'before-navigation'], [12, 'after-navigation']] : [0, 1, 2, 3].map(cycle => [cycle])).map(([cycle, phase]) => ({ cycle, ...(phase ? { phase } : {}), samples: Array.from({ length: tabCount }, (_, index) => sample(index)) })),
       attribution: { worker: { pid: 42, isolate: 'worker-isolate' }, pages: Array.from({ length: tabCount }, (_, index) => ({ targetId: 'page-' + index, pid: 43, isolate: 'shared-isolate' })), workerSharesPageProcess: false, workerSharesPageIsolate: false },
       workerMemory: structuredClone(unavailable), wholeBrowser: { rssBytes: null, processes: [structuredClone(unavailable)] },
       closedTargets: tabCount - 1, teardown: { samples: [sample(0)] },
@@ -52,6 +52,9 @@ test('lifecycle reports require complete aligned repetitions and retain unavaila
 test('Settings report rejects node/listener accumulation and missing teardown', async () => {
   const { validateLifecycleProfile } = await import('../lifecycle-profile-report.mjs');
   for (const mutate of [
+    report => { report.runs[0].checkpoints.splice(1, 1); },
+    report => { report.runs[0].checkpoints[1].phase = 'after-navigation'; },
+    report => { report.runs[0].checkpoints = []; },
     report => { report.runs[0].checkpoints[1].samples[0].connectedElements++; },
     report => { report.runs[0].checkpoints[1].samples[0].jsEventListeners++; },
     report => { report.runs[0].checkpoints[1].samples[0].documents++; },

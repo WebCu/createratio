@@ -30,11 +30,17 @@ export async function settingsWorkload(browser, { cycles = 12, tabCount = 4, aft
     await evaluate(browser, page.session, '(async()=>{await refresh();clearSaved();document.activeElement.blur();})()');
   }
   for (const page of pages) await exercise(page);
-  const checkpoints = [await samplePages(browser, pages, 0, { controls: true })];
+  const checkpoint = async (cycle, phase) => ({ ...await samplePages(browser, pages, cycle, { controls: true }), phase });
+  const checkpoints = [await checkpoint(0, 'initial')];
   for (let cycle = 1; cycle <= cycles; cycle++) {
+    const measured = cycle === Math.ceil(cycles / 2) || cycle === cycles;
     for (const page of pages) {
       await evaluate(browser, page.session, '(async()=>{await refresh();await refresh();})()');
       await exercise(page);
+      await afterCycle(browser, page, cycle);
+    }
+    if (measured) checkpoints.push(await checkpoint(cycle, 'before-navigation'));
+    for (const page of pages) {
       if (cycle % 3 === 0) {
         const previousDocument = await evaluate(browser, page.session, 'performance.timeOrigin');
         await browser.cdp.send('Page.reload', {}, page.session);
@@ -43,9 +49,8 @@ export async function settingsWorkload(browser, { cycles = 12, tabCount = 4, aft
         assert.equal(await evaluate(browser, page.session, 'document.querySelector("#accessMinutes-site-x").value'), 'default', 'inherited duration survives reload');
         await exercise(page);
       }
-      await afterCycle(browser, page, cycle);
     }
-    if (cycle === Math.ceil(cycles / 2) || cycle === cycles) checkpoints.push(await samplePages(browser, pages, cycle, { controls: true }));
+    if (measured) checkpoints.push(await checkpoint(cycle, 'after-navigation'));
   }
   try { assertStableControls(checkpoints); }
   catch (error) { error.resourceCheckpoints = checkpoints; throw error; }

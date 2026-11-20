@@ -43,11 +43,13 @@ for (const retained of ['node', 'listener']) test(`Settings lifecycle workload d
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   try {
     await withFailureArtifacts(browser, 'Settings resource sensitivity', async () => {
-      await assert.rejects(settingsWorkload(browser, { cycles: 2, tabCount: 1, afterCycle: async (browser, page) => {
+      await assert.rejects(settingsWorkload(browser, { tabCount: 1, afterCycle: async (browser, page) => {
         await evaluate(browser, page.session, retained === 'node'
           ? '(globalThis.syntheticRetainedControls ||= []).push(document.createElement("button"))'
           : 'window.addEventListener("synthetic-retained-listener", () => {})');
       } }), retained === 'node' ? /Settings detached DOM nodes accumulated/ : /Settings listeners accumulated/);
+      const restored = await settingsWorkload(browser, { tabCount: 1 });
+      assert.deepEqual(restored.checkpoints.map(({ cycle, phase }) => [cycle, phase]), [[0, 'initial'], [6, 'before-navigation'], [6, 'after-navigation'], [12, 'before-navigation'], [12, 'after-navigation']]);
     });
   } finally { await browser.cleanup(); }
 });

@@ -43,7 +43,9 @@ export function validateLifecycleProfile(report) {
     assert.match(run.browser, /^[A-Za-z ]+\/\d+(?:\.\d+){1,3}$/);
     assert.equal(run.cycles, report.workload === 'settings' ? 12 : 3);
     assert.equal(run.tabCount, report.workload === 'settings' ? 4 : 8);
-    assert.deepEqual(run.checkpoints.map(point => point.cycle), report.workload === 'settings' ? [0, 6, 12] : [0, 1, 2, 3]);
+    if (report.workload === 'settings') {
+      assert.deepEqual(run.checkpoints.map(({ cycle, phase }) => [cycle, phase]), [[0, 'initial'], [6, 'before-navigation'], [6, 'after-navigation'], [12, 'before-navigation'], [12, 'after-navigation']]);
+    } else assert.deepEqual(run.checkpoints.map(point => point.cycle), [0, 1, 2, 3]);
     memory(run.workerMemory);
     assert.equal(run.attribution.pages.length, run.tabCount);
     for (const target of [run.attribution.worker, ...run.attribution.pages]) assert.ok(Number.isSafeInteger(target.pid) && target.pid > 0 && typeof target.isolate === 'string');
@@ -109,10 +111,10 @@ export function renderLifecycleProfile(report) {
     ['Worker-containing process private memory (bytes)', run => run.workerMemory.privateBytes],
     ['CDP-listed whole-browser RSS (bytes)', run => run.wholeBrowser.rssBytes],
     ...report.runs[0].checkpoints.flatMap(point => [
-      [`Page 1 post-GC isolate heap, cycle ${point.cycle} (bytes)`, run => run.checkpoints.find(sample => sample.cycle === point.cycle).samples[0].heapBytes],
-      [`Page 1 connected DOM elements, cycle ${point.cycle}`, run => run.checkpoints.find(sample => sample.cycle === point.cycle).samples[0].connectedElements],
-      [`Page 1 renderer DOM nodes, cycle ${point.cycle}`, run => run.checkpoints.find(sample => sample.cycle === point.cycle).samples[0].nodes],
-      [`Page 1 renderer listeners, cycle ${point.cycle}`, run => run.checkpoints.find(sample => sample.cycle === point.cycle).samples[0].jsEventListeners]
+      [`Page 1 post-GC isolate heap, cycle ${point.cycle} ${point.phase || ''} (bytes)`, run => run.checkpoints.find(sample => sample.cycle === point.cycle && sample.phase === point.phase).samples[0].heapBytes],
+      [`Page 1 connected DOM elements, cycle ${point.cycle} ${point.phase || ''}`, run => run.checkpoints.find(sample => sample.cycle === point.cycle && sample.phase === point.phase).samples[0].connectedElements],
+      [`Page 1 renderer DOM nodes, cycle ${point.cycle} ${point.phase || ''}`, run => run.checkpoints.find(sample => sample.cycle === point.cycle && sample.phase === point.phase).samples[0].nodes],
+      [`Page 1 renderer listeners, cycle ${point.cycle} ${point.phase || ''}`, run => run.checkpoints.find(sample => sample.cycle === point.cycle && sample.phase === point.phase).samples[0].jsEventListeners]
     ])
   ];
   if (report.workload === 'trackers') metrics.push(['First observed worker absence (ms)', run => run.idle.observations.find(point => point.targetId === null)?.elapsedMs ?? null]);
