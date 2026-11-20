@@ -316,3 +316,12 @@
   .site-preference-field { grid-template-columns: 1fr; gap: 8px; }
   .site-field-source { grid-column: 1; }
 }
+
+.settings-page .wait-preference-field > label { grid-column: 1; grid-row: 2; font-size: 13px; }
+.settings-page .wait-preference-field .site-field-value { grid-row: 2; }
+.settings-page .custom-wait-duration { grid-row: 4; }
+@media (max-width: 600px) {
+  .settings-page .wait-preference-field > label { grid-row: 4; display: block !important; }
+  .settings-page .wait-preference-field .site-field-value { grid-row: 5; }
+  .settings-page .custom-wait-duration { grid-row: 6; }
+}

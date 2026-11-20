@@ -346,3 +346,16 @@ test('gate recovers ongoing waits from refresh and resets abandoned requests', a
   p.now = 30000; p.intervals[5000](); await p.flush(); assert.equal(p.elements.clock.textContent, '0:30');
   p.now = 660000; p.intervals[1000](); assert.equal(p.elements.request.hidden, false); assert.equal(p.elements.waiting.hidden, true);
 });
+
+test('configured wait updates instructions and progress scale', async () => {
+  const p = page(); await p.flush();
+  p.access = { waitSeconds: 120, readyAt: 120000, requestExpiresAt: 720000 };
+  p.intervals[5000](); await p.flush();
+  assert.equal(p.elements['wait-step'].textContent, 'Pause for 120 seconds.');
+  assert.equal(p.elements.begin.textContent, 'Start the 120-second wait');
+  assert.equal(p.elements.progress.max, 120);
+  assert.equal(p.elements.progress.value, 0);
+  p.now = 60000; p.intervals[1000]();
+  assert.equal(p.elements.progress.value, 60);
+  assert.equal(p.elements.open.disabled, true);
+});

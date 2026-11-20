@@ -79,7 +79,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
       if (message.type === 'update-apply') return { ok: true, applied: false };
       if (message.type === 'settings') return { ok: false, error: 'Unknown message' };
       if (message.type === 'access-duration') {
-        settings = C3.updatePreferences(settings, { accessMinutes: message.minutes }, message.site);
+        settings = C3.updatePreferences(settings, { [message.preference || 'accessMinutes']: message.minutes }, message.site);
         for (const [site, access] of Object.entries(state.access)) access.sessionMinutes = C3.siteSettings(site, settings).accessMinutes;
         return { ok: true, access: structuredClone(state.access) };
       }

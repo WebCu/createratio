@@ -50,6 +50,7 @@
           if (!core.SITES.some(site => site.id === message.site) || typeof message.enabled !== 'boolean') throw refuse('Choose a vetted website and enable or disable tracking');
           break;
         case 'access-duration':
+          if (message.preference !== undefined && message.preference !== 'waitMinutes') throw refuse('Unsupported preference');
           if (message.site !== undefined && !gated.has(message.site)) throw refuse('Unsupported site');
           if (!(message.site !== undefined && message.minutes === null) && !core.validAccessMinutes(message.minutes)) throw refuse(`Choose a whole number from ${core.ACCESS_LIMITS.minMinutes} to ${core.ACCESS_LIMITS.maxMinutes} minutes`);
           break;

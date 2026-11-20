@@ -539,3 +539,19 @@ test('a tracking save can finish while its session-duration save remains pending
   assert.equal(x.reset.disabled, true); assert.equal(x.reset.hidden, false);
   assert.deepEqual(p.notifications, [{ id: 1, type: 'refresh' }, { id: 2, type: 'refresh' }]);
 });
+
+test('intention wait controls save defaults, overrides, reset, custom values and errors', async () => {
+  const p = settingsPage(); await p.ready();
+  const input = p.nodes['waitMinutes-default'], site = p.nodes['waitMinutes-site-x'];
+  assert.equal(input.value, 1); assert.equal(site.value, 'default');
+  input.value = '5'; await input.fire('change'); await p.ready();
+  assert.equal(p.settings.waitMinutes, 5);
+  site.value = 'custom'; await site.fire('change'); await p.ready();
+  p.nodes['customWaitMinutes-site-x'].value = '2';
+  await p.nodes['custom-wait-duration-site-x'].fire('submit', { preventDefault() {} }); await p.ready();
+  assert.equal(site.value, 2);
+  await p.nodes['wait-reset-x'].fire('click'); await p.ready();
+  assert.equal(site.value, 'default');
+  p.fail = true; input.value = '10'; await input.fire('change'); await p.ready();
+  assert.equal(input.value, 5); assert.equal(p.nodes.error.hidden, false);
+});

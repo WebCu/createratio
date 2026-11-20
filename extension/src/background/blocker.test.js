@@ -378,3 +378,22 @@ test('session messages still reconcile before rejecting authorization or an unkn
   assert.equal(w.calls[0].type, 'session.get');
   assert.deepEqual(w.calls.at(-1), { type: 'local.get', value: ['_access', 'settings', '_intentions'] });
 });
+
+test('saved intention waits control deadlines without changing session duration', async () => {
+  const w = worker();
+  const setting = { type: 'access-duration', preference: 'waitMinutes', minutes: 5 };
+  assert.equal((await w.send(setting, popupSender)).ok, true);
+  assert.equal((await w.send({ ...setting, site: 'x', minutes: 2 }, popupSender)).ok, true);
+  const result = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+  assert.equal(result.access.x.waitSeconds, 120);
+  assert.equal(result.access.x.readyAt, w.now + 120000);
+  assert.equal(result.access.linkedin.waitSeconds, 300);
+  assert.equal(result.access.x.sessionMinutes, 5);
+  w.advance(60000);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+  w.advance(60000);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
+  for (const minutes of [undefined, null, 0, 241, '2']) assert.equal((await w.send({ ...setting, minutes }, popupSender)).ok, false);
+  assert.equal((await w.send({ ...setting, preference: 'unknown' }, popupSender)).ok, false);
+  assert.equal((await w.send(setting, gate('x'))).ok, false);
+});

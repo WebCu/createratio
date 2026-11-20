@@ -37,12 +37,14 @@ function render() {
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
   const waiting = !active && access.readyAt > 0 && access.requestExpiresAt > now;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
+  $('wait-step').textContent = `Pause for ${access.waitSeconds} seconds.`;
+  $('begin').textContent = `Start the ${access.waitSeconds}-second wait`;
   $('session-step').textContent = `Open a ${access.sessionMinutes}-minute session.`;
   $('heading').textContent = active ? `${access.name} is open.` : blockedLine;
   $('access-steps').hidden = active;
   const stateText = access.goalAllowed ? 'Above your daily goal' : active ? 'Temporary access' : 'Blocked by default';
   if ($('state-text').textContent !== stateText) $('state-text').textContent = stateText;
-  $('description').textContent = access.goalAllowed ? `${access.name} is open while today’s creation score is above your current daily target. No intention, wait or timer needed.` : active ? `Time counts only in the active tab of a focused browser window. When time runs out, all ${access.name} tabs return to this page.` : `${access.name} is paused. Set an intention, take a minute, then open a timed session.`;
+  $('description').textContent = access.goalAllowed ? `${access.name} is open while today’s creation score is above your current daily target. No intention, wait or timer needed.` : active ? `Time counts only in the active tab of a focused browser window. When time runs out, all ${access.name} tabs return to this page.` : `${access.name} is paused. Set an intention, take a deliberate pause, then open a timed session.`;
   document.title = `${access.name} ${active ? 'session' : 'blocked'} - CreateRatio`;
   $('request').hidden = active || waiting;
   $('waiting').hidden = !waiting;
@@ -56,7 +58,8 @@ function render() {
   if (waiting) {
     const seconds = Math.max(0, Math.ceil((access.readyAt - now) / 1000));
     $('clock').textContent = remaining(access.readyAt - now);
-    $('progress').value = 60 - seconds;
+    $('progress').max = access.waitSeconds;
+    $('progress').value = Math.max(0, access.waitSeconds - seconds);
     $('open').disabled = busy || seconds > 0;
     $('open').textContent = `Open ${access.name} for ${access.sessionMinutes} active minute${access.sessionMinutes === 1 ? '' : 's'}`;
     const message = seconds > 0 ? 'A deliberate pause, not an instant override.' : 'Ready when you are. Confirm to start your session.';

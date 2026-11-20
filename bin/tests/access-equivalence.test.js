@@ -28,7 +28,7 @@ test('equivalence detects changed lifecycle behavior', async t => {
   const { baseline, candidate } = await bundles(t);
   const blocker = path.join(candidate, 'blocker.js');
   const source = await fs.readFile(blocker, 'utf8');
-  const changed = source.replace('WAIT_MS = 60000', 'WAIT_MS = 60001');
+  const changed = source.replace('waitSeconds: waitMinutes * 60', 'waitSeconds: waitMinutes * 60 + 1');
   assert.notEqual(changed, source);
   await fs.writeFile(blocker, changed);
   await assert.rejects(compare(baseline, candidate), /lifecycle/);
