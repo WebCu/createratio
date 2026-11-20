@@ -8,7 +8,7 @@ $('reason').maxLength = C3.INTENTION_LIMITS.maxLength;
 let access, busy = false, refreshing = false;
 const blockedLines = [
   'The feed can wait. You’ve got this.',
-  'Your next idea called. It wants a minute.',
+  'Your next idea called. It wants {wait}.',
   'Give your scrolling thumb a breather.',
   'The feed will survive without you.',
   'Plot twist: go make something.',
@@ -29,7 +29,7 @@ function nextBlockedLine() {
   return blockedLines[selected];
 }
 const blockedLine = nextBlockedLine();
-$('heading').textContent = blockedLine;
+$('heading').textContent = blockedLine.replace('{wait}', 'a deliberate pause');
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
 function remaining(ms) { const seconds = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }
 function render() {
@@ -41,7 +41,7 @@ function render() {
   $('begin').textContent = `Start the ${access.waitSeconds}-second wait`;
   $('reason-requirement').textContent = `${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters. A little clarity, then ${access.waitSeconds} seconds to pause.`;
   $('session-step').textContent = `Open a ${access.sessionMinutes}-minute session.`;
-  $('heading').textContent = active ? `${access.name} is open.` : blockedLine;
+  $('heading').textContent = active ? `${access.name} is open.` : blockedLine.replace('{wait}', access.waitSeconds === 60 ? 'a minute' : `${access.waitSeconds / 60} minutes`);
   $('access-steps').hidden = active;
   const stateText = access.goalAllowed ? 'Above your daily goal' : active ? 'Temporary access' : 'Blocked by default';
   if ($('state-text').textContent !== stateText) $('state-text').textContent = stateText;

@@ -347,6 +347,20 @@ test('gate recovers ongoing waits from refresh and resets abandoned requests', a
   p.now = 660000; p.intervals[1000](); assert.equal(p.elements.request.hidden, false); assert.equal(p.elements.waiting.hidden, true);
 });
 
+test('the idea headline follows configured whole-minute waits with singular and plural wording', async () => {
+  const p = page({ random: 0.2 }); await p.flush();
+  assert.equal(p.elements.heading.textContent, 'Your next idea called. It wants a minute.');
+  for (const minutes of [2, 5, 240, 1]) {
+    p.access = { waitSeconds: minutes * 60 };
+    p.intervals[5000](); await p.flush();
+    assert.equal(p.elements.heading.textContent, `Your next idea called. It wants ${minutes === 1 ? 'a minute' : minutes + ' minutes'}.`);
+    p.intervals[1000]();
+    assert.equal(p.elements.heading.textContent, `Your next idea called. It wants ${minutes === 1 ? 'a minute' : minutes + ' minutes'}.`);
+    assert.equal(p.elements['wait-step'].textContent, `Pause for ${minutes * 60} seconds.`);
+    assert.equal(p.elements.begin.textContent, `Start the ${minutes * 60}-second wait`);
+  }
+});
+
 test('configured wait updates instructions and progress scale', async () => {
   const p = page(); await p.flush();
   p.access = { waitSeconds: 120, readyAt: 120000, requestExpiresAt: 720000 };
