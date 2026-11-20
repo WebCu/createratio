@@ -39,6 +39,7 @@ function render() {
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
   $('wait-step').textContent = `Pause for ${access.waitSeconds} seconds.`;
   $('begin').textContent = `Start the ${access.waitSeconds}-second wait`;
+  $('reason-requirement').textContent = `${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters. A little clarity, then ${access.waitSeconds} seconds to pause.`;
   $('session-step').textContent = `Open a ${access.sessionMinutes}-minute session.`;
   $('heading').textContent = active ? `${access.name} is open.` : blockedLine;
   $('access-steps').hidden = active;

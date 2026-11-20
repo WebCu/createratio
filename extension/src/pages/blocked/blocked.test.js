@@ -353,6 +353,7 @@ test('configured wait updates instructions and progress scale', async () => {
   p.intervals[5000](); await p.flush();
   assert.equal(p.elements['wait-step'].textContent, 'Pause for 120 seconds.');
   assert.equal(p.elements.begin.textContent, 'Start the 120-second wait');
+  assert.equal(p.elements['reason-requirement'].textContent, '20–280 characters. A little clarity, then 120 seconds to pause.');
   assert.equal(p.elements.progress.max, 120);
   assert.equal(p.elements.progress.value, 0);
   p.now = 60000; p.intervals[1000]();
