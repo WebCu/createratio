@@ -64,7 +64,7 @@ for (const browser of ['chrome', 'browser']) {
       { remainingMs: 1e20, expiresAt: 0 },
       { expiresAt: now + 241 * 60000 },
       { readyAt: 1, requestExpiresAt: now + 365 * 86400000 },
-      { readyAt: now + 60001, requestExpiresAt: now + 660001 },
+      { readyAt: now + C.ACCESS_LIMITS.maxMinutes * 60000 + 1, requestExpiresAt: now + C.ACCESS_LIMITS.maxMinutes * 60000 + 600001 },
       { readyAt: now - 1, requestExpiresAt: now + 600000 }
     ];
     for (const entry of entries) {

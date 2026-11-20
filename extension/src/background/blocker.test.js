@@ -379,6 +379,27 @@ test('session messages still reconcile before rejecting authorization or an unkn
   assert.deepEqual(w.calls.at(-1), { type: 'local.get', value: ['_access', 'settings', '_intentions'] });
 });
 
+test('lowering the intention wait preserves a pending request until its original deadline', async () => {
+  const w = worker();
+  const setting = { type: 'access-duration', preference: 'waitMinutes', minutes: 5 };
+  assert.equal((await w.send(setting, popupSender)).ok, true);
+  const begun = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+  const { readyAt, requestExpiresAt } = begun.access.x;
+  assert.equal(readyAt, w.now + 300000);
+  assert.equal(requestExpiresAt, readyAt + 600000);
+  const changed = await w.send({ ...setting, minutes: 1 }, popupSender);
+  assert.equal(changed.ok, true);
+  assert.equal(changed.access.x.waitSeconds, 60);
+  assert.equal(changed.access.x.readyAt, readyAt);
+  assert.equal(changed.access.x.requestExpiresAt, requestExpiresAt);
+  assert.equal(w.data._access.x.readyAt, readyAt);
+  assert.equal(w.data._access.x.requestExpiresAt, requestExpiresAt);
+  w.advance(60000);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+  w.advance(240000);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
+});
+
 test('saved intention waits control deadlines without changing session duration', async () => {
   const w = worker();
   const setting = { type: 'access-duration', preference: 'waitMinutes', minutes: 5 };

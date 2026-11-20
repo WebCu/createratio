@@ -24,11 +24,11 @@ const SiteAccess = (() => {
     if (!Object.hasOwn(SITES, site)) throw new Error('Unsupported site');
     const remainingMs = Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0;
     const expiresAt = remainingMs && entry.expiresAt > now ? entry.expiresAt : 0;
-    const readyAt = !remainingMs && validWait(entry, now, waitMinutes) ? entry.readyAt : 0;
+    const readyAt = !remainingMs && validWait(entry, now) ? entry.readyAt : 0;
     return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, requestExpiresAt: readyAt ? entry.requestExpiresAt : 0, refilledAt: entry.refilledAt || 0, waitSeconds: waitMinutes * 60, sessionMinutes: minutes };
   }
-  function validWait(entry, now, waitMinutes) {
-    return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && Number.isFinite(entry.requestExpiresAt) && entry.requestExpiresAt > entry.readyAt && entry.requestExpiresAt > now && entry.requestExpiresAt - entry.readyAt <= REQUEST_MS && entry.readyAt <= now + waitMinutes * 60000;
+  function validWait(entry, now) {
+    return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && Number.isFinite(entry.requestExpiresAt) && entry.requestExpiresAt > entry.readyAt && entry.requestExpiresAt > now && entry.requestExpiresAt - entry.readyAt <= REQUEST_MS && entry.readyAt <= now + C3.ACCESS_LIMITS.maxMinutes * 60000;
   }
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
@@ -77,7 +77,7 @@ const SiteAccess = (() => {
         delete entry.remainingMs;
         await api.alarms.clear('access-' + site);
       }
-      if (!validWait(entry, now, C3.siteSettings(site, stored.settings).waitMinutes)) { delete entry.readyAt; delete entry.requestExpiresAt; }
+      if (!validWait(entry, now)) { delete entry.readyAt; delete entry.requestExpiresAt; }
     }
     const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
     if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules))) await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: Object.keys(SITES).flatMap(ruleIds), addRules: rules });
