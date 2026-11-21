@@ -32,6 +32,15 @@
           api.tabs.sendMessage(tab.id, message, { frameId: 0 }),
           new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Update preparation timed out')), 5000); })
         ]);
+      } catch (error) {
+        if (/receiving end|establish connection|message port closed|context invalidated/i.test(error.message)) {
+          try {
+            await api.scripting.executeScript({ target: { tabId: tab.id }, func: () => location.href });
+          } catch (probeError) {
+            if (/Frame with ID \d+ is showing error page/i.test(probeError.message)) return { ready: true, errorPage: true };
+          }
+        }
+        throw error;
       } finally { clearTimeout(timer); }
     }
     async function restore() {
@@ -40,6 +49,7 @@
         if (tab.status === 'loading') continue;
         try {
           const reply = await send(tab, { type: 'prepare-update', force: false });
+          if (reply?.errorPage) continue;
           if (reply?.ready === false) continue;
           if (reply?.ready === true && (await send(tab, { type: 'commit-update' }))?.ready !== true) { restored = false; continue; }
         } catch (error) {

@@ -62,7 +62,7 @@ test('failed recovery remains durable and retries even after the pending version
   h.api.alarms.create = async name => { alarms.add(name); };
   h.api.alarms.clear = async name => { alarms.delete(name); };
   h.api.tabs.sendMessage = async () => { throw new Error('Receiving end does not exist.'); };
-  h.api.scripting.executeScript = async () => { injections++; if (failing) throw new Error('Injection temporarily unavailable'); };
+  h.api.scripting.executeScript = async details => { if (details.files) injections++; if (failing) throw new Error('Injection temporarily unavailable'); };
   await h.updates.start();
   assert.equal(injections, 1); assert.equal(h.data._updateRecovery, true);
   assert.equal(alarms.has('extension-update'), true);
@@ -92,6 +92,50 @@ test('discarded tabs cannot block updates or receive script reinjection', async 
   await h.updates.installed({ reason: 'update' });
   assert.equal(h.calls.some(call => call.target?.tabId === 2), false);
 });
+
+for (const path of ['apply', 'restore']) {
+  test(`${path} ignores a browser error document whose tab retains a supported URL`, async t => {
+    const h = harness();
+    t.mock.method(console, 'error', () => {});
+    h.api.tabs.sendMessage = async () => { throw new Error('Could not establish connection. Receiving end does not exist.'); };
+    h.api.scripting.executeScript = async details => {
+      assert.equal(details.target.tabId, 1);
+      throw new Error('Frame with ID 0 is showing error page');
+    };
+    if (path === 'apply') {
+      h.state.pages = [{}];
+      await h.updates.available({ version: '0.0.5' });
+      assert.deepEqual(await h.updates.attempt(true), { applied: true });
+      assert.equal(h.calls.at(-1), 'reload');
+    } else {
+      await h.updates.installed({ reason: 'update' });
+      assert.equal(h.data._updateRecovery, undefined);
+    }
+  });
+}
+
+test('a live client with unsaved data still defers even an explicit update', async () => {
+  const h = harness(); h.state.ready = false;
+  await h.updates.available({ version: '0.0.5' });
+  assert.deepEqual(await h.updates.attempt(true), { applied: false });
+  assert.equal(h.calls.includes('reload'), false);
+  assert.equal(h.calls.includes('commit-update'), false);
+  assert.equal(h.data._pendingUpdate, '0.0.5');
+});
+
+for (const probe of ['live', 'failed']) {
+  test(`a missing receiver with a ${probe} document probe cannot bypass update preparation`, async () => {
+    const h = harness();
+    h.api.tabs.sendMessage = async () => { throw new Error('Receiving end does not exist.'); };
+    h.api.scripting.executeScript = async () => {
+      if (probe === 'failed') throw new Error('Injection temporarily unavailable');
+      return [{ result: 'https://x.com/home' }];
+    };
+    assert.deepEqual(await h.updates.available({ version: '0.0.5' }), { applied: false });
+    assert.equal(h.calls.includes('reload'), false);
+    assert.equal(h.data._pendingUpdate, '0.0.5');
+  });
+}
 
 test('startup cannot reinstall the version whose installation is still initializing', async () => {
   const h = harness(); let release;
