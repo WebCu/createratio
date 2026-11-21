@@ -1,8 +1,8 @@
 'use strict';
 const api = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(api.runtime);
-/** @type {(id: string) => any} */
-const $ = id => document.getElementById(id);
+/** @type {(id: string) => HTMLInputElement} */
+const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 const site = new URLSearchParams(location.search).get('site');
 $('reason').minLength = C3.INTENTION_LIMITS.minLength;
 $('reason').maxLength = C3.INTENTION_LIMITS.maxLength;
@@ -63,7 +63,7 @@ function render() {
     const seconds = Math.max(0, Math.ceil((access.readyAt - now) / 1000));
     $('clock').textContent = remaining(access.readyAt - now);
     $('progress').max = access.waitSeconds;
-    $('progress').value = Math.max(0, access.waitSeconds - seconds);
+    /** @type {HTMLProgressElement} */ (document.getElementById('progress')).value = Math.max(0, access.waitSeconds - seconds);
     $('open').disabled = busy || seconds > 0;
     $('open').textContent = `Open ${access.name} for ${access.sessionMinutes} active minute${access.sessionMinutes === 1 ? '' : 's'}`;
     const message = seconds > 0 ? 'A deliberate pause, not an instant override.' : 'Ready when you are. Confirm to start your session.';

@@ -1,4 +1,5 @@
 'use strict';
+/** @type {RefillAnimationApi} */
 const RefillAnimation = (() => {
   const views = new WeakMap();
   function render(target, access) {

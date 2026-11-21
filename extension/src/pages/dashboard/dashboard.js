@@ -1,8 +1,8 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
-/** @type {(id: string) => any} */
-const $ = id => document.getElementById(id);
+/** @type {(id: string) => HTMLInputElement} */
+const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
 let reportURL = null, reportTimer = null, reportVersion = 0;
 function nextDay() {
@@ -80,11 +80,11 @@ function renderIntentions() {
 function renderRatio(days) {
   const today = C3.localDate(), day = days[today] || {}, total = C3.aggregate(day), score = C3.score(total);
   const hasActivity = ['createSec', 'consumeSec', 'posts', 'replies', 'comments'].some(key => total[key] > 0);
-  $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); $('date').dateTime = today;
+  $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); /** @type {HTMLTimeElement} */ (document.getElementById('date')).dateTime = today;
   $('score').textContent = score.toFixed(2); $('score').style.color = hasActivity ? C3.scoreColor(score) : '';
   $('score-status').textContent = !hasActivity ? 'A fresh start. Make something today.' : score >= 1 ? 'You’re making more than you’re taking in.' : score >= 0.5 ? 'A little more creating gets you to 1.0.' : 'One thoughtful reply is a great start.';
   $('create-min').textContent = minutes(total.createSec); $('consume-min').textContent = minutes(total.consumeSec);
-  for (const key of ['posts', 'replies', 'comments', 'likes', 'quotes', 'reposts', 'bookmarks']) $(key).textContent = total[key];
+  for (const key of ['posts', 'replies', 'comments', 'likes', 'quotes', 'reposts', 'bookmarks']) $(key).textContent = String(total[key]);
   $('sites').replaceChildren();
   const names = new Map(C3.SITES.map(site => [site.id, site.name]));
   for (const site of new Set([...names.keys(), ...C3.recordedSites(day)])) {

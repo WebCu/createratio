@@ -1,7 +1,23 @@
 declare global {
+  type StoredSettings = Partial<typeof C3.DEFAULT_SETTINGS> & { siteOverrides?: Record<string, Record<string, unknown>> };
+  type StoredData = { settings?: StoredSettings; [key: string]: unknown };
+  type AccessStatus = { site: string; enabled: boolean; goalAllowed: boolean; name: string; home: string; remainingMs: number; expiresAt: number; readyAt: number; refilledAt: number; waitSeconds: number; sessionMinutes: number };
+  type SiteAccessApi = {
+    handle(message: { type: string; site?: string }, sender: chrome.runtime.MessageSender): Promise<unknown>;
+    reconcile(closeAll?: boolean): Promise<Record<string, AccessStatus>>;
+    siteForURL(raw: string): string | null;
+    gateURL(site: string): string;
+  };
+  type ContentOwner = { prepare(force: boolean): Promise<boolean>; resume(): void; stop(): void };
+  type ContentLifecycleApi = { register(name: 'guard' | 'tracker', owner: ContentOwner): void };
+  type RefillAnimationApi = {
+    render(target: HTMLElement, access: { refilledAt?: number; remainingMs: number }): void;
+    waitForFill(target: HTMLElement): Promise<void> | undefined;
+  };
+  type SocialSharingApi = { mount(options: { messages: ReturnType<typeof RuntimeMessages.create>; range: () => string; error: (message?: string) => void }): { clear(): void } };
   var C3: typeof import('../core/core.js');
   var C3Sites: typeof import('../sites/index.js');
-  var C3_SITE_MODULES: Record<string, any> | undefined;
+  var C3_SITE_MODULES: Record<string, unknown> | undefined;
   var C3_DOM: typeof import('../src/content/dom.js');
   var RuntimeMessages: typeof import('../src/shared/messages.js');
   var MessageContracts: typeof import('../src/background/message-contracts.js');
@@ -11,14 +27,13 @@ declare global {
   var CreationReport: typeof import('../src/pages/dashboard/report.js');
   var SocialCard: typeof import('../src/pages/dashboard/share-card.js');
   var ScrollFriction: typeof import('../src/content/scroll-friction.js');
-  var SiteAccess: any;
-  var RefillAnimation: any;
-  var ContentLifecycle: any;
-  var SocialSharing: any;
-  var browser: any;
-  var chrome: any;
-  var module: any;
-  function require(id: string): any;
+  var SiteAccess: SiteAccessApi;
+  var RefillAnimation: RefillAnimationApi;
+  var ContentLifecycle: ContentLifecycleApi | undefined;
+  var SocialSharing: SocialSharingApi;
+  var browser: typeof chrome | undefined;
+  var module: { exports: unknown } | undefined;
+  function require(id: string): unknown;
   function importScripts(...urls: string[]): void;
 }
 

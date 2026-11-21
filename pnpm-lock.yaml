@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@types/chrome':
+        specifier: 0.3.7
+        version: 0.3.7
       acorn:
         specifier: 8.19.0
         version: 8.19.0
@@ -28,6 +31,12 @@ packages:
   '@plausible-analytics/tracker@0.4.7':
     resolution: {integrity: sha512-majmq1uion4uLo88Tr0eMCMfi7TY00okp3I0Vql9egFaAz6DYCW4bJaV3t5LB3BfcvW5exJpmqzROU0a1b6nAA==}
 
+  '@types/chrome@0.3.7':
+    resolution: {integrity: sha512-jWZgbHqWbTL1a5+PoyN0OJutNyejWgyZ5MdcvKo6iJE1TNRtXR3FxsC4WzNl52yZWPidfWC8NV/VUNZf+OFKcA==}
+
+  '@types/har-format@1.2.16':
+    resolution: {integrity: sha512-fluxdy7ryD3MV6h8pTfTYpy/xQzCFC7m89nOH9y94cNqJ1mDIDPut7MnRHI3F6qRmh/cT2fUjG1MLdCNb4hE9A==}
+
   acorn@8.19.0:
     resolution: {integrity: sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw==}
     engines: {node: '>=0.4.0'}
@@ -41,6 +50,12 @@ packages:
 snapshots:
 
   '@plausible-analytics/tracker@0.4.7': {}
+
+  '@types/chrome@0.3.7':
+    dependencies:
+      '@types/har-format': 1.2.16
+
+  '@types/har-format@1.2.16': {}
 
   acorn@8.19.0: {}
 

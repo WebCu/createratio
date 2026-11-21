@@ -57,7 +57,7 @@ test('dashboard preserves scores, actions, history and removed-integration total
   const p = dashboard(); await p.ready();
   assert.equal(p.nodes['consume-min'].textContent, '1.0m'); assert.equal(p.nodes['chart-table'].querySelector().children.length, 7);
   p.setDay({ retired: { consumeSec: 120, posts: 1, quotes: 1 } }); p.change(); await p.ready();
-  assert.equal(p.nodes['consume-min'].textContent, '2.0m'); assert.equal(p.nodes.posts.textContent, 1); assert.equal(p.nodes.quotes.textContent, 1);
+  assert.equal(p.nodes['consume-min'].textContent, '2.0m'); assert.equal(p.nodes.posts.textContent, '1'); assert.equal(p.nodes.quotes.textContent, '1');
   assert.ok(p.nodes.sites.children.some(row => row.children[0].textContent === 'retired (unavailable)'));
 });
 test('dashboard charts use the same semantic colors as the time legend', async () => {

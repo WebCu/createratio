@@ -62,7 +62,7 @@ async function score(w, expected, posts) {
   const dashboard = await ui(w, 'dashboard');
   assert.equal(popup.nodes.score.textContent, expected);
   assert.equal(dashboard.nodes.score.textContent, expected);
-  assert.equal(dashboard.nodes.posts.textContent, posts);
+  assert.equal(dashboard.nodes.posts.textContent, String(posts));
   assert.deepEqual(popup.state.storageReads, ['_pendingUpdate']);
   assert.deepEqual(dashboard.state.storageReads, ['_pendingUpdate']);
   return { popup, dashboard };
