@@ -499,7 +499,9 @@ per-site scores, including history from disabled or removed integrations.
 Website-time CSV separately includes dates, domains, and seconds; formula-like
 domain names are escaped as text to prevent spreadsheet formula evaluation.
 **Clear history** removes both histories after confirmation, invalidates pending
-pre-clear measurements in open tabs, and preserves preferences and access boundaries.
+pre-clear measurements in open tabs, and preserves preferences and timed access
+sessions. The creation score resets, so sites open only through Above-goal access
+are blocked again.
 Fresh trusted input is required to resume creation tracking after clearing.
 Export regularly for longer retention and
 before uninstalling, which removes extension data. Timezone changes affect future

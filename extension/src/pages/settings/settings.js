@@ -277,11 +277,11 @@ async function exportHistory(kind, button) {
 $('export-ratio').addEventListener('click', () => exportHistory('ratio', $('export-ratio')));
 $('export-websites').addEventListener('click', () => exportHistory('websites', $('export-websites')));
 $('clear-history').addEventListener('click', async () => {
-  if (!confirm('Delete all recorded activity and website time? This cannot be undone. Export CSV files first if you want a backup.')) return;
+  if (!confirm('Delete all recorded activity and website time? This cannot be undone. Your creation score will reset, and sites open only through Above-goal access will be blocked again. Export CSV files first if you want a backup.')) return;
   $('clear-history').disabled = true;
   try {
     await messages.send({ type: 'clear-history' }, 'Unable to clear history.');
-    saved('History cleared. Your settings and site access boundaries are unchanged.');
+    saved('History cleared and creation score reset. Sites open only through Above-goal access are blocked again. Timed access sessions are unchanged.');
   } catch (e) { error(e.message); } finally { $('clear-history').disabled = false; }
 });
 extensionAPI.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
