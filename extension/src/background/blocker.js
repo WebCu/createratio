@@ -87,7 +87,8 @@ const SiteAccess = (() => {
       if (!Number.isFinite(entry.remainingMs) && Number.isFinite(entry.expiresAt)) entry.remainingMs = Math.max(0, entry.expiresAt - now);
       if (entry.date && entry.date !== date) {
         const runningAtMidnight = !restart && entry.expiresAt >= dayStart;
-        if (runningAtMidnight) windowStart = dayStart;
+        const pausedAtMidnight = !restart && entry.remainingMs > 0 && !entry.expiresAt;
+        if (runningAtMidnight || pausedAtMidnight) windowStart = dayStart;
         entry.remainingMs = minutes * 60000;
         entry.refilledAt = dayStart;
         entry.expiresAt = runningAtMidnight ? dayStart + entry.remainingMs : 0;
