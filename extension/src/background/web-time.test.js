@@ -213,13 +213,15 @@ for (const pending of [false, true]) {
   });
 }
 
-test('history clear rejects stale website samples and pending entries but permits fresh time', async () => {
+test('history clear resets website samples and pending entries and permits fresh time', async () => {
   const h = harness(); await h.tracker.setEnabled(true);
   const set = h.api.storage.local.set;
   h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
   h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
   h.api.storage.local.set = set;
   await h.history.clear('after-clear');
+  h.state.focused = false;
+  await h.tracker.start(true);
   const replacement = harness(h.data, h.session); replacement.advance(10000);
   await replacement.tracker.start(); await replacement.tick();
   assert.equal(h.data['_websiteTime:2026-10-11'], undefined);
@@ -229,6 +231,26 @@ test('history clear rejects stale website samples and pending entries but permit
   replacement.advance(5000); await replacement.tick();
   assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
 });
+
+for (const generation of [null, 'stable']) {
+  test(`website receipt rollover preserves queued intervals across restart with generation ${generation}`, async () => {
+    const data = { _websiteTimeReceipts: Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i) };
+    if (generation !== null) data._historyGeneration = generation;
+    const h = harness(data); await h.tracker.setEnabled(true);
+    const set = h.api.storage.local.set;
+    h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+    h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+    h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+    h.api.storage.local.set = set;
+    const replacement = harness(h.data, h.session); replacement.advance(15000);
+    await replacement.tracker.start(); await replacement.tick();
+    assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 15);
+    assert.equal(h.data._historyGeneration ?? null, generation);
+    assert.equal(h.data._websiteTimeReceipts.length, C3.DELIVERY_LIMITS.receiptLimit);
+    replacement.advance(5000); await replacement.tick();
+    assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 20);
+  });
+}
 
 test('unfocused windows, idle/locked time, private tabs and browser pages never accrue', async () => {
   const h = harness(); await h.tracker.setEnabled(true);

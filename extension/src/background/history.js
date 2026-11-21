@@ -66,14 +66,17 @@
       }
       await remove(expired);
       const migrated = {};
-      const journals = [stored._receipts, stored._websiteTimeReceipts];
-      const malformedReceipts = journals.some(receipts => receipts != null && (!Array.isArray(receipts) || receipts.length > receiptLimit || ![...receipts].every(id => typeof id === 'string' && id.length <= core.DELIVERY_LIMITS.maxIdLength) || new Set(receipts).size !== receipts.length));
+      const receipts = stored._receipts;
+      const malformedReceipts = receipts != null && (!Array.isArray(receipts) || receipts.length > receiptLimit || ![...receipts].every(id => typeof id === 'string' && id.length <= core.DELIVERY_LIMITS.maxIdLength) || new Set(receipts).size !== receipts.length);
       const generation = stored._historyGeneration;
       const malformedGeneration = generation != null && (typeof generation !== 'string' || !generation.length);
-      if (malformedReceipts || malformedGeneration || generation == null && journals.some(receipts => Array.isArray(receipts) && receipts.length >= receiptLimit)) {
+      if (malformedReceipts || malformedGeneration || generation == null && Array.isArray(receipts) && receipts.length >= receiptLimit) {
         migrated._receipts = [];
-        if (stored._websiteTimeReceipts != null) migrated._websiteTimeReceipts = [];
         migrated._historyGeneration = crypto.randomUUID();
+      }
+      const websiteReceipts = stored._websiteTimeReceipts;
+      if (websiteReceipts != null && (!Array.isArray(websiteReceipts) || websiteReceipts.length > receiptLimit || ![...websiteReceipts].every(id => typeof id === 'string' && id.length <= core.DELIVERY_LIMITS.maxIdLength) || new Set(websiteReceipts).size !== websiteReceipts.length)) {
+        migrated._websiteTimeReceipts = [];
       }
       for (const [date, value] of Object.entries(collection(stored._websiteTime))) {
         const key = PREFIX + date;
@@ -97,13 +100,13 @@
     }
     async function clear(generation) {
       const stored = await storage.get(null);
-      const keys = Object.keys(stored).filter(key => dateForKey(key) || key === '_websiteTime');
+      const keys = Object.keys(stored).filter(key => dateForKey(key) || key === '_websiteTime' || key === '_websiteTimeReceipts');
       if (generation !== undefined) {
         const reset = { _historyGeneration: generation, _historyReset: stored._historyReset !== true };
         try { await storage.set(reset); }
         catch (error) {
           if (error.name !== 'QuotaExceededError' && error.message !== 'Resource::kQuotaBytes quota exceeded' && !/\bQUOTA_BYTES(?:_PER_ITEM)?(?: quota)? exceeded\b/i.test(error.message)) throw error;
-          await storage.set({ ...Object.fromEntries(keys.map(key => [key, {}])), ...reset });
+          await storage.set({ ...Object.fromEntries(keys.map(key => [key, key === '_websiteTimeReceipts' ? [] : {}])), ...reset });
           for (const key of keys) if (dateForKey(key)) sizes.set(key, bytes(key, {}));
         }
       }
@@ -137,12 +140,12 @@
       }
       await save(changes);
     }
-    async function recordWebsiteTime(domain, segments, id, generation = null) {
+    async function recordWebsiteTime(domain, segments, id) {
       await prepare();
       const selected = segments.filter(segment => eligible(segment.date));
-      const stored = await storage.get([...selected.map(segment => PREFIX + segment.date), '_websiteTimeReceipts', '_historyGeneration']);
+      const stored = await storage.get([...selected.map(segment => PREFIX + segment.date), '_websiteTimeReceipts']);
       const receipts = stored._websiteTimeReceipts || [];
-      if (id !== undefined && (generation !== (stored._historyGeneration ?? null) || receipts.includes(id))) return;
+      if (id !== undefined && receipts.includes(id)) return;
       const changes = {};
       for (const { date, sec } of selected) {
         const key = PREFIX + date;
@@ -150,14 +153,7 @@
         const total = Object.hasOwn(day, domain) ? nonnegative(day[domain]) : 0;
         changes[key] = { ...day, [domain]: total + sec };
       }
-      if (id !== undefined) {
-        if (receipts.length >= receiptLimit) {
-          changes._historyGeneration = crypto.randomUUID();
-          changes._websiteTimeReceipts = [id];
-        } else {
-          changes._websiteTimeReceipts = [...receipts, id];
-        }
-      }
+      if (id !== undefined) changes._websiteTimeReceipts = [...receipts, id].slice(-receiptLimit);
       await save(changes);
     }
     return { prepare, save, read, clear, retained, creationDay, recordCreation, recordWebsiteTime };
