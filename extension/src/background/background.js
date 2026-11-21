@@ -22,11 +22,12 @@ async function badge(day) {
 }
 async function snapshot() {
   await history.prepare();
+  const access = await SiteAccess.reconcile();
   const date = C3.localDate();
   const stored = /** @type {StoredData} */ (await extensionAPI.storage.local.get([date, 'settings', '_historyGeneration']));
   const day = history.creationDay(stored[date]);
   await badge(day);
-  return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: C3.settingsSnapshot(stored.settings), access: await SiteAccess.reconcile(), websiteTimeEnabled: websiteTime.enabled };
+  return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: C3.settingsSnapshot(stored.settings), access, websiteTimeEnabled: websiteTime.enabled };
 }
 async function recordPacket(message, sender, access, batch) {
   if (message?.type !== 'ingest') throw MessageContracts.refuse('Invalid activity packet');

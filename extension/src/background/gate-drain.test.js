@@ -167,6 +167,21 @@ test('a drain records its entire admitted generation across receipt rollover wit
   assert.equal(w.data[date].reddit.consumeSec, 3);
 });
 
+test('expiry snapshots include the history and generation produced by their drain', async () => {
+  const generation = 'before-drain';
+  const packets = ['first', 'rollover'].map(id => ({ type: 'ingest', id, generation, site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] }));
+  const w = worker({ _historyGeneration: generation,
+    _receipts: Array.from({ length: C.DELIVERY_LIMITS.receiptLimit - 1 }, (_, n) => 'known-' + n),
+    _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } }
+  }, 'chrome', start, { session: { _accessInitialized: true }, sendTabMessage() { return { packets }; } });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  w.tabs.push({ id: 1, url }); w.advance(1100);
+  const reply = await w.send({ type: 'snapshot' });
+  assert.notEqual(w.data._historyGeneration, generation);
+  assert.equal(reply.generation, w.data._historyGeneration);
+  assert.equal(reply.day.reddit.consumeSec, 2);
+});
+
 test('concurrent drains admit their generation before a slower tab responds', async () => {
   const generation = 'recognized-window';
   let release;
