@@ -20,8 +20,10 @@ declare global {
   type IngestMessage = { type: 'ingest'; id: string; generation: string | null; site: string; segments: TimeSegment[]; actions: SiteActionEntry[] };
   type PreferenceRules = { [K in PreferenceMessage['type']]: (message: Extract<PreferenceMessage, { type: K }>) => void };
   type HistoryStore = ReturnType<typeof ActivityHistory.create>;
-  type SnapshotReply = { ok: true; generation: string | null; date: string; day: ReturnType<HistoryStore['creationDay']>; settings: ReturnType<typeof C3.settingsSnapshot>; access: Record<string, AccessStatus>; websiteTimeEnabled: boolean };
-  type AccessReply = { ok: true; access: Record<string, AccessStatus> };
+  type ReplySettings = { trackedSites?: string[]; scrollFrictionEnabled?: boolean; scrollFrictionStrength?: number; [key: string]: unknown };
+  type ReplyAccess = Omit<AccessStatus, 'site' | 'goalAllowed' | 'refilledAt' | 'waitSeconds'> & { goalAllowed?: boolean; refilledAt?: unknown; waitSeconds?: unknown };
+  type SnapshotReply = { ok: true; generation?: string | null; date: string; day: ReturnType<HistoryStore['creationDay']>; settings: ReplySettings; access: Record<string, ReplyAccess>; websiteTimeEnabled: boolean };
+  type AccessReply = { ok: true; access: Record<string, ReplyAccess> };
   type SavedIntention = { site: string; reason: string; requestedAt: number };
   type ReplyTable<T extends Record<RuntimeMessage['type'], { ok: true }>> = T;
   type RuntimeReplies = {
@@ -33,7 +35,7 @@ declare global {
     'history': { ok: true; days: Awaited<ReturnType<HistoryStore['read']>> };
     'update-apply': { ok: true; applied: boolean };
     'website-time-setting': { ok: true; enabled: boolean };
-    'access-status': AccessReply & { intentionHistoryEnabled: boolean };
+    'access-status': AccessReply & { intentionHistoryEnabled?: unknown };
     'access-begin': AccessReply;
     'access-open': AccessReply;
     'access-cancel': AccessReply;

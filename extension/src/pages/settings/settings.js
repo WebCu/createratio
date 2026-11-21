@@ -5,7 +5,9 @@ const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
 let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, refreshPending = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
-let scrollEditing = false, scrollPending = null, scrollSaving = null;
+let scrollEditing = false;
+/** @type {{ enabled: boolean, strength: number } | null} */
+let scrollPending = null, scrollSaving = null;
 let saveDismissTimer = null, saveCleanupTimer = null;
 let historyVersion = 0;
 function clearSaved() {
@@ -193,7 +195,7 @@ function render(settings, force = '') {
   renderScroll(settings);
   if (!goalSettingBusy) $('allow-above-goal').checked = settings.allowAboveGoal;
   $('allow-above-goal').disabled = goalSettingBusy;
-  if (!intentionSettingBusy) $('intention-history-enabled').checked = settings.intentionHistoryEnabled;
+  if (!intentionSettingBusy) $('intention-history-enabled').checked = settings.intentionHistoryEnabled === true;
   $('intention-history-enabled').disabled = intentionSettingBusy;
   if (!websiteSettingBusy) $('website-time-enabled').checked = websiteTimeEnabled;
   $('website-time-enabled').disabled = websiteSettingBusy;

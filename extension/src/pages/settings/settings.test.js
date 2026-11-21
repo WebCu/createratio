@@ -105,6 +105,15 @@ test('an ordinary storage update renders the saved intention preference', async 
   assert.equal(p.nodes['intention-history-enabled'].checked, true);
 });
 
+test('a non-boolean intention preference in a snapshot renders unchecked', async () => {
+  for (const intentionHistoryEnabled of ['true', 1, {}]) {
+    const p = settingsPage(); await p.ready();
+    p.state.replies.set('snapshot', { ok: true, date: C3.localDate(), day: {}, access: {}, settings: { ...p.settings, intentionHistoryEnabled }, websiteTimeEnabled: false });
+    p.refresh(); await p.ready(); await p.ready();
+    assert.equal(p.nodes['intention-history-enabled'].checked, false, JSON.stringify(intentionHistoryEnabled));
+  }
+});
+
 test('save confirmations fade after four seconds and polling does not extend their lifetime', async () => {
   const p = settingsPage(); await p.ready();
   p.toggle('x', false); await p.ready();

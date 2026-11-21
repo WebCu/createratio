@@ -6,7 +6,9 @@ const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 const site = new URLSearchParams(location.search).get('site');
 $('reason').minLength = C3.INTENTION_LIMITS.minLength;
 $('reason').maxLength = C3.INTENTION_LIMITS.maxLength;
-let access, busy = false, refreshing = false;
+/** @type {ReplyAccess | undefined} */
+let access;
+let busy = false, refreshing = false;
 const blockedLines = [
   'The feed can wait. You’ve got this.',
   'Your next idea called. It wants {wait}.',
@@ -37,7 +39,8 @@ function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
   const waiting = !active && access.readyAt > 0;
-  const waitMinutes = access.waitSeconds / 60;
+  const waitSeconds = typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0 ? access.waitSeconds : C3.DEFAULT_SETTINGS.waitMinutes * 60;
+  const waitMinutes = waitSeconds / 60;
   const waitDuration = `${waitMinutes} minute${waitMinutes === 1 ? '' : 's'}`;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
   $('wait-step').textContent = `Pause for ${waitDuration}.`;
@@ -64,8 +67,9 @@ function render() {
   if (waiting) {
     const seconds = Math.max(0, Math.ceil((access.readyAt - now) / 1000));
     $('clock').textContent = remaining(access.readyAt - now);
-    $('progress').max = access.waitSeconds;
-    /** @type {HTMLProgressElement} */ (document.getElementById('progress')).value = Math.max(0, access.waitSeconds - seconds);
+    const progress = /** @type {HTMLProgressElement} */ (document.getElementById('progress'));
+    progress.max = waitSeconds;
+    progress.value = Math.max(0, waitSeconds - seconds);
     $('open').disabled = busy || seconds > 0;
     $('open').textContent = `Open ${access.name} for ${access.sessionMinutes} active minute${access.sessionMinutes === 1 ? '' : 's'}`;
     const message = seconds > 0 ? 'A deliberate pause, not an instant override.' : 'Ready when you are. Confirm to start your session.';
