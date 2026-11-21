@@ -374,17 +374,18 @@ test('gate restores a wait and offers confirmation after a long absence', async 
   assert.deepEqual(p.redirects, []);
 });
 
-test('the idea headline follows configured whole-minute waits with singular and plural wording', async () => {
+test('the headline and instructions show the configured wait in minutes', async () => {
   const p = page({ random: 0.2 }); await p.flush();
   assert.equal(p.elements.heading.textContent, 'Your next idea called. It wants 5 minutes.');
-  for (const minutes of [2, 5, 240, 1]) {
+  for (const [minutes, duration] of [[2, '2 minutes'], [5, '5 minutes'], [240, '240 minutes'], [1, '1 minute']]) {
     p.access = { waitSeconds: minutes * 60 };
     p.intervals[5000](); await p.flush();
-    assert.equal(p.elements.heading.textContent, `Your next idea called. It wants ${minutes === 1 ? 'a minute' : minutes + ' minutes'}.`);
+    assert.equal(p.elements.heading.textContent, `Your next idea called. It wants ${minutes === 1 ? 'a minute' : duration}.`);
     p.intervals[1000]();
-    assert.equal(p.elements.heading.textContent, `Your next idea called. It wants ${minutes === 1 ? 'a minute' : minutes + ' minutes'}.`);
-    assert.equal(p.elements['wait-step'].textContent, `Pause for ${minutes * 60} seconds.`);
-    assert.equal(p.elements.begin.textContent, `Start the ${minutes * 60}-second wait`);
+    assert.equal(p.elements.heading.textContent, `Your next idea called. It wants ${minutes === 1 ? 'a minute' : duration}.`);
+    assert.equal(p.elements['wait-step'].textContent, `Pause for ${duration}.`);
+    assert.equal(p.elements.begin.textContent, `Start the ${minutes}-minute wait`);
+    assert.equal(p.elements['reason-requirement'].textContent, `20–280 characters. A little clarity, then ${duration} to pause.`);
   }
 });
 
@@ -392,9 +393,9 @@ test('configured wait updates instructions and progress scale', async () => {
   const p = page(); await p.flush();
   p.access = { waitSeconds: 120, readyAt: 120000 };
   p.intervals[5000](); await p.flush();
-  assert.equal(p.elements['wait-step'].textContent, 'Pause for 120 seconds.');
-  assert.equal(p.elements.begin.textContent, 'Start the 120-second wait');
-  assert.equal(p.elements['reason-requirement'].textContent, '20–280 characters. A little clarity, then 120 seconds to pause.');
+  assert.equal(p.elements['wait-step'].textContent, 'Pause for 2 minutes.');
+  assert.equal(p.elements.begin.textContent, 'Start the 2-minute wait');
+  assert.equal(p.elements['reason-requirement'].textContent, '20–280 characters. A little clarity, then 2 minutes to pause.');
   assert.equal(p.elements.progress.max, 120);
   assert.equal(p.elements.progress.value, 0);
   p.now = 60000; p.intervals[1000]();
@@ -404,6 +405,8 @@ test('configured wait updates instructions and progress scale', async () => {
 
 test('pending wait progress and instructions survive setting changes and reload with the request duration', async () => {
   for (const [initial, updated] of [[1, 5], [5, 1]]) {
+    const initialDuration = initial === 1 ? '1 minute' : '5 minutes';
+    const updatedDuration = updated === 1 ? '1 minute' : '5 minutes';
     let w = worker({ settings: { waitMinutes: initial } });
     const options = { now: w.now, random: 0.2, send: message => w.send(message, gate('x')) };
     const p = page(options); await p.flush();
@@ -419,17 +422,17 @@ test('pending wait progress and instructions survive setting changes and reload 
       assert.equal(current.elements.progress.max, initial * 60);
       assert.equal(current.elements.progress.value, 30);
       assert.equal(current.elements.clock.textContent, initial === 1 ? '0:30' : '4:30');
-      assert.equal(current.elements['wait-step'].textContent, `Pause for ${initial * 60} seconds.`);
-      assert.equal(current.elements['reason-requirement'].textContent, `20–280 characters. A little clarity, then ${initial * 60} seconds to pause.`);
+      assert.equal(current.elements['wait-step'].textContent, `Pause for ${initialDuration}.`);
+      assert.equal(current.elements['reason-requirement'].textContent, `20–280 characters. A little clarity, then ${initialDuration} to pause.`);
       assert.equal(current.elements.heading.textContent, `Your next idea called. It wants ${initial === 1 ? 'a minute' : initial + ' minutes'}.`);
       assert.equal(current.elements.open.disabled, true);
     }
     reloaded.click('cancel'); await reloaded.flush();
-    assert.equal(reloaded.elements.begin.textContent, `Start the ${updated * 60}-second wait`);
+    assert.equal(reloaded.elements.begin.textContent, `Start the ${updated}-minute wait`);
     reloaded.elements.reason.value = 'Reply to Alex about our launch, then leave.';
     reloaded.submit(); await reloaded.flush();
     assert.equal(reloaded.elements.progress.max, updated * 60);
     assert.equal(reloaded.elements.progress.value, 0);
-    assert.equal(reloaded.elements['wait-step'].textContent, `Pause for ${updated * 60} seconds.`);
+    assert.equal(reloaded.elements['wait-step'].textContent, `Pause for ${updatedDuration}.`);
   }
 });
