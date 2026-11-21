@@ -146,6 +146,17 @@ test('manual end revokes every overlapping clock-correction window', async () =>
   assert.equal(w.data[date].reddit.comments, 1);
 });
 
+test('manual end persists an empty window history before draining', async () => {
+  const packet = { type: 'ingest', id: 'immediate-end', site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] };
+  const w = worker({ _access: { reddit: { remainingMs: 60000, expiresAt: start + 60000, date } } }, 'chrome', start, {
+    session: { _accessInitialized: true }, sendTabMessage() { return { packets: [packet] }; }
+  });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  w.tabs.push({ id: 1, url });
+  await w.send({ type: 'access-end', site: 'reddit' }, popupSender);
+  assert.equal(w.data[date], undefined);
+});
+
 test('a failed drained history write cannot prevent gate navigation or create retry state', async () => {
   const session = { _accessInitialized: true };
   const packet = { type: 'ingest', id: 'failed-drain', site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] };

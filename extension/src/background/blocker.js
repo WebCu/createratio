@@ -223,7 +223,7 @@ const SiteAccess = (() => {
     updateWindows(windows, site, Date.now(), Date.now());
     delete access[site];
     await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: ruleIds(site) });
-    await api.storage.local.set({ _access: access, ...(Object.keys(windows).length ? { _accessWindows: windows } : {}) });
+    await api.storage.local.set({ _access: access, _accessWindows: windows });
     await api.alarms.clear('access-' + site);
     await closeTabs(site);
   }
