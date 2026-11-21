@@ -5,6 +5,10 @@
   'use strict';
   function refuse(message) { return Object.assign(new Error(message), { expected: true }); }
   function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+  /** @template {string} K
+   * @param {Record<K, unknown>} table
+   * @param {NoInfer<K> | undefined} value
+   * @returns {value is K} */
   function member(table, value) { return typeof value === 'string' && Object.hasOwn(table, value); }
   /** @type {Record<AccessPreference, true>} */
   const ACCESS_PREFERENCES = { accessMinutes: true, waitMinutes: true };
