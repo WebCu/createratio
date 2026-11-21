@@ -153,6 +153,101 @@ test('worker replacement after committed teardown restores the same website docu
   } finally { await browser.cleanup(); }
 });
 
+test('real browser error documents cannot block safe updates or recovery', async t => {
+  const { launch, evaluate, eventually, click, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
+  const { scrollFixture } = await import('./scrolling.mjs');
+  const browser = await launch(path.resolve(__dirname, '../../dist/chrome'), { developerMode: true });
+  const scrolling = scrollFixture(browser);
+  try {
+    await withFailureArtifacts(browser, 'error document update', async () => {
+      await seedAccess(browser, ['x']);
+      const settings = await browser.page(browser.origin + '/settings.html');
+      await eventually(() => evaluate(browser, settings.session, '!!document.querySelector("#track-x")'), 'Settings ready');
+      await evaluate(browser, browser.worker, 'updates.available({version:"0.0.5"})');
+      const errorTab = await browser.page('about:blank');
+      const errorURL = 'https://x.com/error-update';
+      await browser.cdp.send('Fetch.disable', {}, errorTab.session);
+      await browser.cdp.send('Network.enable', {}, errorTab.session);
+      await browser.cdp.send('Network.setBlockedURLs', { urls: [errorURL] }, errorTab.session);
+      await browser.cdp.send('Page.navigate', { url: errorURL }, errorTab.session);
+      await eventually(async () => {
+        const { frameTree } = await browser.cdp.send('Page.getFrameTree', {}, errorTab.session);
+        return frameTree.frame.url === 'chrome-error://chromewebdata/' && frameTree.frame.unreachableUrl === errorURL;
+      }, 'real Chrome error document for the supported URL');
+      const errorId = await eventually(() => evaluate(browser, browser.worker, `(async()=>{
+        const [tab]=await chrome.tabs.query({url:${JSON.stringify(errorURL)}});
+        return tab?.status === 'complete' ? tab.id : null;
+      })()`), 'completed error tab retains the supported URL');
+      assert.ok(Number.isInteger(errorId), 'Chrome retains the supported tab URL');
+      if (process.env.UPDATE_SCREENSHOT_DIR) {
+        const screenshot = await browser.cdp.send('Page.captureScreenshot', { format: 'png' }, errorTab.session);
+        await writeFile(path.join(process.env.UPDATE_SCREENSHOT_DIR, 'error-tab.png'), Buffer.from(screenshot.data, 'base64'));
+      }
+      const site = await browser.page('https://x.com/home');
+      await eventually(() => evaluate(browser, site.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'live website ready');
+      await waitForTracking(browser, site, scrolling);
+      await evaluate(browser, site.session, 'globalThis.documentToken="surviving live document"');
+
+      await t.test('unsaved live measurements still defer explicit installation', async () => {
+        await evaluate(browser, browser.worker, `(async()=>{
+          const key='_browserQuotaFiller';
+          const used=await chrome.storage.local.getBytesInUse(null);
+          await chrome.storage.local.set({[key]:'x'.repeat(chrome.storage.local.QUOTA_BYTES-used-key.length-34)});
+        })()`);
+        await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }, site.session);
+        await evaluate(browser, site.session, 'new Promise(resolve=>setTimeout(resolve,300))');
+        const ready = await evaluate(browser, browser.worker, `(async()=>{
+          const [tab]=await chrome.tabs.query({url:'https://x.com/home'});
+          return chrome.tabs.sendMessage(tab.id,{type:'prepare-update',force:true});
+        })()`);
+        assert.equal(ready.ready, false, 'real storage quota failure leaves measurements unsaved');
+        assert.deepEqual(await evaluate(browser, browser.worker, 'updates.attempt(true)'), { applied: false });
+        assert.equal(await evaluate(browser, site.session, 'documentToken'), 'surviving live document');
+      });
+      await evaluate(browser, browser.worker, 'chrome.storage.local.remove("_browserQuotaFiller")');
+      await t.test('Update now replaces the worker while the error tab remains open', async () => {
+        const old = (await browser.cdp.send('Target.getTargets')).targetInfos.find(target => target.type === 'service_worker' && target.url.startsWith(browser.origin));
+        await browser.cdp.send('Target.activateTarget', { targetId: settings.targetId });
+        let dialog;
+        const removeDialog = browser.cdp.on('Page.javascriptDialogOpening', (event, session) => { if (session === settings.session) dialog = event; });
+        try {
+          const updating = click(browser, settings, '#update-apply'); updating.catch(() => {});
+          await eventually(() => dialog, 'Update now confirmation');
+          await browser.cdp.send('Page.handleJavaScriptDialog', { accept: true }, settings.session);
+          await updating;
+        } finally { removeDialog(); }
+        const replacement = await eventually(async () => (await browser.cdp.send('Target.getTargets')).targetInfos.find(target => target.type === 'service_worker' && target.url === old.url && target.targetId !== old.targetId), 'error tab does not block worker replacement');
+        const attached = await browser.cdp.send('Target.attachToTarget', { targetId: replacement.targetId, flatten: true });
+        browser.worker = attached.sessionId;
+        await browser.cdp.send('Runtime.enable', {}, browser.worker);
+        await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.local.get(["_pendingUpdate","_updateRecovery"]).then(data=>!data._pendingUpdate&&!data._updateRecovery)'), 'update and recovery complete');
+        assert.equal(await evaluate(browser, site.session, 'documentToken'), 'surviving live document');
+        assert.equal((await browser.cdp.send('Page.getFrameTree', {}, errorTab.session)).frameTree.frame.unreachableUrl, errorURL);
+        const updatedSettings = await browser.page(browser.origin + '/settings.html');
+        await eventually(() => evaluate(browser, updatedSettings.session, 'document.querySelector("#update-notice")?.hidden'), 'update notice cleared');
+        if (process.env.UPDATE_SCREENSHOT_DIR) {
+          const screenshot = await browser.cdp.send('Page.captureScreenshot', { format: 'png' }, updatedSettings.session);
+          await writeFile(path.join(process.env.UPDATE_SCREENSHOT_DIR, 'error-tab-update-complete.png'), Buffer.from(screenshot.data, 'base64'));
+        }
+      });
+      await t.test('recovery clears its marker without reinjecting the error document', async () => {
+        await evaluate(browser, browser.worker, `(async()=>{
+          const execute=chrome.scripting.executeScript.bind(chrome.scripting);
+          globalThis.errorDocumentReinjections=0;
+          chrome.scripting.executeScript=details=>{
+            if(details.target.tabId===${errorId} && details.files) errorDocumentReinjections++;
+            return execute(details);
+          };
+          await chrome.storage.local.set({_updateRecovery:true});
+          await updates.installed({reason:'update'});
+        })()`);
+        assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("_updateRecovery").then(data=>data._updateRecovery)'), undefined);
+        assert.equal(await evaluate(browser, browser.worker, 'errorDocumentReinjections'), 0);
+      });
+    });
+  } finally { await browser.cleanup(); }
+});
+
 test('a prepared extension reload preserves website drafts and resumes tracking in the same document', async () => {
   const { launch, evaluate, eventually, click, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
   const { scrollFixture } = await import('./scrolling.mjs');
