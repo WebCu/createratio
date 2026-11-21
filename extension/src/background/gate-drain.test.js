@@ -129,8 +129,21 @@ for (const correction of [-3600000, -1500]) test(`backward clock correction pres
     ...(correction === -3600000 ? [{ date, mode: 'consume', start: corrected + 1000, end: corrected + 2000, sec: 1 }] : [])
   ], actions: [] };
   assert.equal((await w.send(packet, sender)).ok, true);
-  assert.equal(w.data[date].reddit.consumeSec, 2);
+  assert.equal(w.data[date].reddit.consumeSec, correction === -1500 ? 1.5 : 2);
   assert.ok(w.data._accessWindows.reddit.every(window => window.end > window.start));
+});
+
+test('manual end revokes every overlapping clock-correction window', async () => {
+  const w = worker({ _access: { reddit: { remainingMs: 60000, expiresAt: start + 60000, date } } }, 'chrome', start, { session: { _accessInitialized: true } });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  w.advance(-500); await w.send({ type: 'snapshot' });
+  w.advance(1000); await w.send({ type: 'access-end', site: 'reddit' }, popupSender);
+  const result = await w.send({ type: 'ingest', id: 'ended-clock-correction', site: 'reddit', segments: [
+    { date, mode: 'consume', start: start - 500, end: start + 1500, sec: 2 }
+  ], actions: [{ date, action: 'comments', at: start + 499 }, { date, action: 'comments', at: start + 500 }] }, sender);
+  assert.equal(result.ok, true);
+  assert.equal(w.data[date].reddit.consumeSec, 1);
+  assert.equal(w.data[date].reddit.comments, 1);
 });
 
 test('a failed drained history write cannot prevent gate navigation or create retry state', async () => {

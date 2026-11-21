@@ -25,9 +25,13 @@ const SiteAccess = (() => {
   function updateWindows(windows, site, now, end) {
     const entries = Array.isArray(windows[site]) ? windows[site].filter(item => record(item) && Number.isFinite(item.start) && Number.isFinite(item.end) && item.start >= 0 && item.end > item.start) : [];
     const last = entries.at(-1);
-    if (last && last.start <= now && last.end >= now) last.end = end;
+    if (last && last.start <= now && last.end >= now) {
+      for (const entry of entries) if (entry.start <= now && entry.end >= now) entry.end = Math.min(entry.end, end);
+      last.end = end;
+    }
     else if (end > now) entries.push({ start: now, end });
-    if (entries.length) windows[site] = entries.slice(-C3.DELIVERY_LIMITS.receiptLimit);
+    const retained = entries.filter(entry => entry.end > entry.start);
+    if (retained.length) windows[site] = retained.slice(-C3.DELIVERY_LIMITS.receiptLimit);
     else delete windows[site];
   }
   async function creationPacket(packet, access) {
