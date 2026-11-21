@@ -261,7 +261,7 @@ test('resistance previews locally during a drag and commits once without losing 
   const p = settingsPage({ settings: { scrollFrictionEnabled: true } }); await p.ready();
   const slider = p.nodes['scroll-friction-strength'];
   assert.equal(slider.value, 50); assert.equal(slider.disabled, false);
-  assert.equal(slider.min, 50); assert.equal(slider.max, 95); assert.equal(slider.step, 5);
+  assert.equal(slider.min, '50'); assert.equal(slider.max, '95'); assert.equal(slider.step, '5');
   slider.focus(); const before = p.messages.length;
   for (let i = 0; i < 100; i++) { slider.value = String(50 + i % 10 * 5); await slider.fire('input'); }
   slider.value = '80'; await slider.fire('input');

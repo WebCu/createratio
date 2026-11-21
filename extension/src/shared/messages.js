@@ -50,7 +50,9 @@
       || JSON.stringify(accessPhase(change.oldValue)) !== JSON.stringify(accessPhase(change.newValue))));
   }
   function create(runtime) {
-    return { async send(message, fallbackMessage) {
+    /** @typedef {ReplyTable<RuntimeReplies>} CheckedRuntimeReplies */
+    /** @type {RuntimeMessenger} */
+    const messenger = { async send(message, fallbackMessage) {
       let reply;
       try { reply = await runtime.sendMessage(message); }
       catch (error) { throw new Error(typeof error?.message === 'string' && error.message ? error.message : typeof error === 'string' && error ? error : fallbackMessage); }
@@ -66,6 +68,7 @@
       if (message.type === 'access-history-list' && !intentions(reply.intentions)) throw new Error(fallbackMessage);
       return reply;
     } };
+    return messenger;
   }
   return { create, shouldRefresh };
 });

@@ -1,7 +1,8 @@
 'use strict';
 const api = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(api.runtime);
-const $ = id => document.getElementById(id);
+/** @type {(id: string) => HTMLInputElement} */
+const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 const site = new URLSearchParams(location.search).get('site');
 $('reason').minLength = C3.INTENTION_LIMITS.minLength;
 $('reason').maxLength = C3.INTENTION_LIMITS.maxLength;
@@ -64,7 +65,7 @@ function render() {
     const seconds = Math.max(0, Math.ceil((access.readyAt - now) / 1000));
     $('clock').textContent = remaining(access.readyAt - now);
     $('progress').max = access.waitSeconds;
-    $('progress').value = Math.max(0, access.waitSeconds - seconds);
+    /** @type {HTMLProgressElement} */ (document.getElementById('progress')).value = Math.max(0, access.waitSeconds - seconds);
     $('open').disabled = busy || seconds > 0;
     $('open').textContent = `Open ${access.name} for ${access.sessionMinutes} active minute${access.sessionMinutes === 1 ? '' : 's'}`;
     const message = seconds > 0 ? 'A deliberate pause, not an instant override.' : 'Ready when you are. Confirm to start your session.';
@@ -73,13 +74,17 @@ function render() {
   if (active) $('active-time').textContent = access.goalAllowed ? 'Blocking returns at or below your current daily target, or on a new day, unless a timed session still has time left.' : `${remaining(access.expiresAt ? access.expiresAt - now : access.remainingMs)} remaining${access.expiresAt ? '' : ' · paused'}. All ${access.name} tabs will block again when time runs out.`;
   RefillAnimation.render($('active-countdown'), access.goalAllowed ? { ...access, remainingMs: 0 } : access);
 }
+/** @param {AccessSessionMessage['type']} type
+ * @param {{ reason?: string }} [extra] */
 async function send(type, extra = {}) {
   const result = await messages.send({ type, site, ...extra }, 'Unable to check access. The site stays blocked.');
   if (!result.access?.[site]) throw new Error('Open this page by visiting X or LinkedIn.');
-  if (typeof result.intentionHistoryEnabled === 'boolean') $('reason-hint').textContent = result.intentionHistoryEnabled ? 'Be specific. Your intention is saved on this device. Review or clear it in the dashboard.' : 'Be specific. Your intention is not saved. You can enable intention history in Settings.';
+  if ('intentionHistoryEnabled' in result && typeof result.intentionHistoryEnabled === 'boolean') $('reason-hint').textContent = result.intentionHistoryEnabled ? 'Be specific. Your intention is saved on this device. Review or clear it in the dashboard.' : 'Be specific. Your intention is not saved. You can enable intention history in Settings.';
   access = result.access[site];
   return access;
 }
+/** @param {AccessSessionMessage['type']} type
+ * @param {{ reason?: string }} [extra] */
 async function action(type, extra = {}, navigate = false) {
   if (busy) return;
   const previousRefill = access?.refilledAt || 0;

@@ -23,7 +23,7 @@ async function badge(day) {
 async function snapshot() {
   await history.prepare();
   const date = C3.localDate();
-  const stored = await extensionAPI.storage.local.get([date, 'settings', '_historyGeneration']);
+  const stored = /** @type {StoredData} */ (await extensionAPI.storage.local.get([date, 'settings', '_historyGeneration']));
   const day = history.creationDay(stored[date]);
   await badge(day);
   return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: C3.settingsSnapshot(stored.settings), access: await SiteAccess.reconcile(), websiteTimeEnabled: websiteTime.enabled };
@@ -32,7 +32,7 @@ async function recordPacket(message, sender, access, batch) {
   if (message?.type !== 'ingest') throw MessageContracts.refuse('Invalid activity packet');
   if (!contracts.creationSender(message, sender)) throw MessageContracts.refuse('Unsupported sender');
   await history.prepare();
-  const preferences = await extensionAPI.storage.local.get(['settings', '_historyGeneration']);
+  const preferences = /** @type {StoredData} */ (await extensionAPI.storage.local.get(['settings', '_historyGeneration']));
   if ((message.generation ?? null) !== (batch ? batch.generation : preferences._historyGeneration ?? null)) return;
   if (!C3.trackingEnabled(message.site, preferences.settings)) return;
   contracts.packet(message);
@@ -53,7 +53,7 @@ async function ingest(message, sender) {
 }
 async function packetBatch() {
   await history.prepare();
-  const stored = await extensionAPI.storage.local.get(['_historyGeneration', '_receipts']);
+  const stored = /** @type {{ _historyGeneration?: string | null, _receipts?: string[] }} */ (await extensionAPI.storage.local.get(['_historyGeneration', '_receipts']));
   return { generation: stored._historyGeneration ?? null, receipts: new Set(stored._receipts || []) };
 }
 async function drainTracker(tab) {
@@ -108,7 +108,7 @@ async function handle(message, sender) {
       return snapshot();
     case 'scroll-friction-setting': {
       contracts.preferences(message, sender);
-      const stored = await extensionAPI.storage.local.get('settings');
+      const stored = /** @type {StoredData} */ (await extensionAPI.storage.local.get('settings'));
       await extensionAPI.storage.local.set({ settings: { ...stored.settings, scrollFrictionEnabled: message.enabled,
         scrollFrictionStrength: message.strength ?? C3.settingsSnapshot(stored.settings).scrollFrictionStrength } });
       return snapshot();

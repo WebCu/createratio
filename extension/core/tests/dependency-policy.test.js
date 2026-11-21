@@ -101,7 +101,8 @@ test('CI uses a frozen install, audits security, and runs the shared fail-fast c
     assert.ok(workflow.includes(`run: ${command}`), command);
   }
   assert.equal(manifests[0].scripts['check:syntax'], 'node bin/check-syntax.js');
-  assert.equal(manifests[0].scripts.check, 'pnpm check:syntax && pnpm test && pnpm build && pnpm build:site');
+  assert.equal(manifests[0].scripts['check:types'], 'tsc -p tsconfig.json');
+  assert.equal(manifests[0].scripts.check, 'pnpm check:syntax && pnpm check:types && pnpm test && pnpm build && pnpm build:site');
   assert.equal(manifests[0].scripts['check:browser'], 'pnpm build:chrome && pnpm test:browser');
   assert.match(workflow, /run: pnpm check:browser/);
   assert.match(workflow, /^  contents: read$/m);

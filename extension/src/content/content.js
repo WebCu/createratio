@@ -12,7 +12,13 @@
   let wallOffset = Date.now() - lastSample;
   let enabled = false, mode = 'neutral';
   let wasVisible = document.visibilityState === 'visible', wasFocused = document.hasFocus();
-  let segments = [], actions = [], outbox = [], delivery = null, stopped = false, pageActive = true, updating = false;
+  /** @type {IngestMessage[]} */
+  let outbox = [];
+  /** @type {TimeSegment[]} */
+  let segments = [];
+  /** @type {SiteActionEntry[]} */
+  let actions = [];
+  let delivery = null, stopped = false, pageActive = true, updating = false;
   const listeners = [];
   function listen(target, type, fn, options) { target.addEventListener(type, fn, options); listeners.push([target, type, fn, options]); }
   let adapter = null, failed = false;
@@ -33,7 +39,10 @@
     }
   }
 
-  function appendTime(start, end) {
+  /** @param {number} start
+   * @param {number} end
+   * @param {SegmentMode} segmentMode */
+  function appendTime(start, end, segmentMode) {
     let cursor = start;
     const parts = C3.splitInterval(start, end);
     for (const [index, part] of parts.entries()) {
@@ -41,8 +50,8 @@
       if (recordingPaused) break;
       const tail = segments.at(-1);
       const partEnd = index === parts.length - 1 ? end : cursor + part.sec * 1000;
-      if (tail && tail.mode === mode && tail.date === part.date && tail.end === cursor) { tail.end = partEnd; tail.sec = (tail.end - tail.start) / 1000; }
-      else segments.push({ ...part, sec: (partEnd - cursor) / 1000, mode, start: cursor, end: partEnd });
+      if (tail && tail.mode === segmentMode && tail.date === part.date && tail.end === cursor) { tail.end = partEnd; tail.sec = (tail.end - tail.start) / 1000; }
+      else segments.push({ ...part, sec: (partEnd - cursor) / 1000, mode: segmentMode, start: cursor, end: partEnd });
       cursor = partEnd;
       if (segments.length === MAX_ITEMS) queuePacket();
       if (recordingPaused) break;
@@ -52,9 +61,9 @@
     const now = performance.now();
     const wallNow = Date.now();
     const ms = recordingPaused ? 0 : C3.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
-    if (ms > 0) {
+    if (ms > 0 && (mode === 'create' || mode === 'consume')) {
       const activeEnd = Math.min(now, lastInput + 30000);
-      appendTime(wallOffset + Math.max(lastSample, lastInput), wallOffset + activeEnd);
+      appendTime(wallOffset + Math.max(lastSample, lastInput), wallOffset + activeEnd, mode);
     }
     lastSample = now;
     if (Math.abs(wallNow - (wallOffset + now)) > 2) wallOffset = wallNow - now;

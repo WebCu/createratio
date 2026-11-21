@@ -1,7 +1,8 @@
 (() => {
   'use strict';
   const api = globalThis.browser || globalThis.chrome;
-  const notice = document.getElementById('update-notice'), button = document.getElementById('update-apply'), status = document.getElementById('update-status');
+  const notice = document.getElementById('update-notice'), status = document.getElementById('update-status');
+  const button = /** @type {HTMLButtonElement} */ (document.getElementById('update-apply'));
   const messages = RuntimeMessages.create(api.runtime);
   function show(version) { notice.hidden = typeof version !== 'string' || !version; }
   api.storage.local.get('_pendingUpdate').then(stored => show(stored._pendingUpdate)).catch(() => {});
