@@ -21,13 +21,13 @@ function harness(data = {}, session = {}) {
     alarms: { async create(key, options) { alarms[key] = options; }, async clear(key) { delete alarms[key]; } }
   };
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
-  const context = vm.createContext({ Date: Clock, URL, TextEncoder, console });
+  const context = vm.createContext({ Date: Clock, URL, TextEncoder, console, crypto });
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'history.js'), 'utf8'), context);
   const history = context.ActivityHistory.create(api.storage.local, C3);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'web-time.js'), 'utf8'), context);
   function serialize(task) { const next = queue.then(task); queue = next.catch(() => {}); return next; }
   const tracker = context.WebTime.create(api, serialize, C3, history, { setInterval(fn, ms) { assert.equal(ms, 5000); timer = fn; return 1; }, clearInterval() { timer = null; } });
-  return { data, session, api, state, tracker, alarms, advance(ms) { now += ms; }, setTime(value) { now = value; }, async tick(alarm) { return serialize(() => tracker.tick(alarm)); }, async drain() { return serialize(() => {}); }, get timer() { return timer; } };
+  return { data, session, api, state, tracker, history, alarms, advance(ms) { now += ms; }, setTime(value) { now = value; }, async tick(alarm) { return serialize(() => tracker.tick(alarm)); }, async drain() { return serialize(() => {}); }, get timer() { return timer; } };
 }
 
 test('domain-only HTTP/S identifiers, duration, range totals, ordering and CSV', () => {
@@ -89,6 +89,195 @@ test('switching tabs and navigation attribute intervals to the previous domain',
   h.advance(3000); h.state.tab.url = 'https://third.test/messages'; h.api.tabs.onUpdated.emit(1, { url: h.state.tab.url }); await h.drain();
   h.advance(5000); await h.tick();
   assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 2, 'other.test': 3, 'third.test': 5 });
+});
+
+test('failed website time writes preserve the interval for the next tick', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  assert.equal(h.data['_websiteTime:2026-10-11'], undefined);
+  h.api.storage.local.set = set;
+  h.advance(5000); await h.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']?.['example.com'], 10);
+  h.advance(5000); await h.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 15);
+});
+
+test('failed website time writes preserve tab boundaries across worker replacement', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); h.state.tab.url = 'https://other.test/';
+  await assert.rejects(h.tick(), /Storage unavailable/);
+  h.api.storage.local.set = set;
+  const replacement = harness(h.data, h.session); replacement.advance(10000);
+  replacement.state.tab.url = 'https://other.test/';
+  await replacement.tracker.start(); await replacement.tick();
+  assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 5, 'other.test': 5 });
+  replacement.advance(5000); await replacement.tick();
+  assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 5, 'other.test': 10 });
+});
+
+for (const inactive of ['idle', 'unfocused']) {
+  test(`failed website time writes do not backfill ${inactive} time`, async () => {
+    const h = harness(); await h.tracker.setEnabled(true);
+    const set = h.api.storage.local.set;
+    h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+    h.advance(5000);
+    if (inactive === 'idle') h.state.idle = 'idle';
+    else h.state.focused = false;
+    await assert.rejects(h.tick(), /Storage unavailable/);
+    h.api.storage.local.set = set;
+    h.advance(5000); await h.tick();
+    h.advance(5000); await h.tick();
+    assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 5 });
+  });
+}
+
+test('website time pauses at the pending limit and resumes without backfilling', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  for (let i = 0; i < 105; i++) {
+    h.advance(1000); await assert.rejects(h.tick(), /Storage unavailable/);
+  }
+  assert.equal(h.session._websiteTimePending.length, 100);
+  assert.equal(h.session._websiteTimeSample, null);
+  h.api.storage.local.set = set;
+  h.advance(5000); await h.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 100);
+  h.advance(5000); await h.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 105);
+  assert.deepEqual(h.session._websiteTimePending, []);
+});
+
+test('website time retries only unsaved segments after a partial recovery', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); h.state.tab.url = 'https://other.test/';
+  await assert.rejects(h.tick(), /Storage unavailable/);
+  let writes = 0;
+  h.api.storage.local.set = async values => {
+    if (++writes === 2) throw new Error('Storage unavailable');
+    await set(values);
+  };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 5 });
+  h.api.storage.local.set = set;
+  h.advance(5000); await h.tick();
+  assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 5, 'other.test': 10 });
+  h.advance(5000); await h.tick();
+  assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 5, 'other.test': 15 });
+});
+
+test('failed disable checkpoints partial website time recovery before worker replacement', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  let writes = 0;
+  h.api.storage.local.set = async values => {
+    if (++writes === 2) throw new Error('Storage unavailable');
+    await set(values);
+  };
+  await assert.rejects(h.tracker.setEnabled(false), /Storage unavailable/);
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
+  h.api.storage.local.set = set;
+  const replacement = harness(h.data, h.session); replacement.advance(10000);
+  await replacement.tracker.start(); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 10);
+  replacement.advance(5000); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 15);
+});
+
+for (const pending of [false, true]) {
+  test(`website time replay after a failed checkpoint does not duplicate a restored ${pending ? 'pending queue' : 'sample'}`, async () => {
+    const h = harness(); await h.tracker.setEnabled(true);
+    if (pending) {
+      const set = h.api.storage.local.set;
+      h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+      h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+      h.api.storage.local.set = set;
+    }
+    h.api.storage.session.set = async () => { throw new Error('Checkpoint unavailable'); };
+    h.advance(5000); await assert.rejects(h.tick(), /Checkpoint unavailable/);
+    const saved = h.data['_websiteTime:2026-10-11']['example.com'];
+    const replacement = harness(h.data, h.session); replacement.advance(15000);
+    await replacement.tracker.start(); await replacement.tick();
+    assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], saved);
+    replacement.advance(5000); await replacement.tick();
+    assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], saved + 5);
+  });
+}
+
+test('history clear resets website samples and pending entries and permits fresh time', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  h.api.storage.local.set = set;
+  await h.history.clear('after-clear');
+  h.state.focused = false;
+  await h.tracker.start(true);
+  const replacement = harness(h.data, h.session); replacement.advance(10000);
+  await replacement.tracker.start(); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11'], undefined);
+  replacement.advance(5000); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
+  await replacement.history.clear('another-clear'); await replacement.tracker.start(true);
+  replacement.advance(5000); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
+});
+
+for (const generation of [null, 'stable']) {
+  test(`website receipt rollover preserves queued intervals across restart with generation ${generation}`, async () => {
+    const data = { _websiteTimeReceipts: Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i) };
+    if (generation !== null) data._historyGeneration = generation;
+    const h = harness(data); await h.tracker.setEnabled(true);
+    const set = h.api.storage.local.set;
+    h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+    h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+    h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+    h.api.storage.local.set = set;
+    const replacement = harness(h.data, h.session); replacement.advance(15000);
+    await replacement.tracker.start(); await replacement.tick();
+    assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 15);
+    assert.equal(h.data._historyGeneration ?? null, generation);
+    assert.equal(h.data._websiteTimeReceipts.length, C3.DELIVERY_LIMITS.receiptLimit);
+    replacement.advance(5000); await replacement.tick();
+    assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 20);
+  });
+}
+
+test('repeated checkpoint failures cannot evict replayable website receipts', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  h.api.storage.session.set = async () => { throw new Error('Checkpoint unavailable'); };
+  for (let i = 0; i < C3.DELIVERY_LIMITS.receiptLimit + 2; i++) {
+    h.advance(1); await assert.rejects(h.tick(), /Checkpoint unavailable/);
+  }
+  const saved = h.data['_websiteTime:2026-10-11']['example.com'];
+  const replacement = harness(h.data, h.session); replacement.advance(1000);
+  await replacement.tracker.start(); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], saved);
+});
+
+test('failed reset checkpoint cannot restore cleared website samples or pending time', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  h.api.storage.local.set = set;
+  await h.history.clear('after-clear');
+  h.api.storage.session.set = async () => { throw new Error('Checkpoint unavailable'); };
+  await assert.rejects(h.tracker.start(true), /Checkpoint unavailable/);
+  const replacement = harness(h.data, h.session); replacement.advance(10000);
+  await replacement.tracker.start(); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11'], undefined);
+  replacement.advance(5000); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
 });
 
 test('unfocused windows, idle/locked time, private tabs and browser pages never accrue', async () => {

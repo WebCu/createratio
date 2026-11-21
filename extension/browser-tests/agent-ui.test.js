@@ -26,10 +26,10 @@ test('agents discover site-specific actions and complete the existing access UI 
       await eventually(() => inspect(gate, '!document.querySelector("#begin").disabled'), 'gate loaded');
       await find(gate, 'form', 'Request access to X');
       const reason = await find(gate, 'textbox', 'What do you need to do?');
-      assert.match(reason.description.value, /20–280/);
+      assert.match(reason.description.value, /20–280 characters\. A little clarity, then 5 minutes to pause\./);
       await browser.cdp.send('DOM.focus', { backendNodeId: reason.backendDOMNodeId }, gate.session);
       await browser.cdp.send('Input.insertText', { text: 'Review the synthetic launch plan, then leave.' }, gate.session);
-      await clickNamed(gate, 'Start the 300-second wait');
+      await clickNamed(gate, 'Start the 5-minute wait');
       await eventually(() => inspect(gate, '!document.querySelector("#waiting").hidden && !document.querySelector("#cancel").disabled'), 'waiting acknowledged');
       await find(gate, 'region', 'A little breathing room.');
       const openName = 'Open X for 5 active minutes';

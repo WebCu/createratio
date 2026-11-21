@@ -48,23 +48,42 @@
     return rows.join('\r\n') + '\r\n';
   }
   function create(api, serialize, core, history) {
-    let enabled = false, previous = null;
+    const pendingLimit = Math.min(100, Math.floor(core.DELIVERY_LIMITS.receiptLimit / 4) - 1);
+    let enabled = false, previous = null, pending = [], checkpointFailed = false, epoch = false;
     async function allowed() { return !!api.permissions && await api.permissions.contains(PERMISSIONS); }
     async function checkpoint() {
-      await api.storage.session?.set({ _websiteTimeSample: previous });
+      try {
+        await api.storage.session?.set({ _websiteTimeSample: previous, _websiteTimePending: pending, _websiteTimeEpoch: epoch });
+        checkpointFailed = false;
+      } catch (error) {
+        checkpointFailed = true;
+        throw error;
+      }
     }
     function schedule(task) { return serialize(task).catch(error => console.error('CreateRatio website time:', error)); }
     async function accrue(now) {
+      const hadPending = pending.length > 0;
       const old = previous; previous = null;
-      if (!old || typeof old.domain !== 'string' || !Number.isFinite(old.at) || now <= old.at || now - old.at > 75000) return;
-      await history.recordWebsiteTime(old.domain, core.splitInterval(old.at, now));
+      if (old && typeof old.id === 'string' && typeof old.domain === 'string' && Number.isFinite(old.at) && now > old.at && now - old.at <= 75000 && pending.length < pendingLimit) {
+        pending.push({ id: old.id, domain: old.domain, segments: core.splitInterval(old.at, now) });
+      }
+      try {
+        while (pending.length) {
+          const entry = pending[0];
+          if (typeof entry.id === 'string') await history.recordWebsiteTime(entry.domain, entry.segments, entry.id);
+          pending.shift();
+        }
+      } finally {
+        if (hadPending || pending.length) await checkpoint();
+      }
     }
     async function sample(now) {
+      if (checkpointFailed || pending.length >= pendingLimit) return;
       const window = await api.windows.getLastFocused();
       if (!window.focused || window.type !== 'normal' || await api.idle.queryState(30) !== 'active') return;
       const [tab] = await api.tabs.query({ active: true, windowId: window.id });
       const domain = !tab?.incognito && domainForURL(tab?.url);
-      if (domain) previous = { domain, at: now };
+      if (domain) previous = { id: 'website:' + crypto.randomUUID(), domain, at: now };
     }
     async function tick(alarm = {}) {
       if (!enabled) return;
@@ -76,9 +95,11 @@
       }
       const now = Date.now();
       if (Number.isFinite(alarm.scheduledTime) && now - alarm.scheduledTime > 15000) previous = null;
-      await accrue(now);
-      await sample(now);
-      await checkpoint();
+      try { await accrue(now); }
+      finally {
+        try { await sample(now); }
+        finally { await checkpoint(); }
+      }
     }
     async function updateMonitoring() {
       if (!enabled) {
@@ -92,8 +113,12 @@
       await checkpoint();
     }
     async function start(reset = false) {
-      previous = reset ? null : (await api.storage.session?.get('_websiteTimeSample'))?._websiteTimeSample || null;
+      if (reset) { previous = null; pending = []; }
       const stored = await api.storage.local.get('_websiteTimeEnabled');
+      epoch = (await api.storage.local.get('_historyReset'))._historyReset === true;
+      const savedEpoch = (await api.storage.session?.get('_websiteTimeEpoch'))?._websiteTimeEpoch === true;
+      previous = reset || savedEpoch !== epoch ? null : (await api.storage.session?.get('_websiteTimeSample'))?._websiteTimeSample || null;
+      pending = reset || savedEpoch !== epoch ? [] : (await api.storage.session?.get('_websiteTimePending'))?._websiteTimePending || [];
       enabled = stored._websiteTimeEnabled === true && await allowed();
       if (!enabled) previous = null;
       await updateMonitoring();

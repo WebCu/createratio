@@ -270,6 +270,72 @@ test('website recording owns date keys and accumulates repeated domain segments 
   assert.equal(data[PREFIX + '2026-10-01'], undefined);
   assert.equal(data._receipts, undefined);
 });
+
+test('website receipts are saved atomically with midnight totals and deduplicate replay', async () => {
+  const date = '2026-10-31', prior = '2026-10-30', h = harness();
+  const segments = [{ date: prior, sec: 2 }, { date, sec: 3 }];
+  h.state.failSet = true;
+  await assert.rejects(h.history.recordWebsiteTime('example.com', segments, 'website:retry'), /Storage unavailable/);
+  assert.deepEqual(h.data, {});
+  h.state.failSet = false;
+  await h.history.recordWebsiteTime('example.com', segments, 'website:retry');
+  await harness(h.data).history.recordWebsiteTime('example.com', segments, 'website:retry');
+  assert.deepEqual(h.data[PREFIX + prior], { 'example.com': 2 });
+  assert.deepEqual(h.data[PREFIX + date], { 'example.com': 3 });
+  assert.deepEqual(h.data._websiteTimeReceipts, ['website:retry']);
+  assert.deepEqual(h.writes[0], { [PREFIX + prior]: { 'example.com': 2 }, [PREFIX + date]: { 'example.com': 3 }, _websiteTimeReceipts: ['website:retry'] });
+});
+
+test('website receipts trim FIFO without rotating packet generations and clear permits new data', async () => {
+  const date = '2026-10-31', receipts = Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i);
+  const data = { _historyGeneration: 'packets', _websiteTimeReceipts: receipts }, h = harness(data);
+  const segments = [{ date, sec: 5 }];
+  await h.history.recordWebsiteTime('example.com', segments, 'website:first');
+  assert.equal(data._historyGeneration, 'packets');
+  assert.deepEqual(data._websiteTimeReceipts, [...receipts.slice(1), 'website:first']);
+  await h.history.recordWebsiteTime('example.com', segments, 'website:first');
+  assert.equal(data[PREFIX + date]['example.com'], 5);
+  await h.history.clear('after-clear');
+  assert.equal(data[PREFIX + date], undefined);
+  assert.equal(data._websiteTimeReceipts, undefined);
+  await h.history.recordWebsiteTime('example.com', segments, 'website:first');
+  assert.equal(data[PREFIX + date]['example.com'], 5);
+  await h.history.recordWebsiteTime('example.com', segments, 'website:first');
+  assert.equal(data[PREFIX + date]['example.com'], 5);
+});
+
+test('website receipt repair preserves packet generations and recorded totals', async () => {
+  const date = '2026-10-31', segments = [{ date, sec: 5 }];
+  for (const receipts of [{ broken: true }, ['duplicate', 'duplicate'], [7], ['x'.repeat(C3.DELIVERY_LIMITS.maxIdLength + 1)]]) {
+    const data = { _historyGeneration: 'packets', _websiteTimeReceipts: receipts, [PREFIX + date]: { 'example.com': 3 } }, h = harness(data);
+    await h.history.prepare();
+    assert.equal(data._historyGeneration, 'packets');
+    assert.equal(data[PREFIX + date]['example.com'], 3);
+    assert.deepEqual(data._websiteTimeReceipts, []);
+    await h.history.recordWebsiteTime('example.com', segments, 'website:fresh');
+    assert.equal(data[PREFIX + date]['example.com'], 8);
+  }
+});
+
+test('packet receipt rollover preserves pending website time', async () => {
+  const date = '2026-10-31', data = { _historyGeneration: 'packets', _receipts: Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'packet-' + i) }, h = harness(data);
+  await h.history.prepare();
+  await h.history.recordCreation({ id: 'packet:fresh', site: 'x', segments: [{ date, mode: 'consume', sec: 5 }], actions: [] });
+  assert.notEqual(data._historyGeneration, 'packets');
+  await h.history.recordWebsiteTime('example.com', [{ date, sec: 5 }], 'website:pending');
+  assert.equal(data[PREFIX + date]['example.com'], 5);
+});
+
+test('quota clear keeps website receipts usable if cleanup fails after the reset batch', async () => {
+  const date = '2026-10-31', h = harness();
+  await h.history.recordWebsiteTime('example.com', [{ date, sec: 5 }], 'website:before-clear');
+  h.state.quota = true; h.state.failRemove = true;
+  await assert.rejects(h.history.clear('after-clear'), /Remove failed/);
+  assert.deepEqual(h.data._websiteTimeReceipts, []);
+  h.state.failRemove = false;
+  await h.history.recordWebsiteTime('example.com', [{ date, sec: 3 }], 'website:after-clear');
+  assert.equal(h.data[PREFIX + date]['example.com'], 3);
+});
 test('creation accrual normalizes known stats without coercion and preserves other saved history', async () => {
   const date = '2026-10-31', retired = { consumeSec: 20, posts: 2, oldField: 'saved' };
   for (const invalid of ['10', -10, NaN, Infinity, -Infinity, null, true, {}, []]) {

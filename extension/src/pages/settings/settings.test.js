@@ -4,6 +4,52 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { page, C3 } = require('../../tests/ui-harness.js');
+for (const kind of ['ratio', 'websites']) {
+  test(`settings ${kind} CSV rejection survives a reset refresh that finishes later`, async () => {
+    const p = page('settings'); await p.ready();
+    const releaseExport = p.holdMessage('history');
+    const exporting = p.nodes['export-' + kind].fire('click'); await p.ready();
+    const releaseRefresh = p.holdMessage('snapshot');
+    p.change({ _historyReset: { oldValue: false, newValue: true } });
+    await p.ready(); releaseExport(); await exporting;
+    releaseRefresh(); await p.ready();
+    assert.equal(p.blobs.length, 0);
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    assert.equal(p.nodes.error.hidden, false);
+  });
+  test(`settings ${kind} CSV survives receipt-window rollover`, async () => {
+    const p = page('settings'); await p.ready();
+    const button = p.nodes['export-' + kind];
+    const release = p.holdMessage('history');
+    const exporting = button.fire('click'); await p.ready();
+    p.change({ _historyGeneration: { oldValue: 'before', newValue: 'after' }, _receipts: { newValue: [] } });
+    await p.ready(); release(); await exporting;
+    assert.equal(p.blobs.length, 1);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+  test(`settings ${kind} CSV rejects pre-reset replies and retries with empty history`, async () => {
+    const today = C3.localDate();
+    const data = { [today]: { x: { createSec: 180 } }, _websiteTime: { [today]: { 'cleared.test': 180 } } };
+    const p = page('settings', data); await p.ready();
+    const button = p.nodes['export-' + kind];
+    p.state.replies.set('history', { ok: true, days: structuredClone(kind === 'ratio' ? { [today]: data[today] } : data._websiteTime) });
+    const release = p.holdMessage('history');
+    const exporting = button.fire('click');
+    await p.ready();
+    delete data[today]; data._websiteTime = {};
+    p.change({ _historyReset: { oldValue: false, newValue: true } });
+    await p.ready(); release(); await exporting;
+    assert.equal(p.blobs.length, 0, 'cleared history never becomes a CSV');
+    assert.deepEqual(p.state.downloads, []);
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    p.state.replies.delete('history');
+    await button.fire('click');
+    assert.equal(p.blobs.length, 1);
+    assert.equal((await p.blobs[0].text()).trim().split('\n').length, 1);
+    assert.equal(button.disabled, false);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+}
 const settingsPage = (data, enabled) => page('settings', data, enabled);
 function controls(p, site = '') {
   const suffix = site ? 'site-' + site : 'default';
@@ -494,6 +540,19 @@ test('declining permission resets Website time without sending an opt-in message
   p.nodes['website-time-enabled'].checked = true; await p.nodes['website-time-enabled'].fire('change'); await p.ready();
   assert.equal(p.state.requested, 1); assert.equal(p.nodes['website-time-enabled'].checked, false);
   assert.match(p.nodes.error.textContent, /Permission declined/); assert.equal(p.messages.some(message => message.type === 'website-time-setting'), false);
+});
+test('failed Website time enabling revokes granted permissions and preserves the save error', async () => {
+  for (const removalFails of [false, true]) {
+    const p = settingsPage(); await p.ready();
+    p.state.rejections.set('website-time-setting', new Error('Website time save rejected.'));
+    p.state.removeFails = removalFails;
+    p.nodes['website-time-enabled'].checked = true;
+    await p.nodes['website-time-enabled'].fire('change'); await p.ready();
+    assert.equal(p.state.requested, 1);
+    assert.equal(p.state.removed, 1);
+    assert.equal(p.nodes['website-time-enabled'].checked, false);
+    assert.equal(p.nodes.error.textContent, 'Website time save rejected.');
+  }
 });
 test('Website time enable requests permission; disable revokes it and preserves totals', async () => {
   const p = settingsPage({ _websiteTime: { [C3.localDate()]: { 'example.com': 120 } } }); await p.ready();
