@@ -46,7 +46,7 @@ for (const pageName of ['dashboard', 'settings']) for (const kind of ['ratio', '
           await browser.cdp.send('Page.handleJavaScriptDialog', { accept: true }, settings.session);
           await clearing;
         } finally { removeDialog(); }
-        await eventually(() => inspect(settings, 'document.querySelector("#save-status").textContent.startsWith("History cleared.")'), 'history cleared');
+        await eventually(() => inspect(settings, 'document.querySelector("#save-status").textContent.startsWith("History cleared and creation score reset.")'), 'history cleared');
         if (pageName === 'dashboard') {
           const total = kind === 'ratio' ? '#create-min' : '#website-total';
           const empty = kind === 'ratio' ? '0.0m' : '0s';
