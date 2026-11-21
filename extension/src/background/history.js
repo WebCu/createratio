@@ -66,12 +66,13 @@
       }
       await remove(expired);
       const migrated = {};
-      const receipts = stored._receipts;
-      const malformedReceipts = receipts != null && (!Array.isArray(receipts) || receipts.length > receiptLimit || ![...receipts].every(id => typeof id === 'string' && id.length <= core.DELIVERY_LIMITS.maxIdLength) || new Set(receipts).size !== receipts.length);
+      const journals = [stored._receipts, stored._websiteTimeReceipts];
+      const malformedReceipts = journals.some(receipts => receipts != null && (!Array.isArray(receipts) || receipts.length > receiptLimit || ![...receipts].every(id => typeof id === 'string' && id.length <= core.DELIVERY_LIMITS.maxIdLength) || new Set(receipts).size !== receipts.length));
       const generation = stored._historyGeneration;
       const malformedGeneration = generation != null && (typeof generation !== 'string' || !generation.length);
-      if (malformedReceipts || malformedGeneration || generation == null && Array.isArray(receipts) && receipts.length >= receiptLimit) {
+      if (malformedReceipts || malformedGeneration || generation == null && journals.some(receipts => Array.isArray(receipts) && receipts.length >= receiptLimit)) {
         migrated._receipts = [];
+        if (stored._websiteTimeReceipts != null) migrated._websiteTimeReceipts = [];
         migrated._historyGeneration = crypto.randomUUID();
       }
       for (const [date, value] of Object.entries(collection(stored._websiteTime))) {
@@ -136,16 +137,26 @@
       }
       await save(changes);
     }
-    async function recordWebsiteTime(domain, segments) {
+    async function recordWebsiteTime(domain, segments, id, generation = null) {
       await prepare();
       const selected = segments.filter(segment => eligible(segment.date));
-      const stored = await storage.get(selected.map(segment => PREFIX + segment.date));
+      const stored = await storage.get([...selected.map(segment => PREFIX + segment.date), '_websiteTimeReceipts', '_historyGeneration']);
+      const receipts = stored._websiteTimeReceipts || [];
+      if (id !== undefined && (generation !== (stored._historyGeneration ?? null) || receipts.includes(id))) return;
       const changes = {};
       for (const { date, sec } of selected) {
         const key = PREFIX + date;
         const day = changes[key] || collection(stored[key]);
         const total = Object.hasOwn(day, domain) ? nonnegative(day[domain]) : 0;
         changes[key] = { ...day, [domain]: total + sec };
+      }
+      if (id !== undefined) {
+        if (receipts.length >= receiptLimit) {
+          changes._historyGeneration = crypto.randomUUID();
+          changes._websiteTimeReceipts = [id];
+        } else {
+          changes._websiteTimeReceipts = [...receipts, id];
+        }
       }
       await save(changes);
     }

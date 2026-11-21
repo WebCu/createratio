@@ -57,13 +57,13 @@
     async function accrue(now) {
       const hadPending = pending.length > 0;
       const old = previous; previous = null;
-      if (old && typeof old.domain === 'string' && Number.isFinite(old.at) && now > old.at && now - old.at <= 75000 && pending.length < pendingLimit) {
-        pending.push({ domain: old.domain, segments: core.splitInterval(old.at, now) });
+      if (old && typeof old.id === 'string' && typeof old.domain === 'string' && Number.isFinite(old.at) && now > old.at && now - old.at <= 75000 && pending.length < pendingLimit) {
+        pending.push({ id: old.id, generation: old.generation, domain: old.domain, segments: core.splitInterval(old.at, now) });
       }
       try {
         while (pending.length) {
           const entry = pending[0];
-          await history.recordWebsiteTime(entry.domain, entry.segments);
+          if (typeof entry.id === 'string') await history.recordWebsiteTime(entry.domain, entry.segments, entry.id, entry.generation);
           pending.shift();
         }
       } finally {
@@ -76,7 +76,11 @@
       if (!window.focused || window.type !== 'normal' || await api.idle.queryState(30) !== 'active') return;
       const [tab] = await api.tabs.query({ active: true, windowId: window.id });
       const domain = !tab?.incognito && domainForURL(tab?.url);
-      if (domain) previous = { domain, at: now };
+      if (domain) {
+        await history.prepare();
+        const stored = await api.storage.local.get('_historyGeneration');
+        previous = { id: 'website:' + crypto.randomUUID(), generation: stored._historyGeneration ?? null, domain, at: now };
+      }
     }
     async function tick(alarm = {}) {
       if (!enabled) return;

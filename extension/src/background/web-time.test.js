@@ -21,13 +21,13 @@ function harness(data = {}, session = {}) {
     alarms: { async create(key, options) { alarms[key] = options; }, async clear(key) { delete alarms[key]; } }
   };
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
-  const context = vm.createContext({ Date: Clock, URL, TextEncoder, console });
+  const context = vm.createContext({ Date: Clock, URL, TextEncoder, console, crypto });
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'history.js'), 'utf8'), context);
   const history = context.ActivityHistory.create(api.storage.local, C3);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'web-time.js'), 'utf8'), context);
   function serialize(task) { const next = queue.then(task); queue = next.catch(() => {}); return next; }
   const tracker = context.WebTime.create(api, serialize, C3, history, { setInterval(fn, ms) { assert.equal(ms, 5000); timer = fn; return 1; }, clearInterval() { timer = null; } });
-  return { data, session, api, state, tracker, alarms, advance(ms) { now += ms; }, setTime(value) { now = value; }, async tick(alarm) { return serialize(() => tracker.tick(alarm)); }, async drain() { return serialize(() => {}); }, get timer() { return timer; } };
+  return { data, session, api, state, tracker, history, alarms, advance(ms) { now += ms; }, setTime(value) { now = value; }, async tick(alarm) { return serialize(() => tracker.tick(alarm)); }, async drain() { return serialize(() => {}); }, get timer() { return timer; } };
 }
 
 test('domain-only HTTP/S identifiers, duration, range totals, ordering and CSV', () => {
@@ -191,6 +191,43 @@ test('failed disable checkpoints partial website time recovery before worker rep
   assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 10);
   replacement.advance(5000); await replacement.tick();
   assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 15);
+});
+
+for (const pending of [false, true]) {
+  test(`website time replay after a failed checkpoint does not duplicate a restored ${pending ? 'pending queue' : 'sample'}`, async () => {
+    const h = harness(); await h.tracker.setEnabled(true);
+    if (pending) {
+      const set = h.api.storage.local.set;
+      h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+      h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+      h.api.storage.local.set = set;
+    }
+    h.api.storage.session.set = async () => { throw new Error('Checkpoint unavailable'); };
+    h.advance(5000); await assert.rejects(h.tick(), /Checkpoint unavailable/);
+    const saved = h.data['_websiteTime:2026-10-11']['example.com'];
+    const replacement = harness(h.data, h.session); replacement.advance(15000);
+    await replacement.tracker.start(); await replacement.tick();
+    assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], saved);
+    replacement.advance(5000); await replacement.tick();
+    assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], saved + 5);
+  });
+}
+
+test('history clear rejects stale website samples and pending entries but permits fresh time', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  h.api.storage.local.set = set;
+  await h.history.clear('after-clear');
+  const replacement = harness(h.data, h.session); replacement.advance(10000);
+  await replacement.tracker.start(); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11'], undefined);
+  replacement.advance(5000); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
+  await replacement.history.clear('another-clear'); await replacement.tracker.start(true);
+  replacement.advance(5000); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
 });
 
 test('unfocused windows, idle/locked time, private tabs and browser pages never accrue', async () => {
