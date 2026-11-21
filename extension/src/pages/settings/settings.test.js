@@ -4,6 +4,40 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { page, C3 } = require('../../tests/ui-harness.js');
+for (const kind of ['ratio', 'websites']) {
+  test(`settings ${kind} CSV survives receipt-window rollover`, async () => {
+    const p = page('settings'); await p.ready();
+    const button = p.nodes['export-' + kind];
+    const release = p.holdMessage('history');
+    const exporting = button.fire('click'); await p.ready();
+    p.change({ _historyGeneration: { oldValue: 'before', newValue: 'after' }, _receipts: { newValue: [] } });
+    await p.ready(); release(); await exporting;
+    assert.equal(p.blobs.length, 1);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+  test(`settings ${kind} CSV rejects pre-reset replies and retries with empty history`, async () => {
+    const today = C3.localDate();
+    const data = { [today]: { x: { createSec: 180 } }, _websiteTime: { [today]: { 'cleared.test': 180 } } };
+    const p = page('settings', data); await p.ready();
+    const button = p.nodes['export-' + kind];
+    p.state.replies.set('history', { ok: true, days: structuredClone(kind === 'ratio' ? { [today]: data[today] } : data._websiteTime) });
+    const release = p.holdMessage('history');
+    const exporting = button.fire('click');
+    await p.ready();
+    delete data[today]; data._websiteTime = {};
+    p.change({ _historyReset: { oldValue: false, newValue: true } });
+    await p.ready(); release(); await exporting;
+    assert.equal(p.blobs.length, 0, 'cleared history never becomes a CSV');
+    assert.deepEqual(p.state.downloads, []);
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    p.state.replies.delete('history');
+    await button.fire('click');
+    assert.equal(p.blobs.length, 1);
+    assert.equal((await p.blobs[0].text()).trim().split('\n').length, 1);
+    assert.equal(button.disabled, false);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+}
 const settingsPage = (data, enabled) => page('settings', data, enabled);
 function controls(p, site = '') {
   const suffix = site ? 'site-' + site : 'default';

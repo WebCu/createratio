@@ -128,6 +128,7 @@ $('intention-clear').addEventListener('click', async () => {
 });
 $('website-range').addEventListener('change', () => { void refresh(true); });
 async function exportHistory(kind) {
+  const version = reportVersion;
   const websites = kind === 'websites';
   const failure = websites ? 'Unable to export website time.' : 'Unable to export history.';
   try {
@@ -135,6 +136,7 @@ async function exportHistory(kind) {
       await messages.send({ type: 'snapshot' }, failure);
     }
     const data = await messages.send({ type: 'history', kind, range: 'month' }, failure);
+    if (version !== reportVersion) throw new Error('History changed while loading. Please try again.');
     const csv = websites ? WebTime.csv(data.days) : C3.csv(data.days);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url; link.download = `CreateRatio${websites ? '-websites' : ''}-${C3.localDate()}.csv`; document.body.append(link); link.click(); link.remove();

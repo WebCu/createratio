@@ -4,6 +4,62 @@ const assert = require('node:assert/strict');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 
+for (const pageName of ['dashboard', 'settings']) for (const kind of ['ratio', 'websites']) {
+  test(`${pageName} ${kind} CSV cannot download a pre-reset history reply`, async () => {
+    const { launch, evaluate, eventually, click, openSettingsSection, withFailureArtifacts } = await import('./chromium.mjs');
+    const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+    const inspect = (page, source) => evaluate(browser, page.session, source);
+    const downloads = [], completed = new Set();
+    const removeBegin = browser.cdp.on('Browser.downloadWillBegin', event => downloads.push(event));
+    const removeProgress = browser.cdp.on('Browser.downloadProgress', event => { if (event.state === 'completed') completed.add(event.guid); });
+    try {
+      await withFailureArtifacts(browser, `${pageName} ${kind} CSV reset`, async () => {
+        await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: browser.directory, eventsEnabled: true });
+        const date = await evaluate(browser, browser.worker, 'C3.localDate()');
+        await evaluate(browser, browser.worker, `chrome.storage.local.set(${JSON.stringify({ [date]: { x: { createSec: 180 } }, ['_websiteTime:' + date]: { 'cleared.test': 180 } })})`);
+        const page = await browser.page(browser.origin + '/' + pageName + '.html');
+        const settings = pageName === 'settings' ? page : await browser.page(browser.origin + '/settings.html');
+        await openSettingsSection(browser, settings, 'data');
+        const selector = pageName === 'settings' ? '#export-' + kind : kind === 'ratio' ? '#export' : '#website-export';
+        if (pageName === 'dashboard' && kind === 'websites') await click(browser, page, '#websites-view');
+        await eventually(() => inspect(page, `!document.querySelector('${selector}').disabled`), 'CSV export ready');
+        await inspect(page, `(() => {
+          const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+          let hold = true;
+          chrome.runtime.sendMessage = async message => {
+            const reply = await send(message);
+            if (message.type === 'history' && hold) {
+              hold = false; globalThis.preResetHistory = reply;
+              await new Promise(resolve => { globalThis.releaseExportHistory = resolve; });
+            }
+            return reply;
+          };
+        })()`);
+        await click(browser, page, selector);
+        await eventually(() => inspect(page, 'typeof releaseExportHistory === "function"'), 'pre-reset CSV history held');
+        assert.ok(await inspect(page, `Object.keys(preResetHistory.days).length`));
+        let dialog;
+        const removeDialog = browser.cdp.on('Page.javascriptDialogOpening', event => { dialog = event; });
+        try {
+          const clearing = click(browser, settings, '#clear-history'); clearing.catch(() => {});
+          await eventually(() => dialog, 'clear confirmation');
+          await browser.cdp.send('Page.handleJavaScriptDialog', { accept: true }, settings.session);
+          await clearing;
+        } finally { removeDialog(); }
+        await eventually(() => inspect(settings, 'document.querySelector("#save-status").textContent.startsWith("History cleared.")'), 'history cleared');
+        await inspect(page, 'releaseExportHistory()');
+        await eventually(() => inspect(page, 'document.querySelector("#error").textContent === "History changed while loading. Please try again."'), 'stale CSV rejected');
+        assert.equal(downloads.length, 0);
+        await click(browser, page, selector);
+        await eventually(() => downloads.length === 1 && completed.has(downloads[0].guid), 'empty CSV retry downloaded');
+        const csv = await readFile(path.join(browser.directory, downloads[0].guid), 'utf8');
+        assert.equal(csv.trim().split('\n').length, 1);
+        assert.deepEqual(browser.errors, []);
+      });
+    } finally { removeBegin(); removeProgress(); await browser.cleanup(); }
+  });
+}
+
 test('pending HTML exports cannot download activity after Clear history', async t => {
   const { launch, evaluate, eventually, click, withFailureArtifacts, openSettingsSection } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
