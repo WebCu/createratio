@@ -167,6 +167,7 @@
   listen(window, 'pagehide', () => {
     settle(); pageActive = false; lastInput = -Infinity;
     boundary();
+    if (outbox.length) void pump();
   });
   listen(window, 'pageshow', () => {
     lastSample = performance.now(); pageActive = true;

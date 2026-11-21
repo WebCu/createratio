@@ -83,6 +83,21 @@ test('queued activity respects retry backoff, drains in order while hidden and r
   assert.equal(attempts.length, failed + 1);
 });
 
+test('pagehide attempts queued activity during backoff', async () => {
+  for (const persisted of [true, false]) {
+    const options = { failIngest: true, attempts: [] };
+    const t = await tracker('chrome', options);
+    t.setNow(5000); t.event('click', { isTrusted: true, target: t.button }); await t.tick();
+    assert.equal(options.attempts.length, 1);
+    options.failIngest = false;
+    t.setNow(5001); t.event('pagehide', { persisted });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(options.attempts.length, 2);
+    assert.deepEqual(t.packets[0], options.attempts[0]);
+    assert.equal(t.packets.length, 1);
+  }
+});
+
 test('worker refresh bypasses pending activity backoff', async () => {
   const options = { failIngest: true, attempts: [] };
   const t = await tracker('chrome', options);
