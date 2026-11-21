@@ -200,26 +200,19 @@ test('invalid restored session dates cannot grant a daily refill or retain acces
 for (const browser of ['chrome', 'browser']) {
   test(`${browser}: malformed restored waiting deadlines cannot confirm access or prevent a fresh full wait`, async () => {
     const invalid = [0, -1, -Infinity, Infinity, NaN, '1', null, undefined, true, {}, []];
-    const entries = [
-      ...invalid.map(readyAt => ({ readyAt, requestExpiresAt: now + 600000 })),
-      ...invalid.map(requestExpiresAt => ({ readyAt: now - 1, requestExpiresAt })),
-      { readyAt: now - 1 },
-      { requestExpiresAt: now + 600000 },
-      { readyAt: now + 120000, requestExpiresAt: now + 60000 }
-    ];
+    const entries = [...invalid.map(readyAt => ({ readyAt })), {}, { readyAt: now + C.ACCESS_LIMITS.maxMinutes * 60000 + 1 }];
     for (const entry of entries) {
       const w = worker({ _access: { x: entry } }, browser, now);
       const result = await w.send({ type: 'access-status' });
       assert.equal(result.ok, true);
       assert.equal(result.access.x.readyAt, 0);
-      assert.equal(result.access.x.requestExpiresAt, 0);
       assert.equal(w.errors.length, 0);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       assert.deepEqual(rulesFor(w), []);
       const begin = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
       assert.equal(begin.ok, true);
-      assert.equal(begin.access.x.readyAt, now + 60000);
-      w.advance(59999);
+      assert.equal(begin.access.x.readyAt, now + 300000);
+      w.advance(299999);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       w.advance(1);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).access.x.remainingMs, 300000);
@@ -244,7 +237,7 @@ test('malformed restored access containers and entries fail closed without worke
     assert.equal(w.errors.length, 0);
     const begin = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
     assert.equal(begin.ok, true);
-    assert.equal(begin.access.x.readyAt, now + 60000);
+    assert.equal(begin.access.x.readyAt, now + 300000);
     assert.equal(Array.isArray(w.data._access), false);
   }
 });
@@ -289,7 +282,7 @@ for (const browser of ['chrome', 'browser']) {
       const w = worker({ settings: { intentionHistoryEnabled: true }, _intentions: history }, browser, now);
       const result = await w.send({ type: 'access-begin', site: 'x', reason: '  ' + intent + '  ' }, gate('x'));
       assert.equal(result.ok, true);
-      assert.equal(result.access.x.readyAt, now + 60000);
+      assert.equal(result.access.x.readyAt, now + 300000);
       assert.equal(w.errors.length, 0);
       const expected = [...(Array.isArray(history) ? [old] : []), { site: 'x', reason: intent, requestedAt: now }];
       assert.deepEqual(w.data._intentions, expected);
@@ -302,7 +295,7 @@ test('valid restored paused budgets and waits remain unchanged and exhausted ses
   const date = C.localDate(new Date(now));
   const entries = [
     { remainingMs: 120000, expiresAt: 0, refilledAt: 0, date },
-    { readyAt: now + 30000, requestExpiresAt: now + 630000 },
+    { readyAt: now + 30000 },
     { date, refilledAt: now - 600000 }
   ];
   for (const entry of entries) {
@@ -342,14 +335,15 @@ test('access validation delegates to shared domain policy without applying new-i
     assert.deepEqual(validations.validIntention, [reason]);
   }
   validations.validIntention.length = 0;
-  assert.equal((await w.handle({ type: 'access-begin', site: 'x', reason: intent }, gate('x'))).access.x.readyAt, now + 60000);
+  assert.equal((await w.handle({ type: 'access-begin', site: 'x', reason: intent }, gate('x'))).access.x.readyAt, now + 300000);
   assert.deepEqual(validations.validIntention, [intent]);
   assert.deepEqual(structuredClone(await w.handle({ type: 'access-history-list' }, dashboardSender)), { ok: true, intentions: [] });
   for (const minutes of [1, 240]) {
     validations.validAccessMinutes.length = 0;
     const result = await w.handle({ type: 'access-duration', site: 'x', minutes }, popupSender);
     assert.equal(result.access.x.sessionMinutes, minutes);
-    assert.deepEqual(validations.validAccessMinutes, [minutes]);
+    assert.equal(validations.validAccessMinutes[0], minutes);
+    assert.ok(validations.validAccessMinutes.slice(1).every(value => value === C.DEFAULT_SETTINGS.waitMinutes));
   }
   validations.validAccessMinutes.length = 0;
   await assert.rejects(w.handle({ type: 'access-duration', site: 'x', minutes: 241 }, popupSender), /Choose a whole number from 1 to 240 minutes/);
@@ -377,4 +371,112 @@ test('session messages still reconcile before rejecting authorization or an unkn
   await assert.rejects(w.handle({ type: 'access-unknown', site: 'x' }, gate('x')), /Unknown access message/);
   assert.equal(w.calls[0].type, 'session.get');
   assert.deepEqual(w.calls.at(-1), { type: 'local.get', value: ['_access', 'settings', '_intentions'] });
+});
+
+test('lowering the intention wait preserves a pending request until its original deadline', async () => {
+  const w = worker();
+  const setting = { type: 'access-duration', preference: 'waitMinutes', minutes: 5 };
+  assert.equal((await w.send(setting, popupSender)).ok, true);
+  const begun = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+  const { readyAt } = begun.access.x;
+  assert.equal(readyAt, w.now + 300000);
+  const changed = await w.send({ ...setting, minutes: 1 }, popupSender);
+  assert.equal(changed.ok, true);
+  assert.equal(changed.access.x.waitSeconds, 300);
+  assert.equal(changed.access.x.readyAt, readyAt);
+  assert.equal(w.data._access.x.readyAt, readyAt);
+  w.advance(60000);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+  w.advance(240000);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
+});
+
+test('pending waits retain their own duration across setting changes and worker restart; new requests use the current setting', async () => {
+  for (const [initial, updated] of [[1, 5], [5, 1]]) {
+    const w = worker({ settings: { waitMinutes: initial } });
+    const begun = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+    const { readyAt } = begun.access.x;
+    assert.equal(w.data._access.x.waitMs, initial * 60000);
+    w.advance(30000);
+    const changed = await w.send({ type: 'access-duration', preference: 'waitMinutes', site: 'x', minutes: updated }, popupSender);
+    assert.equal(changed.access.x.waitSeconds, initial * 60);
+    const restarted = worker(structuredClone(w.data), 'chrome', w.now);
+    const restored = (await restarted.send({ type: 'access-status' })).access.x;
+    assert.equal(restored.waitSeconds, initial * 60);
+    assert.equal(restored.readyAt, readyAt);
+    assert.equal((await restarted.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+    restarted.advance(86400000);
+    const ready = (await restarted.send({ type: 'access-status' })).access.x;
+    assert.equal(ready.readyAt, readyAt);
+    assert.equal(ready.waitSeconds, initial * 60);
+    assert.equal(ready.remainingMs, 0);
+    assert.deepEqual(rulesFor(restarted), []);
+    await restarted.send({ type: 'access-cancel', site: 'x' }, gate('x'));
+    assert.equal((await restarted.send({ type: 'access-status' })).access.x.waitSeconds, updated * 60);
+    const next = await restarted.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+    assert.equal(next.access.x.waitSeconds, updated * 60);
+    assert.equal(next.access.x.readyAt, restarted.now + updated * 60000);
+    restarted.advance(updated * 60000 + 600000);
+    const completed = (await restarted.send({ type: 'access-status' })).access.x;
+    assert.equal(completed.readyAt, next.access.x.readyAt);
+    assert.equal(completed.waitSeconds, updated * 60);
+    assert.equal(restarted.data._access.x.waitMs, updated * 60000);
+  }
+});
+
+test('legacy or malformed stored wait durations retain the original 60-second wait without discarding a pending request', async () => {
+  for (const waitMs of [undefined, null, 0, -60000, 60001, '60000', NaN, Infinity, (C.ACCESS_LIMITS.maxMinutes + 1) * 60000]) {
+    const entry = { readyAt: now + 30000, ...(waitMs === undefined ? {} : { waitMs }) };
+    const w = worker({ settings: { waitMinutes: 2 }, _access: { x: entry } }, 'chrome', now);
+    const result = (await w.send({ type: 'access-status' })).access.x;
+    assert.equal(result.readyAt, entry.readyAt);
+    assert.equal(result.waitSeconds, 60);
+    assert.deepEqual(w.errors, []);
+  }
+  const w = worker({ settings: { waitMinutes: 2 }, _access: { x: { waitMs: 60000 } } }, 'chrome', now);
+  assert.equal((await w.send({ type: 'access-status' })).access.x.waitSeconds, 120);
+});
+
+test('restored waits cannot have more time remaining than their original validated duration', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const waitMs of [60000, 300000, undefined, null, 0, -60000, 60001, '60000', NaN, Infinity, 241 * 60000]) {
+      const duration = C.validAccessMinutes(waitMs / 60000) && typeof waitMs === 'number' ? waitMs : 60000;
+      const entry = { readyAt: now + duration + 1, ...(waitMs === undefined ? {} : { waitMs }) };
+      const w = worker({ _access: { x: entry } }, browser, now);
+      const rejected = (await w.send({ type: 'access-status' })).access.x;
+      assert.equal(rejected.readyAt, 0);
+      assert.equal(w.data._access.x.waitMs, undefined);
+      assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+      const boundary = worker({ _access: { x: { ...entry, readyAt: now + duration } } }, browser, now);
+      const pending = (await boundary.send({ type: 'access-status' })).access.x;
+      assert.equal(pending.readyAt, now + duration);
+      assert.equal(pending.waitSeconds, duration / 1000);
+      const returned = worker(structuredClone(boundary.data), browser, now + 86400000);
+      const ready = (await returned.send({ type: 'access-status' })).access.x;
+      assert.equal(ready.readyAt, pending.readyAt);
+      assert.equal(ready.waitSeconds, duration / 1000);
+      assert.equal(ready.remainingMs, 0);
+      assert.deepEqual(rulesFor(returned), []);
+      assert.equal((await returned.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
+    }
+  }
+});
+
+test('saved intention waits control deadlines without changing session duration', async () => {
+  const w = worker();
+  const setting = { type: 'access-duration', preference: 'waitMinutes', minutes: 5 };
+  assert.equal((await w.send(setting, popupSender)).ok, true);
+  assert.equal((await w.send({ ...setting, site: 'x', minutes: 2 }, popupSender)).ok, true);
+  const result = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+  assert.equal(result.access.x.waitSeconds, 120);
+  assert.equal(result.access.x.readyAt, w.now + 120000);
+  assert.equal(result.access.linkedin.waitSeconds, 300);
+  assert.equal(result.access.x.sessionMinutes, 5);
+  w.advance(60000);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+  w.advance(60000);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
+  for (const minutes of [undefined, null, 0, 241, '2']) assert.equal((await w.send({ ...setting, minutes }, popupSender)).ok, false);
+  assert.equal((await w.send({ ...setting, preference: 'unknown' }, popupSender)).ok, false);
+  assert.equal((await w.send(setting, gate('x'))).ok, false);
 });

@@ -186,17 +186,18 @@ are blocked on HTTP and HTTPS. Blocking covers the whole site, including posting
 and messages.
 
 1. Visit a blocked site or choose **Request access**.
-2. Write an intention of 20–280 characters and start the **60-second wait**.
+2. Write an intention of 20–280 characters and start the **five-minute wait** by
+   default, configurable from 1–240 minutes in Settings.
 3. Explicitly confirm access when the wait finishes. Waiting alone never unlocks.
 4. Use the shared per-site active-time budget: **five minutes** by default,
    configurable from 1–240 minutes in Settings. Only the active tab in a focused
    browser window uses the budget; other sites remain blocked.
 
-Reloading does not reset the wait. Cancelling does; unconfirmed requests expire
-ten minutes after the wait finishes. The popup can end access early. Remaining
-budgets survive restarts and refill to the configured duration at local midnight,
-without accumulating. Never-opened sites stay blocked; manually ending a session
-cancels its daily refill.
+Reloading does not reset the wait. Once the wait finishes, the request stays
+ready until you confirm it, cancel it, or turn **Limit & track** off for that
+site. The popup can end access early. Remaining budgets survive restarts and
+refill to the configured duration at local midnight, without accumulating.
+Never-opened sites stay blocked; manually ending a session cancels its daily refill.
 
 **Save drafts before expiry:** open tabs redirect to the local blocked page.
 

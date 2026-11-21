@@ -5,6 +5,20 @@ const { activeWorker, worker, gate, popupSender } = require('../tests/background
 const C = require('../../core/core.js');
 
 for (const browser of ['chrome', 'browser']) {
+  test(`${browser}: duration commands accept explicit session and wait preferences and default to session time`, async () => {
+    const w = worker({}, browser);
+    for (const [preference, minutes] of [[undefined, 2], ['accessMinutes', 3], ['waitMinutes', 4]]) {
+      const message = { type: 'access-duration', minutes, ...(preference === undefined ? {} : { preference }) };
+      assert.equal((await w.send(message, popupSender)).ok, true);
+      assert.equal(w.data.settings[preference || 'accessMinutes'], minutes);
+    }
+    const saved = structuredClone(w.data.settings);
+    for (const preference of ['unsupported', '', null, false, {}, []]) {
+      assert.deepEqual(await w.send({ type: 'access-duration', preference, minutes: 5 }, popupSender), { ok: false, error: 'Unsupported preference' });
+      assert.deepEqual(w.data.settings, saved);
+    }
+    assert.deepEqual(w.errors, []);
+  });
   test(`${browser}: malformed commands are deliberate refusals, not worker failures`, async () => {
     const w = worker({}, browser);
     for (const message of [null, undefined, [], true, { type: 1 }, { type: [] }, {}]) {
@@ -63,9 +77,7 @@ for (const browser of ['chrome', 'browser']) {
     const entries = [
       { remainingMs: 1e20, expiresAt: 0 },
       { expiresAt: now + 241 * 60000 },
-      { readyAt: 1, requestExpiresAt: now + 365 * 86400000 },
-      { readyAt: now + 60001, requestExpiresAt: now + 660001 },
-      { readyAt: now - 1, requestExpiresAt: now + 600000 }
+      { readyAt: now + C.ACCESS_LIMITS.maxMinutes * 60000 + 1 }
     ];
     for (const entry of entries) {
       const w = worker({ _access: { x: entry } }, browser, now);
@@ -110,7 +122,7 @@ for (const browser of ['chrome', 'browser']) {
       const day = { x: { consumeSec: 10 } }, intentions = [{ site: 'retired', reason: 'Legacy reason', requestedAt: 0 }];
       const websiteKey = '_websiteTime:' + date;
       const w = worker({ settings: structuredClone(settings), [date]: structuredClone(day), _intentions: structuredClone(intentions), [websiteKey]: { 'saved.test': 7 },
-        _access: { x: { remainingMs: 120000 }, linkedin: { readyAt: now + 60000, requestExpiresAt: now + 660000 } } }, browser, now);
+        _access: { x: { remainingMs: 120000 }, linkedin: { readyAt: now + 60000 } } }, browser, now);
       const snapshot = await w.send({ type: 'snapshot' }, popupSender);
       assert.equal(snapshot.ok, true);
       assert.deepEqual(snapshot.settings.trackedSites, []);

@@ -7,16 +7,17 @@ const path = require('node:path');
 const C3 = require('../../../core/core.js');
 const C3Sites = require('../../../sites/index.js');
 const { accessState } = require('../../tests/ui-harness.js');
+const { worker, gate, popupSender } = require('../../tests/background-harness.js');
 
 function page(options = {}) {
   const site = options.site || 'x';
-  let now = 0, fail = !!options.fail, access = accessState(site);
-  const elements = {}, intervals = {}, sent = [], redirects = [];
+  let now = options.now || 0, fail = !!options.fail, access = accessState(site);
+  const elements = {}, intervals = {}, sent = [], redirects = [], pending = new Set();
   const document = { body: { id: '', tagName: 'BODY', focus() { document.activeElement = this; } }, getElementById: id => elements[id], createElement: element };
   document.activeElement = document.body;
-  const panels = { reason: 'request', begin: 'request', 'waiting-title': 'waiting', open: 'waiting', cancel: 'waiting', 'active-title': 'active', return: 'active', end: 'active' };
+  const panels = { reason: 'request', begin: 'request', 'waiting-title': 'waiting', open: 'waiting', cancel: 'waiting', 'active-title': 'active', return: 'active', 'cancel-pending': 'active', end: 'active' };
   for (const [, id] of fs.readFileSync(path.join(__dirname, 'blocked.html'), 'utf8').matchAll(/id="([^"]+)"/g)) {
-    let hidden = ['waiting', 'active', 'error'].includes(id), disabled = ['reason', 'begin', 'open'].includes(id);
+    let hidden = ['waiting', 'active', 'cancel-pending', 'error'].includes(id), disabled = ['reason', 'begin', 'open'].includes(id);
     elements[id] = { id, get hidden() { return hidden; }, set hidden(value) { hidden = value; if (value && (document.activeElement === this || panels[document.activeElement.id] === id)) document.activeElement = document.body; }, get disabled() { return disabled; }, set disabled(value) { disabled = value; if (value && document.activeElement === this) document.activeElement = document.body; }, focus() { if (!this.disabled && !this.hidden && !elements[panels[id]]?.hidden) document.activeElement = this; }, value: '', textContent: '', attributes: {}, setAttribute(key, value) { this.attributes[key] = value; }, events: {}, addEventListener(event, fn) { this.events[event] = fn; }, reportValidity() { return true; } };
   }
   let finishFill;
@@ -34,24 +35,29 @@ function page(options = {}) {
     chrome: { storage: { onChanged: { addListener() {} } }, runtime: { async sendMessage(message) {
       sent.push(structuredClone(message));
       if (options.beforeReply) await options.beforeReply(message);
+      if (options.send) {
+        const reply = options.send(message); pending.add(reply);
+        try { return await reply; }
+        finally { pending.delete(reply); }
+      }
       if (Object.hasOwn(options, 'reply')) return options.reply;
       if (fail) return { ok: false, error: 'Unable to check access.' };
       if (message.type === 'access-begin') {
         if (!C3.validIntention(message.reason)) return { ok: false, error: 'Write a specific intention of 20–280 characters.' };
-        access = { ...access, readyAt: now + 60000, requestExpiresAt: now + 660000 };
+        access = { ...access, readyAt: now + access.waitSeconds * 1000 };
       }
       if (message.type === 'access-open' && !access.remainingMs) {
         if (!access.readyAt || now < access.readyAt) return { ok: false, error: 'Finish the waiting period before opening the site.' };
         access = { ...access, readyAt: 0, remainingMs: access.sessionMinutes * 60000, expiresAt: 0, refilledAt: now };
       }
-      if (message.type === 'access-cancel' || message.type === 'access-end') access = { ...access, readyAt: 0, expiresAt: 0, remainingMs: 0, requestExpiresAt: 0 };
+      if (message.type === 'access-cancel' || message.type === 'access-end') access = { ...access, readyAt: 0, expiresAt: 0, remainingMs: 0 };
       return { ok: true, access: { [site]: structuredClone(access) }, intentionHistoryEnabled: options.intentionHistoryEnabled === true };
     } } }
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../shared/messages.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../shared/refill.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'blocked.js'), 'utf8'), context);
-  return { elements, document, sent, redirects, intervals, finishFill, set now(value) { now = value; }, set fail(value) { fail = value; }, set access(value) { access = { ...access, ...value }; }, async flush() { await new Promise(resolve => setImmediate(resolve)); }, submit() { elements.request.events.submit({ preventDefault() {} }); }, click(id) { elements[id].focus(); elements[id].events.click(); } };
+  return { elements, document, sent, redirects, intervals, finishFill, set now(value) { now = value; }, set fail(value) { fail = value; }, set access(value) { access = { ...access, ...value }; }, async flush() { await Promise.all([...pending]); await new Promise(resolve => setImmediate(resolve)); }, submit() { elements.request.events.submit({ preventDefault() {} }); }, click(id) { elements[id].focus(); elements[id].events.click(); } };
 }
 test('acknowledged intention moves focus to the waiting heading, not on later renders', async () => {
   const p = page(); await p.flush();
@@ -59,7 +65,7 @@ test('acknowledged intention moves focus to the waiting heading, not on later re
   p.elements.reason.value = 'Reply to Alex about our launch, then leave.';
   p.elements.begin.focus(); p.submit(); await p.flush();
   assert.equal(p.document.activeElement.id, 'waiting-title');
-  p.elements.cancel.focus(); p.now = 60000;
+  p.elements.cancel.focus(); p.now = 300000;
   p.intervals[1000](); p.intervals[5000](); await p.flush();
   assert.equal(p.elements.open.disabled, false);
   assert.equal(p.document.activeElement.id, 'cancel', 'readiness and polling must not move focus');
@@ -90,9 +96,9 @@ test('failed intention preserves input and restores actionable focus after re-en
 test('pending actions preserve focus deliberately moved to another control before acknowledgement', async () => {
   for (const [type, control, state] of [
     ['access-begin', 'begin', {}],
-    ['access-cancel', 'cancel', { readyAt: 60000, requestExpiresAt: 660000 }],
+    ['access-cancel', 'cancel', { readyAt: 60000 }],
     ['access-end', 'end', { remainingMs: 60000 }],
-    ['access-open', 'open', { readyAt: 1, requestExpiresAt: 660000 }],
+    ['access-open', 'open', { readyAt: 1 }],
     ['access-status', 'return', { remainingMs: 60000 }]
   ]) {
     let release, hold = false;
@@ -111,9 +117,9 @@ test('pending actions preserve focus deliberately moved to another control befor
 
 test('failed cancel, end and open retain the current view and an enabled recovery control', async () => {
   for (const [control, panel, state] of [
-    ['cancel', 'waiting', { readyAt: 60000, requestExpiresAt: 660000 }],
+    ['cancel', 'waiting', { readyAt: 60000 }],
     ['end', 'active', { remainingMs: 60000 }],
-    ['open', 'waiting', { readyAt: 1, requestExpiresAt: 660000 }]
+    ['open', 'waiting', { readyAt: 1 }]
   ]) {
     const p = page(); await p.flush(); p.now = 1000; p.access = state; p.intervals[5000](); await p.flush();
     p.elements.reason.value = 'Keep this intention until the action succeeds.'; p.fail = true;
@@ -126,13 +132,13 @@ test('failed cancel, end and open retain the current view and an enabled recover
   }
 });
 
-test('passive wait restoration, expiry and active refreshes never move deliberate focus', async () => {
+test('passive wait restoration, readiness and active refreshes never move deliberate focus', async () => {
   const p = page(); await p.flush();
   const link = p.document.createElement('a'); link.focus();
-  p.access = { readyAt: 60000, requestExpiresAt: 660000 }; p.intervals[5000](); await p.flush();
+  p.access = { readyAt: 60000 }; p.intervals[5000](); await p.flush();
   assert.equal(p.document.activeElement, link);
   p.now = 660000; p.intervals[1000]();
-  assert.equal(p.elements.request.hidden, false); assert.equal(p.document.activeElement, link);
+  assert.equal(p.elements.open.disabled, false); assert.equal(p.document.activeElement, link);
   p.access = { remainingMs: 60000 }; p.intervals[5000](); await p.flush(); p.intervals[1000]();
   assert.equal(p.elements.active.hidden, false); assert.equal(p.document.activeElement, link);
 });
@@ -220,6 +226,23 @@ test('gate shows goal-based access without a countdown and returns directly to t
   assert.equal(p.elements.active.hidden, true); assert.equal(p.elements.request.hidden, false);
 });
 
+test('gate lets users cancel a pending wait without ending goal-based access', async () => {
+  const p = page(); await p.flush();
+  p.access = { readyAt: 60000 }; p.intervals[5000](); await p.flush();
+  assert.equal(p.elements.waiting.hidden, false);
+  p.access = { goalAllowed: true }; p.intervals[5000](); await p.flush();
+  assert.equal(p.elements.waiting.hidden, true);
+  assert.equal(p.elements['cancel-pending'].hidden, false);
+  p.click('cancel-pending'); await p.flush();
+  assert.equal(p.sent.at(-1).type, 'access-cancel');
+  assert.equal(p.elements['cancel-pending'].hidden, true);
+  assert.equal(p.elements.active.hidden, false);
+  assert.equal(p.document.activeElement.id, 'return');
+  assert.deepEqual(p.redirects, []);
+  p.access = { goalAllowed: false }; p.intervals[5000](); await p.flush();
+  assert.equal(p.elements.request.hidden, false);
+});
+
 test('an open session hides blocked-only instructions and restores them when the session ends', async () => {
   const p = page(); await p.flush();
   assert.equal(p.elements['access-steps'].hidden, false);
@@ -250,9 +273,9 @@ test('gate counts down but never automatically opens access; confirmation naviga
   const p = page(); await p.flush();
   p.elements.reason.value = 'Reply to Alex about our launch, then leave.'; p.submit(); await p.flush();
   assert.equal(p.elements.waiting.hidden, false); assert.equal(p.elements.open.disabled, true);
-  assert.equal(p.elements.clock.textContent, '1:00');
-  p.now = 59000; p.intervals[1000](); assert.equal(p.elements.clock.textContent, '0:01'); assert.equal(p.elements.open.disabled, true);
-  p.now = 60000; p.intervals[1000](); assert.equal(p.elements.open.disabled, false); assert.equal(p.elements.clock.textContent, '0:00');
+  assert.equal(p.elements.clock.textContent, '5:00');
+  p.now = 299000; p.intervals[1000](); assert.equal(p.elements.clock.textContent, '0:01'); assert.equal(p.elements.open.disabled, true);
+  p.now = 300000; p.intervals[1000](); assert.equal(p.elements.open.disabled, false); assert.equal(p.elements.clock.textContent, '0:00');
   assert.deepEqual(p.redirects, []); assert.equal(p.sent.some(message => message.type === 'access-open'), false);
   p.click('open'); assert.equal(p.elements.open.disabled, true); assert.deepEqual(p.redirects, []); await p.flush();
   assert.deepEqual(p.redirects, ['https://x.com/home']);
@@ -262,7 +285,7 @@ test('gate counts down but never automatically opens access; confirmation naviga
 test('successful unblock shows the refill sweep before navigation; returning does not wait or replay', async () => {
   const p = page({ animate: true }); await p.flush();
   p.elements.reason.value = 'Reply to Alex about our launch, then leave.';
-  p.submit(); await p.flush(); p.now = 60000;
+  p.submit(); await p.flush(); p.now = 300000;
   p.click('open'); await p.flush();
   const notice = p.elements['active-countdown'].children[0];
   assert.equal(notice.children[0].textContent, 'Time refilled');
@@ -284,7 +307,7 @@ test('successful unblock shows the refill sweep before navigation; returning doe
 test('successful unblock navigates immediately when no motion is running', async () => {
   const p = page(); await p.flush();
   p.elements.reason.value = 'Reply to Alex about our launch, then leave.';
-  p.submit(); await p.flush(); p.now = 60000;
+  p.submit(); await p.flush(); p.now = 300000;
   p.click('open'); await p.flush();
   assert.deepEqual(p.redirects, ['https://x.com/home']);
   assert.equal(p.elements['active-countdown'].children[0].children[0].textContent, 'Time refilled');
@@ -295,7 +318,7 @@ test('gate uses configured duration and displays a paused budget without consumi
   p.elements.reason.value = 'Reply to Alex about our launch, then leave.';
   p.submit(); await p.flush();
   assert.equal(p.elements.open.textContent, 'Open X for 12 active minutes');
-  p.now = 60000; p.click('open'); await p.flush();
+  p.now = 300000; p.click('open'); await p.flush();
   assert.match(p.elements['active-time'].textContent, /12:00 remaining · paused/);
   p.now = 900000; p.intervals[1000]();
   assert.match(p.elements['active-time'].textContent, /12:00 remaining · paused/);
@@ -341,8 +364,72 @@ test('gate reports failed requests without navigating or claiming access', async
   assert.equal(p.elements.error.hidden, false); assert.equal(p.elements.error.textContent, 'Unable to check access.');
   assert.equal(p.elements.active.hidden, true); assert.deepEqual(p.redirects, []);
 });
-test('gate recovers ongoing waits from refresh and resets abandoned requests', async () => {
-  const p = page(); await p.flush(); p.access = { readyAt: 60000, requestExpiresAt: 660000 };
+test('gate restores a wait and offers confirmation after a long absence', async () => {
+  const p = page(); await p.flush(); p.access = { readyAt: 60000 };
   p.now = 30000; p.intervals[5000](); await p.flush(); assert.equal(p.elements.clock.textContent, '0:30');
-  p.now = 660000; p.intervals[1000](); assert.equal(p.elements.request.hidden, false); assert.equal(p.elements.waiting.hidden, true);
+  p.now = 3600000; p.intervals[1000]();
+  assert.equal(p.elements.request.hidden, true);
+  assert.equal(p.elements.waiting.hidden, false);
+  assert.equal(p.elements.open.disabled, false);
+  assert.deepEqual(p.redirects, []);
+});
+
+test('the idea headline follows configured whole-minute waits with singular and plural wording', async () => {
+  const p = page({ random: 0.2 }); await p.flush();
+  assert.equal(p.elements.heading.textContent, 'Your next idea called. It wants 5 minutes.');
+  for (const minutes of [2, 5, 240, 1]) {
+    p.access = { waitSeconds: minutes * 60 };
+    p.intervals[5000](); await p.flush();
+    assert.equal(p.elements.heading.textContent, `Your next idea called. It wants ${minutes === 1 ? 'a minute' : minutes + ' minutes'}.`);
+    p.intervals[1000]();
+    assert.equal(p.elements.heading.textContent, `Your next idea called. It wants ${minutes === 1 ? 'a minute' : minutes + ' minutes'}.`);
+    assert.equal(p.elements['wait-step'].textContent, `Pause for ${minutes * 60} seconds.`);
+    assert.equal(p.elements.begin.textContent, `Start the ${minutes * 60}-second wait`);
+  }
+});
+
+test('configured wait updates instructions and progress scale', async () => {
+  const p = page(); await p.flush();
+  p.access = { waitSeconds: 120, readyAt: 120000 };
+  p.intervals[5000](); await p.flush();
+  assert.equal(p.elements['wait-step'].textContent, 'Pause for 120 seconds.');
+  assert.equal(p.elements.begin.textContent, 'Start the 120-second wait');
+  assert.equal(p.elements['reason-requirement'].textContent, '20–280 characters. A little clarity, then 120 seconds to pause.');
+  assert.equal(p.elements.progress.max, 120);
+  assert.equal(p.elements.progress.value, 0);
+  p.now = 60000; p.intervals[1000]();
+  assert.equal(p.elements.progress.value, 60);
+  assert.equal(p.elements.open.disabled, true);
+});
+
+test('pending wait progress and instructions survive setting changes and reload with the request duration', async () => {
+  for (const [initial, updated] of [[1, 5], [5, 1]]) {
+    let w = worker({ settings: { waitMinutes: initial } });
+    const options = { now: w.now, random: 0.2, send: message => w.send(message, gate('x')) };
+    const p = page(options); await p.flush();
+    p.elements.reason.value = 'Reply to Alex about our launch, then leave.';
+    p.submit(); await p.flush();
+    w.advance(30000); p.now = w.now;
+    await w.send({ type: 'access-duration', preference: 'waitMinutes', minutes: updated }, popupSender);
+    p.intervals[5000](); await p.flush();
+    w = worker(structuredClone(w.data), 'chrome', w.now);
+    const reloaded = page({ ...options, now: w.now }); await reloaded.flush();
+    for (const current of [p, reloaded]) {
+      assert.equal(current.elements.waiting.hidden, false);
+      assert.equal(current.elements.progress.max, initial * 60);
+      assert.equal(current.elements.progress.value, 30);
+      assert.equal(current.elements.clock.textContent, initial === 1 ? '0:30' : '4:30');
+      assert.equal(current.elements['wait-step'].textContent, `Pause for ${initial * 60} seconds.`);
+      assert.equal(current.elements['reason-requirement'].textContent, `20–280 characters. A little clarity, then ${initial * 60} seconds to pause.`);
+      assert.equal(current.elements.heading.textContent, `Your next idea called. It wants ${initial === 1 ? 'a minute' : initial + ' minutes'}.`);
+      assert.equal(current.elements.open.disabled, true);
+    }
+    reloaded.click('cancel'); await reloaded.flush();
+    assert.equal(reloaded.elements.begin.textContent, `Start the ${updated * 60}-second wait`);
+    reloaded.elements.reason.value = 'Reply to Alex about our launch, then leave.';
+    reloaded.submit(); await reloaded.flush();
+    assert.equal(reloaded.elements.progress.max, updated * 60);
+    assert.equal(reloaded.elements.progress.value, 0);
+    assert.equal(reloaded.elements['wait-step'].textContent, `Pause for ${updated * 60} seconds.`);
+  }
 });

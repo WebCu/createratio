@@ -5,7 +5,7 @@
   "shortDescription": "Create more, consume intentionally on seven platforms. Private, local creation tracking and timed access.",
   "description": [
     "CreateRatio helps you create more and consume intentionally on X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit.",
-    "Write an intention, wait the full 60 seconds, then explicitly start a timed session. Sessions default to five active minutes shared across a site's tabs, pause when you switch away, and refill daily until ended or disabled. Session times are configurable. Optional above-goal access is off by default.",
+    "Write an intention, wait five minutes by default, then explicitly start a timed session. Sessions default to five active minutes shared across a site's tabs, pause when you switch away, and refill daily until ended or disabled. Session times and intention waits are configurable. Optional above-goal access is off by default.",
     "All seven supported platforms start with Limit & track On for fresh installs. Manage each site in Settings → Websites. Turning a site's Limit & track off removes its access restrictions and stops new creation-score measurements without deleting history. Saved choices persist.",
     "See your daily creation score and seven-day chart. Creation tracking compares supported creating and consuming time, with credit for detected post, reply and comment actions. Recognition is approximate, not proof of publication. Slow scrolling adds adjustable wheel and trackpad resistance on enabled consuming pages.",
     "Your extension records stay in your browser profile. No extension account, analytics, telemetry or activity uploads. No post text, keystroke values or full URLs are saved. Optional Website time records focused domains and elapsed time separately from the score. Website time and Remember my intentions start off.",
@@ -16,7 +16,7 @@
   "socialPost": "CreateRatio supports X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit. A deliberate pause before you browse, active-time limits, and a local creation score. Choose your sites in Settings → Websites → Limit & track. Free and open source. https://createratio.com/",
   "screenshots": [
     { "id": "01-websites", "caption": "Choose from seven supported sites: X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit. All seven start On for fresh installs; existing saved choices are preserved." },
-    { "id": "02-intention", "caption": "Make room for intention before opening Instagram. Write an intention, wait 60 seconds, then explicitly start a timed session." },
+    { "id": "02-intention", "caption": "Make room for intention before opening Instagram. Write an intention, wait five minutes by default, then explicitly start a timed session." },
     { "id": "03-creation-score", "caption": "See your creating-versus-consuming balance. Demonstration totals are synthetic; the creation score is approximate." }
   ]
 }

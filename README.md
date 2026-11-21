@@ -5,7 +5,7 @@
 A free, open-source browser extension that helps you spend more time creating
 and less time consuming. X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit
 are blocked by default on a fresh install. Write an
-intention, wait 60 seconds, then confirm access for five active minutes by default.
+intention, wait five minutes, then confirm access for five active minutes by default.
 Switching away pauses the timer.
 
 - **Intentional access:** configurable session times and a **Limit & track**

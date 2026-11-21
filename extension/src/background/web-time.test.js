@@ -142,6 +142,35 @@ test('disable keeps totals, stops timer; permission revocation stops tracking', 
   assert.equal(h.alarms['website-time'], undefined);
 });
 
+test('a failed Website time disable save keeps recording without a worker restart', async (t) => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  t.mock.method(h.api.storage.local, 'set', async values => {
+    if (values._websiteTimeEnabled === false) throw new Error('Preference write failed');
+    return set(values);
+  });
+
+  h.advance(2000);
+  await assert.rejects(h.tracker.setEnabled(false), /Preference write failed/);
+  assert.equal(h.data._websiteTimeEnabled, true);
+  assert.equal(h.tracker.enabled, true);
+  assert.ok(h.alarms['website-time']);
+  h.advance(5000); await h.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 7);
+});
+
+test('a failed Website time enable save does not start tracking', async (t) => {
+  const h = harness(); await h.tracker.start();
+  t.mock.method(h.api.storage.local, 'set', async () => { throw new Error('Preference write failed'); });
+
+  await assert.rejects(h.tracker.setEnabled(true), /Preference write failed/);
+  assert.equal(h.data._websiteTimeEnabled, undefined);
+  assert.equal(h.tracker.enabled, false);
+  assert.equal(h.alarms['website-time'], undefined);
+  h.advance(5000); await h.tick();
+  assert.equal(h.state.queries, 0);
+});
+
 test('concurrent ticks share the serialized writer without double counting', async () => {
   const h = harness(); await h.tracker.setEnabled(true); h.advance(5000);
   await Promise.all([h.tick(), h.tick(), h.tick()]);

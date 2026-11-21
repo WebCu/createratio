@@ -4,7 +4,7 @@ const messages = RuntimeMessages.create(extensionAPI.runtime);
 /** @type {(id: string) => any} */
 const $ = id => document.getElementById(id);
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
-let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
+let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, refreshPending = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
 let scrollEditing = false, scrollPending = null, scrollSaving = null;
 let saveDismissTimer = null, saveCleanupTimer = null;
 function clearSaved() {
@@ -60,6 +60,45 @@ function createAccessField(site) {
   editor.append(customLabel, custom, unit, apply, cancel); node.append(heading, line, source, editor);
   return { node, input, source, reset, defaultOption, savedOption, editor, custom, apply, cancel, editing: false };
 }
+function createWaitField(site) {
+  const suffix = site.id ? 'site-' + site.id : 'default';
+  const node = document.createElement('div'); node.className = 'site-preference-field wait-preference-field';
+  const heading = document.createElement('label'); heading.textContent = 'Intention wait';
+  const line = document.createElement('div'); line.className = 'site-field-value';
+  const source = document.createElement('small'); source.id = 'waitMinutes-source-' + suffix; source.className = 'sr-only';
+  const input = document.createElement('select'); input.id = 'waitMinutes-' + suffix; heading.htmlFor = input.id;
+  input.setAttribute('aria-label', 'Intention wait for ' + site.name); input.setAttribute('aria-describedby', source.id + ' site-time-note');
+  function option(value, text) {
+    const item = document.createElement('option'); item.value = String(value); item.textContent = text; input.append(item); return item;
+  }
+  const defaultOption = site.id ? option('default', 'Default') : null;
+  for (const minutes of [1, ...durationPresets]) option(minutes, minutes + ' min');
+  const savedOption = option('', ''); savedOption.hidden = true;
+  option('custom', 'Custom…');
+  input.addEventListener('change', () => saveWaitDuration(site.id)); line.append(input);
+  let reset = null;
+  if (site.id) {
+    reset = document.createElement('button'); reset.type = 'button'; reset.className = 'duration-reset'; reset.id = 'wait-reset-' + site.id;
+    reset.setAttribute('aria-label', 'Use Default intention wait for ' + site.name); reset.title = 'Use Default';
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); icon.setAttribute('viewBox', '0 0 20 20'); icon.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M4 8a6 6 0 1 1 0 6M4 3v5h5'); icon.append(path); reset.append(icon);
+    reset.addEventListener('click', () => saveWaitDuration(site.id, true)); line.append(reset);
+  }
+  const editor = document.createElement('form'); editor.className = 'custom-duration custom-wait-duration'; editor.id = 'custom-wait-duration-' + suffix; editor.hidden = true;
+  const customLabel = document.createElement('label'); customLabel.textContent = 'Custom time'; customLabel.htmlFor = 'customWaitMinutes-' + suffix;
+  const custom = document.createElement('input'); custom.type = 'number'; custom.id = customLabel.htmlFor; custom.required = true;
+  custom.min = String(C3.ACCESS_LIMITS.minMinutes); custom.max = String(C3.ACCESS_LIMITS.maxMinutes); custom.step = '1';
+  custom.setAttribute('aria-label', 'Custom intention wait for ' + site.name); custom.setAttribute('aria-describedby', 'site-time-note');
+  const unit = document.createElement('span'); unit.textContent = 'min';
+  const apply = document.createElement('button'); apply.type = 'submit'; apply.textContent = 'Save'; apply.id = 'custom-wait-save-' + suffix;
+  apply.setAttribute('aria-label', 'Save custom intention wait for ' + site.name);
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.id = 'custom-wait-cancel-' + suffix;
+  cancel.setAttribute('aria-label', 'Cancel custom intention wait for ' + site.name);
+  editor.addEventListener('submit', event => { event.preventDefault(); return saveWaitDuration(site.id, false, true); });
+  cancel.addEventListener('click', () => { const control = siteControls.get(site.id); control.wait.editing = false; renderSite(control, currentSettings, site.id + ':wait'); input.focus(); });
+  editor.append(customLabel, custom, unit, apply, cancel); node.append(heading, line, source, editor);
+  return { node, input, source, reset, defaultOption, savedOption, editor, custom, apply, cancel, editing: false };
+}
 function createSite(site) {
   const trackingOnly = !!site.id && !accessSites.has(site.id);
   const row = document.createElement('li'); row.className = 'site-preferences' + (trackingOnly ? ' tracking-only-site' : ''); row.setAttribute('data-site', site.id);
@@ -80,10 +119,11 @@ function createSite(site) {
     const note = document.createElement('small'); note.textContent = 'Used unless a site has its own time.'; header.append(note);
   }
   const access = trackingOnly ? null : createAccessField(site);
+  const wait = trackingOnly ? null : createWaitField(site);
   row.append(header);
-  if (access) row.append(access.node);
+  if (access) row.append(access.node, wait.node);
   $(trackingOnly ? 'tracking-only-settings' : site.id ? 'site-settings' : 'default-settings').append(row);
-  return { site, row, access, tracking, trackingStatus, busy: new Set() };
+  return { site, row, access, wait, tracking, trackingStatus, busy: new Set() };
 }
 function renderSite(control, settings, force) {
   const { site, access } = control;
@@ -103,6 +143,19 @@ function renderSite(control, settings, force) {
     access.editor.hidden = !access.editing;
     access.custom.disabled = access.apply.disabled = access.cancel.disabled = access.input.disabled;
     if (access.reset) { access.reset.hidden = !overridden; access.reset.disabled = access.input.disabled; }
+  }
+  const wait = control.wait, waitOverridden = Object.hasOwn(settings.siteOverrides?.[site.id] || {}, 'waitMinutes');
+  if (wait) {
+    if (wait.defaultOption) wait.defaultOption.textContent = 'Default · ' + C3.siteSettings('', settings).waitMinutes + ' min';
+    wait.savedOption.value = String(effective.waitMinutes); wait.savedOption.textContent = effective.waitMinutes + ' min';
+    wait.savedOption.hidden = [1, ...durationPresets].includes(effective.waitMinutes);
+    if (inactive) wait.editing = false;
+    if (!control.busy.has('wait') && (force === site.id + ':wait' || document.activeElement !== wait.input)) wait.input.value = wait.editing ? 'custom' : site.id && !waitOverridden ? 'default' : effective.waitMinutes;
+    wait.input.disabled = control.busy.has('wait') || switching || inactive;
+    wait.source.textContent = !site.id ? 'Default' : waitOverridden ? 'Custom' : 'From Default';
+    wait.editor.hidden = !wait.editing;
+    wait.custom.disabled = wait.apply.disabled = wait.cancel.disabled = wait.input.disabled;
+    if (wait.reset) { wait.reset.hidden = !waitOverridden; wait.reset.disabled = wait.input.disabled; }
   }
   if (control.tracking) {
     if (!switching) control.tracking.checked = C3.trackingEnabled(site.id, settings);
@@ -145,11 +198,11 @@ function render(settings, force = '') {
   $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. See domain totals in the dashboard.' : '';
 }
 async function refresh() {
-  if (refreshing) return; refreshing = true;
+  if (refreshing) { refreshPending = true; return; } refreshing = true;
   try {
     const snapshot = await messages.send({ type: 'snapshot' }, 'Unable to load your settings.');
     websiteTimeEnabled = snapshot.websiteTimeEnabled; render(snapshot.settings);
-  } catch (e) { error(e.message); } finally { refreshing = false; }
+  } catch (e) { error(e.message); } finally { refreshing = false; if (refreshPending) { refreshPending = false; void refresh(); } }
 }
 async function notifyTrackers() {
   const tabs = await extensionAPI.tabs.query({}).catch(() => []);
@@ -169,22 +222,34 @@ async function saveAccessDuration(site, reset = false, custom = false) {
     if (access.editing) { access.editing = false; renderSite(control, currentSettings, site + ':access'); input.focus(); }
   }
 }
+async function saveWaitDuration(site, reset = false, custom = false) {
+  const control = siteControls.get(site), access = control.wait, input = access.input;
+  if (control.busy.has('wait') || input.disabled) return;
+  if (!reset && !custom && input.value === 'custom') {
+    access.editing = true; access.custom.value = C3.siteSettings(site, currentSettings).waitMinutes;
+    clearSaved(); error(); renderSite(control, currentSettings); access.custom.focus(); return;
+  }
+  const field = custom ? access.custom : input;
+  const minutes = reset || !custom && site && input.value === 'default' ? null : Number(field.value);
+  if (minutes !== null && (!field.reportValidity() || !C3.validAccessMinutes(minutes))) { error(`Choose a whole number from ${C3.ACCESS_LIMITS.minMinutes} to ${C3.ACCESS_LIMITS.maxMinutes} minutes.`); return; }
+  if (await saveSitePreference(control, 'wait', { type: 'access-duration', preference: 'waitMinutes', minutes, ...(site ? { site } : {}) })) {
+    if (access.editing) { access.editing = false; renderSite(control, currentSettings, site + ':wait'); input.focus(); }
+  }
+}
 async function saveTracking(site) {
   const control = siteControls.get(site);
   if (control.busy.has('tracking')) return;
   await saveSitePreference(control, 'tracking', { type: 'tracking', site, enabled: control.tracking.checked });
 }
 async function saveSitePreference(control, group, message) {
-  const site = control.site.id, input = control.access?.input;
+  const site = control.site.id, field = group === 'wait' ? control.wait : control.access, input = field?.input;
   control.busy.add(group); control.row.setAttribute('aria-busy', 'true');
-  if (group === 'tracking') {
-    control.tracking.disabled = true; control.trackingStatus.textContent = control.tracking.checked ? 'On' : 'Off';
-  }
+  if (group === 'tracking') renderSite(control, currentSettings);
   if (input) {
     input.disabled = true;
-    control.access.custom.disabled = control.access.apply.disabled = control.access.cancel.disabled = true;
+    field.custom.disabled = field.apply.disabled = field.cancel.disabled = true;
   }
-  if (control.access?.reset) control.access.reset.disabled = true;
+  if (field?.reset) field.reset.disabled = true;
   let success = false;
   try {
     const result = await messages.send(message, 'Unable to save settings.');
@@ -195,7 +260,7 @@ async function saveSitePreference(control, group, message) {
         ? message.enabled ? 'Limit & track is on.' : 'Limit & track is off.'
         : message.enabled ? 'Creating/consuming and action measurements are on.' : 'Creation-score tracking is off.';
       saved(`${control.site.name}: ${description} Your history is kept.`);
-    } else saved(`${control.site.name} session time saved for new sessions and midnight refills.`);
+    } else saved(group === 'wait' ? `${control.site.name} intention wait saved for new requests.` : `${control.site.name} session time saved for new sessions and midnight refills.`);
     if (group === 'tracking') await notifyTrackers();
     success = true;
   } catch (e) { error(e.message); }

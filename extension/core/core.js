@@ -13,7 +13,7 @@
   function validIntention(value) { return typeof value === 'string' && value.length <= INTENTION_LIMITS.maxLength && value.trim().length >= INTENTION_LIMITS.minLength; }
   function validAccessMinutes(value) { return Number.isInteger(value) && value >= ACCESS_LIMITS.minMinutes && value <= ACCESS_LIMITS.maxMinutes; }
   function validScrollFrictionStrength(value) { return Number.isInteger(value) && value >= SCROLL_FRICTION_LIMITS.minStrength && value <= SCROLL_FRICTION_LIMITS.maxStrength && value % SCROLL_FRICTION_LIMITS.step === 0; }
-  const DEFAULT_SETTINGS = { accessMinutes: 5, dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, scrollFrictionEnabled: true, scrollFrictionStrength: 50, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
+  const DEFAULT_SETTINGS = { accessMinutes: 5, waitMinutes: 5, dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, scrollFrictionEnabled: true, scrollFrictionStrength: 50, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
   function isRecord(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function trackingSelection(settings) {
     const selected = isRecord(settings) ? settings.trackedSites : undefined;
@@ -26,14 +26,14 @@
     const resolved = { ...DEFAULT_SETTINGS, ...settings };
     resolved.dailyTarget = dailyTarget(settings);
     resolved.trackedSites = trackingSelection(settings).filter(site => typeof site === 'string');
-    if (!validAccessMinutes(resolved.accessMinutes)) resolved.accessMinutes = DEFAULT_SETTINGS.accessMinutes;
+    for (const key of ['accessMinutes', 'waitMinutes']) if (!validAccessMinutes(resolved[key])) resolved[key] = DEFAULT_SETTINGS[key];
     if (resolved.scrollFrictionStrength === 0) resolved.scrollFrictionEnabled = false;
     if (!validScrollFrictionStrength(resolved.scrollFrictionStrength)) resolved.scrollFrictionStrength = DEFAULT_SETTINGS.scrollFrictionStrength;
     for (const key of ['allowAboveGoal', 'intentionHistoryEnabled', 'scrollFrictionEnabled']) if (typeof resolved[key] !== 'boolean') resolved[key] = DEFAULT_SETTINGS[key];
     delete resolved.nudgeEnabled; delete resolved.nudgeMinutes;
     if (Object.hasOwn(resolved, 'siteOverrides')) resolved.siteOverrides = Object.fromEntries(Object.entries(isRecord(resolved.siteOverrides) ? resolved.siteOverrides : {}).filter(([, preferences]) => isRecord(preferences)).map(([site, preferences]) => {
       const overrides = { ...preferences };
-      if (!validAccessMinutes(overrides.accessMinutes)) delete overrides.accessMinutes;
+      for (const key of ['accessMinutes', 'waitMinutes']) if (!validAccessMinutes(overrides[key])) delete overrides[key];
       delete overrides.nudgeEnabled; delete overrides.nudgeMinutes;
       return [site, overrides];
     }).filter(([, overrides]) => Object.keys(overrides).length));
@@ -42,7 +42,7 @@
   function siteSettings(site, settings = {}) {
     const resolved = settingsSnapshot(settings);
     const overrides = Object.hasOwn(resolved.siteOverrides || {}, site) ? resolved.siteOverrides[site] : {};
-    if (overrides?.accessMinutes !== undefined) resolved.accessMinutes = overrides.accessMinutes;
+    for (const key of ['accessMinutes', 'waitMinutes']) if (overrides?.[key] !== undefined) resolved[key] = overrides[key];
     return resolved;
   }
   function updatePreferences(settings = {}, changes, site) {
@@ -50,7 +50,7 @@
     if (!isRecord(changes)) throw new Error('Choose valid preferences');
     if (site !== undefined && !SITES.some(definition => definition.id === site)) throw new Error('Choose a vetted website');
     for (const [key, value] of Object.entries(changes)) {
-      if (key !== 'accessMinutes') throw new Error('Unsupported preference');
+      if (!['accessMinutes', 'waitMinutes'].includes(key)) throw new Error('Unsupported preference');
       if (value === null && site !== undefined) continue;
       if (!validAccessMinutes(value)) throw new Error(`Choose a whole number from ${ACCESS_LIMITS.minMinutes} to ${ACCESS_LIMITS.maxMinutes} minutes`);
     }
