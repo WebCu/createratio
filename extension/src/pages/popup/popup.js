@@ -9,12 +9,16 @@ function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function createAccessControl(site, state) {
   const row = document.createElement('div'); row.className = 'access-row';
   row.setAttribute('role', 'group'); row.setAttribute('aria-label', state.name + ' access');
-  const label = document.createElement('span'), name = document.createElement('strong'), status = document.createElement('small');
+  const label = document.createElement('span'), name = document.createElement('strong'), status = document.createElement('small'), pending = document.createElement('a');
+  const gateUrl = extensionAPI.runtime.getURL('blocked.html') + '?site=' + site;
   label.className = 'refill-target'; status.id = 'access-status-' + site;
-  name.textContent = state.name; label.append(name, status);
+  pending.href = gateUrl; pending.target = '_blank'; pending.rel = 'noopener'; pending.hidden = true;
+  pending.textContent = 'Manage pending wait';
+  pending.setAttribute('aria-label', 'Manage pending wait for ' + state.name);
+  name.textContent = state.name; label.append(name, status, pending);
   const button = document.createElement('button');
   button.setAttribute('aria-describedby', status.id);
-  const control = { row, label, status, button, state, busy: false };
+  const control = { row, label, status, pending, button, state, busy: false };
   button.addEventListener('click', async () => {
     control.busy = true; button.disabled = true;
     try {
@@ -22,7 +26,7 @@ function createAccessControl(site, state) {
       else if (control.state.remainingMs > 0) {
         const result = await messages.send({ type: 'access-end', site }, 'Unable to end session.');
         renderAccess(result.access);
-      } else await extensionAPI.tabs.create({ url: extensionAPI.runtime.getURL('blocked.html') + '?site=' + site });
+      } else await extensionAPI.tabs.create({ url: gateUrl });
       error();
     } catch (e) { error(e.message); }
     finally { control.busy = false; button.disabled = false; }
@@ -36,11 +40,12 @@ function renderAccess(access) {
     let control = accessControls.get(site);
     if (!control) { control = createAccessControl(site, state); accessControls.set(site, control); }
     control.state = state;
-    const { status, button } = control;
+    const { status, pending, button } = control;
     control.row.setAttribute('data-state', state.enabled === false ? 'off' : state.goalAllowed || state.remainingMs > 0 ? 'open' : 'blocked');
     const open = state.remainingMs > 0;
     const left = state.expiresAt ? Math.max(0, state.expiresAt - Date.now()) : state.remainingMs;
     const seconds = Math.ceil(left / 1000);
+    pending.hidden = state.enabled === false || !state.goalAllowed || !state.readyAt;
     status.textContent = state.enabled === false ? 'Limit & track off' : state.goalAllowed ? 'Open · above daily goal' : open ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} left${state.expiresAt ? '' : ' · paused'}` : state.readyAt ? 'Access requested' : 'Blocked';
     button.textContent = state.enabled === false || state.goalAllowed ? 'Open site' : open ? 'End session' : 'Request access';
     button.setAttribute('aria-label', state.enabled === false || state.goalAllowed ? 'Open site: ' + state.name : open ? 'End session for ' + state.name : 'Request access to ' + state.name);
