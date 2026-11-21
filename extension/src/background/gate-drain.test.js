@@ -114,3 +114,21 @@ test('a failed tab navigation preserves the requesting guard fallback after drai
   assert.equal(result.navigationHandled, false);
   assert.equal(w.tabs[0].url, url);
 });
+
+for (const correction of [-3600000, -1500]) test(`backward clock correction preserves historical and current authorization: ${correction}`, async () => {
+  const w = worker({ _access: { reddit: { remainingMs: 60000, expiresAt: start + 60000, date } } }, 'chrome', start, { session: { _accessInitialized: true } });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  w.advance(1000 + correction);
+  await w.send({ type: 'snapshot' });
+  const corrected = w.now;
+  w.advance(1000);
+  await w.send({ type: 'access-end', site: 'reddit' }, popupSender);
+  const packet = { type: 'ingest', id: 'clock-correction', site: 'reddit', segments: [
+    { date, mode: 'consume', start, end: start + 1000, sec: 1 },
+    { date, mode: 'consume', start: corrected, end: corrected + 1000, sec: 1 },
+    ...(correction === -3600000 ? [{ date, mode: 'consume', start: corrected + 1000, end: corrected + 2000, sec: 1 }] : [])
+  ], actions: [] };
+  assert.equal((await w.send(packet, sender)).ok, true);
+  assert.equal(w.data[date].reddit.consumeSec, 2);
+  assert.ok(w.data._accessWindows.reddit.every(window => window.end > window.start));
+});

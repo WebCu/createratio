@@ -23,7 +23,7 @@ const SiteAccess = (() => {
   function updateWindows(windows, site, now, end) {
     const entries = Array.isArray(windows[site]) ? windows[site].filter(item => record(item) && Number.isFinite(item.start) && Number.isFinite(item.end) && item.start >= 0 && item.end > item.start) : [];
     const last = entries.at(-1);
-    if (last && last.end >= now) last.end = end;
+    if (last && last.start <= now && last.end >= now) last.end = end;
     else if (end > now) entries.push({ start: now, end });
     if (entries.length) windows[site] = entries.slice(-C3.DELIVERY_LIMITS.receiptLimit);
     else delete windows[site];
@@ -34,9 +34,15 @@ const SiteAccess = (() => {
     const windows = stored._accessWindows?.[packet.site] || [];
     const legacyAllowed = access[packet.site].enabled && (access[packet.site].goalAllowed || access[packet.site].remainingMs > 0);
     if (!windows.length && legacyAllowed) windows.push({ start: 0, end: access[packet.site].goalAllowed ? Number.MAX_SAFE_INTEGER : access[packet.site].expiresAt || Date.now() + access[packet.site].remainingMs });
+    const coverage = [];
+    for (const window of windows.slice().sort((a, b) => a.start - b.start)) {
+      const last = coverage.at(-1);
+      if (last && window.start <= last.end) last.end = Math.max(last.end, window.end);
+      else coverage.push({ ...window });
+    }
     const segments = packet.segments.flatMap(segment => {
       if (segment.start === undefined) return legacyAllowed ? [segment] : [];
-      return windows.flatMap(window => {
+      return coverage.flatMap(window => {
         const start = Math.max(segment.start, window.start), end = Math.min(segment.end, window.end);
         return end > start ? [{ ...segment, start, end, sec: (end - start) / 1000 }] : [];
       });
