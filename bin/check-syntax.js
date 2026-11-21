@@ -96,7 +96,8 @@ async function main() {
   const inventory = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.js', '*.mjs', '*.cjs'], { cwd: root, encoding: 'utf8' });
   const files = [...new Set(inventory.split('\0').filter(Boolean))].sort().map(file => path.join(root, file)).filter(file => existsSync(file));
   const tsc = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
-  const typedFiles = execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json', '--listFilesOnly'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(file => file && existsSync(file));
+  const typed = existsSync(path.join(root, 'tsconfig.json')) ? execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json', '--listFilesOnly'], { cwd: root, encoding: 'utf8' }) : '';
+  const typedFiles = typed.split(/\r?\n/).filter(file => file && existsSync(file));
   console.log(`${await checkSyntaxParallel(files, typedFiles)} JavaScript syntax checks passed; no code comments outside JSDoc type annotations.`);
 }
 
