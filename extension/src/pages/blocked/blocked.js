@@ -39,7 +39,7 @@ function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
   const waiting = !active && access.readyAt > 0;
-  const waitSeconds = typeof access.waitSeconds === 'number' && access.waitSeconds > 0 ? access.waitSeconds : C3.DEFAULT_SETTINGS.waitMinutes * 60;
+  const waitSeconds = typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0 ? access.waitSeconds : C3.DEFAULT_SETTINGS.waitMinutes * 60;
   const waitMinutes = waitSeconds / 60;
   const waitDuration = `${waitMinutes} minute${waitMinutes === 1 ? '' : 's'}`;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
