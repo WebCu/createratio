@@ -48,6 +48,23 @@ test('reconciliation after the midnight refill expires retains its full authoriz
   assert.equal(w.data[date].x.replies, 1);
   assert.equal(result.access.x.remainingMs, 0);
 });
+test('goal-only access stops authorizing at midnight even when reconciliation is delayed', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const yesterday = C.localDate(new Date(midnight - 1)), today = C.localDate(new Date(midnight));
+  const w = worker({ settings: { allowAboveGoal: true }, [yesterday]: { x: { posts: 1 } } }, 'chrome', midnight - 2000);
+  w.activate('https://x.com/home');
+  assert.equal((await w.send({ type: 'access-status' })).access.x.goalAllowed, true);
+  w.advance(5000);
+  const result = await w.send({ type: 'ingest', id: 'goal-midnight', site: 'x', segments: [
+    { date: yesterday, mode: 'consume', start: midnight - 2000, end: midnight, sec: 2 },
+    { date: today, mode: 'consume', start: midnight, end: midnight + 3000, sec: 3 }
+  ], actions: [{ date: yesterday, action: 'replies', at: midnight - 1 }, { date: today, action: 'replies', at: midnight + 1 }] });
+  assert.equal(result.ok, true);
+  assert.equal(w.data[yesterday].x.consumeSec, 2);
+  assert.equal(w.data[yesterday].x.replies, 1);
+  assert.equal(w.data[today], undefined);
+  assert.equal(result.access.x.goalAllowed, false);
+});
 test('records the final interval of a minute session even after expiry', async () => {
   const w = worker({ settings: { accessMinutes: 1 } });
   await unlock(w);

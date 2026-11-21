@@ -108,7 +108,7 @@ const SiteAccess = (() => {
       }
       if (!validWait(entry, now)) delete entry.readyAt;
       if (windows[site] || entry.refilledAt > 0 || entry.expiresAt || goalAllowed) {
-        updateWindows(windows, site, windowStart, goalAllowed || entry.remainingMs > 0 && !entry.expiresAt ? Number.MAX_SAFE_INTEGER : entry.expiresAt || Math.min(now, authorizedUntil || now));
+        updateWindows(windows, site, windowStart, goalAllowed ? midnight : entry.remainingMs > 0 && !entry.expiresAt ? Number.MAX_SAFE_INTEGER : entry.expiresAt || Math.min(now, authorizedUntil || now));
       }
     }
     const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
