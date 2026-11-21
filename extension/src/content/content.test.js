@@ -276,6 +276,18 @@ test('saved nudge overrides remain inert while both sites continue creation trac
 
 function seconds(t, mode) { return t.packets.flatMap(p => p.segments).filter(s => s.mode === mode).reduce((sum, s) => sum + s.sec, 0); }
 
+test('expiry acknowledgements do not discard other queued pre-expiry packets', async () => {
+  const options = { failIngest: true };
+  const t = await tracker('chrome', options);
+  t.input(); t.setNow(5000); await t.tick();
+  t.setNow(10000); await t.tick();
+  options.failIngest = false;
+  t.setSnapshot({ day: {}, settings: C.DEFAULT_SETTINGS, access: { x: { enabled: true, remainingMs: 0 } } });
+  t.setNow(15000); await t.tick();
+  assert.equal(seconds(t, 'consume'), 15);
+  assert.ok(t.packets.every(packet => packet.segments.every(segment => segment.end - segment.start === segment.sec * 1000)));
+});
+
 test('creating/consuming time and actions require an active access session', async () => {
   const locked = { day: {}, settings: C.DEFAULT_SETTINGS, access: { x: { enabled: true, remainingMs: 0 } } };
   const t = await tracker('chrome', { snapshot: locked }); t.input(); t.setNow(5000); await t.tick(); assert.equal(t.packets.length, 0);

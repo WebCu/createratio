@@ -15,6 +15,48 @@ test('initializes Chromium and Firefox backgrounds with their available storage 
   }
 });
 function packet(id, site = 'x') { return { type: 'ingest', id, site, segments: [{ date: C.localDate(), mode: 'consume', sec: 5 }], actions: [] }; }
+test('records the final interval of a minute session even after expiry', async () => {
+  const w = worker({ settings: { accessMinutes: 1 } });
+  await unlock(w);
+  w.activate('https://x.com/home');
+  await w.send({ type: 'access-status' });
+  const start = w.now, date = C.localDate(new Date(start));
+  for (let index = 0; index < 12; index++) {
+    w.advance(5000);
+    const result = await w.send({ type: 'ingest', id: `minute-${index}`, site: 'x',
+      segments: [{ date, mode: 'consume', sec: 5, start: start + index * 5000, end: w.now }], actions: [] });
+    assert.equal(result.ok, true);
+  }
+  assert.equal(w.data[date].x.consumeSec, 60);
+});
+test('late packets retain only authorized time and actions across expiry, manual end and restart', async () => {
+  for (const manual of [false, true]) {
+    const w = worker({ settings: { accessMinutes: 1 } });
+    await unlock(w);
+    w.activate('https://x.com/home');
+    await w.send({ type: 'access-status' });
+    const start = w.now, end = start + (manual ? 30000 : 60000), date = C.localDate(new Date(start));
+    w.advance(end - start);
+    if (manual) await w.send({ type: 'access-end', site: 'x' }, popupSender);
+    else await w.send({ type: 'access-status' });
+    w.advance(10000);
+    const late = { type: 'ingest', id: 'late', site: 'x',
+      segments: [{ date, mode: 'consume', start: end - 5000, end: end + 5000, sec: 10 }],
+      actions: [{ date, action: 'replies', at: end - 1 }, { date, action: 'replies', at: end }] };
+    w.failWrites = true;
+    assert.equal((await w.send(late)).ok, false);
+    w.failWrites = false;
+    const restarted = worker(w.data, 'chrome', w.now);
+    const retried = await restarted.send(late);
+    assert.equal(retried.ok, true, JSON.stringify(retried));
+    assert.equal((await restarted.send(late)).ok, true);
+    assert.equal(w.data[date].x.consumeSec, 5);
+    assert.equal(w.data[date].x.replies, 1);
+    assert.equal((await restarted.send({ ...late, id: 'outside', segments: [{ date, mode: 'consume', start: end, end: end + 5000, sec: 5 }], actions: [] })).ok, true);
+    assert.equal(w.data[date].x.consumeSec, 5);
+    assert.equal((await restarted.send({ ...late, id: 'invalid', segments: [{ ...late.segments[0], end: end - 6000 }] })).ok, false);
+  }
+});
 test('serialized writes from concurrent tabs preserve all time and quote counts', async () => {
   const w = activeWorker(); const a = packet('a'); a.actions = [{ date: C.localDate(), action: 'quotes' }];
   const b = packet('b', 'linkedin'); b.actions = [{ date: C.localDate(), action: 'comments' }];

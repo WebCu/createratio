@@ -33,12 +33,15 @@
   }
 
   function appendTime(start, end) {
+    let cursor = start;
     for (const part of C3.splitInterval(start, end)) {
       if (segments.reduce((sum, segment) => sum + segment.sec, 0) + part.sec > MAX_SECONDS) queuePacket();
       if (recordingPaused) break;
       const tail = segments.at(-1);
-      if (tail && tail.mode === mode && tail.date === part.date) tail.sec += part.sec;
-      else segments.push({ ...part, mode });
+      const partEnd = cursor + part.sec * 1000;
+      if (tail && tail.mode === mode && tail.date === part.date && tail.end === cursor) { tail.sec += part.sec; tail.end = partEnd; }
+      else segments.push({ ...part, mode, start: cursor, end: partEnd });
+      cursor = partEnd;
       if (segments.length === MAX_ITEMS) queuePacket();
       if (recordingPaused) break;
     }
@@ -81,10 +84,11 @@
     lastInput = -Infinity; lastSample = performance.now();
     console.warn(`CreateRatio: ${integration.name} integration paused until page reload.`, error.message);
   }
-  function synchronizeTracking(nextEnabled, nextGeneration) {
+  function synchronizeTracking(nextEnabled, nextGeneration, preserveOutbox) {
     if (enabled === nextEnabled && generation === nextGeneration) return;
     generation = nextGeneration;
-    segments = []; actions = []; outbox = [];
+    segments = []; actions = [];
+    if (!preserveOutbox) outbox = [];
     recordingPaused = false; resetInput();
     enabled = nextEnabled; adapter = null;
     if (!enabled) return;
@@ -100,7 +104,8 @@
     const nextEnabled = !failed && C3.trackingEnabled(site, result.settings) && (!access || access.enabled !== false && (access.goalAllowed || access.remainingMs > 0));
     scrollFrictionEnabled = result.settings.scrollFrictionEnabled === true;
     scrollSpeed = (100 - (result.settings.scrollFrictionStrength ?? C3.DEFAULT_SETTINGS.scrollFrictionStrength)) / 100;
-    synchronizeTracking(nextEnabled, result.generation ?? null);
+    const nextGeneration = result.generation ?? null;
+    synchronizeTracking(nextEnabled, nextGeneration, generation === nextGeneration && C3.trackingEnabled(site, result.settings));
     syncPending = false; syncRetryAt = 0; syncRetryDelay = 5000;
     refresh();
   }
@@ -146,7 +151,7 @@
     if (!result) return;
     if (!integration.actions.includes(result.action) || typeof result.submission !== 'boolean' || !(result.button instanceof Element)) throw new Error('Invalid action recognition');
     if (!counted(result.button)) return;
-    actions.push({ date: C3.localDate(), action: result.action });
+    actions.push({ date: C3.localDate(), action: result.action, at: Date.now() });
     flush();
   }
   function onInteraction(event) {

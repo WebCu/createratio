@@ -19,6 +19,30 @@ const SiteAccess = (() => {
   const contracts = MessageContracts.create(C3, api.runtime, C3Sites);
   function siteForURL(raw) { return C3Sites.forAccessURL(raw)?.id || null; }
   function gateURL(site) { return api.runtime.getURL('blocked.html') + '?site=' + site; }
+  function updateWindows(windows, site, now, end) {
+    const entries = Array.isArray(windows[site]) ? windows[site].filter(item => record(item) && Number.isFinite(item.start) && Number.isFinite(item.end) && item.start >= 0 && item.end > item.start) : [];
+    const last = entries.at(-1);
+    if (last && last.end >= now) last.end = end;
+    else if (end > now) entries.push({ start: now, end });
+    if (entries.length) windows[site] = entries.slice(-C3.DELIVERY_LIMITS.receiptLimit);
+    else delete windows[site];
+  }
+  async function creationPacket(packet, access) {
+    if (!access[packet.site]) return packet;
+    const stored = await api.storage.local.get('_accessWindows');
+    const windows = stored._accessWindows?.[packet.site] || [];
+    const legacyAllowed = access[packet.site].enabled && (access[packet.site].goalAllowed || access[packet.site].remainingMs > 0);
+    if (!windows.length && legacyAllowed) windows.push({ start: 0, end: access[packet.site].goalAllowed ? Number.MAX_SAFE_INTEGER : access[packet.site].expiresAt || Date.now() + access[packet.site].remainingMs });
+    const segments = packet.segments.flatMap(segment => {
+      if (segment.start === undefined) return legacyAllowed ? [segment] : [];
+      return windows.flatMap(window => {
+        const start = Math.max(segment.start, window.start), end = Math.min(segment.end, window.end);
+        return end > start ? [{ ...segment, start, end, sec: (end - start) / 1000 }] : [];
+      });
+    });
+    const actions = packet.actions.filter(action => action.at === undefined ? legacyAllowed : windows.some(window => action.at >= window.start && action.at < window.end));
+    return { ...packet, segments, actions };
+  }
   function ruleIds(site) { return SITES[site].ruleIds; }
   function status(site, entry = {}, now = Date.now(), minutes = C3.DEFAULT_SETTINGS.accessMinutes, enabled = true, goalAllowed = false) {
     if (!Object.hasOwn(SITES, site)) throw new Error('Unsupported site');
@@ -38,7 +62,8 @@ const SiteAccess = (() => {
   async function reconcile(closeAll = false) {
     const restart = !(await api.storage.session.get('_accessInitialized'))._accessInitialized;
     const now = Date.now(), clock = new Date(now), date = C3.localDate(clock);
-    const stored = await api.storage.local.get(['_access', 'settings', date]);
+    const stored = await api.storage.local.get(['_access', '_accessWindows', 'settings', date]);
+    const windows = accessState(stored._accessWindows), originalWindows = JSON.stringify(windows);
     const goalAllowed = stored.settings?.allowAboveGoal === true && C3.score(C3.aggregate(stored[date])) > C3.dailyTarget(stored.settings);
     const current = await api.declarativeNetRequest.getSessionRules();
     const access = accessState(stored._access), original = JSON.stringify(stored._access === undefined ? {} : stored._access);
@@ -50,12 +75,14 @@ const SiteAccess = (() => {
     const rules = [], expired = [];
     for (const [site, definition] of Object.entries(SITES)) {
       if (!C3.trackingEnabled(site, stored.settings)) {
+        delete windows[site];
         rules.push(...definition.unrestrictedRules);
         delete access[site]; await api.alarms.clear('access-' + site);
         continue;
       }
       if (Object.hasOwn(access, site) && !validSession(access[site], now)) delete access[site];
       const entry = access[site] || {}, minutes = C3.siteSettings(site, stored.settings).accessMinutes;
+      const previousExpiry = entry.expiresAt;
       const hadSession = Number.isFinite(entry.remainingMs) || Number.isFinite(entry.expiresAt);
       if (!Number.isFinite(entry.remainingMs) && Number.isFinite(entry.expiresAt)) entry.remainingMs = Math.max(0, entry.expiresAt - now);
       if (entry.date && entry.date !== date) {
@@ -78,10 +105,14 @@ const SiteAccess = (() => {
         await api.alarms.clear('access-' + site);
       }
       if (!validWait(entry, now)) { delete entry.readyAt; delete entry.requestExpiresAt; }
+      if (windows[site] || entry.refilledAt > 0 || entry.expiresAt || goalAllowed) {
+        updateWindows(windows, site, now, goalAllowed || entry.remainingMs > 0 && !entry.expiresAt ? Number.MAX_SAFE_INTEGER : entry.expiresAt || Math.min(now, previousExpiry || now));
+      }
     }
     const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
     if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules))) await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: Object.keys(SITES).flatMap(ruleIds), addRules: rules });
-    if (JSON.stringify(access) !== original) await api.storage.local.set({ _access: access });
+    const changes = { ...(JSON.stringify(access) !== original ? { _access: access } : {}), ...(JSON.stringify(windows) !== originalWindows ? { _accessWindows: windows } : {}) };
+    if (Object.keys(changes).length) await api.storage.local.set(changes);
     if (Object.keys(SITES).some(site => access[site]?.date)) await api.alarms.create('access-midnight', { when: midnight });
     else await api.alarms.clear('access-midnight');
     await Promise.all(expired.map(closeTabs));
@@ -158,9 +189,12 @@ const SiteAccess = (() => {
     await api.storage.local.set({ _access: access });
   }
   async function endAccess(site, access) {
+    const stored = await api.storage.local.get('_accessWindows');
+    const windows = accessState(stored._accessWindows);
+    updateWindows(windows, site, Date.now(), Date.now());
     delete access[site];
     await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: ruleIds(site) });
-    await api.storage.local.set({ _access: access });
+    await api.storage.local.set({ _access: access, ...(Object.keys(windows).length ? { _accessWindows: windows } : {}) });
     await api.alarms.clear('access-' + site);
     await closeTabs(site);
   }
@@ -206,5 +240,5 @@ const SiteAccess = (() => {
       default: return handleSession(message, sender);
     }
   }
-  return { handle, reconcile, siteForURL, gateURL };
+  return { handle, reconcile, siteForURL, gateURL, creationPacket };
 })();

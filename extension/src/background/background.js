@@ -33,9 +33,9 @@ async function ingest(message, sender) {
   if ((message.generation ?? null) !== (preferences._historyGeneration ?? null)) return snapshot();
   if (!C3.trackingEnabled(message.site, preferences.settings)) return snapshot();
   contracts.packet(message);
-  const access = (await SiteAccess.reconcile())[message.site];
-  if (access && !(access.enabled && (access.goalAllowed || access.remainingMs > 0))) return snapshot();
-  await history.recordCreation(message);
+  const access = await SiteAccess.reconcile();
+  const packet = await SiteAccess.creationPacket(message, access);
+  if (packet.segments.length || packet.actions.length) await history.recordCreation(packet);
   return snapshot();
 }
 async function readHistory(message, sender) {
