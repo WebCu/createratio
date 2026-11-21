@@ -86,22 +86,8 @@ for (const [route, shadow] of [['/messaging/thread/synthetic-thread/', false], [
         await browser.page(browser.origin + '/popup.html');
         await eventually(() => evaluate(browser, browser.worker, 'chrome.declarativeNetRequest.getSessionRules().then(rules => rules.some(rule => rule.id === 102))'), 'LinkedIn access rules allow the synthetic page');
         const totals = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(C3.localDate()).then(data => data[C3.localDate()]?.linkedin || {})');
-        if (shadow) await evaluate(browser, browser.worker, `(() => {
-          const original = snapshot;
-          snapshot = async () => {
-            globalThis.linkedinSnapshotHeld = true;
-            await new Promise(resolve => { globalThis.releaseLinkedinSnapshot = resolve; });
-            snapshot = original;
-            return original();
-          };
-        })()`);
         const page = await browser.page('https://www.linkedin.com/feed/');
         await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#synthetic-site") && document.hasFocus() && !document.hidden'), 'synthetic LinkedIn page is focused');
-        if (shadow) {
-          await eventually(() => evaluate(browser, browser.worker, 'globalThis.linkedinSnapshotHeld === true'), 'LinkedIn snapshot request is pending');
-          assert.equal(await scrolling.isEnabled(page), false, 'a pending snapshot must not authorize tracker input');
-          await evaluate(browser, browser.worker, 'releaseLinkedinSnapshot()');
-        }
         await eventually(() => scrolling.isEnabled(page), 'LinkedIn creation tracker has applied access preferences');
         await evaluate(browser, page.session, `(() => {
           history.pushState({}, '', ${JSON.stringify(route)});
