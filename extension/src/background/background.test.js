@@ -1048,7 +1048,7 @@ test('clear while retrying rejects old generations across worker loads and retai
   assert.deepEqual(w.data._receipts, ['preserved']); assert.equal(w.data._intentions.length, 1);
   const old = attempts[0];
   w = worker(w.data, 'chrome', w.now);
-  await t.tick(); await drainMessages();
+  t.notify(); await t.tick(); await drainMessages();
   assert.equal(w.data['2026-10-11'], undefined);
   assert.equal((await w.send(old)).generation, cleared.generation);
   t.input(); t.setNow(125000); w.advance(5000); await t.tick(); await drainMessages();
@@ -1106,7 +1106,8 @@ test('a lost ingest acknowledgement retries the identical packet through the wor
   t.event('click', { isTrusted: true, target: t.button });
   await drainMessages();
   assert.equal(w.data['2026-10-11'].x.posts, 1);
-  loseResponse = false; await t.tick(); await drainMessages();
+  t.visible(false); await drainMessages();
+  loseResponse = false; t.setNow(10000); w.advance(5000); await t.tick(); await drainMessages();
   assert.deepEqual(attempts[1], attempts[0]);
   assert.equal(w.data['2026-10-11'].x.posts, 1);
   assert.equal(w.data['2026-10-11'].x.consumeSec, 5);

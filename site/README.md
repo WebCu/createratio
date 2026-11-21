@@ -108,9 +108,12 @@ never load it or send events.
 
 The website sends pageviews and engagement to `https://plausible.io/api/event`.
 No cookies, custom events, outbound-link, download, or form tracking are enabled.
-To exclude your visits, set `localStorage.plausible_ignore = 'true'` in the browser
-console. Blocked analytics or disabled JavaScript do not affect the page.
+Blocked analytics or disabled JavaScript do not affect the page.
 This tracker is not included in extension builds.
+
+When testing the production landing page, set
+`localStorage.plausible_ignore = 'true'` in the browser console and reload the
+page to exclude future visits. This does not delete analytics already collected.
 
 ## Accessibility and verification
 

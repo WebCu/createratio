@@ -46,6 +46,68 @@ test('failed synchronization backs off to one request per minute and stays quiet
   assert.equal(t.messages.length, before);
 });
 
+test('queued activity respects retry backoff, drains in order while hidden and resets after success', async () => {
+  const attempts = [], times = [], options = { failIngest: true, attempts };
+  let now = 0;
+  const t = await tracker('chrome', options);
+  const settle = () => new Promise(resolve => setImmediate(resolve));
+  const click = () => t.event('click', { isTrusted: true, target: t.button });
+  click(); await settle(); times.push(now);
+  t.setNow(1000); click(); await settle();
+  t.setNow(2000); t.visible(false); await settle();
+  let count = attempts.length;
+  for (now = 5000; now <= 120000; now += 5000) {
+    t.setNow(now); await t.tick();
+    if (attempts.length > count) times.push(now);
+    count = attempts.length;
+  }
+  assert.deepEqual(times, [0, 5000, 15000, 35000, 75000]);
+  assert.equal(attempts.length, 5);
+  assert.ok(attempts.every(packet => packet.id === attempts[0].id));
+  assert.equal(t.packets.length, 0);
+  options.failIngest = false;
+  t.setNow(135000); await t.tick();
+  assert.deepEqual(t.packets.map(packet => packet.id), [attempts[0].id, attempts[0].id.replace(/:0$/, ':1')]);
+  assert.deepEqual(t.packets.flatMap(packet => packet.actions).map(action => action.action), ['posts', 'posts']);
+  assert.deepEqual(t.packets[0], attempts[0]);
+  const delivered = t.messages.length;
+  t.setNow(140000); await t.tick();
+  assert.equal(t.messages.length, delivered);
+  t.visible(true); await settle();
+  options.failIngest = true;
+  click(); await settle();
+  const failed = attempts.length;
+  t.setNow(140001); await t.tick();
+  assert.equal(attempts.length, failed);
+  t.setNow(145000); await t.tick();
+  assert.equal(attempts.length, failed + 1);
+});
+
+test('pagehide attempts queued activity during backoff', async () => {
+  for (const persisted of [true, false]) {
+    const options = { failIngest: true, attempts: [] };
+    const t = await tracker('chrome', options);
+    t.setNow(5000); t.event('click', { isTrusted: true, target: t.button }); await t.tick();
+    assert.equal(options.attempts.length, 1);
+    options.failIngest = false;
+    t.setNow(5001); t.event('pagehide', { persisted });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(options.attempts.length, 2);
+    assert.deepEqual(t.packets[0], options.attempts[0]);
+    assert.equal(t.packets.length, 1);
+  }
+});
+
+test('worker refresh bypasses pending activity backoff', async () => {
+  const options = { failIngest: true, attempts: [] };
+  const t = await tracker('chrome', options);
+  t.input(); t.setNow(5000); await t.tick();
+  options.failIngest = false;
+  t.setNow(5001); t.notify();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(t.packets, [options.attempts[0]]);
+});
+
 test('updates defer active input, flush partial measurements and release all listeners on commit', async () => {
   const t = await tracker(); t.input(); t.setNow(2000);
   assert.equal((await t.command({ type: 'prepare-update' })).ready, false);
@@ -72,7 +134,7 @@ test('failed update delivery resumes tracking and preserves the exact retry pack
   const options = { failIngest: true, attempts: [] }, t = await tracker('chrome', options);
   t.input(); t.setNow(2000);
   assert.equal((await t.command({ type: 'prepare-update', force: true })).ready, false);
-  options.failIngest = false; await t.tick();
+  options.failIngest = false; t.setNow(7000); await t.tick();
   assert.deepEqual(options.attempts[1], options.attempts[0]);
   assert.equal(t.packets[0].segments[0].sec, 2);
 });
@@ -84,7 +146,7 @@ test('an unusable ingest acknowledgement retains the exact queued packet for ret
       let malformed = true;
       const t = await tracker(browser, { attempts, reply(message, reply) { return message.type === 'ingest' && malformed ? invalid : reply; } });
       t.input(); t.setNow(5000); await t.tick();
-      malformed = false; await t.tick();
+      malformed = false; t.setNow(10000); await t.tick();
       assert.deepEqual(attempts[1], attempts[0]);
       assert.equal(t.warnings.length, 1);
       const count = attempts.length; await t.tick();
@@ -102,7 +164,7 @@ test('an impossible calendar date in a valid ingest reply preserves the packet u
     t.input(); t.setNow(5000); await t.tick();
     assert.equal(attempts.length, 1);
     assert.equal(t.warnings.length, 1);
-    invalidDate = false; await t.tick();
+    invalidDate = false; t.setNow(10000); await t.tick();
     assert.deepEqual(attempts[1], attempts[0]);
     const count = attempts.length; await t.tick();
     assert.equal(attempts.length, count);
@@ -710,14 +772,14 @@ test('sustained ingest failures pause at 64 packets without losing queued action
   assert.equal(t.packets.length, 0);
   assert.ok(options.attempts.every(packet => packet.id === options.attempts[0].id));
   options.failIngest = false;
-  await t.tick();
+  t.setNow(1060000); await t.tick();
   assert.equal(t.packets.length, 64);
   assert.equal(t.packets.flatMap(packet => packet.actions).length, 64);
   assert.equal(seconds(t, 'consume'), 320);
   assert.equal(new Set(t.packets.map(packet => packet.id)).size, 64);
-  t.setNow(1005000); await t.tick();
+  t.setNow(1065000); await t.tick();
   assert.equal(t.packets.length, 64, 'input during the pause cannot backfill after recovery');
-  t.input(); t.setNow(1010000); await t.tick();
+  t.input(); t.setNow(1070000); await t.tick();
   assert.equal(seconds(t, 'consume'), 325);
 });
 

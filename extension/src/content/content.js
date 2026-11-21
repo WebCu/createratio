@@ -144,7 +144,7 @@
     if (stopped) return;
     settle();
     queuePacket();
-    void pump();
+    if (!syncPending || performance.now() >= syncRetryAt) void pump();
   }
   function counted(button) {
     const now = performance.now();
@@ -176,6 +176,7 @@
   listen(window, 'pagehide', () => {
     settle(); pageActive = false; lastInput = -Infinity;
     boundary();
+    if (outbox.length) void pump();
   });
   listen(window, 'pageshow', () => {
     lastSample = performance.now(); pageActive = true;

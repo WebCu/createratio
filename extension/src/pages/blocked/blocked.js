@@ -37,12 +37,14 @@ function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
   const waiting = !active && access.readyAt > 0;
+  const waitMinutes = access.waitSeconds / 60;
+  const waitDuration = `${waitMinutes} minute${waitMinutes === 1 ? '' : 's'}`;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
-  $('wait-step').textContent = `Pause for ${access.waitSeconds} seconds.`;
-  $('begin').textContent = `Start the ${access.waitSeconds}-second wait`;
-  $('reason-requirement').textContent = `${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters. A little clarity, then ${access.waitSeconds} seconds to pause.`;
+  $('wait-step').textContent = `Pause for ${waitDuration}.`;
+  $('begin').textContent = `Start the ${waitMinutes}-minute wait`;
+  $('reason-requirement').textContent = `${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters. A little clarity, then ${waitDuration} to pause.`;
   $('session-step').textContent = `Open a ${access.sessionMinutes}-minute session.`;
-  $('heading').textContent = active ? `${access.name} is open.` : blockedLine.replace('{wait}', access.waitSeconds === 60 ? 'a minute' : `${access.waitSeconds / 60} minutes`);
+  $('heading').textContent = active ? `${access.name} is open.` : blockedLine.replace('{wait}', waitMinutes === 1 ? 'a minute' : waitDuration);
   $('access-steps').hidden = active;
   const stateText = access.goalAllowed ? 'Above your daily goal' : active ? 'Temporary access' : 'Blocked by default';
   if ($('state-text').textContent !== stateText) $('state-text').textContent = stateText;

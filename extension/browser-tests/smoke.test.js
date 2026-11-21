@@ -187,7 +187,7 @@ test('built Chromium extension: access gates and history controls', async t => {
       assert.equal(browser.documents.length, served, 'expiry removes DNR allow rule');
       console.log('Expiry tracer: synthetic budget + controlled Date clock; production guard/worker revoke actual navigation');
     });
-    await journey('cancel/confirm Clear history updates dashboard and actual downloaded CSV, preserving settings, access and intentions', async () => {
+    await journey('cancel/confirm Clear history updates dashboard and actual downloaded CSV, preserving settings, timed access and intentions', async () => {
       const settings = await browser.page(browser.origin + '/settings.html');
       await eventually(() => visible(settings, '#accessMinutes-default'), 'Settings rendered');
       const date = await inspect(settings, 'new Date().toLocaleDateString("en-CA")');
@@ -260,6 +260,7 @@ test('built Chromium extension: access gates and history controls', async t => {
           await eventually(() => dialog, 'native Clear history confirmation');
           assert.equal(dialog.type, 'confirm');
           assert.match(dialog.message, /Delete all recorded activity and website time.*cannot be undone/);
+          assert.match(dialog.message, /sites open only through Above-goal access will be blocked again/);
           await cdp.send('Page.handleJavaScriptDialog', { accept }, settings.session);
           await clicking;
         } finally { remove(); }
@@ -272,7 +273,7 @@ test('built Chromium extension: access gates and history controls', async t => {
       await keptIntentions();
       await exported(true);
       await clear(true);
-      await expectText(settings, '#save-status', 'History cleared. Your settings and site access boundaries are unchanged.');
+      await expectText(settings, '#save-status', 'History cleared and creation score reset. Sites open only through Above-goal access are blocked again. Timed access sessions are unchanged.');
       await ratio(false);
       await websites(false);
       await keptIntentions();

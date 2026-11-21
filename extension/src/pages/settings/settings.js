@@ -7,6 +7,7 @@ const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site
 let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, refreshPending = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
 let scrollEditing = false, scrollPending = null, scrollSaving = null;
 let saveDismissTimer = null, saveCleanupTimer = null;
+let historyVersion = 0;
 function clearSaved() {
   clearTimeout(saveDismissTimer); clearTimeout(saveCleanupTimer);
   saveDismissTimer = saveCleanupTimer = null;
@@ -37,6 +38,7 @@ function createAccessField(site) {
   const savedOption = option('', ''); savedOption.hidden = true;
   option('custom', 'Custom…');
   input.addEventListener('change', () => saveAccessDuration(site.id)); line.append(input);
+  input.addEventListener('blur', () => renderSite(siteControls.get(site.id), currentSettings, site.id + ':access'));
   let reset = null;
   if (site.id) {
     reset = document.createElement('button'); reset.type = 'button'; reset.className = 'duration-reset'; reset.id = 'access-reset-' + site.id;
@@ -301,14 +303,23 @@ scrollSlider.addEventListener('blur', () => { scrollEditing = false; renderScrol
 $('scroll-friction-enabled').addEventListener('change', saveScrollSettings);
 $('website-time-enabled').addEventListener('change', async () => {
   const enabled = $('website-time-enabled').checked;
+  let permissionGranted = false;
   websiteSettingBusy = true; $('website-time-enabled').disabled = true;
   try {
-    if (enabled && !await extensionAPI.permissions.request(WebTime.PERMISSIONS)) throw new Error('Permission declined. Website time remains off.');
+    if (enabled) {
+      permissionGranted = await extensionAPI.permissions.request(WebTime.PERMISSIONS);
+      if (!permissionGranted) throw new Error('Permission declined. Website time remains off.');
+    }
     const result = await messages.send({ type: 'website-time-setting', enabled }, 'Unable to change website time.');
     websiteTimeEnabled = result.enabled;
     if (!enabled) await extensionAPI.permissions.remove(WebTime.PERMISSIONS);
     saved(`Website time ${enabled ? 'enabled' : 'disabled'}. Separate from your creation score.`);
-  } catch (e) { error(e.message); }
+  } catch (e) {
+    if (permissionGranted) {
+      try { await extensionAPI.permissions.remove(WebTime.PERMISSIONS); } catch {}
+    }
+    error(e.message);
+  }
   finally { websiteSettingBusy = false; $('website-time-enabled').checked = websiteTimeEnabled; $('website-time-enabled').disabled = false; void refresh(); }
 });
 $('allow-above-goal').addEventListener('change', async () => {
@@ -332,9 +343,11 @@ $('intention-history-enabled').addEventListener('change', async () => {
 });
 /** @param {HistoryKind} kind */
 async function exportHistory(kind, button) {
+  const version = historyVersion;
   button.disabled = true;
   try {
     const result = await messages.send({ type: 'history', kind, range: 'month' }, 'Unable to export history.');
+    if (version !== historyVersion) throw new Error('History changed while loading. Please try again.');
     const csv = kind === 'ratio' ? C3.csv(result.days) : WebTime.csv(result.days);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
@@ -346,13 +359,16 @@ async function exportHistory(kind, button) {
 $('export-ratio').addEventListener('click', () => exportHistory('ratio', $('export-ratio')));
 $('export-websites').addEventListener('click', () => exportHistory('websites', $('export-websites')));
 $('clear-history').addEventListener('click', async () => {
-  if (!confirm('Delete all recorded activity and website time? This cannot be undone. Export CSV files first if you want a backup.')) return;
+  if (!confirm('Delete all recorded activity and website time? This cannot be undone. Your creation score will reset, and sites open only through Above-goal access will be blocked again. Export CSV files first if you want a backup.')) return;
   $('clear-history').disabled = true;
   try {
     await messages.send({ type: 'clear-history' }, 'Unable to clear history.');
-    saved('History cleared. Your settings and site access boundaries are unchanged.');
+    saved('History cleared and creation score reset. Sites open only through Above-goal access are blocked again. Timed access sessions are unchanged.');
   } catch (e) { error(e.message); } finally { $('clear-history').disabled = false; }
 });
-extensionAPI.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
+extensionAPI.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) historyVersion++;
+  if (RuntimeMessages.shouldRefresh(changes, area)) void refresh();
+});
 addEventListener('focus', refresh);
 void refresh();
