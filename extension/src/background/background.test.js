@@ -244,6 +244,43 @@ test('goal-based access pauses an existing timed budget and resumes it below the
   assert.equal(rulesFor(w).length, 1);
 });
 
+test('cancelling a ready wait during goal-based access clears the wait but keeps goal access', async () => {
+  const w = worker({ [C.localDate()]: { x: { posts: 1 } } });
+  const goal = { type: 'access-goal-setting' };
+  await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+  w.advance(3600000);
+  const { access } = await w.send({ ...goal, enabled: true }, popupSender);
+  assert.equal(access.x.goalAllowed, true);
+  assert.ok(access.x.readyAt > 0);
+  const cancelled = await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
+  assert.equal(cancelled.access.x.goalAllowed, true);
+  assert.equal(cancelled.access.x.readyAt, 0);
+  assert.ok(rulesFor(w).length > 0);
+  assert.equal((await w.send({ ...goal, enabled: false }, popupSender)).access.x.readyAt, 0);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+});
+
+test('a stale wait cancellation during goal-based access does not prevent midnight refill', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const w = worker({}, 'chrome', midnight - 3600000);
+  await unlock(w);
+  w.activate('https://x.com/home');
+  await w.send({ type: 'access-status' });
+  w.advance(300000);
+  const expired = await w.send({ type: 'access-status' });
+  assert.equal(expired.access.x.remainingMs, 0);
+  assert.equal(expired.access.x.readyAt, 0);
+  w.data[C.localDate(new Date(w.now))] = { x: { posts: 1 } };
+  await w.send({ type: 'access-goal-setting', enabled: true }, popupSender);
+  const cancelled = await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
+  assert.equal(cancelled.access.x.goalAllowed, true);
+  w.advance(midnight - w.now);
+  const refilled = await w.send({ type: 'access-status' });
+  assert.equal(refilled.access.x.goalAllowed, false);
+  assert.equal(refilled.access.x.remainingMs, 300000);
+  assert.equal(refilled.access.x.refilledAt, midnight);
+});
+
 test('intention history is opt-in, saves accepted requests once, and survives restart', async () => {
   for (const browser of ['chrome', 'browser']) {
     const w = worker({}, browser), settingsPage = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };
@@ -430,16 +467,6 @@ test('concurrent gates share a wait and repeated opens cannot extend a session',
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).access.x.remainingMs, 280000);
   assert.equal((await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'))).access.x.remainingMs, 280000);
 });
-test('wait survives a worker restart but abandoned requests expire', async () => {
-  const first = worker();
-  await first.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-  const restarted = worker(first.data, 'chrome', first.now + 60000);
-  assert.equal((await restarted.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
-  const abandoned = worker();
-  await abandoned.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-  abandoned.advance(660000);
-  assert.equal((await abandoned.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
-});
 test('expiry revokes access and redirects all matching open tabs, not unrelated sites', async () => {
   const w = worker(); await unlock(w);
   w.tabs.push({ id: 1, url: 'https://x.com/compose/post' }, { id: 2, url: 'http://mobile.twitter.com/home' }, { id: 3, url: 'https://x.com.evil.test/home' }, { id: 4, url: 'https://www.linkedin.com/feed/' });
@@ -482,7 +509,8 @@ test('both sites have independent sessions and ending one does not end the other
 });
 test('cancelling a wait forces a new full wait', async () => {
   const w = worker();
-  await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x')); w.advance(60000);
+  await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x')); w.advance(3600000);
+  assert.ok((await w.send({ type: 'access-status' })).access.x.readyAt > 0);
   await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
   const result = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));

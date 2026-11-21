@@ -8,7 +8,7 @@ const WebTime = require('../background/web-time.js');
 const C3Sites = require('../../sites/index.js');
 function accessState(site, changes = {}, catalog = C3Sites) {
   const definition = catalog.get(site);
-  return { site, name: definition.name, home: definition.access.home, enabled: true, goalAllowed: false, remainingMs: 0, expiresAt: 0, readyAt: 0, requestExpiresAt: 0, sessionMinutes: 5, ...changes };
+  return { site, name: definition.name, home: definition.access.home, enabled: true, goalAllowed: false, remainingMs: 0, expiresAt: 0, readyAt: 0, sessionMinutes: 5, ...changes };
 }
 function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enabled = false, options = {}) {
   class Clock extends Date {

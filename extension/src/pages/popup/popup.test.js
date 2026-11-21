@@ -81,7 +81,23 @@ test('popup opens a goal-allowed site directly rather than offering request or e
   assert.equal(p.messages.some(m => m.type === 'access-end'), false);
   p.state.access.x = { ...p.state.access.x, remainingMs: 60000, refilledAt: Date.now() };
   p.change(); await p.ready();
-  assert.equal(row.children[0].children.length, 2, 'goal-based access does not show a timed-session refill');
+  assert.equal(row.children[0].children.length, 3, 'goal-based access does not show a timed-session refill');
+  assert.equal(row.children[0].children[2].hidden, true, 'without a pending wait there is nothing to manage');
+});
+
+test('popup links to the pending wait without replacing direct goal-based access', async () => {
+  const p = page('popup'); await p.ready();
+  p.state.access = { x: accessState('x', { goalAllowed: true, readyAt: 1000 }) };
+  p.change(); await p.ready(); const [label, button] = p.nodes['access-sites'].children[0].children;
+  const link = label.children[2];
+  assert.equal(link.hidden, false);
+  assert.equal(link.href, 'chrome-extension://test/blocked.html?site=x');
+  assert.equal(link.target, '_blank');
+  assert.equal(link.attributes['aria-label'], 'Manage pending wait for X');
+  await button.fire('click');
+  assert.equal(p.state.tabs[0].url, 'https://x.com/home');
+  p.state.access.x.readyAt = 0; p.change(); await p.ready();
+  assert.equal(link.hidden, true);
 });
 
 test('popup animates a daily refill once without replacing the countdown or access button', async () => {
@@ -89,13 +105,13 @@ test('popup animates a daily refill once without replacing the countdown or acce
   p.state.access = { x: accessState('x', { remainingMs: 300000, refilledAt: Date.now() }) };
   p.change(); await p.ready();
   const row = p.nodes['access-sites'].children[0], label = row.children[0];
-  const notice = label.children[2], button = row.children[1];
+  const notice = label.lastChild, button = row.children[1];
   assert.equal(notice.children[0].textContent, 'Time refilled');
   assert.equal(label.children[1].textContent, '5:00 left · paused');
   p.refresh(); await p.ready();
-  assert.equal(label.children[2], notice); assert.equal(row.children[1], button);
+  assert.equal(label.lastChild, notice); assert.equal(row.children[1], button);
   await button.fire('click'); await p.ready();
-  assert.equal(label.children.length, 2); assert.equal(button.textContent, 'Request access');
+  assert.equal(label.children.length, 3); assert.equal(button.textContent, 'Request access');
 });
 test('popup exposes all access actions without session-time editing', async () => {
   const p = page('popup'); await p.ready();
