@@ -13,7 +13,7 @@ function page(options = {}) {
   const site = options.site || 'x';
   let now = options.now || 0, fail = !!options.fail, access = accessState(site);
   const elements = {}, intervals = {}, sent = [], redirects = [], pending = new Set();
-  const document = { body: { id: '', tagName: 'BODY', focus() { document.activeElement = this; } }, getElementById: id => elements[id], createElement: element };
+  const document = { addEventListener() {}, body: { id: '', tagName: 'BODY', focus() { document.activeElement = this; } }, getElementById: id => elements[id], createElement: element };
   document.activeElement = document.body;
   const panels = { reason: 'request', begin: 'request', 'waiting-title': 'waiting', open: 'waiting', cancel: 'waiting', 'active-title': 'active', return: 'active', 'cancel-pending': 'active', end: 'active' };
   for (const [, id] of fs.readFileSync(path.join(__dirname, 'blocked.html'), 'utf8').matchAll(/id="([^"]+)"/g)) {

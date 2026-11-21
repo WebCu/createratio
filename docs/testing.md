@@ -188,6 +188,26 @@ processes, missing/inaccessible counters and unsupported platforms are distinct.
 Unavailable values are null, never false zero or a lifecycle failure. Process
 memory is not worker-isolate-only memory, and worker exit is not zero extension RAM.
 
+### Hidden blocked-gate worker comparison
+
+```sh
+CHROMIUM_PATH=/path/to/chrome CHROMIUM_NO_SANDBOX=1 node bin/blocked-lifecycle-profile.mjs /tmp/baseline/dist/chrome dist/chrome /path/outside/repo/blocked-profile.json
+```
+
+The shared runner alternates three fresh profiles per build. One blocked X gate
+has no pending wait or access session, Website time stays off, and a neutral tab
+is foregrounded. Every debugger session is detached for 60 seconds; browser-level
+target polling records worker presence every 250 ms. A page-local counter records
+outgoing access-status sends without worker probes. After observation, the same
+gate must refresh within 1.5 seconds of returning and display its current blocked
+state. Scheduled alarms stay enabled; their schedules and page-observed alarm
+events are reported separately, not attributed to periodic polling. JSON retains
+raw observations and bundle/workload fingerprints; the command prints per-run
+lifetime, alive-sample fraction, hidden/return sends and synchronization results.
+Use a new output path outside Git. This measures lifecycle behavior, not RAM or
+an exact cross-platform shutdown deadline; maintainer resource acceptance remains
+separate.
+
 ### Settings-control resource comparison
 
 ```sh

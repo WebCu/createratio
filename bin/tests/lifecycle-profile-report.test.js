@@ -75,3 +75,54 @@ test('tracker report refuses attached-debugger, short-window, missing-recovery a
     report => { report.runs[0].idle.idleMemory.privateBytes = 0; }
   ]) { const report = fixture('trackers'); mutate(report); assert.throws(() => validateLifecycleProfile(report)); }
 });
+
+function blockedFixture() {
+  const report = fixture();
+  report.workload = 'blocked';
+  for (const run of report.runs) {
+    Object.assign(run, {
+      workload: 'blocked', idleMs: 60000,
+      observations: [{ elapsedMs: 0, targetId: 'worker', attached: false }, { elapsedMs: 30000, targetId: null, attached: false }, { elapsedMs: 60000, targetId: null, attached: false }],
+      continuousLifetimeMs: 30000, aliveSamplesFraction: 1 / 3,
+      hiddenSends: 0, returnSends: 1, returnSyncMs: 50, synced: true, sameDocument: true,
+      scheduledAlarms: [], alarmWakes: [], alarmsAfter: []
+    });
+  }
+  return report;
+}
+
+test('blocked reports retain empty alarm inventories and whole-window lifetimes', async () => {
+  const { renderLifecycleProfile } = await import('../lifecycle-profile-report.mjs');
+  const report = blockedFixture();
+  for (const run of report.runs.filter(run => run.variant === 'baseline')) {
+    run.observations.forEach(point => { point.targetId = 'worker'; });
+    run.continuousLifetimeMs = null; run.aliveSamplesFraction = 1; run.hiddenSends = 12;
+    run.scheduledAlarms = [{ name: 'scheduled', scheduledTime: 1000 }];
+    run.alarmWakes = [{ name: 'scheduled', scheduledTime: 1000, observedAt: 1001 }];
+  }
+  const rendered = renderLifecycleProfile(report);
+  assert.match(rendered, /alive whole window/);
+  assert.match(rendered, /\| candidate\/1 \| 30.000 \| 0.333 \| 0 \| 1 \| yes \| 0 \|/);
+  assert.match(rendered, /not proof that the alarm caused a wake/);
+});
+
+test('blocked reports reject incomplete observations, invented counts and failed synchronization', async () => {
+  const { validateLifecycleProfile } = await import('../lifecycle-profile-report.mjs');
+  for (const mutate of [
+    run => { run.observations = []; },
+    run => { run.observations[0].attached = true; },
+    run => { run.observations.at(-1).elapsedMs = 59000; },
+    run => { run.continuousLifetimeMs = null; },
+    run => { run.aliveSamplesFraction = 1; },
+    run => { run.hiddenSends = -1; },
+    run => { run.returnSends = 0; },
+    run => { run.returnSyncMs = 2000; },
+    run => { run.synced = false; },
+    run => { run.sameDocument = false; },
+    run => { delete run.scheduledAlarms; },
+    run => { run.alarmWakes = [{ name: 'missing-time' }]; }
+  ]) {
+    const report = blockedFixture(); mutate(report.runs[0]);
+    assert.throws(() => validateLifecycleProfile(report));
+  }
+});
