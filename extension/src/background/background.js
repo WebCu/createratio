@@ -56,22 +56,6 @@ async function packetBatch() {
   const stored = await extensionAPI.storage.local.get(['_historyGeneration', '_receipts']);
   return { generation: stored._historyGeneration ?? null, receipts: new Set(stored._receipts || []) };
 }
-async function retryDrains() {
-  const stored = await extensionAPI.storage.session.get('_drainRetries');
-  const pending = stored._drainRetries || [], remaining = pending.slice(C3.DELIVERY_LIMITS.maxPackets);
-  const batch = pending.length ? await packetBatch() : null;
-  for (const entry of pending.slice(0, C3.DELIVERY_LIMITS.maxPackets)) {
-    const { packet, sender } = entry;
-    try { await recordPacket(packet, sender, { [packet.site]: { enabled: false } }, batch); }
-    catch (error) { if (!error.expected) remaining.push(entry); }
-  }
-  if (pending.length) {
-    const current = await extensionAPI.storage.local.get('_historyGeneration');
-    await extensionAPI.storage.session.set({ _drainRetries: remaining.map(entry => (entry.packet.generation ?? null) === batch.generation ? { ...entry, packet: { ...entry.packet, generation: current._historyGeneration ?? null } } : entry) });
-  }
-  if (remaining.length) await extensionAPI.alarms.create('drain-retry', { delayInMinutes: 0.5 });
-  else await extensionAPI.alarms.clear('drain-retry');
-}
 async function drainTracker(tab) {
   const batch = await packetBatch();
   let timer, response;
@@ -86,22 +70,11 @@ async function drainTracker(tab) {
   const site = SiteAccess.siteForURL(tab.url);
   const sender = { id: extensionAPI.runtime.id, tab: { id: tab.id }, frameId: 0, url: new URL(tab.url).origin + '/' };
   const write = drainWrites.then(async () => {
-    const failed = [];
     for (const packet of response.packets) {
       if (batch.receipts.has(packet?.id)) continue;
       try { await recordPacket(packet, sender, { [site]: { enabled: false } }, batch); }
       catch (error) {
-        if (!error.expected && (packet.generation ?? null) === batch.generation) failed.push(packet);
-      }
-    }
-    if (failed.length) {
-      const current = await extensionAPI.storage.local.get('_historyGeneration');
-      for (const item of failed) {
-        const packet = { ...item, generation: current._historyGeneration ?? null };
-        const stored = await extensionAPI.storage.session.get('_drainRetries');
-        const pending = (stored._drainRetries || []).filter(entry => entry.packet.id !== packet.id || entry.packet.site !== packet.site || (entry.packet.generation ?? null) !== (packet.generation ?? null));
-        await extensionAPI.storage.session.set({ _drainRetries: [...pending.slice(1 - C3.DELIVERY_LIMITS.maxPackets), { packet, sender }] });
-        await extensionAPI.alarms.create('drain-retry', { delayInMinutes: 0.5 });
+        if (!error.expected) console.warn('CreateRatio: unable to save drained activity.', error.message);
       }
     }
   });
@@ -169,7 +142,6 @@ async function initialize() {
 extensionAPI.runtime.onInstalled.addListener(details => { updates.installed(details, serialized(initialize)).catch(console.error); });
 extensionAPI.runtime.onStartup.addListener(() => { serialized(initialize).catch(console.error); });
 extensionAPI.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === 'drain-retry') serialized(retryDrains).catch(console.error);
   if (alarm.name === 'extension-update') void updates.attempt().catch(console.error);
   if (alarm.name === 'daily-badge') serialized(snapshot).catch(console.error);
   if (alarm.name === 'website-time') serialized(() => websiteTime.tick(alarm)).catch(console.error);
@@ -187,4 +159,4 @@ extensionAPI.tabs.onActivated?.addListener(refreshAccess);
 extensionAPI.tabs.onRemoved?.addListener(refreshAccess);
 extensionAPI.tabs.onUpdated?.addListener((_, change) => { if (change.url || change.status) refreshAccess(); });
 extensionAPI.windows.onFocusChanged.addListener(refreshAccess);
-serialized(async () => { await history.prepare(); await retryDrains(); await SiteAccess.reconcile(true); await websiteTime.start(); }).then(() => updates.start()).catch(console.error);
+serialized(async () => { await history.prepare(); await SiteAccess.reconcile(true); await websiteTime.start(); }).then(() => updates.start()).catch(console.error);

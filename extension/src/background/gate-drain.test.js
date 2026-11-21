@@ -133,7 +133,7 @@ for (const correction of [-3600000, -1500]) test(`backward clock correction pres
   assert.ok(w.data._accessWindows.reddit.every(window => window.end > window.start));
 });
 
-for (const recovery of ['alarm', 'restart', 'reset']) test(`failed drained history writes survive navigation until ${recovery}`, async () => {
+test('a failed drained history write cannot prevent gate navigation or create retry state', async () => {
   const session = { _accessInitialized: true };
   const packet = { type: 'ingest', id: 'failed-drain', site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] };
   const w = worker({ _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } } }, 'chrome', start, {
@@ -146,39 +146,7 @@ for (const recovery of ['alarm', 'restart', 'reset']) test(`failed drained histo
   assert.equal((await w.send({ type: 'snapshot' })).ok, true);
   assert.equal(w.tabs[0].url.endsWith('blocked.html?site=reddit'), true);
   assert.equal(w.data[date], undefined);
-  if (recovery === 'alarm') {
-    w.failWrites = true; w.alarm('drain-retry');
-    await w.send({ type: 'snapshot' });
-    assert.equal(w.data[date], undefined);
-    assert.equal(session._drainRetries.length, 1);
-    w.failWrites = false;
-  }
-  if (recovery === 'reset') await w.send({ type: 'clear-history' }, popupSender);
-  const recovered = recovery === 'restart' ? worker(w.data, 'chrome', w.now, { session }) : w;
-  recovered.alarm('drain-retry');
-  await recovered.send({ type: 'snapshot' });
-  assert.equal(recovered.data[date]?.reddit?.consumeSec || 0, recovery === 'reset' ? 0 : 1);
-  recovered.alarm('drain-retry');
-  await recovered.send({ type: 'snapshot' });
-  assert.equal(recovered.data[date]?.reddit?.consumeSec || 0, recovery === 'reset' ? 0 : 1);
-  assert.equal(session._drainRetries.length, 0);
-});
-
-test('drain retries process bounded batches and discard terminal validation refusals', async () => {
-  const count = C.DELIVERY_LIMITS.maxPackets + 1;
-  const session = { _accessInitialized: true, _drainRetries: [] };
-  for (let n = 0; n < count; n++) session._drainRetries.push({
-    sender,
-    packet: { type: 'ingest', id: 'retry-' + n, site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] }
-  });
-  session._drainRetries.push({ sender, packet: { type: 'ingest', site: 'reddit', id: 'invalid', segments: [{}], actions: [] } });
-  const w = worker({ _accessWindows: { reddit: [{ start, end: start + 1000 }] } }, 'chrome', start + 1100, { session });
-  await w.send({ type: 'snapshot' });
-  assert.equal(w.data[date].reddit.consumeSec, C.DELIVERY_LIMITS.maxPackets);
-  assert.equal(session._drainRetries.length, 2);
-  w.alarm('drain-retry'); await w.send({ type: 'snapshot' });
-  assert.equal(w.data[date].reddit.consumeSec, count);
-  assert.equal(session._drainRetries.length, 0);
+  assert.equal(Object.keys(session).some(key => key.startsWith('_drain')), false);
   assert.equal(w.alarms['drain-retry'], undefined);
 });
 
@@ -197,60 +165,6 @@ test('a drain records its entire admitted generation across receipt rollover wit
   assert.notEqual(w.data._historyGeneration, generation);
   for (const packet of packets) await w.send(packet, sender);
   assert.equal(w.data[date].reddit.consumeSec, 3);
-});
-
-test('drain retry retention caps the total across tabs by retiring the oldest packets', async () => {
-  const session = { _accessInitialized: true }, limit = C.DELIVERY_LIMITS.maxPackets;
-  const w = worker({ _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } } }, 'chrome', start, {
-    session,
-    sendTabMessage(id) {
-      w.failWrites = true;
-      return { packets: Array.from({ length: limit }, (_, n) => ({ type: 'ingest', id: `tab-${id}-${n}`, site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] })) };
-    }
-  });
-  w.activate(url); await w.send({ type: 'snapshot' });
-  w.tabs.push({ id: 1, url }, { id: 2, url }); w.advance(1100);
-  await w.send({ type: 'snapshot' }); w.failWrites = false;
-  const retained = session._drainRetries;
-  assert.equal(retained.length, limit);
-  assert.ok(retained.every(({ packet }) => packet.id.startsWith('tab-2-')));
-  w.alarm('drain-retry'); await w.send({ type: 'snapshot' });
-  assert.equal(w.data[date].reddit.consumeSec, limit);
-});
-
-for (const failure of [false, true]) test(`receipt rollover preserves the retry batch with an initial write failure: ${failure}`, async () => {
-  const generation = 'recognized-window', session = { _accessInitialized: true };
-  const packets = ['first', 'second', 'third'].map(id => ({ type: 'ingest', id, generation, site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] }));
-  const data = {
-    _historyGeneration: generation,
-    _receipts: Array.from({ length: C.DELIVERY_LIMITS.receiptLimit - 1 }, (_, n) => 'known-' + n),
-    _accessWindows: { reddit: [{ start, end: start + 1000 }] },
-    ...(failure ? { _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } } } : {})
-  };
-  let failNext = false;
-  if (!failure) session._drainRetries = packets.map(packet => ({ packet, sender }));
-  const w = worker(data, 'chrome', start, {
-    session,
-    localStorage: {
-      async get(keys) { return Object.fromEntries((keys === null ? Object.keys(data) : Array.isArray(keys) ? keys : [keys]).filter(key => Object.hasOwn(data, key)).map(key => [key, structuredClone(data[key])])); },
-      async set(values) {
-        if (failNext && Object.hasOwn(values, date)) { failNext = false; throw new Error('Transient history failure'); }
-        Object.assign(data, structuredClone(values));
-      },
-      async remove(keys) { for (const key of Array.isArray(keys) ? keys : [keys]) delete data[key]; }
-    },
-    sendTabMessage() { failNext = true; return { packets }; }
-  });
-  w.activate(url); await w.send({ type: 'snapshot' });
-  if (failure) {
-    w.tabs.push({ id: 1, url }); w.advance(1100);
-    await w.send({ type: 'snapshot' });
-    assert.equal(data[date].reddit.consumeSec, 2);
-    w.alarm('drain-retry'); await w.send({ type: 'snapshot' });
-  }
-  assert.equal(data[date].reddit.consumeSec, 3);
-  for (const packet of packets) await w.send(packet, sender);
-  assert.equal(data[date].reddit.consumeSec, 3);
 });
 
 test('concurrent drains admit their generation before a slower tab responds', async () => {

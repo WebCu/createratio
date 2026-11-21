@@ -67,7 +67,8 @@ const SiteAccess = (() => {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
     const tabs = await api.tabs.query({ url: patterns });
     const navigated = await Promise.all(tabs.filter(tab => siteForURL(tab.url) === site).map(async tab => {
-      await beforeNavigate(tab);
+      try { await beforeNavigate(tab); }
+      catch (error) { console.warn('CreateRatio: unable to drain tracker.', error.message); }
       try { await api.tabs.update(tab.id, { url: gateURL(site) }); return tab.id; }
       catch (_) { return null; }
     }));
