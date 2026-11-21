@@ -19,6 +19,20 @@ test('continuous fractional samples coalesce into one segment and packet', async
   assert.equal(segment.sec, 5);
   assert.equal(segment.end - segment.start, segment.sec * 1000);
 });
+test('wall clock corrections re-anchor active intervals without coalescing across the jump', async () => {
+  for (const jump of [3600000, -3600000]) {
+    const options = {}, t = await tracker('chrome', options);
+    t.input(); t.setNow(1000); t.input();
+    options.wallOffset = jump;
+    t.setNow(2000); t.input();
+    t.setNow(5000); await t.tick();
+    const segments = t.packets.flatMap(packet => packet.segments);
+    assert.equal(segments.length, 2);
+    assert.equal(segments[1].start, segments[0].end + jump);
+    assert.equal(segments[1].sec, 4);
+    assert.equal(segments[1].end - segments[1].start, segments[1].sec * 1000);
+  }
+});
 test('expiry refresh queues the final partial interval before resetting tracking', async () => {
   const t = await tracker();
   t.input(); t.setNow(2000);

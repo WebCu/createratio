@@ -9,7 +9,7 @@
   let scrollFrictionEnabled = false, scrollSpeed = 1;
   const session = crypto.randomUUID();
   let sequence = 0, lastSample = performance.now(), lastInput = -Infinity;
-  const wallOffset = Date.now() - lastSample;
+  let wallOffset = Date.now() - lastSample;
   let enabled = false, mode = 'neutral';
   let wasVisible = document.visibilityState === 'visible', wasFocused = document.hasFocus();
   let segments = [], actions = [], outbox = [], delivery = null, stopped = false, pageActive = true, updating = false;
@@ -50,6 +50,8 @@
   }
   function settle() {
     const now = performance.now();
+    const wallNow = Date.now();
+    if (Math.abs(wallNow - (wallOffset + now)) > 2) wallOffset = wallNow - now;
     const ms = recordingPaused ? 0 : C3.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
     if (ms > 0) {
       const activeEnd = Math.min(now, lastInput + 30000);

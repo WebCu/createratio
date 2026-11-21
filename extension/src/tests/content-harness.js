@@ -30,7 +30,7 @@ async function tracker(browser = 'chrome', options = {}) {
     ScrollFriction: require('../content/scroll-friction.js'),
     C3_DOM: require('../content/dom.js'), Element, getComputedStyle: node => ({ ...fixture.getComputedStyle(node), overflowY: node.style.overflowY || 'visible', overflowX: node.style.overflowX || 'visible' }),
     document: doc, location, window: { addEventListener: listen, removeEventListener: unlisten },
-    crypto: { randomUUID: () => crypto.randomUUID() }, performance: { now: () => now }, Date: { now: () => base + now }, console: { ...console, warn(...args) { warnings.push(args); } },
+    crypto: { randomUUID: () => crypto.randomUUID() }, performance: { now: () => now }, Date: { now: () => base + now + (options.wallOffset || 0) }, console: { ...console, warn(...args) { warnings.push(args); } },
     MutationObserver: class { observe() {} disconnect() {} },
     setInterval(fn) { interval = fn; return 1; }, clearInterval() {}, setTimeout() { return 1; }, clearTimeout() {},
     [browser]: { runtime: { id: 'extension', onMessage: { addListener(fn) { runtimeListeners.add(fn); }, removeListener(fn) { runtimeListeners.delete(fn); } }, async sendMessage(message) {
