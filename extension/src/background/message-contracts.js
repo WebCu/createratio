@@ -18,6 +18,8 @@
     const pages = Object.fromEntries(['popup', 'settings', 'dashboard', 'blocked'].map(page => [page, runtime.getURL(page + '.html')]));
     const gate = new URL(pages.blocked);
     const gated = new Set(integrations.sites.filter(site => site.gated).map(site => site.id));
+    /** @param {chrome.runtime.MessageSender} sender
+     * @param {string[]} names */
     function topPage(sender, names) {
       return record(sender) && (sender.frameId === undefined || sender.frameId === 0) && names.some(name => sender.url === pages[name]);
     }
@@ -26,9 +28,12 @@
       if (!record(message) || typeof message.type !== 'string' || !message.type) throw refuse('Invalid message');
       return message;
     }
+    /** @param {IngestMessage} message
+     * @param {chrome.runtime.MessageSender} sender */
     function creationSender(message, sender) {
       return record(sender?.tab) && sender.frameId === 0 && core.siteForURL(sender.url) === message.site && core.SITES.some(site => site.id === message.site);
     }
+    /** @param {IngestMessage} message */
     function packet(message) {
       const limits = core.DELIVERY_LIMITS;
       const site = core.SITES.find(site => site.id === message.site);
@@ -43,9 +48,11 @@
         if (!record(action) || !core.validLocalDate(action.date) || !site.actions.includes(action.action)) throw refuse('Action not supported on this site');
       }
     }
+    /** @param {chrome.runtime.MessageSender} sender */
     function preferencesSender(sender) {
       if (!topPage(sender, ['popup', 'settings'])) throw refuse('Preferences must come from the extension settings page');
     }
+    /** @param {chrome.runtime.MessageSender} sender */
     function updateSender(sender) {
       if (topPage(sender, ['popup', 'settings', 'dashboard'])) return;
       let site;
@@ -76,19 +83,27 @@
         if (typeof message.enabled !== 'boolean') throw refuse('Invalid website tracking setting');
       }
     };
+    /** @param {PreferenceMessage} message
+     * @param {chrome.runtime.MessageSender} sender */
     function preferences(message, sender) {
       preferencesSender(sender);
       if (!member(preferenceRules, message.type)) throw refuse('Unknown preference command');
-      preferenceRules[message.type](message);
+      const rule = /** @type {(message: PreferenceMessage) => void} */ (preferenceRules[message.type]);
+      rule(message);
     }
+    /** @param {Extract<RuntimeMessage, { type: 'history' }>} message
+     * @param {chrome.runtime.MessageSender} sender */
     function history(message, sender) {
       const popupToday = topPage(sender, ['popup']) && message.kind === 'ratio' && message.range === 'today';
       if (!popupToday && !topPage(sender, ['dashboard', 'settings'])) throw refuse('History must come from an extension page');
       if (!member(HISTORY_KINDS, message.kind) || !member(HISTORY_RANGES, message.range)) throw refuse('Invalid history range');
     }
+    /** @param {chrome.runtime.MessageSender} sender */
     function intentions(sender) {
       if (!topPage(sender, ['dashboard'])) throw refuse('Manage intention history from the dashboard');
     }
+    /** @param {chrome.runtime.MessageSender} sender
+     * @param {string} site */
     function blocked(sender, site) {
       let url;
       if (record(sender) && typeof sender.url === 'string') {
@@ -96,6 +111,8 @@
       }
       if (!gated.has(site) || sender?.frameId !== 0 || !url || url.protocol !== gate.protocol || url.host !== gate.host || url.pathname !== gate.pathname || url.searchParams.get('site') !== site) throw refuse('Access requests must come from the blocked page');
     }
+    /** @param {AccessSessionMessage} message
+     * @param {chrome.runtime.MessageSender} sender */
     function session(message, sender) {
       if (message.type === 'access-end') {
         const popup = sender?.url === pages.popup;
