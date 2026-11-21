@@ -192,11 +192,11 @@ and messages.
    configurable from 1–240 minutes in Settings. Only the active tab in a focused
    browser window uses the budget; other sites remain blocked.
 
-Reloading does not reset the wait. Cancelling does; unconfirmed requests expire
-ten minutes after the wait finishes. The popup can end access early. Remaining
-budgets survive restarts and refill to the configured duration at local midnight,
-without accumulating. Never-opened sites stay blocked; manually ending a session
-cancels its daily refill.
+Reloading does not reset the wait. Once the wait finishes, the request stays
+ready until you confirm it, cancel it, or turn **Limit & track** off for that
+site. The popup can end access early. Remaining budgets survive restarts and
+refill to the configured duration at local midnight, without accumulating.
+Never-opened sites stay blocked; manually ending a session cancels its daily refill.
 
 **Save drafts before expiry:** open tabs redirect to the local blocked page.
 

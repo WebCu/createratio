@@ -19,7 +19,7 @@
     return object(states) && Object.entries(states).every(([site, state]) => object(state)
       && typeof state.enabled === 'boolean' && (state.goalAllowed === undefined || typeof state.goalAllowed === 'boolean')
       && typeof state.name === 'string' && home(site, state.home)
-      && ['remainingMs', 'expiresAt', 'readyAt', 'requestExpiresAt'].every(key => nonnegative(state[key]))
+      && ['remainingMs', 'expiresAt', 'readyAt'].every(key => nonnegative(state[key]))
       && Number.isInteger(state.sessionMinutes) && state.sessionMinutes > 0);
   }
   function history(days, kind) {
