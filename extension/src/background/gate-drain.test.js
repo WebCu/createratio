@@ -181,3 +181,20 @@ test('drain retries process bounded batches and discard terminal validation refu
   assert.equal(Object.keys(session).some(key => key.startsWith('_drainRetry:')), false);
   assert.equal(w.alarms['drain-retry'], undefined);
 });
+
+test('a drain records its entire admitted generation across receipt rollover without replaying duplicates', async () => {
+  const generation = 'recognized-window';
+  const packets = ['first', 'rollover', 'last', 'first', 'known-0'].map(id => ({ type: 'ingest', id, generation, site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] }));
+  const w = worker({
+    _historyGeneration: generation,
+    _receipts: Array.from({ length: C.DELIVERY_LIMITS.receiptLimit - 1 }, (_, n) => 'known-' + n),
+    _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } }
+  }, 'chrome', start, { session: { _accessInitialized: true }, sendTabMessage() { return { packets }; } });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  w.tabs.push({ id: 1, url }); w.advance(1100);
+  await w.send({ type: 'snapshot' });
+  assert.equal(w.data[date].reddit.consumeSec, 3);
+  assert.notEqual(w.data._historyGeneration, generation);
+  for (const packet of packets) await w.send(packet, sender);
+  assert.equal(w.data[date].reddit.consumeSec, 3);
+});
