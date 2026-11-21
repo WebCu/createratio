@@ -55,14 +55,19 @@
     }
     function schedule(task) { return serialize(task).catch(error => console.error('CreateRatio website time:', error)); }
     async function accrue(now) {
+      const hadPending = pending.length > 0;
       const old = previous; previous = null;
       if (old && typeof old.domain === 'string' && Number.isFinite(old.at) && now > old.at && now - old.at <= 75000 && pending.length < pendingLimit) {
         pending.push({ domain: old.domain, segments: core.splitInterval(old.at, now) });
       }
-      while (pending.length) {
-        const entry = pending[0];
-        await history.recordWebsiteTime(entry.domain, entry.segments);
-        pending.shift();
+      try {
+        while (pending.length) {
+          const entry = pending[0];
+          await history.recordWebsiteTime(entry.domain, entry.segments);
+          pending.shift();
+        }
+      } finally {
+        if (hadPending || pending.length) await checkpoint();
       }
     }
     async function sample(now) {

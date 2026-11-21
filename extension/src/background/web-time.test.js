@@ -172,6 +172,27 @@ test('website time retries only unsaved segments after a partial recovery', asyn
   assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 5, 'other.test': 15 });
 });
 
+test('failed disable checkpoints partial website time recovery before worker replacement', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  let writes = 0;
+  h.api.storage.local.set = async values => {
+    if (++writes === 2) throw new Error('Storage unavailable');
+    await set(values);
+  };
+  await assert.rejects(h.tracker.setEnabled(false), /Storage unavailable/);
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
+  h.api.storage.local.set = set;
+  const replacement = harness(h.data, h.session); replacement.advance(10000);
+  await replacement.tracker.start(); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 10);
+  replacement.advance(5000); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 15);
+});
+
 test('unfocused windows, idle/locked time, private tabs and browser pages never accrue', async () => {
   const h = harness(); await h.tracker.setEnabled(true);
   h.advance(2000); h.state.focused = false; h.api.windows.onFocusChanged.emit(-1); await h.drain();
