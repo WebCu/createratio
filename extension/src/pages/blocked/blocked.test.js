@@ -84,6 +84,46 @@ test('acknowledged cancel and end restore the cleared, enabled intention field',
   assert.equal(p.document.activeElement.id, 'reason');
 });
 
+test('invalid intention feedback survives a successful status refresh and clears on edit', async () => {
+  const p = page(); await p.flush();
+  const { reason, error, request, waiting } = p.elements;
+  const invalid = 'short' + ' '.repeat(20);
+  reason.value = invalid;
+  p.submit();
+  assert.equal(error.textContent, 'Write a specific intention of 20–280 characters.');
+  assert.equal(error.hidden, false);
+  assert.equal(p.sent.some(message => message.type === 'access-begin'), false);
+
+  await p.intervals[5000]();
+  assert.equal(p.sent.at(-1).type, 'access-status');
+  assert.equal(reason.value, invalid);
+  assert.equal(request.hidden, false);
+  assert.equal(waiting.hidden, true);
+  assert.equal(error.hidden, false, 'status success must not dismiss validation feedback');
+  assert.equal(error.textContent, 'Write a specific intention of 20–280 characters.');
+
+  reason.value = 'still short';
+  reason.events.input();
+  assert.equal(error.hidden, true);
+  assert.equal(error.textContent, '');
+});
+
+test('editing an invalid intention does not dismiss a pending status error', async () => {
+  const p = page(); await p.flush();
+  p.elements.reason.value = 'short' + ' '.repeat(20);
+  p.submit();
+  p.fail = true;
+  await p.intervals[5000]();
+  assert.equal(p.elements.error.textContent, 'Write a specific intention of 20–280 characters.');
+  p.elements.reason.value = 'still short';
+  p.elements.reason.events.input();
+  assert.equal(p.elements.error.textContent, 'Unable to check access.');
+  assert.equal(p.elements.error.hidden, false);
+  p.fail = false;
+  await p.intervals[5000]();
+  assert.equal(p.elements.error.hidden, true);
+});
+
 test('failed intention preserves input and restores actionable focus after re-enabling controls', async () => {
   const p = page(); await p.flush(); p.fail = true;
   const intention = 'Reply to Alex about our launch, then leave.';
