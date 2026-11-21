@@ -47,6 +47,11 @@ for (const pageName of ['dashboard', 'settings']) for (const kind of ['ratio', '
           await clearing;
         } finally { removeDialog(); }
         await eventually(() => inspect(settings, 'document.querySelector("#save-status").textContent.startsWith("History cleared.")'), 'history cleared');
+        if (pageName === 'dashboard') {
+          const total = kind === 'ratio' ? '#create-min' : '#website-total';
+          const empty = kind === 'ratio' ? '0.0m' : '0s';
+          await eventually(() => inspect(page, `document.querySelector('${total}').textContent === '${empty}'`), 'dashboard renders cleared history');
+        }
         await inspect(page, 'releaseExportHistory()');
         await eventually(() => inspect(page, 'document.querySelector("#error").textContent === "History changed while loading. Please try again."'), 'stale CSV rejected');
         assert.equal(downloads.length, 0);

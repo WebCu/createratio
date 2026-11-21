@@ -5,6 +5,18 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { page, C3 } = require('../../tests/ui-harness.js');
 for (const kind of ['ratio', 'websites']) {
+  test(`settings ${kind} CSV rejection survives a reset refresh that finishes later`, async () => {
+    const p = page('settings'); await p.ready();
+    const releaseExport = p.holdMessage('history');
+    const exporting = p.nodes['export-' + kind].fire('click'); await p.ready();
+    const releaseRefresh = p.holdMessage('snapshot');
+    p.change({ _historyReset: { oldValue: false, newValue: true } });
+    await p.ready(); releaseExport(); await exporting;
+    releaseRefresh(); await p.ready();
+    assert.equal(p.blobs.length, 0);
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    assert.equal(p.nodes.error.hidden, false);
+  });
   test(`settings ${kind} CSV survives receipt-window rollover`, async () => {
     const p = page('settings'); await p.ready();
     const button = p.nodes['export-' + kind];
