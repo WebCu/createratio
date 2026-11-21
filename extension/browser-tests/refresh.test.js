@@ -22,7 +22,7 @@ test('Default session reconciles after blur when another Settings tab saves', as
       await browser.cdp.send('Page.bringToFront', {}, a.session);
       await evaluate(browser, a.session, 'document.querySelector("#accessMinutes-default").blur()');
       assert.equal(await evaluate(browser, a.session, 'document.querySelector("#accessMinutes-default").value'), '15');
-      const inherited = await evaluate(browser, a.session, 'Array.from(document.querySelectorAll("#site-settings select"), input => ({ value: input.value, label: input.selectedOptions[0].textContent }))');
+      const inherited = await evaluate(browser, a.session, `Array.from(document.querySelectorAll('#site-settings select[id^="accessMinutes-site-"]'), input => ({ value: input.value, label: input.selectedOptions[0].textContent }))`);
       assert.ok(inherited.length > 0);
       for (const row of inherited) assert.deepEqual(row, { value: 'default', label: 'Default · 15 min' });
       assert.deepEqual(browser.errors, []);
