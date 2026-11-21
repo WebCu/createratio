@@ -72,6 +72,8 @@ function render() {
   if (active) $('active-time').textContent = access.goalAllowed ? 'Blocking returns at or below your current daily target, or on a new day, unless a timed session still has time left.' : `${remaining(access.expiresAt ? access.expiresAt - now : access.remainingMs)} remaining${access.expiresAt ? '' : ' · paused'}. All ${access.name} tabs will block again when time runs out.`;
   RefillAnimation.render($('active-countdown'), access.goalAllowed ? { ...access, remainingMs: 0 } : access);
 }
+/** @param {AccessSessionMessage['type']} type
+ * @param {{ reason?: string }} [extra] */
 async function send(type, extra = {}) {
   const result = await messages.send({ type, site, ...extra }, 'Unable to check access. The site stays blocked.');
   if (!result.access?.[site]) throw new Error('Open this page by visiting X or LinkedIn.');
@@ -79,6 +81,8 @@ async function send(type, extra = {}) {
   access = result.access[site];
   return access;
 }
+/** @param {AccessSessionMessage['type']} type
+ * @param {{ reason?: string }} [extra] */
 async function action(type, extra = {}, navigate = false) {
   if (busy) return;
   const previousRefill = access?.refilledAt || 0;

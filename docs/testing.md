@@ -423,6 +423,10 @@ test harnesses. Types come from inference and JSDoc annotations;
 `extension/types/globals.d.ts` declares the globals that classic scripts share in
 extension pages and the background worker, and the browser extension APIs, which
 stay untyped.
+`extension/types/messages.d.ts` types the runtime messages: `messages.send`
+accepts only `RuntimeMessage` shapes, and `message-contracts.js` keeps its
+allowed values in `Record<…, true>` tables, so a value missing from either side
+fails `pnpm check:types`. `bin/tests/message-types.test.js` covers both failures.
 The pre-commit hook checks staged whitespace, including newly added files.
 `pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
 paths, including skill-directory symlinks and files force-added while ignored.
