@@ -6,7 +6,8 @@
     "target": "es2023",
     "module": "preserve",
     "lib": ["es2023", "dom", "dom.iterable"],
-    "types": [],
+    "typeRoots": ["./node_modules/@types"],
+    "types": ["chrome"],
     "skipLibCheck": true,
     "strict": false,
     "moduleDetection": "force"

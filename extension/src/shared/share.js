@@ -1,8 +1,9 @@
+/** @param {typeof globalThis} root */
 (function (root) {
   'use strict';
   function mount({ messages, range, error }) {
-    /** @type {(id: string) => any} */
-    const $ = id => document.getElementById(id);
+    /** @type {(id: string) => HTMLInputElement} */
+    const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
     const button = $('share-create'), label = button.textContent;
     const expandable = button.hasAttribute('aria-expanded');
     let url = null, card = null, version = 0, copying = false;
@@ -16,7 +17,7 @@
       $('share-download').disabled = true; $('share-copy').disabled = true;
       $('share-status').textContent = '';
       if (expandable) button.setAttribute('aria-expanded', 'false');
-      if ($('share-caption-details')) $('share-caption-details').open = false;
+      if ($('share-caption-details')) /** @type {HTMLDetailsElement} */ (document.getElementById('share-caption-details')).open = false;
     }
     clear();
     button.addEventListener('click', async () => {
@@ -29,7 +30,7 @@
         const data = await messages.send({ type: 'history', kind: 'ratio', range: period }, 'Unable to create share card.');
         if (request !== version) return;
         if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
-        const next = SocialCard.create(data.days, period, now), canvas = $('share-preview');
+        const next = SocialCard.create(data.days, period, now), canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('share-preview'));
         SocialCard.draw(canvas, next);
         const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Unable to create the PNG. Please try again.')), 'image/png'));
         if (request !== version) return;
@@ -57,7 +58,7 @@
         if (request === version) $('share-status').textContent = 'Caption copied. Paste it alongside your image.';
       } catch (_) {
         if (request !== version) return;
-        if ($('share-caption-details')) $('share-caption-details').open = true;
+        if ($('share-caption-details')) /** @type {HTMLDetailsElement} */ (document.getElementById('share-caption-details')).open = true;
         $('share-caption').focus(); $('share-caption').select();
         $('share-status').textContent = 'Clipboard unavailable. The caption is selected; copy it manually.';
       } finally {

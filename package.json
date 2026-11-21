@@ -36,6 +36,7 @@
     "build:firefox": "node extension/build.js firefox"
   },
   "devDependencies": {
+    "@types/chrome": "0.3.7",
     "acorn": "8.19.0",
     "typescript": "6.0.3"
   }
