@@ -11,7 +11,9 @@
   let sequence = 0, lastSample = performance.now(), lastInput = -Infinity;
   let enabled = false, mode = 'neutral';
   let wasVisible = document.visibilityState === 'visible', wasFocused = document.hasFocus();
-  let segments = [], actions = [], outbox = [], delivery = null, stopped = false, pageActive = true, updating = false;
+  /** @type {IngestMessage[]} */
+  let outbox = [];
+  let segments = [], actions = [], delivery = null, stopped = false, pageActive = true, updating = false;
   const listeners = [];
   function listen(target, type, fn, options) { target.addEventListener(type, fn, options); listeners.push([target, type, fn, options]); }
   let adapter = null, failed = false;

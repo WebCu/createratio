@@ -330,6 +330,7 @@ $('intention-history-enabled').addEventListener('change', async () => {
   } catch (e) { error(e.message); }
   finally { intentionSettingBusy = false; void refresh(); }
 });
+/** @param {HistoryKind} kind */
 async function exportHistory(kind, button) {
   button.disabled = true;
   try {

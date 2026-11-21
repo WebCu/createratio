@@ -128,6 +128,7 @@ $('intention-clear').addEventListener('click', async () => {
   finally { $('intention-clear').disabled = !intentions.length; }
 });
 $('website-range').addEventListener('change', () => { void refresh(true); });
+/** @param {HistoryKind} kind */
 async function exportHistory(kind) {
   const websites = kind === 'websites';
   const failure = websites ? 'Unable to export website time.' : 'Unable to export history.';

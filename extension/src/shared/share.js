@@ -1,5 +1,6 @@
 (function (root) {
   'use strict';
+  /** @param {{ messages: RuntimeMessenger, range: () => HistoryRange, error: (message?: string) => void }} options */
   function mount({ messages, range, error }) {
     /** @type {(id: string) => any} */
     const $ = id => document.getElementById(id);

@@ -52,7 +52,7 @@
       try { site = new URL(sender?.url).searchParams.get('site'); } catch (_) {}
       blocked(sender, site);
     }
-    /** @type {Record<PreferenceMessage['type'], (message: any) => void>} */
+    /** @type {PreferenceRules} */
     const preferenceRules = {
       'tracking'(message) {
         if (!core.SITES.some(site => site.id === message.site) || typeof message.enabled !== 'boolean') throw refuse('Choose a vetted website and enable or disable tracking');

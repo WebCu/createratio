@@ -17,12 +17,15 @@ declare global {
     site?: string;
     reason?: string;
   };
+  type IngestMessage = { type: 'ingest'; id: string; generation: string | null; site: string; segments: TimeSegment[]; actions: SiteActionEntry[] };
+  type PreferenceRules = { [K in PreferenceMessage['type']]: (message: Extract<PreferenceMessage, { type: K }>) => void };
+  type RuntimeMessenger = { send(message: RuntimeMessage, fallbackMessage: string): Promise<any> };
   type RuntimeMessage =
     | PreferenceMessage
     | AccessSessionMessage
     | { type: 'snapshot' | 'clear-history' | 'update-apply' | 'access-history-list' | 'access-history-clear' }
     | { type: 'history'; kind: HistoryKind; range: HistoryRange }
-    | { type: 'ingest'; id: string; generation: string | null; site: string; segments: TimeSegment[]; actions: SiteActionEntry[] };
+    | IngestMessage;
 }
 
 export {};
