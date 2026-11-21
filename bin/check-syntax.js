@@ -34,26 +34,13 @@ function typeTagLine(line) {
   return false;
 }
 
-function typeCheckedFile(file) {
-  const real = realpathSync(file);
-  for (let directory = path.dirname(real); ; directory = path.dirname(directory)) {
-    const config = path.join(directory, 'tsconfig.json');
-    if (existsSync(config)) {
-      const { include = [], exclude = [] } = JSON.parse(readFileSync(config, 'utf8'));
-      const relative = path.relative(directory, real).split(path.sep).join('/');
-      return include.some(pattern => path.matchesGlob(relative, pattern)) && !exclude.some(pattern => path.matchesGlob(relative, pattern));
-    }
-    if (path.dirname(directory) === directory) return false;
-  }
-}
-
 function typeAnnotation(comment) {
   if (comment.type !== 'Block' || !comment.value.startsWith('*')) return false;
   const lines = comment.value.slice(1).split(/\r?\n/).map(line => line.replace(/^\s*\*?\s*/, '').trim()).filter(Boolean);
   return lines.length > 0 && lines.every(typeTagLine);
 }
 
-function codeComments(file) {
+function codeComments(file, typed) {
   const source = readFileSync(file, 'utf8');
   const extension = path.extname(file);
   const type = extension === '.js' ? packageType(file) : undefined;
@@ -70,16 +57,16 @@ function codeComments(file) {
   } catch (error) {
     throw new Error(`Comment parse failed: ${file}\n${error.message}`);
   }
-  const typed = typeCheckedFile(file);
   return comments.filter(comment => !(comment.start === 0 && source.startsWith('#!')) && !(typed && typeAnnotation(comment)));
 }
 
-function checkSyntax(files) {
+function checkSyntax(files, typedFiles = []) {
+  const typed = new Set(typedFiles.map(file => realpathSync(file)));
   for (const file of files) {
     const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8', timeout: 10000 });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(`Syntax check failed: ${file}\n${result.stderr || result.stdout}`);
-    const comments = codeComments(file);
+    const comments = codeComments(file, typed.has(realpathSync(file)));
     if (comments.length) {
       const locations = comments.map(comment => `${file}:${comment.loc.start.line}:${comment.loc.start.column + 1}`);
       throw new Error(`Code comments are not allowed:\n${locations.join('\n')}`);
@@ -88,11 +75,11 @@ function checkSyntax(files) {
   return files.length;
 }
 
-async function checkSyntaxParallel(files) {
-  if (files.length < 2) return checkSyntax(files);
+async function checkSyntaxParallel(files, typedFiles = []) {
+  if (files.length < 2) return checkSyntax(files, typedFiles);
   const groups = Array.from({ length: Math.min(4, files.length) }, () => []);
   files.forEach((file, index) => groups[index % groups.length].push(file));
-  const workers = groups.map(group => new Worker(__filename, { workerData: group }));
+  const workers = groups.map(group => new Worker(__filename, { workerData: { files: group, typedFiles } }));
   try {
     await Promise.all(workers.map(worker => new Promise((resolve, reject) => {
       worker.once('error', reject);
@@ -108,11 +95,13 @@ async function main() {
   const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
   const inventory = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.js', '*.mjs', '*.cjs'], { cwd: root, encoding: 'utf8' });
   const files = [...new Set(inventory.split('\0').filter(Boolean))].sort().map(file => path.join(root, file)).filter(file => existsSync(file));
-  console.log(`${await checkSyntaxParallel(files)} JavaScript syntax checks passed; no code comments outside JSDoc type annotations.`);
+  const tsc = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
+  const typedFiles = execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json', '--listFilesOnly'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(file => file && existsSync(file));
+  console.log(`${await checkSyntaxParallel(files, typedFiles)} JavaScript syntax checks passed; no code comments outside JSDoc type annotations.`);
 }
 
 if (require.main === module) {
-  if (!isMainThread) checkSyntax(workerData);
+  if (!isMainThread) checkSyntax(workerData.files, workerData.typedFiles);
   else main().catch(error => {
     console.error(error.message);
     process.exitCode = 1;
