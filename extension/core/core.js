@@ -83,7 +83,9 @@
   }
   function validDailyTarget(value) { return Number.isFinite(value) && value >= 0.1 && value <= 100 && Math.abs(value * 10 - Math.round(value * 10)) < 1e-9; }
   function dailyTarget(settings = {}) { return validDailyTarget(settings?.dailyTarget) ? settings.dailyTarget : DEFAULT_SETTINGS.dailyTarget; }
-  function scoreColor(value) { return value >= 1 ? '#16804a' : value >= 0.5 ? '#b77900' : '#be3f43'; }
+  const SCORE_COLORS = { high: '#16804a', mid: '#b77900', low: '#be3f43' };
+  function scoreBand(value) { return value >= 1 ? 'high' : value >= 0.5 ? 'mid' : 'low'; }
+  function scoreColor(value) { return SCORE_COLORS[scoreBand(value)]; }
   function badgeText(value) { return value >= 100 ? '99+' : value >= 10 ? value.toFixed(0) : value.toFixed(1); }
   function localDate(date = new Date()) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -128,5 +130,5 @@
     }
     return rows.join('\r\n') + '\r\n';
   }
-  return { FIELDS, SITES, ACCESS_LIMITS, INTENTION_LIMITS, DELIVERY_LIMITS, SCROLL_FRICTION_LIMITS, validScrollFrictionStrength, validAccessMinutes, validIntention, DEFAULT_SETTINGS, settingsSnapshot, siteSettings, updatePreferences, trackingEnabled, recordedSites, emptyStats, statsSnapshot, aggregate, score, validDailyTarget, dailyTarget, scoreColor, badgeText, localDate, validLocalDate, recentDates, siteForURL, classifyPage, activeMillis, splitInterval, csv };
+  return { FIELDS, SITES, ACCESS_LIMITS, INTENTION_LIMITS, DELIVERY_LIMITS, SCROLL_FRICTION_LIMITS, validScrollFrictionStrength, validAccessMinutes, validIntention, DEFAULT_SETTINGS, settingsSnapshot, siteSettings, updatePreferences, trackingEnabled, recordedSites, emptyStats, statsSnapshot, aggregate, score, validDailyTarget, dailyTarget, scoreBand, scoreColor, badgeText, localDate, validLocalDate, recentDates, siteForURL, classifyPage, activeMillis, splitInterval, csv };
 });

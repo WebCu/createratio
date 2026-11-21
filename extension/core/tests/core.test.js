@@ -44,6 +44,7 @@ test('score aggregates both sites before dividing and uses exact badge threshold
   assert.equal(C.score(total), 300 / 360);
   assert.equal(C.scoreColor(0.4999), '#be3f43'); assert.equal(C.scoreColor(0.5), '#b77900');
   assert.equal(C.scoreColor(0.9999), '#b77900'); assert.equal(C.scoreColor(1), '#16804a');
+  assert.equal(C.scoreBand(0.4999), 'low'); assert.equal(C.scoreBand(0.5), 'mid'); assert.equal(C.scoreBand(0.9999), 'mid'); assert.equal(C.scoreBand(1), 'high');
   assert.equal(C.badgeText(100), '99+');
 });
 test('daily target resolves the current setting with safe defaults for legacy or invalid preferences', () => {
