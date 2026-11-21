@@ -200,12 +200,7 @@ test('invalid restored session dates cannot grant a daily refill or retain acces
 for (const browser of ['chrome', 'browser']) {
   test(`${browser}: malformed restored waiting deadlines cannot confirm access or prevent a fresh full wait`, async () => {
     const invalid = [0, -1, -Infinity, Infinity, NaN, '1', null, undefined, true, {}, []];
-    const entries = [
-      ...invalid.map(readyAt => ({ readyAt, requestExpiresAt: now + 600000 })),
-      ...invalid.map(requestExpiresAt => ({ readyAt: now - 1, requestExpiresAt })),
-      { requestExpiresAt: now + 600000 },
-      { readyAt: now + 120000, requestExpiresAt: now + 60000 }
-    ];
+    const entries = [...invalid.map(readyAt => ({ readyAt })), {}, { readyAt: now + 120000 }];
     for (const entry of entries) {
       const w = worker({ _access: { x: entry } }, browser, now);
       const result = await w.send({ type: 'access-status' });

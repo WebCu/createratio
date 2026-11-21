@@ -63,9 +63,7 @@ for (const browser of ['chrome', 'browser']) {
     const entries = [
       { remainingMs: 1e20, expiresAt: 0 },
       { expiresAt: now + 241 * 60000 },
-      { readyAt: 1, requestExpiresAt: now + 365 * 86400000 },
-      { readyAt: now + 60001 },
-      { readyAt: now - 1, requestExpiresAt: now + 600000 }
+      { readyAt: now + 60001 }
     ];
     for (const entry of entries) {
       const w = worker({ _access: { x: entry } }, browser, now);

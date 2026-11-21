@@ -1,6 +1,6 @@
 'use strict';
 const SiteAccess = (() => {
-  const WAIT_MS = 60000, LEGACY_CONFIRM_WINDOW_MS = 600000;
+  const WAIT_MS = 60000;
   const MAX_BUDGET_MS = C3.ACCESS_LIMITS.maxMinutes * 60000;
   function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function accessState(value) { return record(value) ? value : {}; }
@@ -29,12 +29,6 @@ const SiteAccess = (() => {
   }
   function validWait(entry, now) {
     return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && entry.readyAt <= now + WAIT_MS;
-  }
-  function restoreWait(entry, now) {
-    const { readyAt, requestExpiresAt } = entry;
-    if (!validWait(entry, now) || (Object.hasOwn(entry, 'requestExpiresAt')
-      && (!Number.isFinite(requestExpiresAt) || requestExpiresAt <= readyAt || requestExpiresAt - readyAt > LEGACY_CONFIRM_WINDOW_MS))) delete entry.readyAt;
-    delete entry.requestExpiresAt;
   }
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
@@ -83,7 +77,7 @@ const SiteAccess = (() => {
         delete entry.remainingMs;
         await api.alarms.clear('access-' + site);
       }
-      restoreWait(entry, now);
+      if (!validWait(entry, now)) delete entry.readyAt;
     }
     const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
     if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules))) await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: Object.keys(SITES).flatMap(ruleIds), addRules: rules });

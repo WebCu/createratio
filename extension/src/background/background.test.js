@@ -430,15 +430,6 @@ test('concurrent gates share a wait and repeated opens cannot extend a session',
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).access.x.remainingMs, 280000);
   assert.equal((await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'))).access.x.remainingMs, 280000);
 });
-test('a legacy wait that outlasts its old deadline stays ready without retaining the deadline', async () => {
-  const readyAt = worker().now - 3600000;
-  const w = worker({ _access: { x: { readyAt, requestExpiresAt: readyAt + 600000 } } });
-  assert.equal((await w.send({ type: 'access-status' })).access.x.readyAt, readyAt);
-  assert.deepEqual(w.data._access.x, { readyAt });
-  assert.deepEqual(rulesFor(w), []);
-  assert.equal((await w.send({ type: 'access-cancel', site: 'x' }, gate('x'))).access.x.readyAt, 0);
-  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
-});
 test('expiry revokes access and redirects all matching open tabs, not unrelated sites', async () => {
   const w = worker(); await unlock(w);
   w.tabs.push({ id: 1, url: 'https://x.com/compose/post' }, { id: 2, url: 'http://mobile.twitter.com/home' }, { id: 3, url: 'https://x.com.evil.test/home' }, { id: 4, url: 'https://www.linkedin.com/feed/' });
@@ -481,7 +472,8 @@ test('both sites have independent sessions and ending one does not end the other
 });
 test('cancelling a wait forces a new full wait', async () => {
   const w = worker();
-  await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x')); w.advance(60000);
+  await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x')); w.advance(3600000);
+  assert.ok((await w.send({ type: 'access-status' })).access.x.readyAt > 0);
   await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
   const result = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
