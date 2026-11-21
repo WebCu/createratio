@@ -74,6 +74,10 @@
         migrated._receipts = [];
         migrated._historyGeneration = crypto.randomUUID();
       }
+      const websiteReceipts = stored._websiteTimeReceipts;
+      if (websiteReceipts != null && (!Array.isArray(websiteReceipts) || websiteReceipts.length > receiptLimit || ![...websiteReceipts].every(id => typeof id === 'string' && id.length <= core.DELIVERY_LIMITS.maxIdLength) || new Set(websiteReceipts).size !== websiteReceipts.length)) {
+        migrated._websiteTimeReceipts = [];
+      }
       for (const [date, value] of Object.entries(collection(stored._websiteTime))) {
         const key = PREFIX + date;
         if (!retained(date)) continue;
@@ -96,13 +100,13 @@
     }
     async function clear(generation) {
       const stored = await storage.get(null);
-      const keys = Object.keys(stored).filter(key => dateForKey(key) || key === '_websiteTime');
+      const keys = Object.keys(stored).filter(key => dateForKey(key) || key === '_websiteTime' || key === '_websiteTimeReceipts');
       if (generation !== undefined) {
         const reset = { _historyGeneration: generation, _historyReset: stored._historyReset !== true };
         try { await storage.set(reset); }
         catch (error) {
           if (error.name !== 'QuotaExceededError' && error.message !== 'Resource::kQuotaBytes quota exceeded' && !/\bQUOTA_BYTES(?:_PER_ITEM)?(?: quota)? exceeded\b/i.test(error.message)) throw error;
-          await storage.set({ ...Object.fromEntries(keys.map(key => [key, {}])), ...reset });
+          await storage.set({ ...Object.fromEntries(keys.map(key => [key, key === '_websiteTimeReceipts' ? [] : {}])), ...reset });
           for (const key of keys) if (dateForKey(key)) sizes.set(key, bytes(key, {}));
         }
       }
@@ -136,10 +140,12 @@
       }
       await save(changes);
     }
-    async function recordWebsiteTime(domain, segments) {
+    async function recordWebsiteTime(domain, segments, id) {
       await prepare();
       const selected = segments.filter(segment => eligible(segment.date));
-      const stored = await storage.get(selected.map(segment => PREFIX + segment.date));
+      const stored = await storage.get([...selected.map(segment => PREFIX + segment.date), '_websiteTimeReceipts']);
+      const receipts = stored._websiteTimeReceipts || [];
+      if (id !== undefined && receipts.includes(id)) return;
       const changes = {};
       for (const { date, sec } of selected) {
         const key = PREFIX + date;
@@ -147,6 +153,7 @@
         const total = Object.hasOwn(day, domain) ? nonnegative(day[domain]) : 0;
         changes[key] = { ...day, [domain]: total + sec };
       }
+      if (id !== undefined) changes._websiteTimeReceipts = [...receipts, id].slice(-receiptLimit);
       await save(changes);
     }
     return { prepare, save, read, clear, retained, creationDay, recordCreation, recordWebsiteTime };
