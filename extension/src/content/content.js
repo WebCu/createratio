@@ -86,7 +86,7 @@
   }
   function markInput(event) {
     if (!canRecord(event)) return;
-    settle(); lastInput = performance.now();
+    settle(); lastInput = lastSample;
     wasVisible = document.visibilityState === 'visible'; wasFocused = document.hasFocus();
   }
   function pauseIntegration(error) {

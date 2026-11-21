@@ -20,6 +20,20 @@ test('continuous fractional samples coalesce into one segment and packet', async
   assert.equal(segment.sec, 5);
   assert.equal(segment.end - segment.start, segment.sec * 1000);
 });
+test('continuous input coalesces when clock reads advance within each handler', async () => {
+  const options = { sampleStep: 0.01 }, t = await tracker('chrome', options);
+  t.setNow(0); t.input();
+  for (let sample = 1; sample <= 300; sample++) {
+    t.setNow(sample * 5000 / 300); t.input();
+  }
+  options.sampleStep = 0;
+  t.setNow(5000); await t.tick();
+  assert.equal(t.packets.length, 1);
+  assert.equal(t.packets[0].segments.length, 1);
+  const segment = t.packets[0].segments[0];
+  assert.equal(segment.sec, 5);
+  assert.equal(segment.end - segment.start, segment.sec * 1000);
+});
 test('wall clock corrections re-anchor active intervals without coalescing across the jump', async () => {
   for (const jump of [3600000, -3600000]) {
     const options = {}, t = await tracker('chrome', options);
