@@ -116,7 +116,7 @@ replacing an uploaded package; keep package and manifest versions aligned.
 
 - Describe the single purpose: intentional site access with private local
   feedback on creating versus consuming.
-- Explain default X/LinkedIn blocking, the intention and 60-second wait, shared
+- Explain default X/LinkedIn blocking, the intention and five-minute default wait, shared
   active-time budgets, midnight refills, and the optional above-goal exception.
 - Explain Limit & track: Off means unrestricted access and no new creation-score
   measurements; Website time remains an independent opt-in feature.
@@ -150,7 +150,7 @@ analytics are disclosed separately in the privacy policy.
 
 Install and pin the Chrome bundle. Visit X or LinkedIn, enter a synthetic
 20–280-character intention, start the wait, and reload to check persistence.
-Confirm only after 60 seconds; waiting alone must not unlock access. The default
+Confirm only after five minutes by default; waiting alone must not unlock access. The default
 budget is five active minutes shared by the site's tabs; switching away pauses
 it. Check expiry and manual end, then turn Limit & track Off and On in Settings.
 Save drafts before expiry redirects open tabs.

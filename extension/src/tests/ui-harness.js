@@ -8,7 +8,7 @@ const WebTime = require('../background/web-time.js');
 const C3Sites = require('../../sites/index.js');
 function accessState(site, changes = {}, catalog = C3Sites) {
   const definition = catalog.get(site);
-  return { site, name: definition.name, home: definition.access.home, enabled: true, goalAllowed: false, remainingMs: 0, expiresAt: 0, readyAt: 0, sessionMinutes: 5, ...changes };
+  return { site, name: definition.name, home: definition.access.home, enabled: true, goalAllowed: false, remainingMs: 0, expiresAt: 0, readyAt: 0, sessionMinutes: 5, waitSeconds: C3.DEFAULT_SETTINGS.waitMinutes * 60, ...changes };
 }
 function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enabled = false, options = {}) {
   class Clock extends Date {
@@ -79,7 +79,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
       if (message.type === 'update-apply') return { ok: true, applied: false };
       if (message.type === 'settings') return { ok: false, error: 'Unknown message' };
       if (message.type === 'access-duration') {
-        settings = C3.updatePreferences(settings, { accessMinutes: message.minutes }, message.site);
+        settings = C3.updatePreferences(settings, { [message.preference || 'accessMinutes']: message.minutes }, message.site);
         for (const [site, access] of Object.entries(state.access)) access.sessionMinutes = C3.siteSettings(site, settings).accessMinutes;
         return { ok: true, access: structuredClone(state.access) };
       }

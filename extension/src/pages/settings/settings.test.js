@@ -583,3 +583,58 @@ test('a tracking save can finish while its session-duration save remains pending
   assert.equal(x.reset.disabled, true); assert.equal(x.reset.hidden, false);
   assert.deepEqual(p.notifications, [{ id: 1, type: 'refresh' }, { id: 2, type: 'refresh' }]);
 });
+
+test('tracking saves immediately disable both duration groups and prevent wait edits until acknowledgement', async () => {
+  for (const fail of [false, true]) {
+    const p = settingsPage(); await p.ready();
+    p.setSettings({ ...C3.DEFAULT_SETTINGS, siteOverrides: { x: { accessMinutes: 2, waitMinutes: 2 } } }); p.change(); await p.ready();
+    const x = controls(p, 'x'), wait = p.nodes['waitMinutes-site-x'];
+    const row = p.nodes['site-settings'].children.find(row => row.attributes['data-site'] === 'x');
+    x.access.value = 'custom'; await x.access.fire('change');
+    wait.value = 'custom'; await wait.fire('change');
+    const durationControls = [x.access, x.reset, x.custom, x.apply, x.cancel, wait, p.nodes['wait-reset-x'], p.nodes['customWaitMinutes-site-x'], p.nodes['custom-wait-save-site-x'], p.nodes['custom-wait-cancel-site-x']];
+    assert.ok(durationControls.every(control => !control.disabled));
+    const release = p.holdMessage('tracking'); p.fail = fail;
+    x.tracking.checked = false; const saving = x.tracking.fire('change');
+    assert.equal(x.tracking.disabled, true);
+    assert.ok(durationControls.every(control => control.disabled));
+    assert.equal(row.attributes['aria-busy'], 'true');
+    const before = p.messages.length;
+    await wait.fire('change'); await p.nodes['wait-reset-x'].fire('click');
+    await p.nodes['custom-wait-duration-site-x'].fire('submit', { preventDefault() {} });
+    assert.equal(p.messages.length, before);
+    assert.equal(controls(p, 'linkedin').access.disabled, false);
+    assert.equal(p.nodes['waitMinutes-site-linkedin'].disabled, false);
+    release(); await saving; await p.ready();
+    assert.equal(x.tracking.disabled, false);
+    assert.equal(x.tracking.checked, fail);
+    assert.ok(durationControls.every(control => control.disabled === !fail));
+    assert.equal(row.attributes['aria-busy'], 'false');
+    assert.equal(p.nodes.error.hidden, !fail);
+    assert.equal(p.settings.siteOverrides.x.waitMinutes, 2);
+  }
+});
+
+test('paired time selectors identify their site and setting without relying on table headings', async () => {
+  const p = settingsPage(); await p.ready();
+  for (const site of [{ id: '', name: 'Default' }, ...C3.SITES.filter(site => site.gated)]) {
+    const suffix = site.id ? 'site-' + site.id : 'default';
+    assert.equal(p.nodes['accessMinutes-' + suffix].attributes['aria-label'], 'Session time for ' + site.name);
+    assert.equal(p.nodes['waitMinutes-' + suffix].attributes['aria-label'], 'Intention wait for ' + site.name);
+  }
+});
+test('intention wait controls save defaults, overrides, reset, custom values and errors', async () => {
+  const p = settingsPage(); await p.ready();
+  const input = p.nodes['waitMinutes-default'], site = p.nodes['waitMinutes-site-x'];
+  assert.equal(input.value, 5); assert.equal(site.value, 'default');
+  input.value = '1'; await input.fire('change'); await p.ready();
+  assert.equal(p.settings.waitMinutes, 1);
+  site.value = 'custom'; await site.fire('change'); await p.ready();
+  p.nodes['customWaitMinutes-site-x'].value = '2';
+  await p.nodes['custom-wait-duration-site-x'].fire('submit', { preventDefault() {} }); await p.ready();
+  assert.equal(site.value, 2);
+  await p.nodes['wait-reset-x'].fire('click'); await p.ready();
+  assert.equal(site.value, 'default');
+  p.fail = true; input.value = '10'; await input.fire('change'); await p.ready();
+  assert.equal(input.value, 1); assert.equal(p.nodes.error.hidden, false);
+});

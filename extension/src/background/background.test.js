@@ -367,7 +367,7 @@ test('invalid intentions and unsupported senders return rejections without repor
     assert.deepEqual(w.errors, [], 'expected rejections must not appear as extension errors');
     w.failRules = true;
     await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-    w.advance(60000);
+    w.advance(300000);
     assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
     assert.equal(w.errors.length, 1, 'unexpected API failures must still be reported');
     assert.match(w.errors[0][1].message, /Rule update failed/);
@@ -379,9 +379,9 @@ test('unlock requires a specific intention, the full wait and explicit confirmat
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
   for (const reason of ['', 'short', ' '.repeat(20), 'a'.repeat(281)]) assert.equal((await w.send({ type: 'access-begin', site: 'x', reason }, gate('x'))).ok, false);
   const begin = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-  assert.equal(begin.access.x.readyAt, w.now + 60000);
+  assert.equal(begin.access.x.readyAt, w.now + 300000);
   assert.equal(JSON.stringify(w.data).includes(intent), false, 'intentions are not persisted by default');
-  w.advance(59999);
+  w.advance(299999);
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
   w.advance(1);
   assert.equal((await w.send({ type: 'access-status' })).access.x.expiresAt, 0, 'waiting alone never opens the site');
@@ -459,7 +459,7 @@ test('concurrent gates share a wait and repeated opens cannot extend a session',
   w.advance(30000);
   await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
   assert.equal(w.data._access.x.readyAt, readyAt);
-  w.advance(30000);
+  w.advance(270000);
   const results = await Promise.all([w.send({ type: 'access-open', site: 'x' }, gate('x')), w.send({ type: 'access-open', site: 'x' }, gate('x'))]);
   assert.equal(results[0].access.x.remainingMs, 300000);
   w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
@@ -514,7 +514,7 @@ test('cancelling a wait forces a new full wait', async () => {
   await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
   const result = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-  assert.equal(result.access.x.readyAt, w.now + 60000);
+  assert.equal(result.access.x.readyAt, w.now + 300000);
 });
 test('failed rule revocation preserves the running budget for a retry', async () => {
   const w = worker(); await unlock(w);
@@ -845,7 +845,7 @@ test('clear history resets the website time sample without backfilling the prior
 test('paused access refills at local midnight using the current configured duration once per day', async () => {
   for (const browser of ['chrome', 'browser']) {
     const midnight = new Date(2026, 9, 12).getTime();
-    const w = worker({}, browser, midnight - 120000); await unlock(w);
+    const w = worker({}, browser, midnight - 360000); await unlock(w);
     w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
     w.advance(10000); w.blur(); await w.send({ type: 'access-status' });
     await w.send({ type: 'access-duration', minutes: 12 }, popupSender);
@@ -868,7 +868,7 @@ test('paused access refills at local midnight using the current configured durat
 test('running access refills at midnight without blocking the tab and charges only time in the new day', async () => {
   for (const delay of [0, 10000]) {
     const midnight = new Date(2026, 9, 12).getTime();
-    const w = worker({}, 'chrome', midnight - 120000); await unlock(w);
+    const w = worker({}, 'chrome', midnight - 360000); await unlock(w);
     w.tabs.push({ id: 1, url: 'https://x.com/home' });
     w.activate(w.tabs[0].url); await w.send({ type: 'access-status' });
     w.advance(60000 + delay); w.alarm('access-midnight');
@@ -882,7 +882,7 @@ test('running access refills at midnight without blocking the tab and charges on
 
 test('restart after missed midnights refills unused access without charging browser downtime', async () => {
   const midnight = new Date(2026, 9, 12).getTime();
-  const first = worker({}, 'chrome', midnight - 120000); await unlock(first);
+  const first = worker({}, 'chrome', midnight - 360000); await unlock(first);
   first.activate('https://x.com/home'); await first.send({ type: 'access-status' });
   first.advance(10000); await first.send({ type: 'access-status' });
   const w = worker(first.data, 'chrome', new Date(2026, 9, 15, 12).getTime()); w.startup();
@@ -916,7 +916,7 @@ test('midnight does not unlock never-opened or ended sessions or skip intention 
 test('exhausted access refills at midnight even if expiry was reconciled late', async () => {
   for (const checkExpiry of [true, false]) {
     const midnight = new Date(2026, 9, 12).getTime();
-    const w = worker({}, 'chrome', midnight - 600000); await unlock(w);
+    const w = worker({}, 'chrome', midnight - 840000); await unlock(w);
     w.activate('https://x.com/home'); await w.send({ type: 'access-status' });
     w.advance(300000);
     if (checkExpiry) {
@@ -934,7 +934,7 @@ test('exhausted access refills at midnight even if expiry was reconciled late', 
 test('midnight refills use current per-site overrides and inherited Default independently', async () => {
   for (const browser of ['chrome', 'browser']) {
     const midnight = new Date(2026, 9, 12).getTime();
-    const w = worker({ settings: { accessMinutes: 12, siteOverrides: { x: { accessMinutes: 2 } } } }, browser, midnight - 240000);
+    const w = worker({ settings: { accessMinutes: 12, siteOverrides: { x: { accessMinutes: 2 } } } }, browser, midnight - 720000);
     await unlock(w, 'x'); await unlock(w, 'linkedin');
     await w.send({ type: 'access-duration', site: 'x', minutes: 4 }, popupSender);
     await w.send({ type: 'access-duration', minutes: 15 }, popupSender);
@@ -955,7 +955,7 @@ test('midnight refills use current per-site overrides and inherited Default inde
 test('Off cancels midnight refills and pending waits without deleting intention history', async () => {
   for (const browser of ['chrome', 'browser']) {
     const midnight = new Date(2026, 9, 12).getTime();
-    const w = worker({ settings: { intentionHistoryEnabled: true, siteOverrides: { x: { accessMinutes: 2 } } } }, browser, midnight - 120000);
+    const w = worker({ settings: { intentionHistoryEnabled: true, siteOverrides: { x: { accessMinutes: 2 } } } }, browser, midnight - 360000);
     await unlock(w); assert.equal(w.alarms['access-midnight'].when, midnight);
     await w.send(tracking('x', false), popupSender);
     assert.equal(w.alarms['access-midnight'], undefined); assert.equal(w.data._access.x, undefined);
@@ -995,7 +995,7 @@ test('above-goal access tracks enabled sites but never overrides Off or saves Of
 test('midnight alarm follows the local calendar across daylight-saving changes', async () => {
   for (const [month, day] of [[2, 8], [10, 1]]) {
     const start = new Date(2026, month, day).getTime();
-    const w = worker({}, 'chrome', start - 120000); await unlock(w);
+    const w = worker({}, 'chrome', start - 360000); await unlock(w);
     assert.equal(w.alarms['access-midnight'].when, start);
     w.advance(60000); w.alarm('access-midnight'); await w.send({ type: 'access-status' });
     assert.equal(w.alarms['access-midnight'].when, new Date(2026, month, day + 1).getTime());
@@ -1008,7 +1008,7 @@ async function drainMessages() {
 
 test('clear invalidates partial intervals across tabs and requires fresh input through real runtime messages', async () => {
   for (const browser of ['chrome', 'browser']) {
-    const start = new Date(2026, 9, 11, 12).getTime(), w = worker({}, browser, start - 60000);
+    const start = new Date(2026, 9, 11, 12).getTime(), w = worker({}, browser, start - 300000);
     await unlock(w);
     const first = await tracker(browser, { forward: message => w.send(message) });
     const second = await tracker(browser, { forward: message => w.send(message) });
@@ -1030,7 +1030,7 @@ test('clear invalidates partial intervals across tabs and requires fresh input t
 
 test('clear while retrying rejects old generations across worker loads and retains receipt deduplication', async () => {
   const start = new Date(2026, 9, 11, 12).getTime();
-  let w = worker({ _intentions: [{ site: 'x', reason: intent, requestedAt: start }], _receipts: ['preserved'] }, 'chrome', start - 60000);
+  let w = worker({ _intentions: [{ site: 'x', reason: intent, requestedAt: start }], _receipts: ['preserved'] }, 'chrome', start - 300000);
   await unlock(w);
   const attempts = [], t = await tracker('chrome', { async forward(message) {
     if (message.type === 'ingest') attempts.push(structuredClone(message));
@@ -1090,7 +1090,7 @@ test('failed history removal returns failure and its persisted generation still 
 });
 
 test('a lost ingest acknowledgement retries the identical packet through the worker without doubling actions', async () => {
-  const start = new Date(2026, 9, 11, 12).getTime(), w = worker({}, 'chrome', start - 60000);
+  const start = new Date(2026, 9, 11, 12).getTime(), w = worker({}, 'chrome', start - 300000);
   await unlock(w);
   let loseResponse = true;
   const attempts = [], t = await tracker('chrome', { async forward(message) {

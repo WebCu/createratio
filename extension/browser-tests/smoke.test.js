@@ -83,7 +83,7 @@ test('built Chromium extension: access gates and history controls', async t => {
     midday.setDate(midday.getDate() + 1);
     await browser.setTime(midday.getTime());
     await evaluate(browser, browser.worker, 'chrome.storage.local.set({ settings: { accessMinutes: 1, intentionHistoryEnabled: true, trackedSites: ["x", "linkedin"], allowAboveGoal: false } })');
-    await journey('intention, persistent wait after reload and long absence, explicit unlock, pause and manual end', async () => {
+    await journey('intention, persistent five-minute wait after reload and long absence, explicit unlock, pause and manual end', async () => {
       const page = await browser.page('https://x.com/home');
       await atGate(page);
       assert.equal(browser.documents.length, 0, 'DNR redirects before any synthetic X document is served');
@@ -107,7 +107,7 @@ test('built Chromium extension: access gates and history controls', async t => {
       const started = await storage();
       const request = started._access.x;
       assert.equal(started._intentions.at(-1).reason, 'Review the synthetic launch plan, then leave.');
-      assert.equal(request.readyAt - started._intentions.at(-1).requestedAt, 60000, 'real access-begin creates a full 60-second wait');
+      assert.equal(request.readyAt - started._intentions.at(-1).requestedAt, 300000, 'real access-begin creates a full five-minute wait');
       assert.equal(await inspect(page, 'document.querySelector("#open").disabled'), true);
       await reload(page);
       await eventually(() => visible(page, '#waiting'), 'waiting survives reload');
@@ -115,7 +115,7 @@ test('built Chromium extension: access gates and history controls', async t => {
       assert.equal((await focused(page)).tag, 'BODY', 'restoring a wait on load must not move focus');
       await tabTo(page, 'cancel');
       await browser.setTime(request.readyAt - 5000);
-      await eventually(() => inspect(page, 'document.querySelector("#clock").textContent !== "1:00" && document.querySelector("#open").disabled'), 'clock advances but access is still disabled before readiness');
+      await eventually(() => inspect(page, 'document.querySelector("#clock").textContent !== "5:00" && document.querySelector("#open").disabled'), 'clock advances but access is still disabled before readiness');
       assert.equal(await inspect(page, 'document.querySelector("#open").disabled'), true);
       await browser.setTime(request.readyAt + 100);
       await eventually(() => inspect(page, '!document.querySelector("#open").disabled'), 'explicit confirmation becomes available');
@@ -153,7 +153,7 @@ test('built Chromium extension: access gates and history controls', async t => {
       await atGate(page);
       assert.equal(browser.documents.length, served, 'manual end removes DNR allow rule, not just the currently open tab');
       await expectText(popup, '.access-row button', 'Request access');
-      console.log('Access tracer: DNR block → 60-second clock → explicit trusted confirm → synthetic X → paused budget → trusted manual end → DNR block');
+      console.log('Access tracer: DNR block → five-minute clock → explicit trusted confirm → synthetic X → paused budget → trusted manual end → DNR block');
     });
     await journey('keyboard ending an active session restores the intention without load-time focus stealing', async () => {
       const page = await browser.page(browser.origin + '/blocked.html?site=x');

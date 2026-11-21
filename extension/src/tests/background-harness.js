@@ -56,8 +56,9 @@ function activeWorker(data = {}, browser = 'chrome') {
 const gate = site => ({ id: 'test-extension', tab: { id: 3 }, frameId: 0, url: `chrome-extension://test-extension/blocked.html?site=${site}` });
 const intent = 'Reply to Alex about our launch, then leave.';
 async function unlock(w, site = 'x') {
-  assert.equal((await w.send({ type: 'access-begin', site, reason: intent }, gate(site))).ok, true);
-  w.advance(60000);
+  const begun = await w.send({ type: 'access-begin', site, reason: intent }, gate(site));
+  assert.equal(begun.ok, true);
+  w.advance(Math.max(0, begun.access[site].readyAt - w.now));
   const result = await w.send({ type: 'access-open', site }, gate(site));
   assert.equal(result.ok, true); return result;
 }
