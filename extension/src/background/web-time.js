@@ -47,11 +47,17 @@
     return rows.join('\r\n') + '\r\n';
   }
   function create(api, serialize, core, history) {
-    const pendingLimit = 100;
-    let enabled = false, previous = null, pending = [];
+    const pendingLimit = Math.min(100, Math.floor(core.DELIVERY_LIMITS.receiptLimit / 4) - 1);
+    let enabled = false, previous = null, pending = [], checkpointFailed = false, epoch = false;
     async function allowed() { return !!api.permissions && await api.permissions.contains(PERMISSIONS); }
     async function checkpoint() {
-      await api.storage.session?.set({ _websiteTimeSample: previous, _websiteTimePending: pending });
+      try {
+        await api.storage.session?.set({ _websiteTimeSample: previous, _websiteTimePending: pending, _websiteTimeEpoch: epoch });
+        checkpointFailed = false;
+      } catch (error) {
+        checkpointFailed = true;
+        throw error;
+      }
     }
     function schedule(task) { return serialize(task).catch(error => console.error('CreateRatio website time:', error)); }
     async function accrue(now) {
@@ -71,7 +77,7 @@
       }
     }
     async function sample(now) {
-      if (pending.length >= pendingLimit) return;
+      if (checkpointFailed || pending.length >= pendingLimit) return;
       const window = await api.windows.getLastFocused();
       if (!window.focused || window.type !== 'normal' || await api.idle.queryState(30) !== 'active') return;
       const [tab] = await api.tabs.query({ active: true, windowId: window.id });
@@ -106,9 +112,12 @@
       await checkpoint();
     }
     async function start(reset = false) {
-      previous = reset ? null : (await api.storage.session?.get('_websiteTimeSample'))?._websiteTimeSample || null;
-      pending = reset ? [] : (await api.storage.session?.get('_websiteTimePending'))?._websiteTimePending || [];
+      if (reset) { previous = null; pending = []; }
       const stored = await api.storage.local.get('_websiteTimeEnabled');
+      epoch = (await api.storage.local.get('_historyReset'))._historyReset === true;
+      const savedEpoch = (await api.storage.session?.get('_websiteTimeEpoch'))?._websiteTimeEpoch === true;
+      previous = reset || savedEpoch !== epoch ? null : (await api.storage.session?.get('_websiteTimeSample'))?._websiteTimeSample || null;
+      pending = reset || savedEpoch !== epoch ? [] : (await api.storage.session?.get('_websiteTimePending'))?._websiteTimePending || [];
       enabled = stored._websiteTimeEnabled === true && await allowed();
       if (!enabled) previous = null;
       await updateMonitoring();

@@ -252,6 +252,34 @@ for (const generation of [null, 'stable']) {
   });
 }
 
+test('repeated checkpoint failures cannot evict replayable website receipts', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  h.api.storage.session.set = async () => { throw new Error('Checkpoint unavailable'); };
+  for (let i = 0; i < C3.DELIVERY_LIMITS.receiptLimit + 2; i++) {
+    h.advance(1); await assert.rejects(h.tick(), /Checkpoint unavailable/);
+  }
+  const saved = h.data['_websiteTime:2026-10-11']['example.com'];
+  const replacement = harness(h.data, h.session); replacement.advance(1000);
+  await replacement.tracker.start(); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], saved);
+});
+
+test('failed reset checkpoint cannot restore cleared website samples or pending time', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  h.api.storage.local.set = set;
+  await h.history.clear('after-clear');
+  h.api.storage.session.set = async () => { throw new Error('Checkpoint unavailable'); };
+  await assert.rejects(h.tracker.start(true), /Checkpoint unavailable/);
+  const replacement = harness(h.data, h.session); replacement.advance(10000);
+  await replacement.tracker.start(); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11'], undefined);
+  replacement.advance(5000); await replacement.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 5);
+});
+
 test('unfocused windows, idle/locked time, private tabs and browser pages never accrue', async () => {
   const h = harness(); await h.tracker.setEnabled(true);
   h.advance(2000); h.state.focused = false; h.api.windows.onFocusChanged.emit(-1); await h.drain();
