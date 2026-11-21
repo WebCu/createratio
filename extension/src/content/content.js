@@ -86,6 +86,7 @@
   }
   function synchronizeTracking(nextEnabled, nextGeneration, preserveOutbox) {
     if (enabled === nextEnabled && generation === nextGeneration) return;
+    if (preserveOutbox && enabled && !nextEnabled) { settle(); queuePacket(); }
     generation = nextGeneration;
     segments = []; actions = [];
     if (!preserveOutbox) outbox = [];

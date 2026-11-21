@@ -5,6 +5,15 @@ const C = require('../../core/core.js');
 const integrations = require('../../sites/index.js');
 const { Element, linkedinFixture } = require('../../sites/test-support.js');
 const { tracker } = require('../tests/content-harness.js');
+test('expiry refresh queues the final partial interval before resetting tracking', async () => {
+  const t = await tracker();
+  t.input(); t.setNow(2000);
+  t.setSnapshot({ day: {}, settings: C.DEFAULT_SETTINGS, access: { x: { enabled: true, remainingMs: 0 } } });
+  for (let turn = 0; turn < 20; turn++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(t.packets.flatMap(packet => packet.segments).reduce((sum, segment) => sum + segment.sec, 0), 2);
+  t.input(); t.setNow(5000); await t.tick();
+  assert.equal(t.packets.length, 1);
+});
 test('a terminal packet refusal does not block later measurements', async () => {
   let rejected, accepted = [];
   const t = await tracker('chrome', { reply(message, result) {
