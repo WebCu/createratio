@@ -83,6 +83,23 @@ test('a timed budget paused above goal continues authorizing from its midnight r
   assert.equal(w.data[today].x.replies, 1);
   assert.equal(w.data._access.x.refilledAt, midnight);
 });
+for (const active of [true, false]) test(`midnight above-goal refill charges only continuously active access: ${active}`, async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const yesterday = C.localDate(new Date(midnight - 1)), today = C.localDate(new Date(midnight));
+  const w = worker({ settings: { allowAboveGoal: true, accessMinutes: 1 }, [yesterday]: { x: { posts: 1 } },
+    _access: { x: { date: yesterday, remainingMs: 30000, expiresAt: 0 } } }, 'chrome', midnight - 2000);
+  if (active) w.activate('https://x.com/home');
+  assert.equal((await w.send({ type: 'access-status' })).access.x.goalAllowed, true);
+  w.advance(122000);
+  const result = await w.send({ type: 'ingest', id: 'delayed-goal-refill', site: 'x',
+    segments: [{ date: today, mode: 'consume', start: midnight, end: w.now, sec: 120 }],
+    actions: [{ date: today, action: 'replies', at: midnight + 59000 }, { date: today, action: 'replies', at: midnight + 60000 }] });
+  assert.equal(result.ok, true);
+  assert.equal(w.data[today]?.x.consumeSec, active ? 60 : 120);
+  assert.equal(w.data[today].x.replies, active ? 1 : 2);
+  assert.equal(result.access.x.remainingMs, active ? 0 : 60000);
+});
+
 test('records the final interval of a minute session even after expiry', async () => {
   const w = worker({ settings: { accessMinutes: 1 } });
   await unlock(w);

@@ -107,7 +107,7 @@ const SiteAccess = (() => {
       const hadSession = Number.isFinite(entry.remainingMs) || Number.isFinite(entry.expiresAt);
       if (!Number.isFinite(entry.remainingMs) && Number.isFinite(entry.expiresAt)) entry.remainingMs = Math.max(0, entry.expiresAt - now);
       if (entry.date && entry.date !== date) {
-        const runningAtMidnight = !restart && entry.expiresAt >= dayStart;
+        const runningAtMidnight = !restart && (entry.expiresAt >= dayStart || !goalAllowed && entry.goalActive === true);
         const pausedAtMidnight = !restart && entry.remainingMs > 0 && !entry.expiresAt;
         if (runningAtMidnight || pausedAtMidnight) windowStart = dayStart;
         entry.remainingMs = minutes * 60000;
@@ -115,6 +115,8 @@ const SiteAccess = (() => {
         entry.expiresAt = runningAtMidnight ? dayStart + entry.remainingMs : 0;
       }
       const authorizedUntil = entry.expiresAt;
+      if (goalAllowed && activeSite === site && entry.remainingMs > 0) entry.goalActive = true;
+      else delete entry.goalActive;
       if (entry.remainingMs > 0) entry.date = date;
       if (!restart && entry.expiresAt) entry.remainingMs = Math.min(entry.remainingMs, Math.max(0, entry.expiresAt - now));
       if (goalAllowed || entry.remainingMs > 0) {
