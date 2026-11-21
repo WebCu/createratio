@@ -54,9 +54,10 @@
     }
     function schedule(task) { return serialize(task).catch(error => console.error('CreateRatio website time:', error)); }
     async function accrue(now) {
-      const old = previous; previous = null;
-      if (!old || typeof old.domain !== 'string' || !Number.isFinite(old.at) || now <= old.at || now - old.at > 75000) return;
+      const old = previous;
+      if (!old || typeof old.domain !== 'string' || !Number.isFinite(old.at) || now <= old.at || now - old.at > 75000) { previous = null; return; }
       await history.recordWebsiteTime(old.domain, core.splitInterval(old.at, now));
+      previous = null;
     }
     async function sample(now) {
       const window = await api.windows.getLastFocused();

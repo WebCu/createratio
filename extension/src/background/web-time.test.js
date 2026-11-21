@@ -91,6 +91,19 @@ test('switching tabs and navigation attribute intervals to the previous domain',
   assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'example.com': 2, 'other.test': 3, 'third.test': 5 });
 });
 
+test('failed website time writes preserve the interval for the next tick', async () => {
+  const h = harness(); await h.tracker.setEnabled(true);
+  const set = h.api.storage.local.set;
+  h.api.storage.local.set = async () => { throw new Error('Storage unavailable'); };
+  h.advance(5000); await assert.rejects(h.tick(), /Storage unavailable/);
+  assert.equal(h.data['_websiteTime:2026-10-11'], undefined);
+  h.api.storage.local.set = set;
+  h.advance(5000); await h.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']?.['example.com'], 10);
+  h.advance(5000); await h.tick();
+  assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 15);
+});
+
 test('unfocused windows, idle/locked time, private tabs and browser pages never accrue', async () => {
   const h = harness(); await h.tracker.setEnabled(true);
   h.advance(2000); h.state.focused = false; h.api.windows.onFocusChanged.emit(-1); await h.drain();
