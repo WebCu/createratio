@@ -217,3 +217,60 @@ test('drain retry retention caps the total across tabs by retiring the oldest pa
   w.alarm('drain-retry'); await w.send({ type: 'snapshot' });
   assert.equal(w.data[date].reddit.consumeSec, limit);
 });
+
+for (const failure of [false, true]) test(`receipt rollover preserves the retry batch with an initial write failure: ${failure}`, async () => {
+  const generation = 'recognized-window', session = { _accessInitialized: true };
+  const packets = ['first', 'second', 'third'].map(id => ({ type: 'ingest', id, generation, site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] }));
+  const data = {
+    _historyGeneration: generation,
+    _receipts: Array.from({ length: C.DELIVERY_LIMITS.receiptLimit - 1 }, (_, n) => 'known-' + n),
+    _accessWindows: { reddit: [{ start, end: start + 1000 }] },
+    ...(failure ? { _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } } } : {})
+  };
+  let failNext = false;
+  if (!failure) session._drainRetries = packets.map(packet => ({ packet, sender }));
+  const w = worker(data, 'chrome', start, {
+    session,
+    localStorage: {
+      async get(keys) { return Object.fromEntries((keys === null ? Object.keys(data) : Array.isArray(keys) ? keys : [keys]).filter(key => Object.hasOwn(data, key)).map(key => [key, structuredClone(data[key])])); },
+      async set(values) {
+        if (failNext && Object.hasOwn(values, date)) { failNext = false; throw new Error('Transient history failure'); }
+        Object.assign(data, structuredClone(values));
+      },
+      async remove(keys) { for (const key of Array.isArray(keys) ? keys : [keys]) delete data[key]; }
+    },
+    sendTabMessage() { failNext = true; return { packets }; }
+  });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  if (failure) {
+    w.tabs.push({ id: 1, url }); w.advance(1100);
+    await w.send({ type: 'snapshot' });
+    assert.equal(data[date].reddit.consumeSec, 2);
+    w.alarm('drain-retry'); await w.send({ type: 'snapshot' });
+  }
+  assert.equal(data[date].reddit.consumeSec, 3);
+  for (const packet of packets) await w.send(packet, sender);
+  assert.equal(data[date].reddit.consumeSec, 3);
+});
+
+test('concurrent drains admit their generation before a slower tab responds', async () => {
+  const generation = 'recognized-window';
+  let release;
+  const navigated = new Promise(resolve => { release = resolve; });
+  const w = worker({
+    _historyGeneration: generation,
+    _receipts: Array.from({ length: C.DELIVERY_LIMITS.receiptLimit - 1 }, (_, n) => 'known-' + n),
+    _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } }
+  }, 'chrome', start, {
+    session: { _accessInitialized: true },
+    async sendTabMessage(id) {
+      if (id === 2) await navigated;
+      return { packets: Array.from({ length: 3 }, (_, n) => ({ type: 'ingest', id: `tab-${id}-${n}`, generation, site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] })) };
+    },
+    onTabUpdate(id) { if (id === 1) release(); }
+  });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  w.tabs.push({ id: 1, url }, { id: 2, url }); w.advance(1100);
+  await w.send({ type: 'snapshot' });
+  assert.equal(w.data[date].reddit.consumeSec, 6);
+});
