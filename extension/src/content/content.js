@@ -9,6 +9,7 @@
   let scrollFrictionEnabled = false, scrollSpeed = 1;
   const session = crypto.randomUUID();
   let sequence = 0, lastSample = performance.now(), lastInput = -Infinity;
+  const wallOffset = Date.now() - lastSample;
   let enabled = false, mode = 'neutral';
   let wasVisible = document.visibilityState === 'visible', wasFocused = document.hasFocus();
   let segments = [], actions = [], outbox = [], delivery = null, stopped = false, pageActive = true, updating = false;
@@ -34,13 +35,14 @@
 
   function appendTime(start, end) {
     let cursor = start;
-    for (const part of C3.splitInterval(start, end)) {
+    const parts = C3.splitInterval(start, end);
+    for (const [index, part] of parts.entries()) {
       if (segments.reduce((sum, segment) => sum + segment.sec, 0) + part.sec > MAX_SECONDS) queuePacket();
       if (recordingPaused) break;
       const tail = segments.at(-1);
-      const partEnd = cursor + part.sec * 1000;
-      if (tail && tail.mode === mode && tail.date === part.date && tail.end === cursor) { tail.sec += part.sec; tail.end = partEnd; }
-      else segments.push({ ...part, mode, start: cursor, end: partEnd });
+      const partEnd = index === parts.length - 1 ? end : cursor + part.sec * 1000;
+      if (tail && tail.mode === mode && tail.date === part.date && tail.end === cursor) { tail.end = partEnd; tail.sec = (tail.end - tail.start) / 1000; }
+      else segments.push({ ...part, sec: (partEnd - cursor) / 1000, mode, start: cursor, end: partEnd });
       cursor = partEnd;
       if (segments.length === MAX_ITEMS) queuePacket();
       if (recordingPaused) break;
@@ -51,8 +53,7 @@
     const ms = recordingPaused ? 0 : C3.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
     if (ms > 0) {
       const activeEnd = Math.min(now, lastInput + 30000);
-      const endWall = Date.now() - (now - activeEnd);
-      appendTime(endWall - ms, endWall);
+      appendTime(wallOffset + Math.max(lastSample, lastInput), wallOffset + activeEnd);
     }
     lastSample = now;
   }
