@@ -36,6 +36,7 @@ function createAccessField(site) {
   const savedOption = option('', ''); savedOption.hidden = true;
   option('custom', 'Custom…');
   input.addEventListener('change', () => saveAccessDuration(site.id)); line.append(input);
+  input.addEventListener('blur', () => renderSite(siteControls.get(site.id), currentSettings, site.id + ':access'));
   let reset = null;
   if (site.id) {
     reset = document.createElement('button'); reset.type = 'button'; reset.className = 'duration-reset'; reset.id = 'access-reset-' + site.id;
