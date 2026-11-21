@@ -64,7 +64,7 @@ function matrix(catalog) {
     expired: { settings: enabled, _access: entries({ remainingMs: 1000, date, expiresAt: now - 1 }) },
     aboveGoal: { settings: { ...enabled, allowAboveGoal: true }, [date]: { [first.id]: { createSec: 121, consumeSec: 120 } } },
     atGoal: { settings: { ...enabled, allowAboveGoal: true }, [date]: { [first.id]: { createSec: 120, consumeSec: 120 } } },
-    waiting: { settings: enabled, _access: entries({ readyAt: now + 30000, requestExpiresAt: now + 600000 }) },
+    waiting: { settings: enabled, _access: entries({ readyAt: now + 30000 }) },
     midnight: { settings: { ...enabled, accessMinutes: 12, siteOverrides: { [first.id]: { accessMinutes: 2 } } }, _access: entries({ remainingMs: 60000, date: '2026-01-14', expiresAt: 0 }) },
   };
   return { urls, states };

@@ -200,19 +200,12 @@ test('invalid restored session dates cannot grant a daily refill or retain acces
 for (const browser of ['chrome', 'browser']) {
   test(`${browser}: malformed restored waiting deadlines cannot confirm access or prevent a fresh full wait`, async () => {
     const invalid = [0, -1, -Infinity, Infinity, NaN, '1', null, undefined, true, {}, []];
-    const entries = [
-      ...invalid.map(readyAt => ({ readyAt, requestExpiresAt: now + 600000 })),
-      ...invalid.map(requestExpiresAt => ({ readyAt: now - 1, requestExpiresAt })),
-      { readyAt: now - 1 },
-      { requestExpiresAt: now + 600000 },
-      { readyAt: now + 120000, requestExpiresAt: now + 60000 }
-    ];
+    const entries = [...invalid.map(readyAt => ({ readyAt })), {}, { readyAt: now + C.ACCESS_LIMITS.maxMinutes * 60000 + 1 }];
     for (const entry of entries) {
       const w = worker({ _access: { x: entry } }, browser, now);
       const result = await w.send({ type: 'access-status' });
       assert.equal(result.ok, true);
       assert.equal(result.access.x.readyAt, 0);
-      assert.equal(result.access.x.requestExpiresAt, 0);
       assert.equal(w.errors.length, 0);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       assert.deepEqual(rulesFor(w), []);
@@ -302,7 +295,7 @@ test('valid restored paused budgets and waits remain unchanged and exhausted ses
   const date = C.localDate(new Date(now));
   const entries = [
     { remainingMs: 120000, expiresAt: 0, refilledAt: 0, date },
-    { readyAt: now + 30000, requestExpiresAt: now + 630000 },
+    { readyAt: now + 30000 },
     { date, refilledAt: now - 600000 }
   ];
   for (const entry of entries) {
@@ -384,16 +377,13 @@ test('lowering the intention wait preserves a pending request until its original
   const setting = { type: 'access-duration', preference: 'waitMinutes', minutes: 5 };
   assert.equal((await w.send(setting, popupSender)).ok, true);
   const begun = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-  const { readyAt, requestExpiresAt } = begun.access.x;
+  const { readyAt } = begun.access.x;
   assert.equal(readyAt, w.now + 300000);
-  assert.equal(requestExpiresAt, readyAt + 600000);
   const changed = await w.send({ ...setting, minutes: 1 }, popupSender);
   assert.equal(changed.ok, true);
   assert.equal(changed.access.x.waitSeconds, 300);
   assert.equal(changed.access.x.readyAt, readyAt);
-  assert.equal(changed.access.x.requestExpiresAt, requestExpiresAt);
   assert.equal(w.data._access.x.readyAt, readyAt);
-  assert.equal(w.data._access.x.requestExpiresAt, requestExpiresAt);
   w.advance(60000);
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
   w.advance(240000);
@@ -404,7 +394,7 @@ test('pending waits retain their own duration across setting changes and worker 
   for (const [initial, updated] of [[1, 5], [5, 1]]) {
     const w = worker({ settings: { waitMinutes: initial } });
     const begun = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
-    const { readyAt, requestExpiresAt } = begun.access.x;
+    const { readyAt } = begun.access.x;
     assert.equal(w.data._access.x.waitMs, initial * 60000);
     w.advance(30000);
     const changed = await w.send({ type: 'access-duration', preference: 'waitMinutes', site: 'x', minutes: updated }, popupSender);
@@ -413,24 +403,29 @@ test('pending waits retain their own duration across setting changes and worker 
     const restored = (await restarted.send({ type: 'access-status' })).access.x;
     assert.equal(restored.waitSeconds, initial * 60);
     assert.equal(restored.readyAt, readyAt);
-    assert.equal(restored.requestExpiresAt, requestExpiresAt);
     assert.equal((await restarted.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+    restarted.advance(86400000);
+    const ready = (await restarted.send({ type: 'access-status' })).access.x;
+    assert.equal(ready.readyAt, readyAt);
+    assert.equal(ready.waitSeconds, initial * 60);
+    assert.equal(ready.remainingMs, 0);
+    assert.deepEqual(rulesFor(restarted), []);
     await restarted.send({ type: 'access-cancel', site: 'x' }, gate('x'));
     assert.equal((await restarted.send({ type: 'access-status' })).access.x.waitSeconds, updated * 60);
     const next = await restarted.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
     assert.equal(next.access.x.waitSeconds, updated * 60);
     assert.equal(next.access.x.readyAt, restarted.now + updated * 60000);
     restarted.advance(updated * 60000 + 600000);
-    const expired = (await restarted.send({ type: 'access-status' })).access.x;
-    assert.equal(expired.readyAt, 0);
-    assert.equal(expired.waitSeconds, updated * 60);
-    assert.equal(restarted.data._access.x.waitMs, undefined);
+    const completed = (await restarted.send({ type: 'access-status' })).access.x;
+    assert.equal(completed.readyAt, next.access.x.readyAt);
+    assert.equal(completed.waitSeconds, updated * 60);
+    assert.equal(restarted.data._access.x.waitMs, updated * 60000);
   }
 });
 
 test('legacy or malformed stored wait durations retain the original 60-second wait without discarding a pending request', async () => {
   for (const waitMs of [undefined, null, 0, -60000, 60001, '60000', NaN, Infinity, (C.ACCESS_LIMITS.maxMinutes + 1) * 60000]) {
-    const entry = { readyAt: now + 30000, requestExpiresAt: now + 630000, ...(waitMs === undefined ? {} : { waitMs }) };
+    const entry = { readyAt: now + 30000, ...(waitMs === undefined ? {} : { waitMs }) };
     const w = worker({ settings: { waitMinutes: 2 }, _access: { x: entry } }, 'chrome', now);
     const result = (await w.send({ type: 'access-status' })).access.x;
     assert.equal(result.readyAt, entry.readyAt);

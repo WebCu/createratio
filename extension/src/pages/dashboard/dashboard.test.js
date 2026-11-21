@@ -83,6 +83,11 @@ test('website filters show sorted rows and combined time, including paused total
   p.nodes['website-range'].value = 'today'; p.nodes['website-range'].fire('change'); await p.ready();
   assert.equal(p.nodes['website-total'].textContent, '3m 0s'); assert.equal(p.nodes['website-sites'].children[0].children[0].textContent, 'example.com'); assert.equal(p.nodes['website-count'].textContent, '2 websites');
 });
+test('website shares are whole percentages that add up to 100', async () => {
+  const p = dashboard({ _websiteTime: { [C3.localDate()]: { 'a.test': 60, 'b.test': 60, 'c.test': 60 } } }); await p.ready(); p.nodes['websites-view'].fire('click'); await p.ready();
+  const shares = p.nodes['website-sites'].children.map(row => row.children[2].textContent);
+  assert.deepEqual(shares, ['34%', '33%', '33%']);
+});
 test('dashboard exports both existing CSV formats without changing recorded history', async () => {
   const data = { [C3.localDate()]: { x: { consumeSec: 60 } }, _websiteTime: { [C3.localDate()]: { 'example.com': 120 } }, _intentions: [{ site: 'x', reason: 'Private intention text', requestedAt: 1 }] };
   const p = dashboard(data); await p.ready();

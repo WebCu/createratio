@@ -53,6 +53,20 @@ for (const browser of ['chrome', 'browser']) {
       assert.deepEqual(rulesFor(w, [site]), []);
     });
   }
+
+  test(`${browser}: a completed wait stays ready after a long absence without unlocking the site`, async () => {
+    const first = worker({}, browser, start);
+    const { access } = await first.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+    assert.equal(access.x.readyAt, start + 300000);
+
+    const returned = worker(first.data, browser, start + 86400000);
+    const ready = (await status(returned)).x;
+    assert.equal(ready.readyAt, access.x.readyAt);
+    assert.equal(ready.remainingMs, 0);
+    assert.deepEqual(rulesFor(returned, ['x']), []);
+    assert.equal((await returned.send({ type: 'access-open', site: 'x' }, gate('x'))).access.x.remainingMs, 300000);
+  });
+
   test(`${browser}: worker replacement charges the active deadline and repeated wakes cannot refill it`, async () => {
     const session = {};
     const first = worker({}, browser, start - 300000, { session });

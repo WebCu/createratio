@@ -1,6 +1,5 @@
 'use strict';
 const SiteAccess = (() => {
-  const REQUEST_MS = 600000;
   const MAX_BUDGET_MS = C3.ACCESS_LIMITS.maxMinutes * 60000;
   function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function accessState(value) { return record(value) ? value : {}; }
@@ -26,10 +25,10 @@ const SiteAccess = (() => {
     const expiresAt = remainingMs && entry.expiresAt > now ? entry.expiresAt : 0;
     const readyAt = !remainingMs && validWait(entry, now) ? entry.readyAt : 0;
     const waitSeconds = readyAt ? Number.isFinite(entry.waitMs) && C3.validAccessMinutes(entry.waitMs / 60000) ? entry.waitMs / 1000 : 60 : waitMinutes * 60;
-    return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, requestExpiresAt: readyAt ? entry.requestExpiresAt : 0, refilledAt: entry.refilledAt || 0, waitSeconds, sessionMinutes: minutes };
+    return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, refilledAt: entry.refilledAt || 0, waitSeconds, sessionMinutes: minutes };
   }
   function validWait(entry, now) {
-    return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && Number.isFinite(entry.requestExpiresAt) && entry.requestExpiresAt > entry.readyAt && entry.requestExpiresAt > now && entry.requestExpiresAt - entry.readyAt <= REQUEST_MS && entry.readyAt <= now + C3.ACCESS_LIMITS.maxMinutes * 60000;
+    return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && entry.readyAt <= now + C3.ACCESS_LIMITS.maxMinutes * 60000;
   }
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
@@ -78,7 +77,7 @@ const SiteAccess = (() => {
         delete entry.remainingMs;
         await api.alarms.clear('access-' + site);
       }
-      if (!validWait(entry, now)) { delete entry.readyAt; delete entry.requestExpiresAt; delete entry.waitMs; }
+      if (!validWait(entry, now)) { delete entry.readyAt; delete entry.waitMs; }
     }
     const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
     if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules))) await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: Object.keys(SITES).flatMap(ruleIds), addRules: rules });
@@ -143,7 +142,7 @@ const SiteAccess = (() => {
     if (state.remainingMs || state.readyAt) return;
     const site = message.site, access = accessState(stored._access);
     const waitMs = C3.siteSettings(site, stored.settings).waitMinutes * 60000;
-    access[site] = { readyAt: now + waitMs, requestExpiresAt: now + waitMs + REQUEST_MS, waitMs };
+    access[site] = { readyAt: now + waitMs, waitMs };
     const changes = { _access: access };
     if (stored.settings?.intentionHistoryEnabled === true) changes._intentions = [...savedIntentions(stored._intentions), { site, reason: message.reason.trim(), requestedAt: now }].slice(-100);
     await api.storage.local.set(changes);
@@ -155,7 +154,7 @@ const SiteAccess = (() => {
     await api.storage.local.set({ _access: access });
   }
   async function cancelWait(site, state, access) {
-    if (state.remainingMs) return;
+    if (!state.readyAt) return;
     delete access[site];
     await api.storage.local.set({ _access: access });
   }
@@ -173,7 +172,7 @@ const SiteAccess = (() => {
     if (state.enabled === false && ['access-begin', 'access-open', 'access-cancel', 'access-end'].includes(message.type)) return { ok: true, access: statuses };
     if (state.goalAllowed) {
       if (message.type === 'access-end') throw MessageContracts.refuse('Turn off goal-based access in Settings to block sites above the goal.');
-      if (['access-open', 'access-begin', 'access-cancel'].includes(message.type)) return { ok: true, access: statuses };
+      if (['access-open', 'access-begin'].includes(message.type)) return { ok: true, access: statuses };
     }
     const stored = await api.storage.local.get(['_access', 'settings', '_intentions']), access = accessState(stored._access), now = Date.now();
     switch (message.type) {

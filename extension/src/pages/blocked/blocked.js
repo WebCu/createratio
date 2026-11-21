@@ -35,7 +35,7 @@ function remaining(ms) { const seconds = Math.max(0, Math.ceil(ms / 1000)); retu
 function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
-  const waiting = !active && access.readyAt > 0 && access.requestExpiresAt > now;
+  const waiting = !active && access.readyAt > 0;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
   $('wait-step').textContent = `Pause for ${access.waitSeconds} seconds.`;
   $('begin').textContent = `Start the ${access.waitSeconds}-second wait`;
@@ -53,6 +53,8 @@ function render() {
   $('reason').disabled = busy;
   $('begin').disabled = busy;
   $('cancel').disabled = busy;
+  $('cancel-pending').disabled = busy;
+  $('cancel-pending').hidden = !access.goalAllowed || !access.readyAt;
   $('end').disabled = busy;
   $('end').hidden = !!access.goalAllowed;
   $('return').disabled = busy || !active;
@@ -88,6 +90,7 @@ async function action(type, extra = {}, navigate = false) {
   try {
     await send(type, extra); error(); render();
     focusTarget = type === 'access-begin' && !$('waiting').hidden ? $('waiting-title') : (type === 'access-cancel' || type === 'access-end') && !$('request').hidden ? $('reason') : null;
+    if (type === 'access-cancel' && access.goalAllowed) focusTarget = $('return');
     if (navigate && (access.enabled === false || access.goalAllowed || access.remainingMs > 0)) {
       if (!$('active').hidden) restoreFocus($('active-title'));
       if (access.enabled !== false && !access.goalAllowed && type === 'access-open' && access.refilledAt && access.refilledAt !== previousRefill) await RefillAnimation.waitForFill($('active-countdown'));
@@ -118,6 +121,7 @@ $('request').addEventListener('submit', event => {
 $('open').addEventListener('click', () => action('access-open', {}, true));
 $('return').addEventListener('click', () => action('access-status', {}, true));
 $('cancel').addEventListener('click', () => action('access-cancel'));
+$('cancel-pending').addEventListener('click', () => action('access-cancel'));
 $('end').addEventListener('click', () => action('access-end'));
 api.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
 addEventListener('focus', refresh);

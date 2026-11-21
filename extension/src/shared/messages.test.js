@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const RuntimeMessages = require('./messages.js');
 const C3Sites = require('../../sites/index.js');
 
-const access = { x: { name: 'X', home: 'https://x.com/home', enabled: true, goalAllowed: false, remainingMs: 0, expiresAt: 0, readyAt: 0, requestExpiresAt: 0, sessionMinutes: 5 } };
+const access = { x: { name: 'X', home: 'https://x.com/home', enabled: true, goalAllowed: false, remainingMs: 0, expiresAt: 0, readyAt: 0, sessionMinutes: 5 } };
 const snapshot = { ok: true, date: '2026-10-11', day: {}, settings: { trackedSites: ['x'] }, access, websiteTimeEnabled: false };
 
 function client(reply) { return RuntimeMessages.create({ async sendMessage() { return reply; } }); }
@@ -108,11 +108,11 @@ test('storage refreshes distinguish access phases from countdown-only writes', (
   for (const next of [
     {}, { x: { ...running, remainingMs: 0 } }, { x: { ...running, expiresAt: 0 } },
     { x: { ...running, date: '2026-10-12' } }, { x: { ...running, refilledAt: 50000 } },
-    { x: { readyAt: 100000, requestExpiresAt: 700000 } }
+    { x: { readyAt: 100000 } }
   ]) assert.equal(RuntimeMessages.shouldRefresh(notification({ x: running }, next), 'local'), true);
   assert.equal(RuntimeMessages.shouldRefresh(notification({}, { x: running }), 'local'), true);
   assert.equal(RuntimeMessages.shouldRefresh(notification({ x: { ...running, expiresAt: 0 } }, { x: running }), 'local'), true);
-  assert.equal(RuntimeMessages.shouldRefresh(notification({ x: { readyAt: 100000, requestExpiresAt: 700000 } }, {}), 'local'), true);
+  assert.equal(RuntimeMessages.shouldRefresh(notification({ x: { readyAt: 100000 } }, {}), 'local'), true);
 });
 
 test('update coordination metadata does not trigger unrelated page refreshes', () => {

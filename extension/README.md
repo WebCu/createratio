@@ -193,11 +193,11 @@ and messages.
    configurable from 1–240 minutes in Settings. Only the active tab in a focused
    browser window uses the budget; other sites remain blocked.
 
-Reloading does not reset the wait. Cancelling does; unconfirmed requests expire
-ten minutes after the wait finishes. The popup can end access early. Remaining
-budgets survive restarts and refill to the configured duration at local midnight,
-without accumulating. Never-opened sites stay blocked; manually ending a session
-cancels its daily refill.
+Reloading does not reset the wait. Once the wait finishes, the request stays
+ready until you confirm it, cancel it, or turn **Limit & track** off for that
+site. The popup can end access early. Remaining budgets survive restarts and
+refill to the configured duration at local midnight, without accumulating.
+Never-opened sites stay blocked; manually ending a session cancels its daily refill.
 
 **Save drafts before expiry:** open tabs redirect to the local blocked page.
 
@@ -556,9 +556,15 @@ Request rules cannot terminate existing connections by themselves; normal expiry
 also redirects open tabs. Embedded frames remain blocked during sessions except
 LinkedIn frames initiated by LinkedIn itself.
 
-Chromium blocking has prior live-browser coverage; Firefox and Edge still need
-live validation before distribution. Automated DOM fixtures cannot confirm current
-logged-in website markup or real sleep/wake behavior.
+Chromium blocking has prior live-browser coverage. On 2026-11-20, source-built
+bundles at `bb07674` were validated live on Microsoft Edge Stable 142.0.3595.94
+and 158.0.4370.33 (both passed the same flows), alongside Firefox 160.0.1, against
+signed-out YouTube: blocking, intention entry and a
+real 60-second wait (premature click rejected), a 5-minute active budget pausing
+off-tab, score dashboard recording consumption, **End session** re-blocking, and
+**Limit & track** Off persisting. Store-published builds, signed-in/authenticated
+YouTube, and trackpad gestures were not covered. Automated DOM fixtures cannot
+confirm current logged-in website markup or real sleep/wake behavior.
 
 Run `pnpm check` and `pnpm check:browser` from the repository root. The browser
 journeys prove selected access and history flows in a disposable Chromium profile,
