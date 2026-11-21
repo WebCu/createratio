@@ -186,7 +186,8 @@ are blocked on HTTP and HTTPS. Blocking covers the whole site, including posting
 and messages.
 
 1. Visit a blocked site or choose **Request access**.
-2. Write an intention of 20–280 characters and start the **60-second wait**.
+2. Write an intention of 20–280 characters and start the **five-minute wait** by
+   default, configurable from 1–240 minutes in Settings.
 3. Explicitly confirm access when the wait finishes. Waiting alone never unlocks.
 4. Use the shared per-site active-time budget: **five minutes** by default,
    configurable from 1–240 minutes in Settings. Only the active tab in a focused

@@ -406,3 +406,19 @@ test('historical site IDs cannot inject CSV formulas or additional columns', () 
   assert.equal(C.aggregate(day).consumeSec, 10);
   assert.ok(!C.csv({ '2026-10-11': day }).includes('formula'));
 });
+
+test('intention wait uses validated defaults, site inheritance and reset', () => {
+  assert.equal(C.siteSettings('x').waitMinutes, 5);
+  assert.equal(C.siteSettings('x', { accessMinutes: 12 }).waitMinutes, 5);
+  assert.equal(C.siteSettings('x', { waitMinutes: 1 }).waitMinutes, 1);
+  for (const value of [null, '5', 0, -1, 1.5, 241, NaN, Infinity]) {
+    assert.equal(C.siteSettings('x', { waitMinutes: value, siteOverrides: { x: { waitMinutes: value } } }).waitMinutes, 5);
+    assert.throws(() => C.updatePreferences({}, { waitMinutes: value }));
+  }
+  let settings = C.updatePreferences({}, { waitMinutes: 10 });
+  settings = C.updatePreferences(settings, { waitMinutes: 2 }, 'x');
+  assert.equal(C.siteSettings('x', settings).waitMinutes, 2);
+  assert.equal(C.siteSettings('linkedin', settings).waitMinutes, 10);
+  settings = C.updatePreferences(settings, { waitMinutes: null }, 'x');
+  assert.equal(C.siteSettings('x', settings).waitMinutes, 10);
+});

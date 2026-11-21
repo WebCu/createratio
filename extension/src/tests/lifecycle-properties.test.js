@@ -57,7 +57,7 @@ async function accessCase({ random, step, steps }, adapter) {
     } else if (type === 'unlock') {
       await ok(w, { type: 'access-begin', site, reason: intent }, gate(site));
       if (enabled[site] && !budget[site]) {
-        elapse(60000);
+        elapse(300000);
         await check();
         budget[site] = minutes[site] * 60000;
       }
@@ -167,7 +167,7 @@ async function deliveryCase({ random, step, steps }, adapter) {
       await ok(w, { type: 'tracking', site, enabled: command.enabled }, popupSender);
     } else if (type === 'unlock') {
       await ok(w, { type: 'access-begin', site, reason: intent }, gate(site));
-      if (enabled[site] && !unlocked[site]) w.advance(60000);
+      if (enabled[site] && !unlocked[site]) w.advance(300000);
       await ok(w, { type: 'access-open', site }, gate(site));
       if (enabled[site]) unlocked[site] = true;
     }
