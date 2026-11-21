@@ -47,6 +47,14 @@ test('normal opens, old or future refills and exhausted budgets do not animate',
   assert.equal(a.target.children.length, 0);
 });
 
+test('malformed refill timestamps from replies never throw or animate', () => {
+  for (const refilledAt of ['100000', {}, [100000], 100000n, true]) {
+    const a = animation();
+    assert.doesNotThrow(() => a.render(a.target, { remainingMs: 300000, refilledAt }), String(refilledAt));
+    assert.equal(a.target.children.length, 0); assert.equal(a.timers.size, 0);
+  }
+});
+
 test('an already-open view announces a missed refill on wake, without replaying it', () => {
   const a = animation(); a.render(a.target, { remainingMs: 100000, refilledAt: 0 });
   a.advance(3600000);
