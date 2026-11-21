@@ -52,15 +52,15 @@ async function ingest(message, sender) {
   return snapshot();
 }
 async function retryDrains() {
-  const stored = await extensionAPI.storage.session.get(null);
-  const pending = Object.entries(stored).filter(([key]) => key.startsWith('_drainRetry:'));
-  let remaining = pending.length;
-  for (const [key, { packet, sender }] of pending.slice(0, C3.DELIVERY_LIMITS.maxPackets)) {
+  const stored = await extensionAPI.storage.session.get('_drainRetries');
+  const pending = stored._drainRetries || [], remaining = pending.slice(C3.DELIVERY_LIMITS.maxPackets);
+  for (const entry of pending.slice(0, C3.DELIVERY_LIMITS.maxPackets)) {
+    const { packet, sender } = entry;
     try { await recordPacket(packet, sender, { [packet.site]: { enabled: false } }); }
-    catch (error) { if (!error.expected) continue; }
-    await extensionAPI.storage.session.remove(key); remaining--;
+    catch (error) { if (!error.expected) remaining.push(entry); }
   }
-  if (remaining) await extensionAPI.alarms.create('drain-retry', { delayInMinutes: 0.5 });
+  if (pending.length) await extensionAPI.storage.session.set({ _drainRetries: remaining });
+  if (remaining.length) await extensionAPI.alarms.create('drain-retry', { delayInMinutes: 0.5 });
   else await extensionAPI.alarms.clear('drain-retry');
 }
 async function drainTracker(tab) {
@@ -83,8 +83,9 @@ async function drainTracker(tab) {
       try { await recordPacket(packet, sender, { [site]: { enabled: false } }, batch); }
       catch (error) {
         if (error.expected) continue;
-        const key = '_drainRetry:' + JSON.stringify([packet.site, packet.generation ?? null, packet.id]);
-        await extensionAPI.storage.session.set({ [key]: { packet, sender } });
+        const stored = await extensionAPI.storage.session.get('_drainRetries');
+        const pending = (stored._drainRetries || []).filter(entry => entry.packet.id !== packet.id || entry.packet.site !== packet.site || (entry.packet.generation ?? null) !== (packet.generation ?? null));
+        await extensionAPI.storage.session.set({ _drainRetries: [...pending.slice(1 - C3.DELIVERY_LIMITS.maxPackets), { packet, sender }] });
         await extensionAPI.alarms.create('drain-retry', { delayInMinutes: 0.5 });
       }
     }

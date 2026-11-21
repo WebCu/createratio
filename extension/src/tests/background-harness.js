@@ -25,8 +25,7 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
     declarativeNetRequest: { async getSessionRules() { return structuredClone(rules); }, async updateSessionRules({ removeRuleIds = [], addRules = [] }) { if (failRules) throw new Error('Rule update failed'); rules = [...rules.filter(rule => !removeRuleIds.includes(rule.id)), ...structuredClone(addRules)]; } },
     action: { async setBadgeText(v) { badge.text = v.text; }, async setBadgeBackgroundColor(v) { badge.color = v.color; }, async setTitle() {} },
     storage: { onChanged: event('storage'), session: {
-      async get(key) { return key === null ? structuredClone(session) : Object.hasOwn(session, key) ? { [key]: structuredClone(session[key]) } : {}; },
-      async remove(key) { delete session[key]; },
+      async get(key) { return Object.hasOwn(session, key) ? { [key]: structuredClone(session[key]) } : {}; },
       async set(values) { Object.assign(session, structuredClone(values)); }
     }, local: { async remove(keys) { if (failRemove) throw new Error('Remove failed'); for (const key of Array.isArray(keys) ? keys : [keys]) delete data[key]; }, async get(keys) { await new Promise(resolve => setImmediate(resolve)); return Object.fromEntries((keys === null ? Object.keys(data) : Array.isArray(keys) ? keys : [keys]).filter(k => data[k] !== undefined).map(k => [k, structuredClone(data[k])])); }, async set(values) { await new Promise(resolve => setImmediate(resolve)); if (failWrites) throw new Error('Storage unavailable'); Object.assign(data, structuredClone(values)); } } }
   };
