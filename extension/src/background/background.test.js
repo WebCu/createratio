@@ -15,6 +15,21 @@ test('initializes Chromium and Firefox backgrounds with their available storage 
   }
 });
 function packet(id, site = 'x') { return { type: 'ingest', id, site, segments: [{ date: C.localDate(), mode: 'consume', sec: 5 }], actions: [] }; }
+test('delayed midnight reconciliation authorizes the continuously running refill', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const w = worker({ settings: { accessMinutes: 1 } }, 'chrome', midnight - 119000);
+  await unlock(w);
+  w.activate('https://x.com/home');
+  await w.send({ type: 'access-status' });
+  assert.equal(w.data._access.x.expiresAt, midnight + 1000);
+  w.advance(62000);
+  assert.equal(w.now, midnight + 3000);
+  const date = C.localDate(new Date(midnight));
+  const result = await w.send({ type: 'ingest', id: 'midnight-refill', site: 'x',
+    segments: [{ date, mode: 'consume', start: midnight, end: w.now, sec: 3 }], actions: [] });
+  assert.equal(result.ok, true);
+  assert.equal(w.data[date].x.consumeSec, 3);
+});
 test('records the final interval of a minute session even after expiry', async () => {
   const w = worker({ settings: { accessMinutes: 1 } });
   await unlock(w);
