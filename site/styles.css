@@ -238,11 +238,6 @@ footer div { display: flex; flex-wrap: wrap; gap: 16px 24px; }
   .has-arrival .arrival { height: calc(var(--arrival-height) + clamp(160px, 32svh, 300px)); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .arrival-stage { height: min(70vh, 640px); }
-  .attention-orbit, .distractions { display: none; }
-}
-
 @media (max-width: 1000px) {
   .page { padding: 0 32px; }
   .hero { gap: 32px; }
@@ -300,11 +295,22 @@ footer div { display: flex; flex-wrap: wrap; gap: 16px 24px; }
 }
 
 @media (max-height: 450px) {
-  .distractions { display: none; }
-  .arrival-stage { min-height: 0; }
   .arrival-thought { font-size: clamp(40px, 9vh, 64px); }
   .arrival-caption { margin-top: 20px; font-size: 18px; }
-  .arrival-header { top: 12px; flex-direction: row; align-items: center; }
-  .arrival-header p { max-width: 32ch; font-size: 12px; }
-  .scroll-hint { bottom: 12px; }
+}
+
+@media (max-height: 38rem), (max-width: 20rem), (prefers-reduced-motion: reduce) {
+  .arrival { --arrival-layout: compact; }
+  .arrival-stage {
+    height: auto;
+    min-height: min(70vh, 640px);
+    padding: 20px clamp(16px, 5vw, 32px);
+    grid-template-rows: auto 1fr auto;
+    gap: 20px;
+    overflow-wrap: anywhere;
+  }
+  .arrival-header { position: static; width: 100%; align-self: start; flex-wrap: wrap; }
+  .arrival-center { padding: 0; }
+  .scroll-hint { position: static; align-self: end; transform: none; animation: none; white-space: normal; }
+  .attention-orbit, .distractions { display: none; }
 }
