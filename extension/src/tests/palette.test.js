@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const C3 = require('../../core/core.js');
 
 function stylesheet(file) {
   const css = fs.readFileSync(path.join(__dirname, file), 'utf8');
@@ -13,7 +14,11 @@ function stylesheet(file) {
     const value = declarations(selector)[property];
     return value.startsWith('var(') ? tokens[value.slice(4, -1)] : value;
   };
-  return { tokens, color };
+  const card = selector => {
+    const values = { ...declarations('.score-card'), ...declarations(selector) };
+    return Object.fromEntries(Object.entries(values).filter(([name]) => name.startsWith('--card-')).map(([name, value]) => [name, value.startsWith('var(') ? tokens[value.slice(4, -1)] : value]));
+  };
+  return { tokens, color, declarations, card };
 }
 function luminance(hex) {
   if (hex.length === 4) hex = '#' + [...hex.slice(1)].map(value => value + value).join('');
@@ -39,8 +44,13 @@ test('website and extension share readable violet branding and text', () => {
 });
 test('extension score-card text and chart bars remain readable', () => {
   const css = stylesheet('../shared/popup.css');
-  const surface = css.color('.score-card', 'background');
-  for (const selector of ['.caption', '.score-card p', '.goal small']) contrast(css.color(selector, 'color'), surface, 4.5, selector);
+  for (const band of ['none', 'high', 'mid', 'low']) {
+    const card = band === 'none' ? css.card('.score-card') : css.card(`.score-card[data-score=${band}]`);
+    for (const selector of ['.caption', '.score-card p', '.goal small']) assert.equal(css.declarations(selector).color, 'var(--card-text)', selector);
+    contrast(card['--card-text'], card['--card-surface'], 4.5, `${band} score card text`);
+    contrast(card['--card-accent'], card['--card-surface'], 3, `${band} score card target arrow`);
+    if (band !== 'none') contrast(C3.scoreColor({ high: 1, mid: 0.5, low: 0 }[band]), card['--card-surface'], 3, `${band} score on its card`);
+  }
   for (const token of ['--green', '--consume']) contrast(css.tokens[token], css.tokens['--paper'], 3, `${token}: chart bar`);
   contrast(css.tokens['--muted'], css.color('.view-nav', 'background'), 4.5, 'navigation text');
 });
