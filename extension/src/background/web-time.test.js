@@ -42,6 +42,14 @@ test('domain-only HTTP/S identifiers, duration, range totals, ordering and CSV',
   assert.deepEqual(WebTime.summarize({ '2026-10-11': { invalid: -1, nan: NaN } }), []);
 });
 
+test('website shares round to whole percentages that add up to 100', () => {
+  assert.deepEqual(WebTime.shares([['a', 1], ['b', 1], ['c', 1]]), [34, 33, 33]);
+  assert.deepEqual(WebTime.shares([['a', 4], ['b', 3], ['c', 3], ['d', 3], ['e', 3], ['f', 3], ['g', 3]]), [18, 14, 14, 14, 14, 13, 13]);
+  assert.deepEqual(WebTime.shares([['a', 2], ['b', 1]]), [67, 33]);
+  assert.deepEqual(WebTime.shares([['a', 120]]), [100]);
+  assert.deepEqual(WebTime.shares([]), []);
+});
+
 test('website CSV treats formula-like domains as text without changing ordinary domains', () => {
   const domains = ['=1+1', '+1', '-example.test', '@example.test', '\t=1+1', '\r=1+1', '\n=1+1'];
   const day = Object.fromEntries(domains.map(domain => [domain, 5]));
