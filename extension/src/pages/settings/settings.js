@@ -6,6 +6,7 @@ const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site
 let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, refreshPending = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
 let scrollEditing = false, scrollPending = null, scrollSaving = null;
 let saveDismissTimer = null, saveCleanupTimer = null;
+let historyVersion = 0;
 function clearSaved() {
   clearTimeout(saveDismissTimer); clearTimeout(saveCleanupTimer);
   saveDismissTimer = saveCleanupTimer = null;
@@ -329,9 +330,11 @@ $('intention-history-enabled').addEventListener('change', async () => {
   finally { intentionSettingBusy = false; void refresh(); }
 });
 async function exportHistory(kind, button) {
+  const version = historyVersion;
   button.disabled = true;
   try {
     const result = await messages.send({ type: 'history', kind, range: 'month' }, 'Unable to export history.');
+    if (version !== historyVersion) throw new Error('History changed while loading. Please try again.');
     const csv = kind === 'ratio' ? C3.csv(result.days) : WebTime.csv(result.days);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
@@ -350,6 +353,9 @@ $('clear-history').addEventListener('click', async () => {
     saved('History cleared and creation score reset. Sites open only through Above-goal access are blocked again. Timed access sessions are unchanged.');
   } catch (e) { error(e.message); } finally { $('clear-history').disabled = false; }
 });
-extensionAPI.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
+extensionAPI.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) historyVersion++;
+  if (RuntimeMessages.shouldRefresh(changes, area)) void refresh();
+});
 addEventListener('focus', refresh);
 void refresh();

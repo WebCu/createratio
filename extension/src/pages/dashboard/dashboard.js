@@ -4,11 +4,12 @@ const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
 let reportURL = null, reportTimer = null, reportVersion = 0;
+let errorVersion = 0;
 function nextDay() {
   const now = new Date();
   setTimeout(() => { nextDay(); void refresh(true); }, new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime() + 100);
 }
-function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
+function error(message = '') { errorVersion++; $('error').textContent = message; $('error').hidden = !message; }
 function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
 function svgElement(tag, attrs = {}, text) {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -96,6 +97,7 @@ function renderRatio(days) {
 }
 async function refresh(requested = false) {
   if (refreshing) { if (requested) refreshPending = true; return; } refreshing = true;
+  const version = errorVersion;
   try {
     const snapshot = await messages.send({ type: 'snapshot' }, 'Unable to load your data.');
     websiteTimeEnabled = snapshot.websiteTimeEnabled;
@@ -107,7 +109,7 @@ async function refresh(requested = false) {
       else if (view === 'websites') { intentions = []; renderWebsites(result.days); }
       else { intentions = result.intentions; renderIntentions(); }
     }
-    error();
+    if (version === errorVersion) error();
   } catch (e) { error(e.message); } finally { refreshing = false; if (refreshPending) { refreshPending = false; void refresh(); } }
 }
 for (const view of ['ratio', 'websites', 'intentions']) $(view + '-view').addEventListener('click', () => {
@@ -128,6 +130,7 @@ $('intention-clear').addEventListener('click', async () => {
 });
 $('website-range').addEventListener('change', () => { void refresh(true); });
 async function exportHistory(kind) {
+  const version = reportVersion;
   const websites = kind === 'websites';
   const failure = websites ? 'Unable to export website time.' : 'Unable to export history.';
   try {
@@ -135,6 +138,7 @@ async function exportHistory(kind) {
       await messages.send({ type: 'snapshot' }, failure);
     }
     const data = await messages.send({ type: 'history', kind, range: 'month' }, failure);
+    if (version !== reportVersion) throw new Error('History changed while loading. Please try again.');
     const csv = websites ? WebTime.csv(data.days) : C3.csv(data.days);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url; link.download = `CreateRatio${websites ? '-websites' : ''}-${C3.localDate()}.csv`; document.body.append(link); link.click(); link.remove();
