@@ -29,7 +29,7 @@ test('agents discover site-specific actions and complete the existing access UI 
       assert.match(reason.description.value, /20–280/);
       await browser.cdp.send('DOM.focus', { backendNodeId: reason.backendDOMNodeId }, gate.session);
       await browser.cdp.send('Input.insertText', { text: 'Review the synthetic launch plan, then leave.' }, gate.session);
-      await clickNamed(gate, 'Start the 60-second wait');
+      await clickNamed(gate, 'Start the 300-second wait');
       await eventually(() => inspect(gate, '!document.querySelector("#waiting").hidden && !document.querySelector("#cancel").disabled'), 'waiting acknowledged');
       await find(gate, 'region', 'A little breathing room.');
       const openName = 'Open X for 5 active minutes';

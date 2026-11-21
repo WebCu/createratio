@@ -60,7 +60,7 @@ export async function platformJourney(platform) {
           await click(browser, page, '#reason');
           await browser.cdp.send('Input.insertText', { text: 'Write a thoughtful synthetic comment, then leave.' }, page.session);
           await click(browser, page, '#begin');
-          const request = await eventually(() => evaluate(browser, browser.worker, `chrome.storage.local.get('_access').then(data => data._access?.[${id}]?.readyAt && data._access[${id}])`), 'real 60-second wait saved');
+          const request = await eventually(() => evaluate(browser, browser.worker, `chrome.storage.local.get('_access').then(data => data._access?.[${id}]?.readyAt && data._access[${id}])`), 'real five-minute wait saved');
           assert.equal(await evaluate(browser, page.session, 'document.querySelector("#open").disabled'), true);
           await browser.setTime(request.readyAt + 100);
           await eventually(() => evaluate(browser, page.session, '!document.querySelector("#open").disabled'), 'explicit access confirmation ready');

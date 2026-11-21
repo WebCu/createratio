@@ -50,7 +50,7 @@ async function request(w) {
 
 async function openSession(w) {
   const p = await request(w);
-  w.advance(60000);
+  w.advance(300000);
   p.timer(1000);
   await p.nodes.open.fire('click');
   assert.deepEqual(p.state.redirects, ['https://x.com/home']);
@@ -154,16 +154,16 @@ for (const browser of ['chrome', 'browser']) {
     assert.match(popup.state.tabs.at(-1).url, /blocked\.html\?site=x$/);
 
     const blocked = await request(w);
-    assert.equal(blocked.nodes.clock.textContent, '1:00');
+    assert.equal(blocked.nodes.clock.textContent, '5:00');
     assert.equal(blocked.nodes.open.disabled, true);
     assert.match(blocked.nodes['reason-hint'].textContent, /saved on this device/);
     assert.equal((await w.send({ type: 'access-status' })).access.x.remainingMs, 0);
 
     w.advance(30000);
     const reloaded = await ui(w, 'blocked');
-    assert.equal(reloaded.nodes.clock.textContent, '0:30');
+    assert.equal(reloaded.nodes.clock.textContent, '4:30');
     assert.equal(reloaded.nodes.open.disabled, true);
-    w.advance(29000);
+    w.advance(269000);
     reloaded.timer(1000);
     assert.equal(reloaded.nodes.clock.textContent, '0:01');
     assert.equal(reloaded.nodes.open.disabled, true);

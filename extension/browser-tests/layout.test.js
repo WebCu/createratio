@@ -151,7 +151,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
     });
     await journey('session and intention wait columns align with defaults and keep custom wait resets usable', async () => {
       const sites = require('../sites/index.js').sites.filter(site => site.gated);
-      await seedAccess(browser, sites.map(site => site.id), { trackedSites: sites.map(site => site.id), accessMinutes: 5, waitMinutes: 1, siteOverrides: {}, allowAboveGoal: false });
+      await seedAccess(browser, sites.map(site => site.id), { trackedSites: sites.map(site => site.id), accessMinutes: 5, waitMinutes: 5, siteOverrides: {}, allowAboveGoal: false });
       for (const width of [1100, 760, 400, 320]) {
         const page = await pageAt('/settings.html', width);
         await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings select").length === 14'), 'paired time controls ready');

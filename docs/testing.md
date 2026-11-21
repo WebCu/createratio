@@ -264,7 +264,7 @@ cannot support Chromium's sandbox. External traffic is blocked
 by interception, an unusable proxy, and DNS isolation; supported-site navigations
 receive synthetic offline HTML. Trusted CDP input drives the actual extension UI,
 waiting for painted, stable geometry and a matching hit target before dispatch.
-The tests shift `Date` in pages and the worker to check the 60-second wait and
+The tests shift `Date` in pages and the worker to check the five-minute default wait and
 expiry without minute-long sleeps; native timers and monotonic time remain real.
 
 Use `findByRole(browser, page, role, name)` and `clickByRole(...)` from
@@ -491,7 +491,7 @@ Before a release, verify:
   Instagram, Facebook, YouTube and Reddit all start On for fresh installs; saved On/Off
   choices survive updates without adding sites to an existing selection. Verify browser
   approval of expanded hosts.
-- Reloading preserves the 60-second wait; only explicit confirmation unlocks.
+- Reloading preserves the configured wait (five minutes by default); only explicit confirmation unlocks.
 - Access budgets are shared per site, pause on tab/window changes, survive
   restarts, refill at local midnight, and revoke access at expiry or manual end.
   A worker wake deducts elapsed active time; actual browser downtime does not.

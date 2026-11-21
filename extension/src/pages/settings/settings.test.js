@@ -551,9 +551,9 @@ test('paired time selectors identify their site and setting without relying on t
 test('intention wait controls save defaults, overrides, reset, custom values and errors', async () => {
   const p = settingsPage(); await p.ready();
   const input = p.nodes['waitMinutes-default'], site = p.nodes['waitMinutes-site-x'];
-  assert.equal(input.value, 1); assert.equal(site.value, 'default');
-  input.value = '5'; await input.fire('change'); await p.ready();
-  assert.equal(p.settings.waitMinutes, 5);
+  assert.equal(input.value, 5); assert.equal(site.value, 'default');
+  input.value = '1'; await input.fire('change'); await p.ready();
+  assert.equal(p.settings.waitMinutes, 1);
   site.value = 'custom'; await site.fire('change'); await p.ready();
   p.nodes['customWaitMinutes-site-x'].value = '2';
   await p.nodes['custom-wait-duration-site-x'].fire('submit', { preventDefault() {} }); await p.ready();
@@ -561,5 +561,5 @@ test('intention wait controls save defaults, overrides, reset, custom values and
   await p.nodes['wait-reset-x'].fire('click'); await p.ready();
   assert.equal(site.value, 'default');
   p.fail = true; input.value = '10'; await input.fire('change'); await p.ready();
-  assert.equal(input.value, 5); assert.equal(p.nodes.error.hidden, false);
+  assert.equal(input.value, 1); assert.equal(p.nodes.error.hidden, false);
 });

@@ -218,8 +218,8 @@ for (const browser of ['chrome', 'browser']) {
       assert.deepEqual(rulesFor(w), []);
       const begin = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
       assert.equal(begin.ok, true);
-      assert.equal(begin.access.x.readyAt, now + 60000);
-      w.advance(59999);
+      assert.equal(begin.access.x.readyAt, now + 300000);
+      w.advance(299999);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       w.advance(1);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).access.x.remainingMs, 300000);
@@ -244,7 +244,7 @@ test('malformed restored access containers and entries fail closed without worke
     assert.equal(w.errors.length, 0);
     const begin = await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
     assert.equal(begin.ok, true);
-    assert.equal(begin.access.x.readyAt, now + 60000);
+    assert.equal(begin.access.x.readyAt, now + 300000);
     assert.equal(Array.isArray(w.data._access), false);
   }
 });
@@ -289,7 +289,7 @@ for (const browser of ['chrome', 'browser']) {
       const w = worker({ settings: { intentionHistoryEnabled: true }, _intentions: history }, browser, now);
       const result = await w.send({ type: 'access-begin', site: 'x', reason: '  ' + intent + '  ' }, gate('x'));
       assert.equal(result.ok, true);
-      assert.equal(result.access.x.readyAt, now + 60000);
+      assert.equal(result.access.x.readyAt, now + 300000);
       assert.equal(w.errors.length, 0);
       const expected = [...(Array.isArray(history) ? [old] : []), { site: 'x', reason: intent, requestedAt: now }];
       assert.deepEqual(w.data._intentions, expected);
@@ -342,7 +342,7 @@ test('access validation delegates to shared domain policy without applying new-i
     assert.deepEqual(validations.validIntention, [reason]);
   }
   validations.validIntention.length = 0;
-  assert.equal((await w.handle({ type: 'access-begin', site: 'x', reason: intent }, gate('x'))).access.x.readyAt, now + 60000);
+  assert.equal((await w.handle({ type: 'access-begin', site: 'x', reason: intent }, gate('x'))).access.x.readyAt, now + 300000);
   assert.deepEqual(validations.validIntention, [intent]);
   assert.deepEqual(structuredClone(await w.handle({ type: 'access-history-list' }, dashboardSender)), { ok: true, intentions: [] });
   for (const minutes of [1, 240]) {

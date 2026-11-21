@@ -23,7 +23,7 @@ for (const browser of ['chrome', 'browser']) {
       w.tabs.push({ id: 1, url: home });
       assert.equal((await w.send({ type: 'access-begin', site, reason: intent }, gate(site))).ok, true);
       assert.equal((await w.send({ type: 'access-open', site }, gate(site))).ok, false);
-      w.advance(60000);
+      w.advance(300000);
       assert.equal((await status(w))[site].remainingMs, 0, 'waiting alone never unlocks');
       assert.equal((await w.send({ type: 'access-open', site }, gate(site))).ok, true);
       w.activate(home);
@@ -55,7 +55,7 @@ for (const browser of ['chrome', 'browser']) {
   }
   test(`${browser}: worker replacement charges the active deadline and repeated wakes cannot refill it`, async () => {
     const session = {};
-    const first = worker({}, browser, start - 60000, { session });
+    const first = worker({}, browser, start - 300000, { session });
     await unlock(first);
     first.activate('https://x.com/home');
     assert.equal((await status(first)).x.remainingMs, 300000);
@@ -77,7 +77,7 @@ for (const browser of ['chrome', 'browser']) {
 
   test(`${browser}: wake away from the active site charges elapsed time before pausing`, async () => {
     const session = {};
-    const first = worker({}, browser, start - 60000, { session });
+    const first = worker({}, browser, start - 300000, { session });
     await unlock(first);
     first.activate('https://x.com/home');
     await status(first);
@@ -93,7 +93,7 @@ for (const browser of ['chrome', 'browser']) {
 
   test(`${browser}: paused budgets survive worker replacement and browser downtime`, async () => {
     const session = {};
-    const first = worker({}, browser, start - 60000, { session });
+    const first = worker({}, browser, start - 300000, { session });
     await unlock(first);
     first.activate('https://x.com/home');
     await status(first);
@@ -110,7 +110,7 @@ for (const browser of ['chrome', 'browser']) {
   });
 
   test(`${browser}: cold load preserves budget before delayed startup and startup cannot refund active time`, async () => {
-    const first = worker({}, browser, start - 60000, { session: {} });
+    const first = worker({}, browser, start - 300000, { session: {} });
     await unlock(first);
     first.activate('https://x.com/home');
     await status(first);
@@ -128,7 +128,7 @@ for (const browser of ['chrome', 'browser']) {
 
   test(`${browser}: an expired deadline on worker wake closes every site tab without granting access`, async () => {
     const session = {};
-    const first = worker({}, browser, start - 60000, { session });
+    const first = worker({}, browser, start - 300000, { session });
     await unlock(first);
     first.activate('https://x.com/home');
     await status(first);
@@ -151,7 +151,7 @@ for (const browser of ['chrome', 'browser']) {
     const midnight = new Date(2026, 9, 12).getTime();
     for (const restart of [false, true]) {
       const session = {};
-      const first = worker({}, browser, midnight - 120000, { session });
+      const first = worker({}, browser, midnight - 360000, { session });
       await unlock(first);
       first.activate('https://x.com/home');
       await status(first);
@@ -168,7 +168,7 @@ for (const browser of ['chrome', 'browser']) {
 
   test(`${browser}: above-goal budgets stay paused over wake and resume when the goal exception ends`, async () => {
     const session = {};
-    const first = worker({}, browser, start - 60000, { session });
+    const first = worker({}, browser, start - 300000, { session });
     await unlock(first);
     first.activate('https://x.com/home');
     await status(first);
