@@ -57,6 +57,10 @@ async function tracker(browser = 'chrome', options = {}) {
   await new Promise(resolve => setImmediate(resolve));
   return {
     packets, messages, elements, warnings, document: doc, editor: fixture.editor, button: fixture.button,
+    async reinject() {
+      for (const file of ['lifecycle.js', 'content.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../content', file), 'utf8'), context);
+      await new Promise(resolve => setImmediate(resolve));
+    },
     notify() { for (const listener of runtimeListeners) listener({ type: 'refresh' }, { id: 'extension' }, () => {}); },
     command(message) { return new Promise(resolve => { for (const listener of runtimeListeners) listener(message, { id: 'extension' }, resolve); }); },
     listenerCount: type => (events[type] || []).length,

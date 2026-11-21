@@ -144,18 +144,86 @@ Build the fixed baseline and candidate into separate directories, then run:
 node bin/update-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/update-profile.json
 ```
 
-The runner alternates three runs per build, each with eight synthetic website
-tabs and Website time enabled in a fresh profile. Only the disposable manifests
-promote optional `tabs`/`idle` permissions to simulate an already-approved opt-in.
-All debugger sessions are detached during each 42-second observation. When comparing
-against an already-idle baseline, append `--baseline-idle`; both builds must then
-shut down. Without that flag, the baseline must remain running and the candidate
-must shut down. Browser-level target inventory observes shutdown without calling
-worker APIs. Bundle hashes
-must remain unchanged. Reports include per-run shutdown times and summed process
-RSS; compare median and range, not a selected run. Summed RSS is not private heap,
-shared-memory-adjusted browser memory or a zero-memory claim. Store delivery,
-Firefox, real sleep/wake and resource acceptance remain separate gates.
+The existing update runner alternates three runs per build with eight synthetic
+website tabs and Website time enabled. Disposable manifests promote optional
+`tabs`/`idle` permissions only. Every debugger is detached during each 42-second
+observation. Append `--baseline-idle` when both builds should shut down; otherwise
+the baseline must remain running and the candidate must shut down. Its summed
+browser-process RSS is not worker-specific or shared-memory-adjusted memory.
+
+### Tracker navigation and worker attribution
+
+The following companion workload adds attribution, repeated navigation and a
+natural idle/wake recovery journey without replacing the Website time comparison.
+Build the fixed baseline and candidate into separate directories. Both must
+support the current tracker and Slow scrolling contracts. Select an installed
+Chromium with `CHROMIUM_PATH`, then run:
+
+```sh
+node bin/tracker-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/tracker-profile.json --baseline-idle
+node bin/lifecycle-profile-report.mjs /tmp/tracker-profile.json > /tmp/tracker-profile.md
+```
+
+This alternates three fresh profiles per build with eight synthetic X tabs,
+three full navigation cycles, a seeded access session and saved 75% resistance.
+Each current document must apply its initial tracking preferences before sampling;
+DOM readiness or access-guard readiness alone is insufficient. Post-GC page-heap
+samples identify their V8 isolates, with an uninjected page as a separate control.
+Do not sum co-resident targets' isolate heaps or renderer DOM counts.
+
+All debugger sessions are detached during each 42-second idle observation.
+Browser-level target inventory observes natural worker absence; foregrounding the
+same website document must wake a replacement worker and restore the saved
+resistance, including its effect on actual wheel input. The fixture records and
+clears scheduled alarms immediately before observation, restoring them after wake
+with at least one minute remaining. This isolates idle behavior, not scheduled
+access enforcement. Website time stays off; manifests and permissions are unchanged.
+
+`--baseline-idle` requires both builds to shut down. Omit it only for a deliberately
+non-idle baseline; the candidate must still shut down. Unique user-timing trace
+marks attribute worker/page processes, with shared processes and isolates recorded.
+Linux `/proc` samples report worker-containing-process PSS/private memory separately
+from page heap and CDP-listed whole-browser RSS. PID identity is rechecked; exited
+processes, missing/inaccessible counters and unsupported platforms are distinct.
+Unavailable values are null, never false zero or a lifecycle failure. Process
+memory is not worker-isolate-only memory, and worker exit is not zero extension RAM.
+
+### Settings-control resource comparison
+
+```sh
+node bin/settings-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/settings-profile.json
+node bin/lifecycle-profile-report.mjs /tmp/settings-profile.json > /tmp/settings-profile.md
+```
+
+This uses the same disposable Chromium runner, bundle fingerprints, attribution
+and reporting helpers: three alternating runs per build, four real built Settings
+pages and twelve cycles after warm-up. Each cycle refreshes preferences, changes a
+preset, opens/saves/cancels Custom, and restores Default inheritance. Every third
+cycle reloads each page and verifies the inherited choice. Synthetic select changes
+exercise the real page handlers; Save/Cancel use trusted browser clicks. No browser
+API or production polling is replaced. Extra pages close before a final retained
+page sample; this verifies target teardown, not immediate process reclamation.
+
+Post-GC checkpoints at cycles 0, 6 and 12 reject growth in connected DOM elements,
+retained detached Node wrappers, renderer documents and listener counts over
+warm-up, while retaining heap measurements without inventing a heap tolerance.
+`Runtime.queryObjects` inspects current-realm Node wrappers and releases its remote
+handles after each sample. Total wrapper counts vary with V8 wrapper caching;
+renderer-wide node counts also include browser/native state. Both totals remain
+informational; shared-isolate/renderer counts are not per-page totals. Built-browser
+regressions independently retain a detached control or a listener and require each
+fault to fail, in disposable fixtures only.
+
+Both commands require a new output path and preserve incremental, versioned JSON
+outside Git. Interrupted reports remain incomplete; failed reports cannot be
+formatted as successful evidence. Reports fingerprint all input bundle files and
+workload sources, reject mixed/incomplete repetitions and environments, and render
+median/range tables. Input bundles are copied before launch and must stay unchanged.
+Use `BROWSER_TIMEOUT_MS=180000` if the Settings workload exceeds the normal per-profile
+watchdog. Keep generated tables outside Git too. Identical-build comparisons validate
+instrumentation, not an optimization. Measurements do not establish or relax a
+resource budget; maintainer acceptance, store delivery, native Firefox/Edge and real
+sleep/wake remain separate gates.
 
 ### Scroll-friction resource comparison
 
@@ -218,6 +286,16 @@ The first two examples deepen existing features rather than add functionality:
 Fast integration journeys and seeded lifecycle properties live in
 `extension/src/tests/`; real built-extension journeys live in
 `extension/browser-tests/`. Run the focused loop with `pnpm test:tracers`.
+
+Coordinated-update interruption coverage in
+`extension/src/tests/update-interruptions.test.js` connects two live trackers to
+the real storage/message path, with a discarded-tab control. Cases name the browser
+adapter, client order and interruption point (before/after recovery persistence,
+partial commit, or before reload). Replay one case with Node's
+`--test-name-pattern` option. Lost acknowledgements, failed saving and failed
+reinjection must preserve queued packets without duplicate credit; restored inactive
+clients must return to quiet idle. These deterministic cases complement rather than
+replace the real Chromium same-document update journeys.
 
 ### Replaying properties
 
