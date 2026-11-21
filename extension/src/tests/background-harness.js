@@ -21,7 +21,7 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
     permissions: { async contains() { return websitePermissions; }, onRemoved: { addListener() {} } },
     windows: { async getLastFocused() { return { id: 1, focused, type: 'normal' }; }, onFocusChanged: event('focus') },
     idle: { setDetectionInterval() {}, async queryState() { return 'active'; }, onStateChanged: { addListener() {} } },
-    tabs: { async query(query) { return query.active ? activeTab ? [activeTab] : [] : tabs; }, async update(id, changes) { Object.assign(tabs.find(tab => tab.id === id), changes); }, onActivated: event('activate'), onUpdated: event('update'), onRemoved: event('remove') },
+    tabs: { async query(query) { return query.active ? activeTab ? [activeTab] : [] : tabs; }, async sendMessage(id, message, target) { return options.sendTabMessage?.(id, message, target); }, async update(id, changes) { await options.onTabUpdate?.(id, changes); Object.assign(tabs.find(tab => tab.id === id), changes); }, onActivated: event('activate'), onUpdated: event('update'), onRemoved: event('remove') },
     declarativeNetRequest: { async getSessionRules() { return structuredClone(rules); }, async updateSessionRules({ removeRuleIds = [], addRules = [] }) { if (failRules) throw new Error('Rule update failed'); rules = [...rules.filter(rule => !removeRuleIds.includes(rule.id)), ...structuredClone(addRules)]; } },
     action: { async setBadgeText(v) { badge.text = v.text; }, async setBadgeBackgroundColor(v) { badge.color = v.color; }, async setTitle() {} },
     storage: { onChanged: event('storage'), session: {
@@ -31,7 +31,7 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
   };
   if (options.localStorage) api.storage.local = options.localStorage;
   if (browser === 'chrome') api.storage.local.setAccessLevel = async options => { accessLevels.push(options.accessLevel); };
-  const context = vm.createContext({ console: { ...console, error(...args) { errors.push(args); } }, URL, TextEncoder, crypto, Date: Clock, setInterval() { return 1; }, clearInterval() {}, [browser]: api });
+  const context = vm.createContext({ console: { ...console, error(...args) { errors.push(args); } }, URL, TextEncoder, crypto, Date: Clock, setTimeout, clearTimeout, setInterval() { return 1; }, clearInterval() {}, [browser]: api });
   const load = file => {
     if (file === 'sites.js') {
       for (const script of require('../../build.js').SITE_SCRIPTS) vm.runInContext(fs.readFileSync(path.join(__dirname, '../..', script), 'utf8'), context);

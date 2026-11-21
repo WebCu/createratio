@@ -15,6 +15,8 @@ const SiteAccess = (() => {
   }
   const SITES = Object.fromEntries(C3Sites.sites.filter(site => site.gated).map(site => [site.id, { name: site.name, ...C3Sites.get(site.id).access }]));
   const api = globalThis.browser || globalThis.chrome;
+  let beforeNavigate = async () => {};
+  function setBeforeNavigate(handler) { beforeNavigate = handler; }
   const contracts = MessageContracts.create(C3, api.runtime, C3Sites);
   function siteForURL(raw) { return C3Sites.forAccessURL(raw)?.id || null; }
   function gateURL(site) { return api.runtime.getURL('blocked.html') + '?site=' + site; }
@@ -58,7 +60,10 @@ const SiteAccess = (() => {
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
     const tabs = await api.tabs.query({ url: patterns });
-    await Promise.all(tabs.filter(tab => siteForURL(tab.url) === site).map(tab => api.tabs.update(tab.id, { url: gateURL(site) }).catch(() => {})));
+    await Promise.all(tabs.filter(tab => siteForURL(tab.url) === site).map(async tab => {
+      await beforeNavigate(tab);
+      await api.tabs.update(tab.id, { url: gateURL(site) }).catch(() => {});
+    }));
   }
   async function reconcile(closeAll = false) {
     const restart = !(await api.storage.session.get('_accessInitialized'))._accessInitialized;
@@ -167,10 +172,12 @@ const SiteAccess = (() => {
     }
     return { ok: true };
   }
-  async function readAccessStatus() {
+  async function readAccessStatus(sender) {
     const access = await reconcile();
+    const site = sender?.frameId === 0 && sender?.tab && siteForURL(sender.url);
+    if (site && access[site].enabled && !access[site].goalAllowed && !access[site].remainingMs) await closeTabs(site);
     const stored = await api.storage.local.get('settings');
-    return { ok: true, access, intentionHistoryEnabled: stored.settings?.intentionHistoryEnabled === true };
+    return { ok: true, access, intentionHistoryEnabled: stored.settings?.intentionHistoryEnabled === true, navigationHandled: !!site };
   }
   async function beginWait(message, state, stored, now) {
     if (!C3.validIntention(message.reason)) return { ok: false, error: `Write a specific intention of ${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters.` };
@@ -241,9 +248,9 @@ const SiteAccess = (() => {
       case 'access-history-clear':
       case 'access-history-list': return manageIntentions(message, sender);
       case 'access-duration': return setDuration(message, sender);
-      case 'access-status': return readAccessStatus();
+      case 'access-status': return readAccessStatus(sender);
       default: return handleSession(message, sender);
     }
   }
-  return { handle, reconcile, siteForURL, gateURL, creationPacket };
+  return { handle, reconcile, siteForURL, gateURL, creationPacket, setBeforeNavigate };
 })();

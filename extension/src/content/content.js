@@ -206,7 +206,12 @@
     listeners.length = 0;
     extensionAPI.runtime.onMessage.removeListener(receive);
   }
-  function receive(message) {
+  function receive(message, sender, respond) {
+    if (message.type === 'drain-tracker' && sender.id === extensionAPI.runtime.id && !stopped) {
+      settle(); queuePacket();
+      respond({ packets: outbox });
+      return;
+    }
     if (message.type === 'refresh' && !stopped && !updating) { refresh(); void pump(); }
   }
   extensionAPI.runtime.onMessage.addListener(receive);

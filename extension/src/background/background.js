@@ -3,6 +3,7 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 if (typeof importScripts === 'function') importScripts('sites.js', 'core.js', 'messages.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'updates.js');
 
 let queue = Promise.resolve();
+let drainWrites = Promise.resolve();
 function serialized(task) {
   const next = queue.then(task); queue = next.catch(() => {}); return next;
 }
@@ -10,6 +11,7 @@ const contracts = MessageContracts.create(C3, extensionAPI.runtime, C3Sites);
 const history = ActivityHistory.create(extensionAPI.storage.local, C3);
 const websiteTime = WebTime.create(extensionAPI, serialized, C3, history);
 const updates = ExtensionUpdates.create(extensionAPI, serialized, async () => { await websiteTime.tick(); await SiteAccess.reconcile(); });
+SiteAccess.setBeforeNavigate(drainTracker);
 async function badge(day) {
   const value = C3.score(C3.aggregate(day));
   await Promise.all([
@@ -26,17 +28,39 @@ async function snapshot() {
   await badge(day);
   return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: C3.settingsSnapshot(stored.settings), access: await SiteAccess.reconcile(), websiteTimeEnabled: websiteTime.enabled };
 }
-async function ingest(message, sender) {
-  if (!contracts.creationSender(message, sender)) return { ok: false, error: 'Unsupported sender', retryable: false };
+async function recordPacket(message, sender, access) {
+  if (message?.type !== 'ingest') throw MessageContracts.refuse('Invalid activity packet');
+  if (!contracts.creationSender(message, sender)) throw MessageContracts.refuse('Unsupported sender');
   await history.prepare();
   const preferences = await extensionAPI.storage.local.get(['settings', '_historyGeneration']);
-  if ((message.generation ?? null) !== (preferences._historyGeneration ?? null)) return snapshot();
-  if (!C3.trackingEnabled(message.site, preferences.settings)) return snapshot();
+  if ((message.generation ?? null) !== (preferences._historyGeneration ?? null)) return;
+  if (!C3.trackingEnabled(message.site, preferences.settings)) return;
   contracts.packet(message);
-  const access = await SiteAccess.reconcile();
-  const packet = await SiteAccess.creationPacket(message, access);
+  const packet = await SiteAccess.creationPacket(message, access || await SiteAccess.reconcile());
   if (packet.segments.length || packet.actions.length) await history.recordCreation(packet);
+}
+async function ingest(message, sender) {
+  await recordPacket(message, sender);
   return snapshot();
+}
+async function drainTracker(tab) {
+  let timer, response;
+  try {
+    response = await Promise.race([
+      extensionAPI.tabs.sendMessage(tab.id, { type: 'drain-tracker' }, { frameId: 0 }),
+      new Promise(resolve => { timer = setTimeout(resolve, 300); })
+    ]);
+  } catch (_) { return; }
+  finally { clearTimeout(timer); }
+  if (!Array.isArray(response?.packets) || response.packets.length > C3.DELIVERY_LIMITS.maxPackets) return;
+  const site = SiteAccess.siteForURL(tab.url);
+  const sender = { id: extensionAPI.runtime.id, tab, frameId: 0, url: tab.url };
+  for (const packet of response.packets) {
+    const write = drainWrites.then(() => recordPacket(packet, sender, { [site]: { enabled: false } }));
+    drainWrites = write.catch(() => {});
+    try { await write; }
+    catch (error) { if (!error.expected) console.warn('CreateRatio: unable to save drained activity.', error.message); }
+  }
 }
 async function readHistory(message, sender) {
   contracts.history(message, sender);
