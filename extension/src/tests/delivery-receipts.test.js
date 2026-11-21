@@ -32,7 +32,7 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(w.data[date].x.posts, 1);
     assert.equal(w.data[date].x.consumeSec, 5);
     assert.equal(attempts.length, 1);
-    t.setNow(6500); w.advance(1500);
+    t.setNow(10000); w.advance(5000);
     t.event('click', { isTrusted: true, target: t.button });
     await drain();
     assert.equal(w.data[date].x.posts, 1);
@@ -47,15 +47,16 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(w.data[date].linkedin.consumeSec, 513);
     w = worker(w.data, browser, w.now, { session });
     loseResponse = false;
+    t.setNow(20000); w.advance(10000);
     await t.tick(); await drain();
     assert.deepEqual(attempts.at(-1), attempts[0]);
     assert.equal(w.data[date].x.posts, 1);
     assert.equal(w.data[date].x.consumeSec, 5);
     assert.equal(w.data[date].linkedin.consumeSec, 513);
-    t.setNow(11500); w.advance(5000);
+    t.setNow(25000); w.advance(5000);
     await t.tick(); await drain();
     assert.equal(w.data[date].x.consumeSec, 5);
-    t.input(); t.setNow(16500); w.advance(5000);
+    t.input(); t.setNow(30000); w.advance(5000);
     await t.tick(); await drain();
     assert.equal(w.data[date].x.consumeSec, 10);
     assert.deepEqual(w.errors, []);
