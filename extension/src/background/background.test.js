@@ -260,6 +260,27 @@ test('cancelling a ready wait during goal-based access clears the wait but keeps
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
 });
 
+test('a stale wait cancellation during goal-based access does not prevent midnight refill', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const w = worker({}, 'chrome', midnight - 3600000);
+  await unlock(w);
+  w.activate('https://x.com/home');
+  await w.send({ type: 'access-status' });
+  w.advance(300000);
+  const expired = await w.send({ type: 'access-status' });
+  assert.equal(expired.access.x.remainingMs, 0);
+  assert.equal(expired.access.x.readyAt, 0);
+  w.data[C.localDate(new Date(w.now))] = { x: { posts: 1 } };
+  await w.send({ type: 'access-goal-setting', enabled: true }, popupSender);
+  const cancelled = await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
+  assert.equal(cancelled.access.x.goalAllowed, true);
+  w.advance(midnight - w.now);
+  const refilled = await w.send({ type: 'access-status' });
+  assert.equal(refilled.access.x.goalAllowed, false);
+  assert.equal(refilled.access.x.remainingMs, 300000);
+  assert.equal(refilled.access.x.refilledAt, midnight);
+});
+
 test('intention history is opt-in, saves accepted requests once, and survives restart', async () => {
   for (const browser of ['chrome', 'browser']) {
     const w = worker({}, browser), settingsPage = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };

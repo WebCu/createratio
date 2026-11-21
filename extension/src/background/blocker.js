@@ -153,7 +153,7 @@ const SiteAccess = (() => {
     await api.storage.local.set({ _access: access });
   }
   async function cancelWait(site, state, access) {
-    if (state.remainingMs) return;
+    if (!state.readyAt) return;
     delete access[site];
     await api.storage.local.set({ _access: access });
   }

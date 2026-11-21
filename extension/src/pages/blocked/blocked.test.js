@@ -14,9 +14,9 @@ function page(options = {}) {
   const elements = {}, intervals = {}, sent = [], redirects = [];
   const document = { body: { id: '', tagName: 'BODY', focus() { document.activeElement = this; } }, getElementById: id => elements[id], createElement: element };
   document.activeElement = document.body;
-  const panels = { reason: 'request', begin: 'request', 'waiting-title': 'waiting', open: 'waiting', cancel: 'waiting', 'active-title': 'active', return: 'active', end: 'active' };
+  const panels = { reason: 'request', begin: 'request', 'waiting-title': 'waiting', open: 'waiting', cancel: 'waiting', 'active-title': 'active', return: 'active', 'cancel-pending': 'active', end: 'active' };
   for (const [, id] of fs.readFileSync(path.join(__dirname, 'blocked.html'), 'utf8').matchAll(/id="([^"]+)"/g)) {
-    let hidden = ['waiting', 'active', 'error'].includes(id), disabled = ['reason', 'begin', 'open'].includes(id);
+    let hidden = ['waiting', 'active', 'cancel-pending', 'error'].includes(id), disabled = ['reason', 'begin', 'open'].includes(id);
     elements[id] = { id, get hidden() { return hidden; }, set hidden(value) { hidden = value; if (value && (document.activeElement === this || panels[document.activeElement.id] === id)) document.activeElement = document.body; }, get disabled() { return disabled; }, set disabled(value) { disabled = value; if (value && document.activeElement === this) document.activeElement = document.body; }, focus() { if (!this.disabled && !this.hidden && !elements[panels[id]]?.hidden) document.activeElement = this; }, value: '', textContent: '', attributes: {}, setAttribute(key, value) { this.attributes[key] = value; }, events: {}, addEventListener(event, fn) { this.events[event] = fn; }, reportValidity() { return true; } };
   }
   let finishFill;
@@ -218,6 +218,23 @@ test('gate shows goal-based access without a countdown and returns directly to t
   assert.equal(p.sent.some(m => m.type === 'access-begin'), false);
   p.access = { goalAllowed: false, remainingMs: 0 }; p.intervals[5000](); await p.flush();
   assert.equal(p.elements.active.hidden, true); assert.equal(p.elements.request.hidden, false);
+});
+
+test('gate lets users cancel a pending wait without ending goal-based access', async () => {
+  const p = page(); await p.flush();
+  p.access = { readyAt: 60000 }; p.intervals[5000](); await p.flush();
+  assert.equal(p.elements.waiting.hidden, false);
+  p.access = { goalAllowed: true }; p.intervals[5000](); await p.flush();
+  assert.equal(p.elements.waiting.hidden, true);
+  assert.equal(p.elements['cancel-pending'].hidden, false);
+  p.click('cancel-pending'); await p.flush();
+  assert.equal(p.sent.at(-1).type, 'access-cancel');
+  assert.equal(p.elements['cancel-pending'].hidden, true);
+  assert.equal(p.elements.active.hidden, false);
+  assert.equal(p.document.activeElement.id, 'return');
+  assert.deepEqual(p.redirects, []);
+  p.access = { goalAllowed: false }; p.intervals[5000](); await p.flush();
+  assert.equal(p.elements.request.hidden, false);
 });
 
 test('an open session hides blocked-only instructions and restores them when the session ends', async () => {
