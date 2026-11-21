@@ -407,7 +407,8 @@ live composing behavior, physical comfort or cross-browser compatibility.
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
 JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
 reject code comments with file, line and column diagnostics. JSDoc blocks that
-contain only type tags with a type and name are allowed. Files are checked
+contain only type tags with a type and name are allowed in files the nearest
+`tsconfig.json` includes, where `pnpm check:types` validates the types. Files are checked
 across at most four workers; any worker failure fails the command. An initial hashbang
 interpreter directive is allowed; comment-like text in strings, templates and
 regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS

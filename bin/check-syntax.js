@@ -22,12 +22,29 @@ function typeTagLine(line) {
   const template = /^@template [A-Za-z_$][\w$]*$/.test(line);
   const tag = /^@(\w+) \{/.exec(line);
   if (template || !tag || !Object.hasOwn(TYPE_TAG_NAMES, tag[1])) return template;
-  let depth = 0;
+  let depth = 0, quote = '';
   for (let index = tag[0].length - 1; index < line.length; index++) {
-    if (line[index] === '{') depth++;
+    if (quote) {
+      if (line[index] === '\\') index++;
+      else if (line[index] === quote) quote = '';
+    } else if (`'"\``.includes(line[index])) quote = line[index];
+    else if (line[index] === '{') depth++;
     else if (line[index] === '}' && --depth === 0) return TYPE_TAG_NAMES[tag[1]].test(line.slice(index + 1).trim());
   }
   return false;
+}
+
+function typeCheckedFile(file) {
+  const real = realpathSync(file);
+  for (let directory = path.dirname(real); ; directory = path.dirname(directory)) {
+    const config = path.join(directory, 'tsconfig.json');
+    if (existsSync(config)) {
+      const { include = [], exclude = [] } = JSON.parse(readFileSync(config, 'utf8'));
+      const relative = path.relative(directory, real).split(path.sep).join('/');
+      return include.some(pattern => path.matchesGlob(relative, pattern)) && !exclude.some(pattern => path.matchesGlob(relative, pattern));
+    }
+    if (path.dirname(directory) === directory) return false;
+  }
 }
 
 function typeAnnotation(comment) {
@@ -53,7 +70,8 @@ function codeComments(file) {
   } catch (error) {
     throw new Error(`Comment parse failed: ${file}\n${error.message}`);
   }
-  return comments.filter(comment => !(comment.start === 0 && source.startsWith('#!')) && !typeAnnotation(comment));
+  const typed = typeCheckedFile(file);
+  return comments.filter(comment => !(comment.start === 0 && source.startsWith('#!')) && !(typed && typeAnnotation(comment)));
 }
 
 function checkSyntax(files) {

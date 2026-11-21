@@ -12,5 +12,5 @@
     "moduleDetection": "force"
   },
   "include": ["extension/types/*.d.ts", "extension/core/*.js", "extension/sites/*.js", "extension/src/**/*.js"],
-  "exclude": ["**/*.test.js", "extension/sites/test-support.js", "extension/src/tests"]
+  "exclude": ["**/*.test.js", "extension/sites/test-support.js", "extension/src/tests/**"]
 }
