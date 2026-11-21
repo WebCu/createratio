@@ -3,7 +3,7 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 const $ = id => document.getElementById(id);
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
-let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
+let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, refreshPending = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
 let scrollEditing = false, scrollPending = null, scrollSaving = null;
 let saveDismissTimer = null, saveCleanupTimer = null;
 function clearSaved() {
@@ -144,11 +144,11 @@ function render(settings, force = '') {
   $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. See domain totals in the dashboard.' : '';
 }
 async function refresh() {
-  if (refreshing) return; refreshing = true;
+  if (refreshing) { refreshPending = true; return; } refreshing = true;
   try {
     const snapshot = await messages.send({ type: 'snapshot' }, 'Unable to load your settings.');
     websiteTimeEnabled = snapshot.websiteTimeEnabled; render(snapshot.settings);
-  } catch (e) { error(e.message); } finally { refreshing = false; }
+  } catch (e) { error(e.message); } finally { refreshing = false; if (refreshPending) { refreshPending = false; void refresh(); } }
 }
 async function notifyTrackers() {
   const tabs = await extensionAPI.tabs.query({}).catch(() => []);
