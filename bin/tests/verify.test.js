@@ -9,19 +9,31 @@ const path = require('node:path');
 const script = path.resolve(__dirname, '../verify.js');
 const stages = ['check', 'check:browser', 'smoke:browser'];
 
-function workspace(t, { available = true, repository = false } = {}) {
+function git(cwd, ...args) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
+function workspace(t, {
+  available = true, repository = false, parentRepository = false, linkedWorktree = false,
+  gitAvailable = repository || parentRepository || linkedWorktree
+} = {}) {
   const directory = mkdtempSync(path.join(tmpdir(), 'createratio-verify-test-'));
   const project = path.join(directory, 'project');
   mkdirSync(project);
   t.after(() => rmSync(directory, { recursive: true, force: true }));
-  if (repository) {
-    for (const args of [
-      ['init', '--initial-branch=main'], ['config', 'user.name', 'Verification fixture'],
-      ['config', 'user.email', 'verify@example.invalid'], ['config', 'commit.gpgsign', 'false']
-    ]) assert.equal(spawnSync('git', args, { cwd: project }).status, 0);
-    writeFileSync(path.join(project, 'source.txt'), 'original');
-    assert.equal(spawnSync('git', ['add', '.'], { cwd: project }).status, 0);
-    assert.equal(spawnSync('git', ['commit', '-m', 'Fixture'], { cwd: project }).status, 0);
+  if (repository || parentRepository || linkedWorktree) {
+    const root = repository ? project : directory;
+    git(root, 'init', '--initial-branch=main');
+    git(root, 'config', 'user.name', 'Verification fixture');
+    git(root, 'config', 'user.email', 'verify@example.invalid');
+    git(root, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(path.join(root, 'source.txt'), 'original');
+    git(root, 'add', 'source.txt');
+    git(root, 'commit', '-m', 'Fixture');
+    if (linkedWorktree) git(root, 'worktree', 'add', '--detach', project);
+    if (parentRepository) writeFileSync(path.join(project, 'source.txt'), 'source copy');
   }
   if (available) writeFileSync(path.join(directory, 'pnpm'), `#!${process.execPath}
 const fs = require('node:fs');
@@ -38,7 +50,7 @@ if (stage === process.env.FAIL_AT) process.exit(7);
     writeFileSync(callLog, '');
     const result = spawnSync(process.execPath, [script], {
       cwd: project, encoding: 'utf8',
-      env: { ...process.env, PATH: repository ? directory + path.delimiter + process.env.PATH : directory, TMPDIR: directory, CALL_LOG: callLog, FAIL_AT: failAt || '', ...overrides }
+      env: { ...process.env, PATH: gitAvailable ? directory + path.delimiter + process.env.PATH : directory, TMPDIR: directory, CALL_LOG: callLog, FAIL_AT: failAt || '', ...overrides }
     });
     assert.ok(result.stdout.includes('Verification logs: '), result.stderr);
     const output = result.stdout.match(/^Verification logs: (.+)$/m)[1];
@@ -73,6 +85,27 @@ test('unavailable provenance is explicit rather than inferred from another check
   const result = workspace(t)();
   assert.deepEqual(result.summary.source, { head: null, dirty: null });
   assert.equal(result.summary.runtime.node, process.version);
+});
+
+test('verification does not record an enclosing repository for a source copy', t => {
+  const result = workspace(t, { parentRepository: true })();
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.summary.source, { head: null, dirty: null });
+});
+
+test('verification records the commit and working-tree state of a linked worktree', t => {
+  const run = workspace(t, { linkedWorktree: true });
+  const clean = run();
+  const head = git(clean.cwd, 'rev-parse', 'HEAD');
+  assert.deepEqual(clean.summary.source, { head, dirty: false });
+  writeFileSync(path.join(clean.cwd, 'source.txt'), 'modified');
+  assert.deepEqual(run().summary.source, { head, dirty: true });
+});
+
+test('verification reports unavailable provenance for a standalone source copy with Git installed', t => {
+  const result = workspace(t, { gitAvailable: true })();
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.summary.source, { head: null, dirty: null });
 });
 
 test('verification preserves a terminated stage as a signal-based failure', t => {
