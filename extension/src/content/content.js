@@ -13,7 +13,11 @@
   let wasVisible = document.visibilityState === 'visible', wasFocused = document.hasFocus();
   /** @type {IngestMessage[]} */
   let outbox = [];
-  let segments = [], actions = [], delivery = null, stopped = false, pageActive = true, updating = false;
+  /** @type {TimeSegment[]} */
+  let segments = [];
+  /** @type {SiteActionEntry[]} */
+  let actions = [];
+  let delivery = null, stopped = false, pageActive = true, updating = false;
   const listeners = [];
   function listen(target, type, fn, options) { target.addEventListener(type, fn, options); listeners.push([target, type, fn, options]); }
   let adapter = null, failed = false;
@@ -34,13 +38,16 @@
     }
   }
 
-  function appendTime(start, end) {
+  /** @param {number} start
+   * @param {number} end
+   * @param {SegmentMode} segmentMode */
+  function appendTime(start, end, segmentMode) {
     for (const part of C3.splitInterval(start, end)) {
       if (segments.reduce((sum, segment) => sum + segment.sec, 0) + part.sec > MAX_SECONDS) queuePacket();
       if (recordingPaused) break;
       const tail = segments.at(-1);
-      if (tail && tail.mode === mode && tail.date === part.date) tail.sec += part.sec;
-      else segments.push({ ...part, mode });
+      if (tail && tail.mode === segmentMode && tail.date === part.date) tail.sec += part.sec;
+      else segments.push({ ...part, mode: segmentMode });
       if (segments.length === MAX_ITEMS) queuePacket();
       if (recordingPaused) break;
     }
@@ -48,10 +55,10 @@
   function settle() {
     const now = performance.now();
     const ms = recordingPaused ? 0 : C3.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
-    if (ms > 0) {
+    if (ms > 0 && (mode === 'create' || mode === 'consume')) {
       const activeEnd = Math.min(now, lastInput + 30000);
       const endWall = Date.now() - (now - activeEnd);
-      appendTime(endWall - ms, endWall);
+      appendTime(endWall - ms, endWall, mode);
     }
     lastSample = now;
   }

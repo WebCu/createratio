@@ -50,6 +50,7 @@
       || JSON.stringify(accessPhase(change.oldValue)) !== JSON.stringify(accessPhase(change.newValue))));
   }
   function create(runtime) {
+    /** @typedef {ReplyTable<RuntimeReplies>} CheckedRuntimeReplies */
     /** @type {RuntimeMessenger} */
     const messenger = { async send(message, fallbackMessage) {
       let reply;

@@ -24,7 +24,7 @@ declare global {
   type AccessReply = { ok: true; access: Record<string, AccessStatus> };
   type SavedIntention = { site: string; reason: string; requestedAt: number };
   type ReplyTable<T extends Record<RuntimeMessage['type'], { ok: true }>> = T;
-  type RuntimeReplies = ReplyTable<{
+  type RuntimeReplies = {
     'snapshot': SnapshotReply;
     'ingest': SnapshotReply;
     'tracking': SnapshotReply;
@@ -43,7 +43,7 @@ declare global {
     'access-history-setting': { ok: true };
     'access-history-list': { ok: true; intentions: SavedIntention[] };
     'access-history-clear': { ok: true };
-  }>;
+  };
   type RuntimeMessenger = { send<M extends RuntimeMessage>(message: M, fallbackMessage: string): Promise<RuntimeReplies[M['type']]> };
   type RuntimeMessage =
     | PreferenceMessage

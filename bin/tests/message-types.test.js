@@ -49,10 +49,15 @@ test('runtime message types reject undocumented senders and incomplete validator
       '/** @type {Record<PreferenceMessage["type"], true>} */',
       "const rules = { tracking: true, 'access-duration': true, 'access-goal-setting': true, 'access-history-setting': true, 'scroll-friction-setting': true, 'website-time-setting': true, 'website-time': true };",
       ''
+    ].join('\n'),
+    'replies.js': [
+      "/** @typedef {ReplyTable<Omit<RuntimeReplies, 'history'>>} MissingReply */",
+      ''
     ].join('\n')
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /sender\.js\(2,\d+\): error TS2322: Type '"waitSeconds"' is not assignable to type 'AccessPreference/);
   assert.match(result.stdout, /validator\.js\(2,7\): error TS2741: Property 'waitMinutes' is missing/);
   assert.match(result.stdout, /validator\.js\(4,\d+\): error TS2353: .*'website-time'/);
+  assert.match(result.stdout, /replies\.js\(1,\d+\): error TS2344: .*\n.*Property 'history' is missing/);
 });
