@@ -342,7 +342,8 @@ test('access validation delegates to shared domain policy without applying new-i
     validations.validAccessMinutes.length = 0;
     const result = await w.handle({ type: 'access-duration', site: 'x', minutes }, popupSender);
     assert.equal(result.access.x.sessionMinutes, minutes);
-    assert.deepEqual(validations.validAccessMinutes, [minutes, C.DEFAULT_SETTINGS.waitMinutes]);
+    assert.equal(validations.validAccessMinutes[0], minutes);
+    assert.ok(validations.validAccessMinutes.slice(1).every(value => value === C.DEFAULT_SETTINGS.waitMinutes));
   }
   validations.validAccessMinutes.length = 0;
   await assert.rejects(w.handle({ type: 'access-duration', site: 'x', minutes: 241 }, popupSender), /Choose a whole number from 1 to 240 minutes/);
@@ -434,6 +435,31 @@ test('legacy or malformed stored wait durations retain the original 60-second wa
   }
   const w = worker({ settings: { waitMinutes: 2 }, _access: { x: { waitMs: 60000 } } }, 'chrome', now);
   assert.equal((await w.send({ type: 'access-status' })).access.x.waitSeconds, 120);
+});
+
+test('restored waits cannot have more time remaining than their original validated duration', async () => {
+  for (const browser of ['chrome', 'browser']) {
+    for (const waitMs of [60000, 300000, undefined, null, 0, -60000, 60001, '60000', NaN, Infinity, 241 * 60000]) {
+      const duration = C.validAccessMinutes(waitMs / 60000) && typeof waitMs === 'number' ? waitMs : 60000;
+      const entry = { readyAt: now + duration + 1, ...(waitMs === undefined ? {} : { waitMs }) };
+      const w = worker({ _access: { x: entry } }, browser, now);
+      const rejected = (await w.send({ type: 'access-status' })).access.x;
+      assert.equal(rejected.readyAt, 0);
+      assert.equal(w.data._access.x.waitMs, undefined);
+      assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+      const boundary = worker({ _access: { x: { ...entry, readyAt: now + duration } } }, browser, now);
+      const pending = (await boundary.send({ type: 'access-status' })).access.x;
+      assert.equal(pending.readyAt, now + duration);
+      assert.equal(pending.waitSeconds, duration / 1000);
+      const returned = worker(structuredClone(boundary.data), browser, now + 86400000);
+      const ready = (await returned.send({ type: 'access-status' })).access.x;
+      assert.equal(ready.readyAt, pending.readyAt);
+      assert.equal(ready.waitSeconds, duration / 1000);
+      assert.equal(ready.remainingMs, 0);
+      assert.deepEqual(rulesFor(returned), []);
+      assert.equal((await returned.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, true);
+    }
+  }
 });
 
 test('saved intention waits control deadlines without changing session duration', async () => {

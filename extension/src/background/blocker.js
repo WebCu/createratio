@@ -19,16 +19,17 @@ const SiteAccess = (() => {
   function siteForURL(raw) { return C3Sites.forAccessURL(raw)?.id || null; }
   function gateURL(site) { return api.runtime.getURL('blocked.html') + '?site=' + site; }
   function ruleIds(site) { return SITES[site].ruleIds; }
+  function waitDurationMs(entry) { return Number.isFinite(entry.waitMs) && C3.validAccessMinutes(entry.waitMs / 60000) ? entry.waitMs : 60000; }
   function status(site, entry = {}, now = Date.now(), minutes = C3.DEFAULT_SETTINGS.accessMinutes, enabled = true, goalAllowed = false, waitMinutes = C3.DEFAULT_SETTINGS.waitMinutes) {
     if (!Object.hasOwn(SITES, site)) throw new Error('Unsupported site');
     const remainingMs = Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0;
     const expiresAt = remainingMs && entry.expiresAt > now ? entry.expiresAt : 0;
     const readyAt = !remainingMs && validWait(entry, now) ? entry.readyAt : 0;
-    const waitSeconds = readyAt ? Number.isFinite(entry.waitMs) && C3.validAccessMinutes(entry.waitMs / 60000) ? entry.waitMs / 1000 : 60 : waitMinutes * 60;
+    const waitSeconds = readyAt ? waitDurationMs(entry) / 1000 : waitMinutes * 60;
     return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, refilledAt: entry.refilledAt || 0, waitSeconds, sessionMinutes: minutes };
   }
   function validWait(entry, now) {
-    return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && entry.readyAt <= now + C3.ACCESS_LIMITS.maxMinutes * 60000;
+    return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && entry.readyAt <= now + waitDurationMs(entry);
   }
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
