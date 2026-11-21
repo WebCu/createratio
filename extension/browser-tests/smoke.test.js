@@ -50,6 +50,12 @@ test('built Chromium extension: access gates and history controls', async t => {
   const inspect = (page, source) => evaluate(browser, page.session, source);
   const storage = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(null)');
   const navigate = (page, url) => cdp.send('Page.navigate', { url }, page.session);
+  const loaderId = async page => (await cdp.send('Page.getFrameTree', {}, page.session)).frameTree.frame.loaderId;
+  const reload = async page => {
+    const previous = await loaderId(page);
+    await cdp.send('Page.reload', {}, page.session);
+    await eventually(async () => (await loaderId(page)) !== previous, 'reload commits a new document');
+  };
   const atGate = page => waitForGate(browser, page);
   const visible = (page, selector) => inspect(page, `!!document.querySelector(${JSON.stringify(selector)})?.getClientRects().length`);
   const text = (page, selector) => inspect(page, `document.querySelector(${JSON.stringify(selector)})?.textContent`);
@@ -103,7 +109,7 @@ test('built Chromium extension: access gates and history controls', async t => {
       assert.equal(started._intentions.at(-1).reason, 'Review the synthetic launch plan, then leave.');
       assert.equal(request.readyAt - started._intentions.at(-1).requestedAt, 60000, 'real access-begin creates a full 60-second wait');
       assert.equal(await inspect(page, 'document.querySelector("#open").disabled'), true);
-      await cdp.send('Page.reload', {}, page.session);
+      await reload(page);
       await eventually(() => visible(page, '#waiting'), 'waiting survives reload');
       assert.equal((await storage())._access.x.readyAt, request.readyAt);
       assert.equal((await focused(page)).tag, 'BODY', 'restoring a wait on load must not move focus');
@@ -114,13 +120,14 @@ test('built Chromium extension: access gates and history controls', async t => {
       await browser.setTime(request.readyAt + 100);
       await eventually(() => inspect(page, '!document.querySelector("#open").disabled'), 'explicit confirmation becomes available');
       assert.equal((await focused(page)).id, 'cancel', 'countdown, refresh and readiness must preserve the chosen control');
-      const probe = await browser.page('https://www.twitter.com/home');
-      await atGate(probe);
+      const probe = await browser.page('about:blank');
       await browser.setTime(request.readyAt + 3600000);
+      await navigate(probe, 'https://www.twitter.com/home');
+      await atGate(probe);
+      assert.equal(browser.documents.length, 0, 'the alias is still blocked after the wait completes');
       await cdp.send('Target.activateTarget', { targetId: page.targetId });
-      await cdp.send('Page.reload', {}, page.session);
+      await reload(page);
       await eventually(() => inspect(page, '!document.querySelector("#waiting").hidden && !document.querySelector("#open").disabled'), 'a long absence still leaves the request ready');
-      assert.equal(browser.documents.length, 0, 'waiting alone still blocks X and its alias');
       await tabTo(page, 'open'); await key(page, 'Enter', 'Enter', 13);
       await eventually(() => inspect(page, 'location.href === "https://x.com/home" && !!document.querySelector("#synthetic-site")'), 'explicit confirmation opens the intercepted real-host page');
       assert.deepEqual(browser.documents, ['https://x.com/home']);

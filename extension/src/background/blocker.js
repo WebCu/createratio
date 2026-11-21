@@ -171,7 +171,7 @@ const SiteAccess = (() => {
     if (state.enabled === false && ['access-begin', 'access-open', 'access-cancel', 'access-end'].includes(message.type)) return { ok: true, access: statuses };
     if (state.goalAllowed) {
       if (message.type === 'access-end') throw MessageContracts.refuse('Turn off goal-based access in Settings to block sites above the goal.');
-      if (['access-open', 'access-begin', 'access-cancel'].includes(message.type)) return { ok: true, access: statuses };
+      if (['access-open', 'access-begin'].includes(message.type)) return { ok: true, access: statuses };
     }
     const stored = await api.storage.local.get(['_access', 'settings', '_intentions']), access = accessState(stored._access), now = Date.now();
     switch (message.type) {

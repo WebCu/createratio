@@ -244,6 +244,22 @@ test('goal-based access pauses an existing timed budget and resumes it below the
   assert.equal(rulesFor(w).length, 1);
 });
 
+test('cancelling a ready wait during goal-based access clears the wait but keeps goal access', async () => {
+  const w = worker({ [C.localDate()]: { x: { posts: 1 } } });
+  const goal = { type: 'access-goal-setting' };
+  await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
+  w.advance(3600000);
+  const { access } = await w.send({ ...goal, enabled: true }, popupSender);
+  assert.equal(access.x.goalAllowed, true);
+  assert.ok(access.x.readyAt > 0);
+  const cancelled = await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
+  assert.equal(cancelled.access.x.goalAllowed, true);
+  assert.equal(cancelled.access.x.readyAt, 0);
+  assert.ok(rulesFor(w).length > 0);
+  assert.equal((await w.send({ ...goal, enabled: false }, popupSender)).access.x.readyAt, 0);
+  assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
+});
+
 test('intention history is opt-in, saves accepted requests once, and survives restart', async () => {
   for (const browser of ['chrome', 'browser']) {
     const w = worker({}, browser), settingsPage = { id: 'test-extension', url: 'chrome-extension://test-extension/settings.html', frameId: 0 };
