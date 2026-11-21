@@ -47,19 +47,26 @@
     return rows.join('\r\n') + '\r\n';
   }
   function create(api, serialize, core, history) {
-    let enabled = false, previous = null;
+    const pendingLimit = 100;
+    let enabled = false, previous = null, pending = [];
     async function allowed() { return !!api.permissions && await api.permissions.contains(PERMISSIONS); }
     async function checkpoint() {
-      await api.storage.session?.set({ _websiteTimeSample: previous });
+      await api.storage.session?.set({ _websiteTimeSample: previous, _websiteTimePending: pending });
     }
     function schedule(task) { return serialize(task).catch(error => console.error('CreateRatio website time:', error)); }
     async function accrue(now) {
-      const old = previous;
-      if (!old || typeof old.domain !== 'string' || !Number.isFinite(old.at) || now <= old.at || now - old.at > 75000) { previous = null; return; }
-      await history.recordWebsiteTime(old.domain, core.splitInterval(old.at, now));
-      previous = null;
+      const old = previous; previous = null;
+      if (old && typeof old.domain === 'string' && Number.isFinite(old.at) && now > old.at && now - old.at <= 75000 && pending.length < pendingLimit) {
+        pending.push({ domain: old.domain, segments: core.splitInterval(old.at, now) });
+      }
+      while (pending.length) {
+        const entry = pending[0];
+        await history.recordWebsiteTime(entry.domain, entry.segments);
+        pending.shift();
+      }
     }
     async function sample(now) {
+      if (pending.length >= pendingLimit) return;
       const window = await api.windows.getLastFocused();
       if (!window.focused || window.type !== 'normal' || await api.idle.queryState(30) !== 'active') return;
       const [tab] = await api.tabs.query({ active: true, windowId: window.id });
@@ -76,9 +83,11 @@
       }
       const now = Date.now();
       if (Number.isFinite(alarm.scheduledTime) && now - alarm.scheduledTime > 15000) previous = null;
-      await accrue(now);
-      await sample(now);
-      await checkpoint();
+      try { await accrue(now); }
+      finally {
+        try { await sample(now); }
+        finally { await checkpoint(); }
+      }
     }
     async function updateMonitoring() {
       if (!enabled) {
@@ -93,6 +102,7 @@
     }
     async function start(reset = false) {
       previous = reset ? null : (await api.storage.session?.get('_websiteTimeSample'))?._websiteTimeSample || null;
+      pending = reset ? [] : (await api.storage.session?.get('_websiteTimePending'))?._websiteTimePending || [];
       const stored = await api.storage.local.get('_websiteTimeEnabled');
       enabled = stored._websiteTimeEnabled === true && await allowed();
       if (!enabled) previous = null;
