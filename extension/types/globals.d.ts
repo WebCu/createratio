@@ -11,7 +11,7 @@ declare global {
   type ContentOwner = { prepare(force: boolean): Promise<boolean>; resume(): void; stop(): void };
   type ContentLifecycleApi = { register(name: 'guard' | 'tracker', owner: ContentOwner): void };
   type RefillAnimationApi = {
-    render(target: HTMLElement, access: { refilledAt?: number; remainingMs: number }): void;
+    render(target: HTMLElement, access: { refilledAt?: unknown; remainingMs: number }): void;
     waitForFill(target: HTMLElement): Promise<void> | undefined;
   };
   type SocialSharingApi = { mount(options: { messages: RuntimeMessenger; range: () => HistoryRange; error: (message?: string) => void }): { clear(): void } };
