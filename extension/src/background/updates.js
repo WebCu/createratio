@@ -34,11 +34,15 @@
         ]);
       } catch (error) {
         if (/receiving end|establish connection|message port closed|context invalidated/i.test(error.message)) {
+          let probeTimer;
           try {
-            await api.scripting.executeScript({ target: { tabId: tab.id }, func: () => location.href });
+            await Promise.race([
+              api.scripting.executeScript({ target: { tabId: tab.id }, func: () => location.href }),
+              new Promise((_, reject) => { probeTimer = setTimeout(() => reject(error), 5000); })
+            ]);
           } catch (probeError) {
             if (/Frame with ID \d+ is showing error page/i.test(probeError.message)) return { ready: true, errorPage: true };
-          }
+          } finally { clearTimeout(probeTimer); }
         }
         throw error;
       } finally { clearTimeout(timer); }

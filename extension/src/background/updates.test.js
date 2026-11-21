@@ -145,6 +145,29 @@ test('startup cannot reinstall the version whose installation is still initializ
   assert.equal(h.calls.includes('reload'), false);
 });
 
+test('a never-settling document probe times out and releases the pending update attempt', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(); let probing = false, settled = false;
+  h.api.tabs.sendMessage = async (id, message) => {
+    if (message.type === 'prepare-update') throw new Error('Receiving end does not exist.');
+    return { ready: true };
+  };
+  h.api.scripting.executeScript = () => { probing = true; return new Promise(() => {}); };
+  const applying = h.updates.available({ version: '0.0.5' }).then(result => { settled = true; return result; });
+  await new Promise(setImmediate);
+  assert.equal(probing, true);
+  t.mock.timers.tick(4999);
+  await new Promise(setImmediate);
+  assert.equal(settled, false);
+  t.mock.timers.tick(1);
+  await new Promise(setImmediate);
+  assert.equal(settled, true);
+  assert.deepEqual(await applying, { applied: false });
+  assert.equal(h.calls.includes('reload'), false);
+  h.api.tabs.sendMessage = async () => ({ ready: true });
+  assert.deepEqual(await h.updates.attempt(true), { applied: true });
+});
+
 test('worker replacement resumes a pending update; concurrent attempts reload only once', async () => {
   const h = harness(); h.data._pendingUpdate = '0.0.5';
   await h.updates.start();
