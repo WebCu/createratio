@@ -99,7 +99,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
     permissions: { async request() { state.requested++; return state.permission; }, async remove(permissions) { assert.deepEqual(permissions, WebTime.PERMISSIONS); state.removed++; if (state.removeFails) throw new Error('Permission removal failed.'); } },
     tabs: { async create(options) { state.tabs.push(options); }, async query(query) { assert.deepEqual(Object.keys(query), []); return [{ id: 1 }, { id: 2 }]; }, async sendMessage(id, message) { state.notifications.push({ id, ...structuredClone(message) }); } }
   };
-  const document = { activeElement: null, getElementById: id => nodes[id], createElement: () => new Element(), createElementNS: () => new Element(), body: new Element() };
+  const document = { activeElement: null, hidden: false, addEventListener(type, fn) { events[type] = fn; }, getElementById: id => nodes[id], createElement: () => new Element(), createElementNS: () => new Element(), body: new Element() };
   const blobs = [];
   const context = vm.createContext({ C3: core, C3Sites, WebTime, chrome: api, document, console, Blob, URL: class extends URL { static createObjectURL(blob) { blobs.push(blob); return 'blob:test/' + blobs.length; } static revokeObjectURL(url) { revokedURLs.push(url); } }, URLSearchParams,
     location: { search: '?site=' + (options.site || 'x'), replace(url) { state.redirects.push(url); } },
@@ -123,6 +123,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
       return release;
     },
     timeouts, revokedURLs, runTimeout(id) { const pending = timeouts.get(id); timeouts.delete(id); pending.fn(); },
+    visible(value) { document.hidden = !value; events.visibilitychange?.(); },
     ready, flush: ready, set fail(value) { state.fail = value; }, get settings() { return structuredClone(settings); }, setSettings(value) { settings = value; }, setDay(value) { data[C3.localDate()] = value; },
     change(changes = { settings: { newValue: structuredClone(settings) } }, area = 'local') { changed(changes, area); }, refresh() { if (events.focus) events.focus(); else if (interval) interval(); else changed({ settings: { newValue: structuredClone(settings) } }, 'local'); }, timer(ms) { intervals[ms](); },
     toggle(site, active) { const input = nodes['track-' + site]; input.checked = active; input.fire('change'); return input; }

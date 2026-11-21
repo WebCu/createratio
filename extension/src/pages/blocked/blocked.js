@@ -127,6 +127,7 @@ $('cancel-pending').addEventListener('click', () => action('access-cancel'));
 $('end').addEventListener('click', () => action('access-end'));
 api.storage.onChanged.addListener((changes, area) => { if (RuntimeMessages.shouldRefresh(changes, area)) void refresh(); });
 addEventListener('focus', refresh);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
 setInterval(render, 1000);
-setInterval(refresh, 5000);
+setInterval(() => { if (!document.hidden) void refresh(); }, 5000);
 void refresh();

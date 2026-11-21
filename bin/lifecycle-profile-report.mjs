@@ -23,7 +23,7 @@ function memory(value) {
 export function validateLifecycleProfile(report) {
   assert.equal(report.schemaVersion, 1);
   assert.equal(report.status, 'complete', 'Incomplete or failed lifecycle report');
-  assert.ok(['settings', 'trackers'].includes(report.workload));
+  assert.ok(['settings', 'trackers', 'blocked'].includes(report.workload));
   assert.ok(hash(report.provenance.workloadSha256));
   for (const label of ['baseline', 'candidate']) {
     const bundle = report.provenance[label];
@@ -41,6 +41,28 @@ export function validateLifecycleProfile(report) {
     assert.equal(run.workload, report.workload);
     assert.equal(run.bundleSha256, report.provenance[run.variant].sha256);
     assert.match(run.browser, /^[A-Za-z ]+\/\d+(?:\.\d+){1,3}$/);
+    if (report.workload === 'blocked') {
+      assert.equal(run.idleMs, 60000);
+      assert.ok(run.observations.length >= 2);
+      for (const [index, point] of run.observations.entries()) {
+        assert.equal(point.attached, false);
+        assert.ok(point.targetId === null || typeof point.targetId === 'string');
+        assert.ok(finite(point.elapsedMs) && (!index || point.elapsedMs >= run.observations[index - 1].elapsedMs));
+      }
+      assert.ok(run.observations[0].elapsedMs < 1000);
+      assert.ok(run.observations.at(-1).elapsedMs >= run.idleMs);
+      assert.equal(run.continuousLifetimeMs, run.observations.find(point => point.targetId === null)?.elapsedMs ?? null);
+      assert.equal(run.aliveSamplesFraction, run.observations.filter(point => point.targetId !== null).length / run.observations.length);
+      for (const key of ['hiddenSends', 'returnSends']) assert.ok(Number.isSafeInteger(run[key]) && run[key] >= 0);
+      assert.ok(run.returnSends > 0 && finite(run.returnSyncMs) && run.returnSyncMs < 1500);
+      assert.equal(run.synced, true);
+      assert.equal(run.sameDocument, true);
+      for (const key of ['scheduledAlarms', 'alarmWakes', 'alarmsAfter']) {
+        assert.ok(Array.isArray(run[key]));
+        for (const alarm of run[key]) assert.ok(typeof alarm.name === 'string' && finite(alarm.scheduledTime));
+      }
+      continue;
+    }
     assert.equal(run.cycles, report.workload === 'settings' ? 12 : 3);
     assert.equal(run.tabCount, report.workload === 'settings' ? 4 : 8);
     if (report.workload === 'settings') {
@@ -96,6 +118,18 @@ export function validateLifecycleProfile(report) {
 
 export function renderLifecycleProfile(report) {
   validateLifecycleProfile(report);
+  if (report.workload === 'blocked') {
+    return [
+      '# Blocked-gate lifecycle comparison', '',
+      `Baseline SHA-256: ${report.provenance.baseline.sha256}`,
+      `Candidate SHA-256: ${report.provenance.candidate.sha256}`,
+      `Browser: ${report.runs[0].browser}`, '',
+      '| Build/run | Continuous lifetime (s) | Alive samples | Hidden sends | Return sends | Synced | Alarm wakes |',
+      '| --- | ---: | ---: | ---: | ---: | --- | ---: |',
+      ...report.runs.map(run => `| ${run.variant}/${run.repetition} | ${run.continuousLifetimeMs === null ? 'alive whole window' : (run.continuousLifetimeMs / 1000).toFixed(3)} | ${run.aliveSamplesFraction.toFixed(3)} | ${run.hiddenSends} | ${run.returnSends} | ${run.synced ? 'yes' : 'no'} | ${run.alarmWakes.length} |`), '',
+      '60-second browser-level target polling, every debugger detached. Scheduled alarms and page-observed alarm events are retained separately in JSON; presence after an alarm is not proof that the alarm caused a wake. Sampling is not an exact worker termination deadline or a memory measurement. Maintainer resource acceptance remains separate.', ''
+    ].join('\n');
+  }
   const lines = [
     `# ${report.workload === 'settings' ? 'Settings controls' : 'Tracker/worker'} lifecycle comparison`, '',
     `Baseline bundle SHA-256: \`${report.provenance.baseline.sha256}\``,

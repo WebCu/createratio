@@ -4,6 +4,64 @@ import { evaluate, eventually, click, seedAccess } from '../extension/browser-te
 import { scrollFixture } from '../extension/browser-tests/scrolling.mjs';
 import { attributeTargets, processMemory, browserMemory, samplePages, assertStableControls } from './lifecycle-resources.mjs';
 
+export async function blockedWorkload(browser) {
+  const idleMs = 60000;
+  await seedAccess(browser, [], { trackedSites: ['x'], allowAboveGoal: false });
+  await evaluate(browser, browser.worker, 'chrome.storage.local.set({_websiteTimeEnabled:false})');
+  const gate = await browser.page(browser.origin + '/blocked.html?site=x');
+  const ready = session => evaluate(browser, session, '!document.hidden && !document.querySelector("#request").hidden && !document.querySelector("#begin").disabled && document.querySelector("#error").hidden && document.querySelector("#state-text").textContent === "Blocked by default"');
+  await eventually(() => ready(gate.session), 'blocked X gate ready');
+  await evaluate(browser, gate.session, `(() => {
+    globalThis.blockedProfile = { sends: 0, alarms: [], token: crypto.randomUUID() };
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = message => {
+      if (message.type === 'access-status') blockedProfile.sends++;
+      return send(message);
+    };
+    chrome.alarms.onAlarm.addListener(alarm => blockedProfile.alarms.push({ name: alarm.name, scheduledTime: alarm.scheduledTime, observedAt: Date.now() }));
+  })()`);
+  const scheduledAlarms = await evaluate(browser, gate.session, 'chrome.alarms.getAll()');
+  const control = await browser.page('about:blank');
+  await browser.cdp.send('Target.activateTarget', { targetId: control.targetId });
+  await eventually(() => evaluate(browser, gate.session, 'document.hidden && !document.hasFocus()'), 'gate hidden');
+  const before = await evaluate(browser, gate.session, 'structuredClone(blockedProfile)');
+  await browser.cdp.send('Target.setAutoAttach', { autoAttach: false, waitForDebuggerOnStart: false, flatten: true });
+  browser.worker = undefined;
+  const started = performance.now(), observationStartedAt = Date.now(), observations = [];
+  async function sample() {
+    const { targetInfos } = await browser.cdp.send('Target.getTargets');
+    assert.ok(targetInfos.every(target => !target.attached), 'All debugger sessions must be detached');
+    const target = targetInfos.find(target => target.type === 'service_worker' && target.url.startsWith(browser.origin + '/'));
+    observations.push({ elapsedMs: performance.now() - started, targetId: target?.targetId ?? null, attached: target?.attached ?? false });
+  }
+  do {
+    await sample();
+    await delay(Math.min(250, Math.max(0, idleMs - (performance.now() - started))));
+  } while (performance.now() - started < idleMs);
+  await sample();
+  const observationEndedAt = Date.now();
+  const attachment = await browser.cdp.send('Target.attachToTarget', { targetId: gate.targetId, flatten: true });
+  const hidden = await evaluate(browser, attachment.sessionId, '({hidden:document.hidden,...structuredClone(blockedProfile)})');
+  assert.equal(hidden.hidden, true);
+  assert.equal(hidden.token, before.token);
+  const returnStarted = performance.now();
+  await browser.cdp.send('Target.activateTarget', { targetId: gate.targetId });
+  await eventually(async () => await evaluate(browser, attachment.sessionId, 'blockedProfile.sends') > hidden.sends && await ready(attachment.sessionId), 'gate synchronizes on return');
+  const returnSyncMs = performance.now() - returnStarted;
+  assert.ok(returnSyncMs < 1500, 'Foreground synchronization must be immediate');
+  const returned = await evaluate(browser, attachment.sessionId, 'structuredClone(blockedProfile)');
+  const firstAbsent = observations.find(point => point.targetId === null);
+  return {
+    workload: 'blocked', idleMs, observationStartedAt, observationEndedAt, observations,
+    continuousLifetimeMs: firstAbsent?.elapsedMs ?? null,
+    aliveSamplesFraction: observations.filter(point => point.targetId !== null).length / observations.length,
+    hiddenSends: hidden.sends - before.sends, returnSends: returned.sends - hidden.sends,
+    returnSyncMs, synced: true, sameDocument: returned.token === before.token,
+    scheduledAlarms, alarmWakes: hidden.alarms, alarmsAfter: await evaluate(browser, attachment.sessionId, 'chrome.alarms.getAll()'),
+    fixture: 'One blocked X gate, no wait/session, Website time off, neutral foreground tab. Page-local send counter and alarm listener; all debugger sessions detached for 60 seconds. Alarms remain enabled. Target samples identify presence, not exact termination times or memory.'
+  };
+}
+
 export async function settingsWorkload(browser, { cycles = 12, tabCount = 4, afterCycle = async () => {} } = {}) {
   assert.ok(Number.isSafeInteger(cycles) && cycles >= 1 && cycles <= 12);
   assert.ok(Number.isSafeInteger(tabCount) && tabCount >= 1 && tabCount <= 4);
