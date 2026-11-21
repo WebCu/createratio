@@ -143,6 +143,7 @@ test('comment check allows JSDoc type annotations without prose in type-checked 
     'function classify({ url } = {}) { return url; }',
     '/**',
     ' * @template T',
+    ' * @template {string} K',
     ' * @param {T[]} items',
     ' * @returns {T | undefined}',
     ' */',

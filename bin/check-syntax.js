@@ -16,7 +16,7 @@ function packageType(file) {
   }
 }
 
-const TYPE_TAG_NAMES = { type: /^$/, satisfies: /^$/, returns: /^$/, param: /^\[?[A-Za-z_$][\w$.]*\]?$/, typedef: /^[A-Za-z_$][\w$]*$/ };
+const TYPE_TAG_NAMES = { type: /^$/, satisfies: /^$/, returns: /^$/, param: /^\[?[A-Za-z_$][\w$.]*\]?$/, typedef: /^[A-Za-z_$][\w$]*$/, template: /^[A-Za-z_$][\w$]*$/ };
 
 function typeTagLine(line) {
   const template = /^@template [A-Za-z_$][\w$]*$/.test(line);
