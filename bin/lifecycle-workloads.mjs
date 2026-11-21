@@ -4,6 +4,10 @@ import { evaluate, eventually, click, seedAccess } from '../extension/browser-te
 import { scrollFixture } from '../extension/browser-tests/scrolling.mjs';
 import { attributeTargets, processMemory, browserMemory, samplePages, assertStableControls } from './lifecycle-resources.mjs';
 
+export async function blockedReturnReady(browser, session, completed) {
+  return evaluate(browser, session, `blockedProfile.completed > ${completed} && !refreshing`);
+}
+
 export async function blockedWorkload(browser) {
   const idleMs = 60000;
   await seedAccess(browser, [], { trackedSites: ['x'], allowAboveGoal: false });
@@ -12,11 +16,13 @@ export async function blockedWorkload(browser) {
   const ready = session => evaluate(browser, session, '!document.hidden && !document.querySelector("#request").hidden && !document.querySelector("#begin").disabled && document.querySelector("#error").hidden && document.querySelector("#state-text").textContent === "Blocked by default"');
   await eventually(() => ready(gate.session), 'blocked X gate ready');
   await evaluate(browser, gate.session, `(() => {
-    globalThis.blockedProfile = { sends: 0, alarms: [], token: crypto.randomUUID() };
+    globalThis.blockedProfile = { sends: 0, completed: 0, alarms: [], token: crypto.randomUUID() };
     const send = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = message => {
+    chrome.runtime.sendMessage = async message => {
       if (message.type === 'access-status') blockedProfile.sends++;
-      return send(message);
+      const reply = await send(message);
+      if (message.type === 'access-status') blockedProfile.completed++;
+      return reply;
     };
     chrome.alarms.onAlarm.addListener(alarm => blockedProfile.alarms.push({ name: alarm.name, scheduledTime: alarm.scheduledTime, observedAt: Date.now() }));
   })()`);
@@ -46,7 +52,7 @@ export async function blockedWorkload(browser) {
   assert.equal(hidden.token, before.token);
   const returnStarted = performance.now();
   await browser.cdp.send('Target.activateTarget', { targetId: gate.targetId });
-  await eventually(async () => await evaluate(browser, attachment.sessionId, 'blockedProfile.sends') > hidden.sends && await ready(attachment.sessionId), 'gate synchronizes on return');
+  await eventually(async () => await blockedReturnReady(browser, attachment.sessionId, hidden.completed) && await ready(attachment.sessionId), 'gate synchronizes on return');
   const returnSyncMs = performance.now() - returnStarted;
   assert.ok(returnSyncMs < 1500, 'Foreground synchronization must be immediate');
   const returned = await evaluate(browser, attachment.sessionId, 'structuredClone(blockedProfile)');
