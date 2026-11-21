@@ -30,6 +30,24 @@ test('delayed midnight reconciliation authorizes the continuously running refill
   assert.equal(result.ok, true);
   assert.equal(w.data[date].x.consumeSec, 3);
 });
+test('reconciliation after the midnight refill expires retains its full authorized minute', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const w = worker({ settings: { accessMinutes: 1 } }, 'chrome', midnight - 119000);
+  await unlock(w);
+  w.activate('https://x.com/home');
+  await w.send({ type: 'access-status' });
+  assert.equal(w.data._access.x.expiresAt, midnight + 1000);
+  w.advance(121000);
+  assert.equal(w.now, midnight + 62000);
+  const date = C.localDate(new Date(midnight));
+  const result = await w.send({ type: 'ingest', id: 'exhausted-refill', site: 'x',
+    segments: [{ date, mode: 'consume', start: midnight, end: w.now, sec: 62 }],
+    actions: [{ date, action: 'replies', at: midnight + 59000 }, { date, action: 'replies', at: midnight + 60000 }] });
+  assert.equal(result.ok, true);
+  assert.equal(w.data[date].x.consumeSec, 60);
+  assert.equal(w.data[date].x.replies, 1);
+  assert.equal(result.access.x.remainingMs, 0);
+});
 test('records the final interval of a minute session even after expiry', async () => {
   const w = worker({ settings: { accessMinutes: 1 } });
   await unlock(w);

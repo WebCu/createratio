@@ -82,7 +82,6 @@ const SiteAccess = (() => {
       }
       if (Object.hasOwn(access, site) && !validSession(access[site], now)) delete access[site];
       const entry = access[site] || {}, minutes = C3.siteSettings(site, stored.settings).accessMinutes;
-      const previousExpiry = entry.expiresAt;
       let windowStart = now;
       const hadSession = Number.isFinite(entry.remainingMs) || Number.isFinite(entry.expiresAt);
       if (!Number.isFinite(entry.remainingMs) && Number.isFinite(entry.expiresAt)) entry.remainingMs = Math.max(0, entry.expiresAt - now);
@@ -93,6 +92,7 @@ const SiteAccess = (() => {
         entry.refilledAt = dayStart;
         entry.expiresAt = runningAtMidnight ? dayStart + entry.remainingMs : 0;
       }
+      const authorizedUntil = entry.expiresAt;
       if (entry.remainingMs > 0) entry.date = date;
       if (!restart && entry.expiresAt) entry.remainingMs = Math.min(entry.remainingMs, Math.max(0, entry.expiresAt - now));
       if (goalAllowed || entry.remainingMs > 0) {
@@ -108,7 +108,7 @@ const SiteAccess = (() => {
       }
       if (!validWait(entry, now)) delete entry.readyAt;
       if (windows[site] || entry.refilledAt > 0 || entry.expiresAt || goalAllowed) {
-        updateWindows(windows, site, windowStart, goalAllowed || entry.remainingMs > 0 && !entry.expiresAt ? Number.MAX_SAFE_INTEGER : entry.expiresAt || Math.min(now, previousExpiry || now));
+        updateWindows(windows, site, windowStart, goalAllowed || entry.remainingMs > 0 && !entry.expiresAt ? Number.MAX_SAFE_INTEGER : entry.expiresAt || Math.min(now, authorizedUntil || now));
       }
     }
     const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
