@@ -60,10 +60,12 @@ const SiteAccess = (() => {
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
     const tabs = await api.tabs.query({ url: patterns });
-    await Promise.all(tabs.filter(tab => siteForURL(tab.url) === site).map(async tab => {
+    const navigated = await Promise.all(tabs.filter(tab => siteForURL(tab.url) === site).map(async tab => {
       await beforeNavigate(tab);
-      await api.tabs.update(tab.id, { url: gateURL(site) }).catch(() => {});
+      try { await api.tabs.update(tab.id, { url: gateURL(site) }); return tab.id; }
+      catch (_) { return null; }
     }));
+    return navigated.filter(id => id !== null);
   }
   async function reconcile(closeAll = false) {
     const restart = !(await api.storage.session.get('_accessInitialized'))._accessInitialized;
@@ -175,9 +177,9 @@ const SiteAccess = (() => {
   async function readAccessStatus(sender) {
     const access = await reconcile();
     const site = sender?.frameId === 0 && sender?.tab && siteForURL(sender.url);
-    if (site && access[site].enabled && !access[site].goalAllowed && !access[site].remainingMs) await closeTabs(site);
+    const navigated = site && access[site].enabled && !access[site].goalAllowed && !access[site].remainingMs ? await closeTabs(site) : [];
     const stored = await api.storage.local.get('settings');
-    return { ok: true, access, intentionHistoryEnabled: stored.settings?.intentionHistoryEnabled === true, navigationHandled: !!site };
+    return { ok: true, access, intentionHistoryEnabled: stored.settings?.intentionHistoryEnabled === true, navigationHandled: navigated.includes(sender?.tab?.id) };
   }
   async function beginWait(message, state, stored, now) {
     if (!C3.validIntention(message.reason)) return { ok: false, error: `Write a specific intention of ${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters.` };

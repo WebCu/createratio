@@ -98,3 +98,19 @@ test('an ingest cannot replay after its expiry drain rotates the receipt window'
   await w.send(incoming, sender);
   assert.equal(w.data[date].reddit.consumeSec, 2);
 });
+
+test('a failed tab navigation preserves the requesting guard fallback after draining', async () => {
+  let drains = 0;
+  const w = worker({ _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } } }, 'chrome', start, {
+    session: { _accessInitialized: true },
+    sendTabMessage() { drains++; return { packets: [] }; },
+    onTabUpdate() { throw new Error('Tab update failed'); }
+  });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  w.tabs.push({ id: 1, url }); w.advance(1100);
+  const result = await w.send({ type: 'access-status' }, sender);
+  assert.equal(result.ok, true);
+  assert.ok(drains > 0);
+  assert.equal(result.navigationHandled, false);
+  assert.equal(w.tabs[0].url, url);
+});
