@@ -102,11 +102,12 @@ async function refresh(requested = false) {
     websiteTimeEnabled = snapshot.websiteTimeEnabled;
     intentionHistoryEnabled = snapshot.settings.intentionHistoryEnabled === true;
     const view = activeView;
-    const result = await messages.send(view === 'intentions' ? { type: 'access-history-list' } : { type: 'history', kind: view === 'ratio' ? 'ratio' : 'websites', range: view === 'ratio' ? 'week' : $('website-range').value }, 'Unable to load history.');
-    if (view === activeView) {
-      if (view === 'ratio') { intentions = []; renderRatio(result.days); }
-      else if (view === 'websites') { intentions = []; renderWebsites(result.days); }
-      else { intentions = result.intentions; renderIntentions(); }
+    if (view === 'intentions') {
+      const result = await messages.send({ type: 'access-history-list' }, 'Unable to load history.');
+      if (view === activeView) { intentions = result.intentions; renderIntentions(); }
+    } else {
+      const result = await messages.send({ type: 'history', kind: view === 'ratio' ? 'ratio' : 'websites', range: view === 'ratio' ? 'week' : /** @type {HistoryRange} */ ($('website-range').value) }, 'Unable to load history.');
+      if (view === activeView) { intentions = []; if (view === 'ratio') renderRatio(result.days); else renderWebsites(result.days); }
     }
     error();
   } catch (e) { error(e.message); } finally { refreshing = false; if (refreshPending) { refreshPending = false; void refresh(); } }
@@ -143,12 +144,12 @@ async function exportHistory(kind) {
     setTimeout(() => URL.revokeObjectURL(url), 10000); error();
   } catch (e) { error(e.message); }
 }
-const sharing = SocialSharing.mount({ messages, range: () => $('report-range').value, error });
+const sharing = SocialSharing.mount({ messages, range: () => /** @type {HistoryRange} */ ($('report-range').value), error });
 $('report-range').addEventListener('change', sharing.clear);
 $('report-export').addEventListener('click', async () => {
   const button = $('report-export');
   if (button.disabled) return;
-  const range = $('report-range').value, version = reportVersion;
+  const range = /** @type {HistoryRange} */ ($('report-range').value), version = reportVersion;
   button.disabled = true; $('report-status').textContent = '';
   try {
     const now = new Date(), date = C3.localDate(now);

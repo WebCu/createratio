@@ -254,7 +254,7 @@ async function saveSitePreference(control, group, message) {
   let success = false;
   try {
     const result = await messages.send(message, 'Unable to save settings.');
-    const snapshot = message.type === 'tracking' ? result : await messages.send({ type: 'snapshot' }, 'Unable to load your saved settings.');
+    const snapshot = message.type === 'tracking' && 'settings' in result ? result : await messages.send({ type: 'snapshot' }, 'Unable to load your saved settings.');
     render(snapshot.settings);
     if (group === 'tracking') {
       const enabled = message.type === 'tracking' && message.enabled;

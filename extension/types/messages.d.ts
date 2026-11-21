@@ -19,7 +19,32 @@ declare global {
   };
   type IngestMessage = { type: 'ingest'; id: string; generation: string | null; site: string; segments: TimeSegment[]; actions: SiteActionEntry[] };
   type PreferenceRules = { [K in PreferenceMessage['type']]: (message: Extract<PreferenceMessage, { type: K }>) => void };
-  type RuntimeMessenger = { send(message: RuntimeMessage, fallbackMessage: string): Promise<any> };
+  type HistoryStore = ReturnType<typeof ActivityHistory.create>;
+  type SnapshotReply = { ok: true; generation: string | null; date: string; day: ReturnType<HistoryStore['creationDay']>; settings: ReturnType<typeof C3.settingsSnapshot>; access: Record<string, AccessStatus>; websiteTimeEnabled: boolean };
+  type AccessReply = { ok: true; access: Record<string, AccessStatus> };
+  type SavedIntention = { site: string; reason: string; requestedAt: number };
+  type ReplyTable<T extends Record<RuntimeMessage['type'], { ok: true }>> = T;
+  type RuntimeReplies = ReplyTable<{
+    'snapshot': SnapshotReply;
+    'ingest': SnapshotReply;
+    'tracking': SnapshotReply;
+    'clear-history': SnapshotReply;
+    'scroll-friction-setting': SnapshotReply;
+    'history': { ok: true; days: Awaited<ReturnType<HistoryStore['read']>> };
+    'update-apply': { ok: true; applied: boolean };
+    'website-time-setting': { ok: true; enabled: boolean };
+    'access-status': AccessReply & { intentionHistoryEnabled: boolean };
+    'access-begin': AccessReply;
+    'access-open': AccessReply;
+    'access-cancel': AccessReply;
+    'access-end': AccessReply;
+    'access-duration': AccessReply;
+    'access-goal-setting': AccessReply;
+    'access-history-setting': { ok: true };
+    'access-history-list': { ok: true; intentions: SavedIntention[] };
+    'access-history-clear': { ok: true };
+  }>;
+  type RuntimeMessenger = { send<M extends RuntimeMessage>(message: M, fallbackMessage: string): Promise<RuntimeReplies[M['type']]> };
   type RuntimeMessage =
     | PreferenceMessage
     | AccessSessionMessage

@@ -77,7 +77,7 @@ function render() {
 async function send(type, extra = {}) {
   const result = await messages.send({ type, site, ...extra }, 'Unable to check access. The site stays blocked.');
   if (!result.access?.[site]) throw new Error('Open this page by visiting X or LinkedIn.');
-  if (typeof result.intentionHistoryEnabled === 'boolean') $('reason-hint').textContent = result.intentionHistoryEnabled ? 'Be specific. Your intention is saved on this device. Review or clear it in the dashboard.' : 'Be specific. Your intention is not saved. You can enable intention history in Settings.';
+  if ('intentionHistoryEnabled' in result && typeof result.intentionHistoryEnabled === 'boolean') $('reason-hint').textContent = result.intentionHistoryEnabled ? 'Be specific. Your intention is saved on this device. Review or clear it in the dashboard.' : 'Be specific. Your intention is not saved. You can enable intention history in Settings.';
   access = result.access[site];
   return access;
 }

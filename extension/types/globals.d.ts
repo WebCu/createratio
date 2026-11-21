@@ -3,7 +3,7 @@ declare global {
   type StoredData = { settings?: StoredSettings; [key: string]: unknown };
   type AccessStatus = { site: string; enabled: boolean; goalAllowed: boolean; name: string; home: string; remainingMs: number; expiresAt: number; readyAt: number; refilledAt: number; waitSeconds: number; sessionMinutes: number };
   type SiteAccessApi = {
-    handle(message: { type: string; site?: string }, sender: chrome.runtime.MessageSender): Promise<unknown>;
+    handle(message: RuntimeMessage, sender: chrome.runtime.MessageSender): Promise<unknown>;
     reconcile(closeAll?: boolean): Promise<Record<string, AccessStatus>>;
     siteForURL(raw: string): string | null;
     gateURL(site: string): string;
@@ -14,7 +14,7 @@ declare global {
     render(target: HTMLElement, access: { refilledAt?: number; remainingMs: number }): void;
     waitForFill(target: HTMLElement): Promise<void> | undefined;
   };
-  type SocialSharingApi = { mount(options: { messages: ReturnType<typeof RuntimeMessages.create>; range: () => string; error: (message?: string) => void }): { clear(): void } };
+  type SocialSharingApi = { mount(options: { messages: RuntimeMessenger; range: () => HistoryRange; error: (message?: string) => void }): { clear(): void } };
   var C3: typeof import('../core/core.js');
   var C3Sites: typeof import('../sites/index.js');
   var C3_SITE_MODULES: Record<string, unknown> | undefined;

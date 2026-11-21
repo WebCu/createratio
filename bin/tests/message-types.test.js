@@ -16,8 +16,9 @@ function typeCheck(t, sources) {
     return name;
   });
   fs.writeFileSync(path.join(directory, 'tsconfig.json'), JSON.stringify({
-    compilerOptions: { allowJs: true, checkJs: true, noEmit: true, types: [], moduleDetection: 'force' },
-    files: [path.join(root, 'extension', 'types', 'messages.d.ts'), ...files]
+    extends: path.join(root, 'tsconfig.json'),
+    files: ['globals.d.ts', 'messages.d.ts'].map(name => path.join(root, 'extension', 'types', name)).concat(files),
+    include: []
   }));
   return spawnSync(process.execPath, [tsc, '-p', 'tsconfig.json'], { cwd: directory, encoding: 'utf8' });
 }
