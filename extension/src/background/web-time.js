@@ -4,6 +4,7 @@
   else root.WebTime = api;
 })(globalThis, function () {
   'use strict';
+  /** @type {chrome.permissions.Permissions} */
   const PERMISSIONS = { permissions: ['tabs', 'idle'] };
   function domainForURL(raw) {
     try {

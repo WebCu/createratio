@@ -20,8 +20,9 @@
     "smoke:browser": "pnpm build:chrome && python3 -m unittest discover -s bin/tests -p test_browser_smoke.py && python3 bin/browser-smoke.py",
     "check:release": "node bin/release-smoke.js",
     "check:syntax": "node bin/check-syntax.js",
+    "check:types": "tsc -p tsconfig.json",
     "check:actions": "node bin/check-actions.js",
-    "check": "pnpm check:syntax && pnpm test && pnpm build && pnpm build:site",
+    "check": "pnpm check:syntax && pnpm check:types && pnpm test && pnpm build && pnpm build:site",
     "check:browser": "pnpm build:chrome && pnpm test:browser",
     "check:browser:shard": "pnpm build:chrome && node bin/browser-shard.js",
     "verify": "node bin/verify.js",
@@ -35,6 +36,8 @@
     "build:firefox": "node extension/build.js firefox"
   },
   "devDependencies": {
-    "acorn": "8.19.0"
+    "@types/chrome": "0.3.7",
+    "acorn": "8.19.0",
+    "typescript": "6.0.3"
   }
 }

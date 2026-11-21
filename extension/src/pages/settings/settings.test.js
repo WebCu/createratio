@@ -105,6 +105,15 @@ test('an ordinary storage update renders the saved intention preference', async 
   assert.equal(p.nodes['intention-history-enabled'].checked, true);
 });
 
+test('a non-boolean intention preference in a snapshot renders unchecked', async () => {
+  for (const intentionHistoryEnabled of ['true', 1, {}]) {
+    const p = settingsPage(); await p.ready();
+    p.state.replies.set('snapshot', { ok: true, date: C3.localDate(), day: {}, access: {}, settings: { ...p.settings, intentionHistoryEnabled }, websiteTimeEnabled: false });
+    p.refresh(); await p.ready(); await p.ready();
+    assert.equal(p.nodes['intention-history-enabled'].checked, false, JSON.stringify(intentionHistoryEnabled));
+  }
+});
+
 test('save confirmations fade after four seconds and polling does not extend their lifetime', async () => {
   const p = settingsPage(); await p.ready();
   p.toggle('x', false); await p.ready();
@@ -261,7 +270,7 @@ test('resistance previews locally during a drag and commits once without losing 
   const p = settingsPage({ settings: { scrollFrictionEnabled: true } }); await p.ready();
   const slider = p.nodes['scroll-friction-strength'];
   assert.equal(slider.value, 50); assert.equal(slider.disabled, false);
-  assert.equal(slider.min, 50); assert.equal(slider.max, 95); assert.equal(slider.step, 5);
+  assert.equal(slider.min, '50'); assert.equal(slider.max, '95'); assert.equal(slider.step, '5');
   slider.focus(); const before = p.messages.length;
   for (let i = 0; i < 100; i++) { slider.value = String(50 + i % 10 * 5); await slider.fire('input'); }
   slider.value = '80'; await slider.fire('input');

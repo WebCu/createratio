@@ -443,6 +443,25 @@ test('configured wait updates instructions and progress scale', async () => {
   assert.equal(p.elements.open.disabled, true);
 });
 
+test('invalid wait durations fall back to the default wait', async () => {
+  for (const waitSeconds of [undefined, '120', 0, -60, Infinity, NaN]) {
+    const p = page(); await p.flush();
+    p.access = { waitSeconds, readyAt: 300000 };
+    p.intervals[5000](); await p.flush();
+    assert.equal(p.elements['wait-step'].textContent, 'Pause for 5 minutes.', String(waitSeconds));
+    assert.equal(p.elements.begin.textContent, 'Start the 5-minute wait');
+    assert.equal(p.elements.progress.max, 300);
+    assert.equal(p.elements.progress.value, 0);
+    assert.equal(p.elements.open.disabled, true);
+    p.now = 150000; p.intervals[1000]();
+    assert.equal(p.elements.progress.value, 150);
+    assert.equal(p.elements.open.disabled, true);
+    p.now = 300000; p.intervals[1000]();
+    assert.equal(p.elements.progress.value, 300);
+    assert.equal(p.elements.open.disabled, false);
+  }
+});
+
 test('pending wait progress and instructions survive setting changes and reload with the request duration', async () => {
   for (const [initial, updated] of [[1, 5], [5, 1]]) {
     const initialDuration = initial === 1 ? '1 minute' : '5 minutes';

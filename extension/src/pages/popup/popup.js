@@ -1,7 +1,8 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
-const $ = id => document.getElementById(id);
+/** @type {(id: string) => HTMLInputElement} */
+const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 let refreshing = false, refreshFailed = false;
 const accessControls = new Map();
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; refreshFailed = false; }
@@ -56,7 +57,7 @@ function renderAccess(access) {
 function render(snapshot) {
   const total = C3.aggregate(snapshot.day), score = C3.score(total);
   const hasActivity = ['createSec', 'consumeSec', 'posts', 'replies', 'comments'].some(key => total[key] > 0);
-  $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); $('date').dateTime = snapshot.date;
+  $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); /** @type {HTMLTimeElement} */ (document.getElementById('date')).dateTime = snapshot.date;
   $('score').textContent = score.toFixed(2); $('score').style.color = hasActivity ? C3.scoreColor(score) : '';
   $('score-card').setAttribute('data-score', hasActivity ? C3.scoreBand(score) : 'none');
   $('score-status').textContent = !hasActivity ? 'A fresh start. Make something today.' : score >= 1 ? 'You’re making more than you’re taking in.' : 'A little more creating gets you to 1.0.';
