@@ -27,7 +27,7 @@ async function snapshot() {
   return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: C3.settingsSnapshot(stored.settings), access: await SiteAccess.reconcile(), websiteTimeEnabled: websiteTime.enabled };
 }
 async function ingest(message, sender) {
-  if (!contracts.creationSender(message, sender)) return { ok: false, error: 'Unsupported sender' };
+  if (!contracts.creationSender(message, sender)) return { ok: false, error: 'Unsupported sender', retryable: false };
   await history.prepare();
   const preferences = await extensionAPI.storage.local.get(['settings', '_historyGeneration']);
   if ((message.generation ?? null) !== (preferences._historyGeneration ?? null)) return snapshot();
@@ -83,7 +83,7 @@ extensionAPI.runtime.onMessage.addListener((message, sender, respond) => {
   }) : serialized(() => handle(message, sender));
   task.then(respond, error => {
     if (!error.expected) console.error('CreateRatio:', error);
-    respond({ ok: false, error: error.message });
+    respond({ ok: false, error: error.message, ...(message?.type === 'ingest' && error.expected ? { retryable: false } : {}) });
   });
   return true;
 });

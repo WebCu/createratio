@@ -4,6 +4,26 @@ const assert = require('node:assert/strict');
 const { activeWorker, worker, gate, popupSender } = require('../tests/background-harness.js');
 const C = require('../../core/core.js');
 
+test('queued timestamps retain their captured date after the timezone changes', async () => {
+  const previous = process.env.TZ;
+  try {
+    process.env.TZ = 'UTC';
+    const start = Date.UTC(2026, 9, 11, 23, 59, 50), date = C.localDate(new Date(start));
+    const packet = { type: 'ingest', id: 'timezone-change', site: 'x',
+      segments: [{ date, mode: 'consume', start, end: start + 5000, sec: 5 }], actions: [{ date, action: 'replies', at: start + 1000 }] };
+    process.env.TZ = 'Asia/Tokyo';
+    assert.notEqual(C.localDate(new Date(start)), date);
+    const w = worker({ _access: { x: { remainingMs: 300000 } } }, 'chrome', start + 10000);
+    const result = await w.send(packet);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(w.data[date].x.consumeSec, 5);
+    assert.equal(w.data[date].x.replies, 1);
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+});
+
 test('fractional intervals immediately after midnight preserve their captured bucket', async () => {
   const midnight = new Date(2026, 9, 12).getTime(), date = C.localDate(new Date(midnight));
   const w = worker({ _access: { x: { remainingMs: 300000 } } }, 'chrome', midnight + 1000);
@@ -42,7 +62,7 @@ for (const browser of ['chrome', 'browser']) {
     const w = activeWorker({}, browser);
     for (const [field, error] of [['segments', 'Invalid time segment'], ['actions', 'Action not supported on this site']]) {
       const packet = { type: 'ingest', site: 'x', id: 'packet', segments: [], actions: [], [field]: [null] };
-      assert.deepEqual(await w.send(packet), { ok: false, error });
+      assert.deepEqual(await w.send(packet), { ok: false, error, retryable: false });
     }
     assert.equal(w.errors.length, 0);
     assert.equal(w.data._receipts, undefined);

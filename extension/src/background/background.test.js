@@ -380,8 +380,8 @@ test('invalid intentions and unsupported senders return rejections without repor
     const w = worker({}, browser);
     const response = await w.send({ type: 'access-begin', site: 'x', reason: 'short' }, gate('x'));
     assert.deepEqual(response, { ok: false, error: 'Write a specific intention of 20–280 characters.' });
-    assert.deepEqual(await w.send(packet('unsupported'), { id: 'test-extension', tab: { id: 1 }, frameId: 0, url: 'https://example.com' }), { ok: false, error: 'Unsupported sender' });
-    assert.deepEqual(await w.send(packet('foreign'), { ...gate('x'), id: 'other-extension' }), { ok: false, error: 'Unsupported sender' });
+    assert.deepEqual(await w.send(packet('unsupported'), { id: 'test-extension', tab: { id: 1 }, frameId: 0, url: 'https://example.com' }), { ok: false, error: 'Unsupported sender', retryable: false });
+    assert.deepEqual(await w.send(packet('foreign'), { ...gate('x'), id: 'other-extension' }), { ok: false, error: 'Unsupported sender', retryable: false });
     assert.equal(w.data._access, undefined);
     assert.equal(w.data[C.localDate()], undefined);
     assert.deepEqual(w.errors, [], 'expected rejections must not appear as extension errors');

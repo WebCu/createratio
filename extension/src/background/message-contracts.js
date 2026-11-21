@@ -29,13 +29,13 @@
         if (!record(segment) || !core.validLocalDate(segment.date) || !['create', 'consume'].includes(segment.mode) || !Number.isFinite(segment.sec) || segment.sec <= 0 || segment.sec > limits.maxSeconds) throw refuse('Invalid time segment');
         totalSec += segment.sec;
         if (segment.start !== undefined || segment.end !== undefined) {
-          if (!Number.isFinite(segment.start) || !Number.isFinite(segment.end) || segment.start < 0 || segment.end <= segment.start || Math.abs((segment.end - segment.start) / 1000 - segment.sec) > 0.001 || core.localDate(new Date(segment.start)) !== segment.date || core.localDate(new Date(Math.ceil(segment.end) - 1)) !== segment.date) throw refuse('Invalid time interval');
+          if (!Number.isFinite(segment.start) || !Number.isFinite(segment.end) || segment.start < 0 || segment.end <= segment.start || Math.abs((segment.end - segment.start) / 1000 - segment.sec) > 0.001) throw refuse('Invalid time interval');
         }
       }
       if (totalSec > limits.maxSeconds) throw refuse('Time packet too large');
       for (const action of message.actions) {
         if (!record(action) || !core.validLocalDate(action.date) || !site.actions.includes(action.action)) throw refuse('Action not supported on this site');
-        if (action.at !== undefined && (!Number.isFinite(action.at) || action.at < 0 || core.localDate(new Date(action.at)) !== action.date)) throw refuse('Invalid action time');
+        if (action.at !== undefined && (!Number.isFinite(action.at) || action.at < 0)) throw refuse('Invalid action time');
       }
     }
     function preferencesSender(sender) {

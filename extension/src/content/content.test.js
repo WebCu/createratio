@@ -5,6 +5,20 @@ const C = require('../../core/core.js');
 const integrations = require('../../sites/index.js');
 const { Element, linkedinFixture } = require('../../sites/test-support.js');
 const { tracker } = require('../tests/content-harness.js');
+test('a terminal packet refusal does not block later measurements', async () => {
+  let rejected, accepted = [];
+  const t = await tracker('chrome', { reply(message, result) {
+    if (message.type !== 'ingest') return result;
+    rejected ??= message.id;
+    if (message.id === rejected) return { ok: false, retryable: false, error: 'Invalid time interval' };
+    accepted.push(message.id);
+    return result;
+  } });
+  t.input(); t.setNow(5000); await t.tick();
+  t.setNow(10000); await t.tick();
+  assert.equal(t.messages.filter(message => message.id === rejected).length, 1);
+  assert.equal(accepted.length, 1);
+});
 test('focused trackers with no fresh input do not keep the worker alive', async () => {
   const t = await tracker(); const before = t.messages.length;
   t.setNow(5000); await t.tick();

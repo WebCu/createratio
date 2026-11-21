@@ -121,7 +121,15 @@
       }
       while (outbox.length && !stopped) {
         const packet = outbox[0];
-        acceptSnapshot(await messages.send(packet, 'No response'));
+        let result;
+        try { result = await messages.send(packet, 'No response'); }
+        catch (error) {
+          if (error.retryable !== false) throw error;
+          if (outbox[0] === packet) outbox.shift();
+          console.warn('CreateRatio: packet rejected.', error.message);
+          continue;
+        }
+        acceptSnapshot(result);
         if (outbox[0] === packet) outbox.shift();
       }
       if (recordingPaused && !outbox.length) {
