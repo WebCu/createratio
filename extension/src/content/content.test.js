@@ -5,6 +5,7 @@ const C = require('../../core/core.js');
 const integrations = require('../../sites/index.js');
 const { Element, linkedinFixture } = require('../../sites/test-support.js');
 const { tracker } = require('../tests/content-harness.js');
+const { worker } = require('../tests/background-harness.js');
 test('continuous fractional samples coalesce into one segment and packet', async () => {
   const t = await tracker();
   t.input();
@@ -28,10 +29,23 @@ test('wall clock corrections re-anchor active intervals without coalescing acros
     t.setNow(5000); await t.tick();
     const segments = t.packets.flatMap(packet => packet.segments);
     assert.equal(segments.length, 2);
+    assert.equal(segments[0].sec, 2);
     assert.equal(segments[1].start, segments[0].end + jump);
-    assert.equal(segments[1].sec, 4);
+    assert.equal(segments[1].sec, 3);
     assert.equal(segments[1].end - segments[1].start, segments[1].sec * 1000);
   }
+});
+test('a forward clock jump near expiry preserves the interval captured before correction', async () => {
+  const start = new Date(2026, 9, 11, 12).getTime(), date = C.localDate(new Date(start));
+  const w = worker({ _access: { x: { date, remainingMs: 2500, expiresAt: start + 2500 } } }, 'chrome', start, { session: { _accessInitialized: true } });
+  w.activate('https://x.com/home');
+  const options = { forward: message => w.send(message) }, t = await tracker('chrome', options);
+  for (let turn = 0; turn < 20; turn++) await new Promise(resolve => setImmediate(resolve));
+  t.input(); t.setNow(1000); w.advance(1000); t.input();
+  options.wallOffset = 3600000;
+  t.setNow(2000); w.advance(3601000); await t.tick();
+  for (let turn = 0; turn < 20; turn++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(w.data[date]?.x.consumeSec || 0, 2);
 });
 test('expiry refresh queues the final partial interval before resetting tracking', async () => {
   const t = await tracker();

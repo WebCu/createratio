@@ -51,13 +51,13 @@
   function settle() {
     const now = performance.now();
     const wallNow = Date.now();
-    if (Math.abs(wallNow - (wallOffset + now)) > 2) wallOffset = wallNow - now;
     const ms = recordingPaused ? 0 : C3.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
     if (ms > 0) {
       const activeEnd = Math.min(now, lastInput + 30000);
       appendTime(wallOffset + Math.max(lastSample, lastInput), wallOffset + activeEnd);
     }
     lastSample = now;
+    if (Math.abs(wallNow - (wallOffset + now)) > 2) wallOffset = wallNow - now;
   }
   function refresh() {
     if (stopped) return;
