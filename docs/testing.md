@@ -421,8 +421,9 @@ JavaScript is not compiled. `tsconfig.json` checks the packaged extension source
 in `extension/core`, `extension/sites` and `extension/src`, excluding tests and
 test harnesses. Types come from inference and JSDoc annotations;
 `extension/types/globals.d.ts` declares the globals that classic scripts share in
-extension pages and the background worker, and the browser extension APIs, which
-stay untyped.
+extension pages and the background worker. Extension API calls are checked
+against `@types/chrome`, and Firefox's `browser` global is declared with the same
+`chrome` API types.
 `extension/types/messages.d.ts` types the runtime messages: `messages.send`
 accepts only `RuntimeMessage` shapes, and `message-contracts.js` keeps its
 allowed values in `Record<…, true>` tables, so a value missing from either side
