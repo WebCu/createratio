@@ -4,6 +4,15 @@ const assert = require('node:assert/strict');
 const { activeWorker, worker, gate, popupSender } = require('../tests/background-harness.js');
 const C = require('../../core/core.js');
 
+test('fractional intervals immediately after midnight preserve their captured bucket', async () => {
+  const midnight = new Date(2026, 9, 12).getTime(), date = C.localDate(new Date(midnight));
+  const w = worker({ _access: { x: { remainingMs: 300000 } } }, 'chrome', midnight + 1000);
+  const result = await w.send({ type: 'ingest', id: 'fractional-midnight', site: 'x',
+    segments: [{ date, mode: 'consume', start: midnight, end: midnight + 0.5, sec: 0.0005 }], actions: [] });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(w.data[date].x.consumeSec, 0.0005);
+});
+
 for (const browser of ['chrome', 'browser']) {
   test(`${browser}: malformed commands are deliberate refusals, not worker failures`, async () => {
     const w = worker({}, browser);
