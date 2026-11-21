@@ -37,6 +37,8 @@ async function recordPacket(message, sender, access) {
   if (!C3.trackingEnabled(message.site, preferences.settings)) return;
   contracts.packet(message);
   const packet = await SiteAccess.creationPacket(message, access || await SiteAccess.reconcile());
+  const current = await extensionAPI.storage.local.get('_historyGeneration');
+  if ((message.generation ?? null) !== (current._historyGeneration ?? null)) return;
   if (packet.segments.length || packet.actions.length) await history.recordCreation(packet);
 }
 async function ingest(message, sender) {

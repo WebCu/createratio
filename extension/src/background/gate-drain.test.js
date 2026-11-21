@@ -76,3 +76,25 @@ test('concurrent tab drains retain both histories and receipts', async () => {
   assert.ok(w.data._receipts.includes('tab-1'));
   assert.ok(w.data._receipts.includes('tab-2'));
 });
+
+test('an ingest cannot replay after its expiry drain rotates the receipt window', async () => {
+  const generation = 'recognized-window';
+  const packet = id => ({ type: 'ingest', id, generation, site: 'reddit', segments: [{ date, mode: 'consume', start, end: start + 1000, sec: 1 }], actions: [] });
+  const incoming = packet('in-flight');
+  const w = worker({
+    _historyGeneration: generation,
+    _receipts: Array.from({ length: C.DELIVERY_LIMITS.receiptLimit - 1 }, (_, n) => 'known-' + n),
+    _access: { reddit: { remainingMs: 1000, expiresAt: start + 1000, date } }
+  }, 'chrome', start, {
+    session: { _accessInitialized: true },
+    sendTabMessage() { return { packets: [incoming, packet('rollover')] }; }
+  });
+  w.activate(url); await w.send({ type: 'snapshot' });
+  w.tabs.push({ id: 1, url }); w.advance(1100);
+  assert.equal((await w.send(incoming, sender)).ok, true);
+  assert.notEqual(w.data._historyGeneration, generation);
+  assert.equal(w.data[date].reddit.consumeSec, 2);
+  assert.equal(w.data._receipts.includes(incoming.id), false);
+  await w.send(incoming, sender);
+  assert.equal(w.data[date].reddit.consumeSec, 2);
+});
