@@ -80,6 +80,8 @@ for (const [name, source, location] of [
   ['described-type.js', '/** @param {string} id private fixture text */\nfunction f(id) {}', '1:1'],
   ['mixed-type.js', '/**\n * private fixture text\n * @type {number}\n */\nconst value = 1;', '1:1'],
   ['line-type.js', '// @type {number} private fixture text\nconst value = 1;', '1:1'],
+  ['linked-type.js', '/** @type {number} See {@link Number} private fixture text */\nconst value = 1;', '1:1'],
+  ['described-return.js', '/** @returns {number} private fixture text */\nfunction f() { return 1; }', '1:1'],
   ['block-type.js', '/* @type {number} private fixture text */\nconst value = 1;', '1:1'],
   ['template.js', 'const x = `${1 /* private fixture text */}`;', '1:16'],
   ['module.js', '// private fixture text\nexport const value = 1;', '1:1'],

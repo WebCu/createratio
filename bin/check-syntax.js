@@ -16,12 +16,24 @@ function packageType(file) {
   }
 }
 
-const TYPE_ANNOTATION = /^(?:@(?:type|satisfies|returns) \{[^\n]+\}|@param \{[^\n]+\} \[?[A-Za-z_$][\w$.]*\]?|@typedef \{[^\n]+\} [A-Za-z_$][\w$]*|@template [A-Za-z_$][\w$]*)$/;
+const TYPE_TAG_NAMES = { type: /^$/, satisfies: /^$/, returns: /^$/, param: /^\[?[A-Za-z_$][\w$.]*\]?$/, typedef: /^[A-Za-z_$][\w$]*$/ };
+
+function typeTagLine(line) {
+  const template = /^@template [A-Za-z_$][\w$]*$/.test(line);
+  const tag = /^@(\w+) \{/.exec(line);
+  if (template || !tag || !Object.hasOwn(TYPE_TAG_NAMES, tag[1])) return template;
+  let depth = 0;
+  for (let index = tag[0].length - 1; index < line.length; index++) {
+    if (line[index] === '{') depth++;
+    else if (line[index] === '}' && --depth === 0) return TYPE_TAG_NAMES[tag[1]].test(line.slice(index + 1).trim());
+  }
+  return false;
+}
 
 function typeAnnotation(comment) {
   if (comment.type !== 'Block' || !comment.value.startsWith('*')) return false;
   const lines = comment.value.slice(1).split(/\r?\n/).map(line => line.replace(/^\s*\*?\s*/, '').trim()).filter(Boolean);
-  return lines.length > 0 && lines.every(line => TYPE_ANNOTATION.test(line));
+  return lines.length > 0 && lines.every(typeTagLine);
 }
 
 function codeComments(file) {
