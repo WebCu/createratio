@@ -45,6 +45,18 @@ async function ingest(message, sender) {
   await recordPacket(message, sender);
   return snapshot();
 }
+async function retryDrains() {
+  const stored = await extensionAPI.storage.session.get(null);
+  const pending = Object.entries(stored).filter(([key]) => key.startsWith('_drainRetry:'));
+  let remaining = pending.length;
+  for (const [key, { packet, sender }] of pending.slice(0, C3.DELIVERY_LIMITS.maxPackets)) {
+    try { await recordPacket(packet, sender, { [packet.site]: { enabled: false } }); }
+    catch (error) { if (!error.expected) continue; }
+    await extensionAPI.storage.session.remove(key); remaining--;
+  }
+  if (remaining) await extensionAPI.alarms.create('drain-retry', { delayInMinutes: 0.5 });
+  else await extensionAPI.alarms.clear('drain-retry');
+}
 async function drainTracker(tab) {
   let timer, response;
   try {
@@ -56,12 +68,19 @@ async function drainTracker(tab) {
   finally { clearTimeout(timer); }
   if (!Array.isArray(response?.packets) || response.packets.length > C3.DELIVERY_LIMITS.maxPackets) return;
   const site = SiteAccess.siteForURL(tab.url);
-  const sender = { id: extensionAPI.runtime.id, tab, frameId: 0, url: tab.url };
+  const sender = { id: extensionAPI.runtime.id, tab: { id: tab.id }, frameId: 0, url: new URL(tab.url).origin + '/' };
   for (const packet of response.packets) {
-    const write = drainWrites.then(() => recordPacket(packet, sender, { [site]: { enabled: false } }));
+    const write = drainWrites.then(async () => {
+      try { await recordPacket(packet, sender, { [site]: { enabled: false } }); }
+      catch (error) {
+        if (error.expected) return;
+        const key = '_drainRetry:' + JSON.stringify([packet.site, packet.generation ?? null, packet.id]);
+        await extensionAPI.storage.session.set({ [key]: { packet, sender } });
+        await extensionAPI.alarms.create('drain-retry', { delayInMinutes: 0.5 });
+      }
+    });
     drainWrites = write.catch(() => {});
-    try { await write; }
-    catch (error) { if (!error.expected) console.warn('CreateRatio: unable to save drained activity.', error.message); }
+    await write;
   }
 }
 async function readHistory(message, sender) {
@@ -125,6 +144,7 @@ async function initialize() {
 extensionAPI.runtime.onInstalled.addListener(details => { updates.installed(details, serialized(initialize)).catch(console.error); });
 extensionAPI.runtime.onStartup.addListener(() => { serialized(initialize).catch(console.error); });
 extensionAPI.alarms.onAlarm.addListener(alarm => {
+  if (alarm.name === 'drain-retry') serialized(retryDrains).catch(console.error);
   if (alarm.name === 'extension-update') void updates.attempt().catch(console.error);
   if (alarm.name === 'daily-badge') serialized(snapshot).catch(console.error);
   if (alarm.name === 'website-time') serialized(() => websiteTime.tick(alarm)).catch(console.error);
@@ -142,4 +162,4 @@ extensionAPI.tabs.onActivated?.addListener(refreshAccess);
 extensionAPI.tabs.onRemoved?.addListener(refreshAccess);
 extensionAPI.tabs.onUpdated?.addListener((_, change) => { if (change.url || change.status) refreshAccess(); });
 extensionAPI.windows.onFocusChanged.addListener(refreshAccess);
-serialized(async () => { await history.prepare(); await SiteAccess.reconcile(true); await websiteTime.start(); }).then(() => updates.start()).catch(console.error);
+serialized(async () => { await history.prepare(); await retryDrains(); await SiteAccess.reconcile(true); await websiteTime.start(); }).then(() => updates.start()).catch(console.error);
