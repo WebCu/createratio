@@ -17,7 +17,11 @@
       const result = await messages.send({ type: 'access-status' }, 'Unable to check access.');
       if (paused || stopped) return;
       const access = result.access[site];
-      if (!access || access.enabled !== false && !(access.goalAllowed || access.remainingMs > 0)) { block(); return; }
+      if (!access) { block(); return; }
+      if (access.enabled !== false && !(access.goalAllowed || access.remainingMs > 0)) {
+        if (result.navigationHandled !== true) block();
+        return;
+      }
       if (!document.hidden && document.hasFocus() && access.enabled !== false && !access.goalAllowed) {
         timer = setTimeout(check, Math.max(1, access.remainingMs));
       }

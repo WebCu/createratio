@@ -254,6 +254,18 @@ export async function launch(extensionPath, options = {}) {
       operation.catch(error => browser.errors.push(error));
     });
     const sessions = new Map();
+    const isolatedContexts = new Map();
+    const applyIsolatedClock = (session, contextId) => cdp.send('Runtime.evaluate', { expression: clockSource(browser.offset), contextId }, session).catch(error => {
+      if (!/Cannot find context|Cannot find execution context|Execution context was destroyed/.test(error.message)) browser.errors.push(error);
+    });
+    cdp.on('Runtime.executionContextCreated', (event, session) => {
+      if (event.context.auxData?.isDefault !== false || !browser.pages.some(page => page.session === session)) return;
+      if (!isolatedContexts.has(session)) isolatedContexts.set(session, new Set());
+      isolatedContexts.get(session).add(event.context.id);
+      void applyIsolatedClock(session, event.context.id);
+    });
+    cdp.on('Runtime.executionContextDestroyed', (event, session) => isolatedContexts.get(session)?.delete(event.executionContextId));
+    cdp.on('Runtime.executionContextsCleared', (_, session) => isolatedContexts.delete(session));
     cdp.on('Target.attachedToTarget', (event) => {
       const { sessionId, targetInfo } = event;
       const initialize = async () => {
@@ -298,6 +310,7 @@ export async function launch(extensionPath, options = {}) {
       browser.offset = now - Date.now();
       await evaluate(browser, browser.worker, clockSource(browser.offset));
       for (const page of browser.pages) {
+        await Promise.all([...(isolatedContexts.get(page.session) || [])].map(contextId => applyIsolatedClock(page.session, contextId)));
         await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: clockSource(browser.offset) }, page.session);
         await eventually(async () => {
           try {

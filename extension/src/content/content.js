@@ -9,6 +9,7 @@
   let scrollFrictionEnabled = false, scrollSpeed = 1;
   const session = crypto.randomUUID();
   let sequence = 0, lastSample = performance.now(), lastInput = -Infinity;
+  let wallOffset = Date.now() - lastSample;
   let enabled = false, mode = 'neutral';
   let wasVisible = document.visibilityState === 'visible', wasFocused = document.hasFocus();
   /** @type {IngestMessage[]} */
@@ -42,25 +43,30 @@
    * @param {number} end
    * @param {SegmentMode} segmentMode */
   function appendTime(start, end, segmentMode) {
-    for (const part of C3.splitInterval(start, end)) {
+    let cursor = start;
+    const parts = C3.splitInterval(start, end);
+    for (const [index, part] of parts.entries()) {
       if (segments.reduce((sum, segment) => sum + segment.sec, 0) + part.sec > MAX_SECONDS) queuePacket();
       if (recordingPaused) break;
       const tail = segments.at(-1);
-      if (tail && tail.mode === segmentMode && tail.date === part.date) tail.sec += part.sec;
-      else segments.push({ ...part, mode: segmentMode });
+      const partEnd = index === parts.length - 1 ? end : cursor + part.sec * 1000;
+      if (tail && tail.mode === segmentMode && tail.date === part.date && tail.end === cursor) { tail.end = partEnd; tail.sec = (tail.end - tail.start) / 1000; }
+      else segments.push({ ...part, sec: (partEnd - cursor) / 1000, mode: segmentMode, start: cursor, end: partEnd });
+      cursor = partEnd;
       if (segments.length === MAX_ITEMS) queuePacket();
       if (recordingPaused) break;
     }
   }
   function settle() {
     const now = performance.now();
+    const wallNow = Date.now();
     const ms = recordingPaused ? 0 : C3.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
     if (ms > 0 && (mode === 'create' || mode === 'consume')) {
       const activeEnd = Math.min(now, lastInput + 30000);
-      const endWall = Date.now() - (now - activeEnd);
-      appendTime(endWall - ms, endWall, mode);
+      appendTime(wallOffset + Math.max(lastSample, lastInput), wallOffset + activeEnd, mode);
     }
     lastSample = now;
+    if (Math.abs(wallNow - (wallOffset + now)) > 2) wallOffset = wallNow - now;
   }
   function refresh() {
     if (stopped) return;
@@ -80,7 +86,7 @@
   }
   function markInput(event) {
     if (!canRecord(event)) return;
-    settle(); lastInput = performance.now();
+    settle(); lastInput = lastSample;
     wasVisible = document.visibilityState === 'visible'; wasFocused = document.hasFocus();
   }
   function pauseIntegration(error) {
@@ -90,10 +96,12 @@
     lastInput = -Infinity; lastSample = performance.now();
     console.warn(`CreateRatio: ${integration.name} integration paused until page reload.`, error.message);
   }
-  function synchronizeTracking(nextEnabled, nextGeneration) {
+  function synchronizeTracking(nextEnabled, nextGeneration, preserveOutbox) {
     if (enabled === nextEnabled && generation === nextGeneration) return;
+    if (preserveOutbox && enabled && !nextEnabled) { settle(); queuePacket(); }
     generation = nextGeneration;
-    segments = []; actions = []; outbox = [];
+    segments = []; actions = [];
+    if (!preserveOutbox) outbox = [];
     recordingPaused = false; resetInput();
     enabled = nextEnabled; adapter = null;
     if (!enabled) return;
@@ -109,7 +117,8 @@
     const nextEnabled = !failed && C3.trackingEnabled(site, result.settings) && (!access || access.enabled !== false && (access.goalAllowed || access.remainingMs > 0));
     scrollFrictionEnabled = result.settings.scrollFrictionEnabled === true;
     scrollSpeed = (100 - (result.settings.scrollFrictionStrength ?? C3.DEFAULT_SETTINGS.scrollFrictionStrength)) / 100;
-    synchronizeTracking(nextEnabled, result.generation ?? null);
+    const nextGeneration = result.generation ?? null;
+    synchronizeTracking(nextEnabled, nextGeneration, generation === nextGeneration && C3.trackingEnabled(site, result.settings));
     syncPending = false; syncRetryAt = 0; syncRetryDelay = 5000;
     refresh();
   }
@@ -125,7 +134,15 @@
       }
       while (outbox.length && !stopped) {
         const packet = outbox[0];
-        acceptSnapshot(await messages.send(packet, 'No response'));
+        let result;
+        try { result = await messages.send(packet, 'No response'); }
+        catch (error) {
+          if (error.retryable !== false) throw error;
+          if (outbox[0] === packet) outbox.shift();
+          console.warn('CreateRatio: packet rejected.', error.message);
+          continue;
+        }
+        acceptSnapshot(result);
         if (outbox[0] === packet) outbox.shift();
       }
       if (recordingPaused && !outbox.length) {
@@ -155,7 +172,7 @@
     if (!result) return;
     if (!integration.actions.includes(result.action) || typeof result.submission !== 'boolean' || !(result.button instanceof Element)) throw new Error('Invalid action recognition');
     if (!counted(result.button)) return;
-    actions.push({ date: C3.localDate(), action: result.action });
+    actions.push({ date: C3.localDate(), action: result.action, at: Date.now() });
     flush();
   }
   function onInteraction(event) {
@@ -199,7 +216,12 @@
     listeners.length = 0;
     extensionAPI.runtime.onMessage.removeListener(receive);
   }
-  function receive(message) {
+  function receive(message, sender, respond) {
+    if (message.type === 'drain-tracker' && sender.id === extensionAPI.runtime.id && !stopped) {
+      settle(); queuePacket();
+      respond({ packets: outbox });
+      return;
+    }
     if (message.type === 'refresh' && !stopped && !updating) { refresh(); void pump(); }
   }
   extensionAPI.runtime.onMessage.addListener(receive);

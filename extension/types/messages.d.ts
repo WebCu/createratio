@@ -3,8 +3,8 @@ declare global {
   type HistoryKind = 'ratio' | 'websites';
   type HistoryRange = 'today' | 'week' | 'month';
   type SegmentMode = 'create' | 'consume';
-  type TimeSegment = { date: string; mode: SegmentMode; sec: number };
-  type SiteActionEntry = { date: string; action: string };
+  type TimeSegment = { date: string; mode: SegmentMode; sec: number; start?: number; end?: number };
+  type SiteActionEntry = { date: string; action: string; at?: number };
   type PreferenceMessage =
     | { type: 'tracking'; site: string; enabled: boolean }
     | { type: 'access-duration'; site?: string; minutes: number | null; preference?: AccessPreference }
@@ -33,7 +33,7 @@ declare global {
     'history': { ok: true; days: Awaited<ReturnType<HistoryStore['read']>> };
     'update-apply': { ok: true; applied: boolean };
     'website-time-setting': { ok: true; enabled: boolean };
-    'access-status': AccessReply & { intentionHistoryEnabled: boolean };
+    'access-status': AccessReply & { intentionHistoryEnabled: boolean; navigationHandled: boolean };
     'access-begin': AccessReply;
     'access-open': AccessReply;
     'access-cancel': AccessReply;

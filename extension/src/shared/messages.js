@@ -57,7 +57,7 @@
       try { reply = await runtime.sendMessage(message); }
       catch (error) { throw new Error(typeof error?.message === 'string' && error.message ? error.message : typeof error === 'string' && error ? error : fallbackMessage); }
       if (!object(reply) || reply.ok !== true && reply.ok !== false) throw new Error(fallbackMessage);
-      if (reply.ok === false) throw new Error(typeof reply.error === 'string' && reply.error ? reply.error : fallbackMessage);
+      if (reply.ok === false) throw Object.assign(new Error(typeof reply.error === 'string' && reply.error ? reply.error : fallbackMessage), reply.retryable === false ? { retryable: false } : {});
       if (['snapshot', 'ingest', 'tracking', 'clear-history', 'scroll-friction-setting'].includes(message.type) && !snapshot(reply)) throw new Error(fallbackMessage);
       if (['access-status', 'access-begin', 'access-open', 'access-cancel', 'access-end', 'access-duration', 'access-goal-setting'].includes(message.type) && !access(reply.access)) throw new Error(fallbackMessage);
       if (message.type === 'scroll-friction-setting' && (typeof reply.settings.scrollFrictionEnabled !== 'boolean'

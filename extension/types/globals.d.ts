@@ -7,6 +7,8 @@ declare global {
     reconcile(closeAll?: boolean): Promise<Record<string, AccessStatus>>;
     siteForURL(raw: string): string | null;
     gateURL(site: string): string;
+    creationPacket(packet: IngestMessage, access: Record<string, Partial<AccessStatus>>): Promise<IngestMessage>;
+    setBeforeNavigate(handler: (tab: chrome.tabs.Tab) => Promise<void>): void;
   };
   type ContentOwner = { prepare(force: boolean): Promise<boolean>; resume(): void; stop(): void };
   type ContentLifecycleApi = { register(name: 'guard' | 'tracker', owner: ContentOwner): void };

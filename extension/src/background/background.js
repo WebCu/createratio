@@ -3,6 +3,7 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 if (typeof importScripts === 'function') importScripts('sites.js', 'core.js', 'messages.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'updates.js');
 
 let queue = Promise.resolve();
+let drainWrites = Promise.resolve();
 function serialized(task) {
   const next = queue.then(task); queue = next.catch(() => {}); return next;
 }
@@ -10,6 +11,7 @@ const contracts = MessageContracts.create(C3, extensionAPI.runtime, C3Sites);
 const history = ActivityHistory.create(extensionAPI.storage.local, C3);
 const websiteTime = WebTime.create(extensionAPI, serialized, C3, history);
 const updates = ExtensionUpdates.create(extensionAPI, serialized, async () => { await websiteTime.tick(); await SiteAccess.reconcile(); });
+SiteAccess.setBeforeNavigate(drainTracker);
 async function badge(day) {
   const value = C3.score(C3.aggregate(day));
   await Promise.all([
@@ -20,23 +22,65 @@ async function badge(day) {
 }
 async function snapshot() {
   await history.prepare();
+  const access = await SiteAccess.reconcile();
   const date = C3.localDate();
   const stored = /** @type {StoredData} */ (await extensionAPI.storage.local.get([date, 'settings', '_historyGeneration']));
   const day = history.creationDay(stored[date]);
   await badge(day);
-  return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: C3.settingsSnapshot(stored.settings), access: await SiteAccess.reconcile(), websiteTimeEnabled: websiteTime.enabled };
+  return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: C3.settingsSnapshot(stored.settings), access, websiteTimeEnabled: websiteTime.enabled };
 }
-async function ingest(message, sender) {
-  if (!contracts.creationSender(message, sender)) return { ok: false, error: 'Unsupported sender' };
+async function recordPacket(message, sender, access, batch) {
+  if (message?.type !== 'ingest') throw MessageContracts.refuse('Invalid activity packet');
+  if (!contracts.creationSender(message, sender)) throw MessageContracts.refuse('Unsupported sender');
   await history.prepare();
   const preferences = /** @type {StoredData} */ (await extensionAPI.storage.local.get(['settings', '_historyGeneration']));
-  if ((message.generation ?? null) !== (preferences._historyGeneration ?? null)) return snapshot();
-  if (!C3.trackingEnabled(message.site, preferences.settings)) return snapshot();
+  if ((message.generation ?? null) !== (batch ? batch.generation : preferences._historyGeneration ?? null)) return;
+  if (!C3.trackingEnabled(message.site, preferences.settings)) return;
   contracts.packet(message);
-  const access = (await SiteAccess.reconcile())[message.site];
-  if (access && !(access.enabled && (access.goalAllowed || access.remainingMs > 0))) return snapshot();
-  await history.recordCreation(message);
+  if (batch) {
+    if (batch.receipts.has(message.id)) return;
+    batch.receipts.add(message.id);
+  }
+  const packet = await SiteAccess.creationPacket(message, access || await SiteAccess.reconcile());
+  if (!batch) {
+    const current = await extensionAPI.storage.local.get('_historyGeneration');
+    if ((message.generation ?? null) !== (current._historyGeneration ?? null)) return;
+  }
+  if (packet.segments.length || packet.actions.length) await history.recordCreation(packet);
+}
+async function ingest(message, sender) {
+  await recordPacket(message, sender);
   return snapshot();
+}
+async function packetBatch() {
+  await history.prepare();
+  const stored = /** @type {{ _historyGeneration?: string | null, _receipts?: string[] }} */ (await extensionAPI.storage.local.get(['_historyGeneration', '_receipts']));
+  return { generation: stored._historyGeneration ?? null, receipts: new Set(stored._receipts || []) };
+}
+async function drainTracker(tab) {
+  const batch = await packetBatch();
+  let timer, response;
+  try {
+    response = await Promise.race([
+      extensionAPI.tabs.sendMessage(tab.id, { type: 'drain-tracker' }, { frameId: 0 }),
+      new Promise(resolve => { timer = setTimeout(resolve, 300); })
+    ]);
+  } catch (_) { return; }
+  finally { clearTimeout(timer); }
+  if (!Array.isArray(response?.packets) || response.packets.length > C3.DELIVERY_LIMITS.maxPackets) return;
+  const site = SiteAccess.siteForURL(tab.url);
+  const sender = { id: extensionAPI.runtime.id, tab: { id: tab.id }, frameId: 0, url: new URL(tab.url).origin + '/' };
+  const write = drainWrites.then(async () => {
+    for (const packet of response.packets) {
+      if (batch.receipts.has(packet?.id)) continue;
+      try { await recordPacket(packet, sender, { [site]: { enabled: false } }, batch); }
+      catch (error) {
+        if (!error.expected) console.warn('CreateRatio: unable to save drained activity.', error.message);
+      }
+    }
+  });
+  drainWrites = write.catch(() => {});
+  await write;
 }
 async function readHistory(message, sender) {
   contracts.history(message, sender);
@@ -83,7 +127,7 @@ extensionAPI.runtime.onMessage.addListener((message, sender, respond) => {
   }) : serialized(() => handle(message, sender));
   task.then(respond, error => {
     if (!error.expected) console.error('CreateRatio:', error);
-    respond({ ok: false, error: error.message });
+    respond({ ok: false, error: error.message, ...(message?.type === 'ingest' && error.expected ? { retryable: false } : {}) });
   });
   return true;
 });

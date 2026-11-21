@@ -8,6 +8,10 @@ const access = { x: { name: 'X', home: 'https://x.com/home', enabled: true, goal
 const snapshot = { ok: true, date: '2026-10-11', day: {}, settings: { trackedSites: ['x'] }, access, websiteTimeEnabled: false };
 
 function client(reply) { return RuntimeMessages.create({ async sendMessage() { return reply; } }); }
+test('terminal refusals preserve their delivery disposition without marking transient failures', async () => {
+  await assert.rejects(client({ ok: false, error: 'Invalid packet', retryable: false }).send({ type: 'ingest' }, 'Failed'), { message: 'Invalid packet', retryable: false });
+  await assert.rejects(client({ ok: false, error: 'Storage unavailable' }).send({ type: 'ingest' }, 'Failed'), error => error.retryable === undefined);
+});
 test('runtime replies require an object envelope with a literal success boolean', async () => {
   for (const reply of [undefined, null, true, [], 'ok', {}, { ok: 1 }, { ok: 'true' }, { ok: false }, { ok: true, enabled: 'true' }]) {
     await assert.rejects(client(reply).send({ type: 'website-time-setting' }, 'Website time stays off.'), { message: 'Website time stays off.' });
