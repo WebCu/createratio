@@ -243,9 +243,7 @@ async function saveTracking(site) {
 async function saveSitePreference(control, group, message) {
   const site = control.site.id, field = group === 'wait' ? control.wait : control.access, input = field?.input;
   control.busy.add(group); control.row.setAttribute('aria-busy', 'true');
-  if (group === 'tracking') {
-    control.tracking.disabled = true; control.trackingStatus.textContent = control.tracking.checked ? 'On' : 'Off';
-  }
+  if (group === 'tracking') renderSite(control, currentSettings);
   if (input) {
     input.disabled = true;
     field.custom.disabled = field.apply.disabled = field.cancel.disabled = true;
