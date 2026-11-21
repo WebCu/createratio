@@ -298,14 +298,23 @@ scrollSlider.addEventListener('blur', () => { scrollEditing = false; renderScrol
 $('scroll-friction-enabled').addEventListener('change', saveScrollSettings);
 $('website-time-enabled').addEventListener('change', async () => {
   const enabled = $('website-time-enabled').checked;
+  let permissionGranted = false;
   websiteSettingBusy = true; $('website-time-enabled').disabled = true;
   try {
-    if (enabled && !await extensionAPI.permissions.request(WebTime.PERMISSIONS)) throw new Error('Permission declined. Website time remains off.');
+    if (enabled) {
+      permissionGranted = await extensionAPI.permissions.request(WebTime.PERMISSIONS);
+      if (!permissionGranted) throw new Error('Permission declined. Website time remains off.');
+    }
     const result = await messages.send({ type: 'website-time-setting', enabled }, 'Unable to change website time.');
     websiteTimeEnabled = result.enabled;
     if (!enabled) await extensionAPI.permissions.remove(WebTime.PERMISSIONS);
     saved(`Website time ${enabled ? 'enabled' : 'disabled'}. Separate from your creation score.`);
-  } catch (e) { error(e.message); }
+  } catch (e) {
+    if (permissionGranted) {
+      try { await extensionAPI.permissions.remove(WebTime.PERMISSIONS); } catch {}
+    }
+    error(e.message);
+  }
   finally { websiteSettingBusy = false; $('website-time-enabled').checked = websiteTimeEnabled; $('website-time-enabled').disabled = false; void refresh(); }
 });
 $('allow-above-goal').addEventListener('change', async () => {

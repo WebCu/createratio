@@ -495,6 +495,19 @@ test('declining permission resets Website time without sending an opt-in message
   assert.equal(p.state.requested, 1); assert.equal(p.nodes['website-time-enabled'].checked, false);
   assert.match(p.nodes.error.textContent, /Permission declined/); assert.equal(p.messages.some(message => message.type === 'website-time-setting'), false);
 });
+test('failed Website time enabling revokes granted permissions and preserves the save error', async () => {
+  for (const removalFails of [false, true]) {
+    const p = settingsPage(); await p.ready();
+    p.state.rejections.set('website-time-setting', new Error('Website time save rejected.'));
+    p.state.removeFails = removalFails;
+    p.nodes['website-time-enabled'].checked = true;
+    await p.nodes['website-time-enabled'].fire('change'); await p.ready();
+    assert.equal(p.state.requested, 1);
+    assert.equal(p.state.removed, 1);
+    assert.equal(p.nodes['website-time-enabled'].checked, false);
+    assert.equal(p.nodes.error.textContent, 'Website time save rejected.');
+  }
+});
 test('Website time enable requests permission; disable revokes it and preserves totals', async () => {
   const p = settingsPage({ _websiteTime: { [C3.localDate()]: { 'example.com': 120 } } }); await p.ready();
   p.nodes['website-time-enabled'].checked = true; await p.nodes['website-time-enabled'].fire('change'); await p.ready();

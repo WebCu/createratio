@@ -96,7 +96,7 @@ function page(name, data = { [C3.localDate()]: { x: { consumeSec: 60 } } }, enab
       return { ok: true, date: C3.localDate(), day: structuredClone(data[C3.localDate()] || {}), settings: C3.settingsSnapshot(structuredClone(settings)), access: structuredClone(state.access), websiteTimeEnabled: enabled };
     } },
     storage: { local: { async get(keys) { state.storageReads.push(keys); return keys === '_websiteTime' ? { _websiteTime: structuredClone(data._websiteTime) } : structuredClone(data); } }, onChanged: { addListener(fn) { storageListeners.push(fn); } } },
-    permissions: { async request() { state.requested++; return state.permission; }, async remove() { state.removed++; } },
+    permissions: { async request() { state.requested++; return state.permission; }, async remove(permissions) { assert.deepEqual(permissions, WebTime.PERMISSIONS); state.removed++; if (state.removeFails) throw new Error('Permission removal failed.'); } },
     tabs: { async create(options) { state.tabs.push(options); }, async query(query) { assert.deepEqual(Object.keys(query), []); return [{ id: 1 }, { id: 2 }]; }, async sendMessage(id, message) { state.notifications.push({ id, ...structuredClone(message) }); } }
   };
   const document = { activeElement: null, getElementById: id => nodes[id], createElement: () => new Element(), createElementNS: () => new Element(), body: new Element() };
