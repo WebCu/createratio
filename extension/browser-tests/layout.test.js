@@ -149,6 +149,50 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       await eventually(() => inspect(page, 'document.querySelector("#custom-duration-site-x").hidden && document.querySelector("#error").hidden && document.querySelector("#accessMinutes-site-x").value === "17"'), 'retry saves the draft');
       await noOverflow(page);
     });
+    await journey('session and intention wait columns align with defaults and keep custom wait resets usable', async () => {
+      const sites = require('../sites/index.js').sites.filter(site => site.gated);
+      await seedAccess(browser, sites.map(site => site.id), { trackedSites: sites.map(site => site.id), accessMinutes: 5, waitMinutes: 1, siteOverrides: {}, allowAboveGoal: false });
+      for (const width of [1100, 760, 400, 320]) {
+        const page = await pageAt('/settings.html', width);
+        await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings select").length === 14'), 'paired time controls ready');
+        const columns = await inspect(page, `(() => {
+          const rect = id => document.getElementById(id).getBoundingClientRect().toJSON();
+          return ['', ...${JSON.stringify(sites.map(site => site.id))}].map(site => {
+            const suffix = site ? 'site-' + site : 'default';
+            return { site, session: rect('accessMinutes-' + suffix), wait: rect('waitMinutes-' + suffix) };
+          });
+        })()`);
+        for (const { site, session, wait } of columns) {
+          assert.ok(Math.abs(session.top - wait.top) < 1, `${width}: ${site || 'Default'} selectors share a row`);
+          assert.ok(wait.left > session.right, `${width}: intention wait follows session time`);
+          assert.ok(Math.abs(session.left - columns[0].session.left) < 1 && Math.abs(wait.left - columns[0].wait.left) < 1, `${width}: ${site || 'Default'} follows the default columns`);
+        }
+        for (const site of [{ id: '', name: 'Default' }, ...sites]) {
+          await findByRole(browser, page, 'combobox', 'Session time for ' + site.name);
+          await findByRole(browser, page, 'combobox', 'Intention wait for ' + site.name);
+        }
+        if (width > 720) {
+          const headings = await inspect(page, '[...document.querySelectorAll(".site-column-headings > span")].map(node => ({ text: node.textContent, left: node.getBoundingClientRect().left }))');
+          assert.deepEqual(headings.map(heading => heading.text), ['Website', 'Session time', 'Intention wait', 'Limit & track']);
+          assert.ok(Math.abs(headings[1].left - columns[0].session.left) < 1 && Math.abs(headings[2].left - columns[0].wait.left) < 1);
+        } else {
+          assert.equal(await inspect(page, '[...document.querySelectorAll("#default-settings .site-preference-field > label, #site-settings .site-preference-field > label")].every(label => label.getBoundingClientRect().height > 1)'), true);
+        }
+        await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
+        const waitMenu = await findByRole(browser, page, 'combobox', 'Intention wait for X');
+        await browser.cdp.send('DOM.focus', { backendNodeId: waitMenu.backendDOMNodeId }, page.session);
+        await key(page, 'End', 35);
+        await eventually(() => inspect(page, 'document.activeElement.id === "customWaitMinutes-site-x"'), 'custom wait editor focused');
+        await key(page, 'a', 65, 2);
+        await browser.cdp.send('Input.insertText', { text: '7' }, page.session);
+        await clickByRole(browser, page, 'button', 'Save custom intention wait for X');
+        await eventually(() => inspect(page, 'document.querySelector("#waitMinutes-site-x").value === "7" && document.querySelector("#custom-wait-duration-site-x").hidden'), 'custom wait saved');
+        await noOverflow(page);
+        await clickByRole(browser, page, 'button', 'Use Default intention wait for X');
+        await eventually(() => inspect(page, 'document.querySelector("#waitMinutes-site-x").value === "default" && document.querySelector("#wait-reset-x").hidden'), 'wait reset to Default');
+        await noOverflow(page);
+      }
+    });
     await journey('all site menus and switches persist at narrow widths without exposing custom fields', async () => {
       const sites = require('../sites/index.js').sites;
       const catalog = sites.filter(site => site.gated), trackingOnly = sites.filter(site => !site.gated);

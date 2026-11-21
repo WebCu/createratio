@@ -540,6 +540,14 @@ test('a tracking save can finish while its session-duration save remains pending
   assert.deepEqual(p.notifications, [{ id: 1, type: 'refresh' }, { id: 2, type: 'refresh' }]);
 });
 
+test('paired time selectors identify their site and setting without relying on table headings', async () => {
+  const p = settingsPage(); await p.ready();
+  for (const site of [{ id: '', name: 'Default' }, ...C3.SITES.filter(site => site.gated)]) {
+    const suffix = site.id ? 'site-' + site.id : 'default';
+    assert.equal(p.nodes['accessMinutes-' + suffix].attributes['aria-label'], 'Session time for ' + site.name);
+    assert.equal(p.nodes['waitMinutes-' + suffix].attributes['aria-label'], 'Intention wait for ' + site.name);
+  }
+});
 test('intention wait controls save defaults, overrides, reset, custom values and errors', async () => {
   const p = settingsPage(); await p.ready();
   const input = p.nodes['waitMinutes-default'], site = p.nodes['waitMinutes-site-x'];
