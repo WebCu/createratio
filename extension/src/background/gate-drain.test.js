@@ -9,7 +9,7 @@ const url = 'https://www.reddit.com/';
 const sender = { id: 'test-extension', frameId: 0, tab: { id: 1 }, url };
 async function settled() { for (let n = 0; n < 30; n++) await new Promise(resolve => setImmediate(resolve)); }
 
-for (const ending of ['alarm', 'manual', 'guard']) test(`gate navigation drains pending activity before destroying the document: ${ending}`, async () => {
+for (const ending of ['alarm', 'manual', 'guard', 'backoff']) test(`gate navigation drains pending activity before destroying the document: ${ending}`, async () => {
   let t, destroyed = false, recordedAtNavigation, drained;
   const w = worker({ _access: { reddit: { remainingMs: 60000, expiresAt: start + 60000, date } } }, 'chrome', start, {
     session: { _accessInitialized: true },
@@ -21,6 +21,7 @@ for (const ending of ['alarm', 'manual', 'guard']) test(`gate navigation drains 
   });
   w.tabs.push({ id: 1, url }); w.activate(url);
   t = await tracker('chrome', { url, async forward(message) {
+    if (ending === 'backoff' && message.type === 'ingest' && w.now >= start + 55000) throw new Error('Worker temporarily unavailable');
     const result = await w.send(message, sender);
     return destroyed ? new Promise(() => {}) : result;
   } });
@@ -28,11 +29,12 @@ for (const ending of ['alarm', 'manual', 'guard']) test(`gate navigation drains 
   for (let time = 5000; time <= 55000; time += 5000) {
     t.setNow(time); w.advance(5000); t.input(); await t.tick(); await settled();
   }
-  const end = ending === 'manual' ? 59000 : 61000;
+  const manual = ending === 'manual' || ending === 'backoff';
+  const end = manual ? 59000 : 61000;
   t.setNow(end); w.advance(end - 55000); t.input();
   if (ending === 'alarm') { w.alarm('access-reddit'); await w.send({ type: 'snapshot' }); }
-  else await w.send(ending === 'manual' ? { type: 'access-end', site: 'reddit' } : { type: 'access-status' }, ending === 'manual' ? popupSender : sender);
-  assert.equal(recordedAtNavigation, ending === 'manual' ? 59 : 60);
+  else await w.send(manual ? { type: 'access-end', site: 'reddit' } : { type: 'access-status' }, manual ? popupSender : sender);
+  assert.equal(recordedAtNavigation, manual ? 59 : 60);
   assert.equal(w.tabs[0].url.endsWith('blocked.html?site=reddit'), true);
   assert.ok(drained.packets.length);
   for (const packet of drained.packets) assert.equal((await w.send(packet, sender)).ok, true);

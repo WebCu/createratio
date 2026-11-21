@@ -1,17 +1,32 @@
 'use strict';
 const { spawnSync } = require('node:child_process');
-const { mkdtempSync, openSync, closeSync, writeFileSync, writeSync, fstatSync, readSync } = require('node:fs');
+const { mkdtempSync, openSync, closeSync, writeFileSync, writeSync, fstatSync, readSync, realpathSync } = require('node:fs');
 const { tmpdir, constants } = require('node:os');
 const path = require('node:path');
 
-function commandValue(program, args) {
+function commandValue(program, args, readOutput = output => output.trim()) {
   const result = spawnSync(program, args, { encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] });
-  return !result.error && result.status === 0 ? result.stdout.trim() : null;
+  return !result.error && result.status === 0 ? readOutput(result.stdout) : null;
+}
+
+function isProjectRepository() {
+  const topLevel = commandValue('git', ['--no-optional-locks', 'rev-parse', '--show-toplevel'], output => output.replace(/\n$/, ''));
+  if (!topLevel) return false;
+  try {
+    return realpathSync(topLevel) === realpathSync(process.cwd());
+  } catch {
+    return false;
+  }
+}
+
+function readSource() {
+  if (!isProjectRepository()) return { head: null, dirty: null };
+  const status = commandValue('git', ['--no-optional-locks', 'status', '--porcelain']);
+  return { head: commandValue('git', ['--no-optional-locks', 'rev-parse', '--verify', 'HEAD']), dirty: status === null ? null : Boolean(status) };
 }
 
 function runVerification() {
-  const status = commandValue('git', ['--no-optional-locks', 'status', '--porcelain']);
-  const source = { head: commandValue('git', ['--no-optional-locks', 'rev-parse', '--verify', 'HEAD']), dirty: status === null ? null : Boolean(status) };
+  const source = readSource();
   const runtime = { node: process.version, pnpm: commandValue('pnpm', ['--version']) };
   const directory = mkdtempSync(path.join(tmpdir(), 'createratio-verify-'));
   const stages = ['check', 'check:browser', 'smoke:browser'].map(name => ({ name, status: 'not-run', log: name.replaceAll(':', '-') + '.log' }));

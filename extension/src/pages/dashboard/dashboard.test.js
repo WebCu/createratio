@@ -4,6 +4,57 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { page, C3 } = require('../../tests/ui-harness.js');
+for (const kind of ['ratio', 'websites']) {
+  test(`dashboard ${kind} CSV rejection survives a reset refresh that finishes later`, async () => {
+    const p = page('dashboard'); await p.ready();
+    const releaseExport = p.holdMessage('history');
+    const exporting = p.nodes[kind === 'ratio' ? 'export' : 'website-export'].fire('click');
+    await p.ready();
+    const releaseRefresh = p.holdMessage('snapshot');
+    p.change({ _historyReset: { oldValue: false, newValue: true } });
+    await p.ready(); releaseExport(); await exporting;
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    releaseRefresh(); await p.ready();
+    assert.equal(p.blobs.length, 0);
+    assert.deepEqual(p.state.downloads, []);
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    assert.equal(p.nodes.error.hidden, false);
+    p.refresh(); await p.ready();
+    assert.equal(p.nodes.error.hidden, true);
+  });
+  test(`dashboard ${kind} CSV survives receipt-window rollover`, async () => {
+    const p = page('dashboard'); await p.ready();
+    const button = p.nodes[kind === 'ratio' ? 'export' : 'website-export'];
+    const release = p.holdMessage('history');
+    const exporting = button.fire('click'); await p.ready();
+    p.change({ _historyGeneration: { oldValue: 'before', newValue: 'after' }, _receipts: { newValue: [] } });
+    await p.ready(); release(); await exporting;
+    assert.equal(p.blobs.length, 1);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+  test(`dashboard ${kind} CSV rejects pre-reset replies and retries with empty history`, async () => {
+    const today = C3.localDate();
+    const data = { [today]: { x: { createSec: 180 } }, _websiteTime: { [today]: { 'cleared.test': 180 } } };
+    const p = page('dashboard', data); await p.ready();
+    const button = p.nodes[(kind === 'ratio' ? 'export' : 'website-export')];
+    p.state.replies.set('history', { ok: true, days: structuredClone(kind === 'ratio' ? { [today]: data[today] } : data._websiteTime) });
+    const release = p.holdMessage('history');
+    const exporting = button.fire('click');
+    await p.ready();
+    delete data[today]; data._websiteTime = {};
+    p.change({ _historyReset: { oldValue: false, newValue: true } });
+    await p.ready(); release(); await exporting;
+    assert.equal(p.blobs.length, 0, 'cleared history never becomes a CSV');
+    assert.deepEqual(p.state.downloads, []);
+    assert.equal(p.nodes.error.textContent, 'History changed while loading. Please try again.');
+    p.state.replies.delete('history');
+    await button.fire('click');
+    assert.equal(p.blobs.length, 1);
+    assert.equal((await p.blobs[0].text()).trim().split('\n').length, 1);
+    assert.equal(button.disabled, false);
+    assert.equal(p.nodes.error.hidden, true);
+  });
+}
 const dashboard = (data, enabled) => page('dashboard', data, enabled);
 test('dashboard rejects malformed history and intentions and surfaces runtime export failures', async () => {
   const p = dashboard(); await p.ready();
