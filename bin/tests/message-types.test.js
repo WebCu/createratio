@@ -20,7 +20,7 @@ function typeCheck(t, sources) {
     files: ['globals.d.ts', 'messages.d.ts'].map(name => path.join(root, 'extension', 'types', name)).concat(files),
     include: []
   }));
-  return spawnSync(process.execPath, [tsc, '-p', 'tsconfig.json'], { cwd: directory, encoding: 'utf8' });
+  return spawnSync(process.execPath, [tsc, '-p', 'tsconfig.json', '--pretty', 'false'], { cwd: directory, encoding: 'utf8' });
 }
 
 test('runtime message types accept documented senders and validator tables', t => {
