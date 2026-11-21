@@ -8,7 +8,7 @@ are blocked by default on a fresh install. Write an
 intention, wait five minutes, then confirm access for five active minutes by default.
 Switching away pauses the timer.
 
-- **Intentional access:** configurable session times and a **Limit & track**
+- **Intentional access:** configurable intention waits and session times, with a **Limit & track**
   switch for X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit. Turning it off removes
   access restrictions and stops new creation-score measurements without deleting history.
 - **A daily creation score:** compares creating time and credit for posts,
@@ -70,7 +70,7 @@ through `pnpm build:chrome`, `pnpm build:edge`, and `pnpm build:firefox`.
 On 2026-11-20, source-built bundles at `bb07674` were validated live on Microsoft
 Edge Stable 142.0.3595.94 and 158.0.4370.33 (both passed the same flows), alongside
 Firefox 160.0.1, against signed-out YouTube: blocking,
-intention entry and a real 60-second wait (premature click rejected), a 5-minute
+intention entry and a real one-minute wait (premature click rejected), a 5-minute
 active budget pausing off-tab, score dashboard recording consumption, **End
 session** re-blocking, and **Limit & track** Off persisting. Store-published builds,
 signed-in/authenticated YouTube, and trackpad gestures were not covered.
