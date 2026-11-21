@@ -174,7 +174,10 @@
     boundary();
   });
   for (const type of ['c3:route-change', 'popstate', 'hashchange']) listen(window, type, refresh);
-  const observer = new MutationObserver(scheduleRefresh);
+  const observer = new MutationObserver(() => {
+    if (!pageActive || document.visibilityState !== 'visible') return;
+    scheduleRefresh();
+  });
   observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['contenteditable', 'aria-hidden', 'style', 'class', 'data-testid'] });
   const interval = setInterval(() => {
     if (!extensionAPI.runtime?.id) { stop(); return; }
