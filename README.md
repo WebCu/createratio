@@ -118,7 +118,8 @@ add an access gate.
 
 Use [GitHub issues](https://github.com/WebCu/createratio/issues) for bug reports
 and feature proposals. Do not include private activity, intention text,
-credentials, or CSV exports.
+credentials, or CSV exports. Report security vulnerabilities privately as
+described in the [security policy](SECURITY.md).
 
 **Send feedback** in a store-installed Chrome build opens its public Chrome Web
 Store reviews page without attaching local activity data. Feedback links are
