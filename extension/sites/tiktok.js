@@ -42,6 +42,7 @@
     if (path === '/messages') return { kind: 'messages' };
     return null;
   }
+  /** @param {{ url?: string, tiktokEditorFocused?: boolean, ownProfilePath?: string | null }} [page] */
   function classifyPage({ url, tiktokEditorFocused = false, ownProfilePath = null } = {}) {
     const route = page(url);
     if (!route) return 'neutral';

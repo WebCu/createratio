@@ -1,7 +1,8 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
-const $ = id => document.getElementById(id);
+/** @type {(id: string) => HTMLInputElement} */
+const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
 let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, refreshPending = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
 let scrollEditing = false, scrollPending = null, scrollSaving = null;
@@ -242,6 +243,7 @@ async function saveTracking(site) {
   if (control.busy.has('tracking')) return;
   await saveSitePreference(control, 'tracking', { type: 'tracking', site, enabled: control.tracking.checked });
 }
+/** @param {PreferenceMessage} message */
 async function saveSitePreference(control, group, message) {
   const site = control.site.id, field = group === 'wait' ? control.wait : control.access, input = field?.input;
   control.busy.add(group); control.row.setAttribute('aria-busy', 'true');
@@ -254,12 +256,13 @@ async function saveSitePreference(control, group, message) {
   let success = false;
   try {
     const result = await messages.send(message, 'Unable to save settings.');
-    const snapshot = message.type === 'tracking' ? result : await messages.send({ type: 'snapshot' }, 'Unable to load your saved settings.');
+    const snapshot = message.type === 'tracking' && 'settings' in result ? result : await messages.send({ type: 'snapshot' }, 'Unable to load your saved settings.');
     render(snapshot.settings);
     if (group === 'tracking') {
+      const enabled = message.type === 'tracking' && message.enabled;
       const description = accessSites.has(site)
-        ? message.enabled ? 'Limit & track is on.' : 'Limit & track is off.'
-        : message.enabled ? 'Creating/consuming and action measurements are on.' : 'Creation-score tracking is off.';
+        ? enabled ? 'Limit & track is on.' : 'Limit & track is off.'
+        : enabled ? 'Creating/consuming and action measurements are on.' : 'Creation-score tracking is off.';
       saved(`${control.site.name}: ${description} Your history is kept.`);
     } else saved(group === 'wait' ? `${control.site.name} intention wait saved for new requests.` : `${control.site.name} session time saved for new sessions and midnight refills.`);
     if (group === 'tracking') await notifyTrackers();
@@ -291,9 +294,9 @@ async function saveScrollSettings() {
   } finally { scrollSettingBusy = false; scrollSaving = null; renderScroll(currentSettings); }
 }
 const scrollSlider = $('scroll-friction-strength');
-scrollSlider.min = C3.SCROLL_FRICTION_LIMITS.minStrength;
-scrollSlider.max = C3.SCROLL_FRICTION_LIMITS.maxStrength;
-scrollSlider.step = C3.SCROLL_FRICTION_LIMITS.step;
+scrollSlider.min = String(C3.SCROLL_FRICTION_LIMITS.minStrength);
+scrollSlider.max = String(C3.SCROLL_FRICTION_LIMITS.maxStrength);
+scrollSlider.step = String(C3.SCROLL_FRICTION_LIMITS.step);
 scrollSlider.addEventListener('input', () => { scrollEditing = true; renderScroll(currentSettings); });
 scrollSlider.addEventListener('change', saveScrollSettings);
 scrollSlider.addEventListener('blur', () => { scrollEditing = false; renderScroll(currentSettings); });
@@ -338,6 +341,7 @@ $('intention-history-enabled').addEventListener('change', async () => {
   } catch (e) { error(e.message); }
   finally { intentionSettingBusy = false; void refresh(); }
 });
+/** @param {HistoryKind} kind */
 async function exportHistory(kind, button) {
   const version = historyVersion;
   button.disabled = true;

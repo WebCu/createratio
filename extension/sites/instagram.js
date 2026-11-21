@@ -46,6 +46,7 @@
     if (profile && !reserved.test(profile[1])) return { kind: 'profile', profile: '/' + profile[1] };
     return null;
   }
+  /** @param {{ url?: string, instagramEditorFocused?: boolean, ownProfilePath?: string | null }} [page] */
   function classifyPage({ url, instagramEditorFocused = false, ownProfilePath = null } = {}) {
     const route = page(url);
     if (!route) return 'neutral';

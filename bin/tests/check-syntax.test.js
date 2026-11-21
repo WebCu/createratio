@@ -77,6 +77,12 @@ for (const [name, source, location] of [
   ['inline.cjs', 'const x = 1; // private fixture text', '1:14'],
   ['block.mjs', 'export const x = 1;\r\n/* private fixture text */', '2:1'],
   ['documentation.js', '/** private fixture text */\nconst value = 1;', '1:1'],
+  ['described-type.js', '/** @param {string} id private fixture text */\nfunction f(id) {}', '1:1'],
+  ['mixed-type.js', '/**\n * private fixture text\n * @type {number}\n */\nconst value = 1;', '1:1'],
+  ['line-type.js', '// @type {number} private fixture text\nconst value = 1;', '1:1'],
+  ['linked-type.js', '/** @type {number} See {@link Number} private fixture text */\nconst value = 1;', '1:1'],
+  ['described-return.js', '/** @returns {number} private fixture text */\nfunction f() { return 1; }', '1:1'],
+  ['block-type.js', '/* @type {number} private fixture text */\nconst value = 1;', '1:1'],
   ['template.js', 'const x = `${1 /* private fixture text */}`;', '1:16'],
   ['module.js', '// private fixture text\nexport const value = 1;', '1:1'],
   ['legacy.js', '<!-- private fixture text\nconst value = 1;', '1:1'],
@@ -85,7 +91,7 @@ for (const [name, source, location] of [
   test(`comment check rejects ${name} with a location, without echoing its contents`, t => {
     const file = path.join(fixture(t), name);
     writeFileSync(file, source);
-    assert.throws(() => checkSyntax([file]), error => {
+    assert.throws(() => checkSyntax([file], [file]), error => {
       assert.match(error.message, /Code comments are not allowed/);
       assert.ok(error.message.includes(`${file}:${location}`), error.message);
       assert.doesNotMatch(error.message, /private fixture text/);
@@ -126,6 +132,36 @@ test('ambiguous scripts retain CommonJS comments without an implicit module trig
   const file = path.join(fixture(t), 'implicit.js');
   writeFileSync(file, 'await / a // b;');
   assert.throws(() => checkSyntax([file]), /implicit\.js:1:11/);
+});
+
+test('comment check allows JSDoc type annotations without prose in type-checked files', t => {
+  const file = path.join(fixture(t), 'types.js');
+  writeFileSync(file, [
+    '/** @type {(id: string) => any} */',
+    'const lookup = id => id;',
+    '/** @param {{ url?: string }} [page] */',
+    'function classify({ url } = {}) { return url; }',
+    '/**',
+    ' * @template T',
+    ' * @template {string} K',
+    ' * @param {T[]} items',
+    ' * @returns {T | undefined}',
+    ' */',
+    'function first(items) { return items[0]; }',
+    '/** @typedef {{ id: string }} Site */',
+    'const pairs = /** @type {const} */ ([[0, "a"]]);',
+    "/** @type {'{' | '}'} */",
+    "const brace = '{';"
+  ].join('\n'));
+  assert.equal(checkSyntax([file], [file]), 1);
+});
+
+test('comment check rejects JSDoc type annotations outside type-checked files', t => {
+  const directory = fixture(t);
+  const typed = path.join(directory, 'typed.js'), untyped = path.join(directory, 'untyped.js');
+  for (const file of [typed, untyped]) writeFileSync(file, '/** @type {number} */\nconst value = 1;');
+  assert.equal(checkSyntax([typed], [typed]), 1);
+  assert.throws(() => checkSyntax([untyped], [typed]), /untyped\.js:1:1/);
 });
 
 test('comment-like text in literals and division are not comments', t => {

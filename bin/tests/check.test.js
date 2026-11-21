@@ -27,9 +27,9 @@ if (command === process.env.FAIL_AT) process.exit(7);
   return { ...result, calls: readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse) };
 }
 
-const stages = ['check:syntax', 'test', 'build', 'build:site'];
+const stages = ['check:syntax', 'check:types', 'test', 'build', 'build:site'];
 
-test('check runs syntax, tests, browser builds, and website build in order', t => {
+test('check runs syntax, types, tests, browser builds, and website build in order', t => {
   const result = check(t);
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.calls, stages);

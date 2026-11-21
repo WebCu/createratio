@@ -1,7 +1,8 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
-const $ = id => document.getElementById(id);
+/** @type {(id: string) => HTMLInputElement} */
+const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
 let reportURL = null, reportTimer = null, reportVersion = 0;
 let errorVersion = 0;
@@ -32,7 +33,7 @@ function chart(days) {
   const tbody = $('chart-table').querySelector('tbody'); tbody.replaceChildren();
   dates.forEach((date, i) => {
     const x = 34 + i * 45;
-    for (const [j, key, color] of [[0, 'createSec', 'var(--green)'], [1, 'consumeSec', 'var(--consume)']]) {
+    for (const [j, key, color] of /** @type {const} */ ([[0, 'createSec', 'var(--green)'], [1, 'consumeSec', 'var(--consume)']])) {
       const height = totals[i][key] / 60 / top * 92;
       const bar = svgElement('rect', { x: x + j * 13, y: 112 - height, width: 10, height, rx: 2, fill: color });
       bar.append(svgElement('title', {}, `${date}: ${minutes(totals[i][key])} ${j === 0 ? 'creating' : 'consuming'}`)); svg.append(bar);
@@ -80,12 +81,12 @@ function renderIntentions() {
 function renderRatio(days) {
   const today = C3.localDate(), day = days[today] || {}, total = C3.aggregate(day), score = C3.score(total);
   const hasActivity = ['createSec', 'consumeSec', 'posts', 'replies', 'comments'].some(key => total[key] > 0);
-  $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); $('date').dateTime = today;
+  $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); /** @type {HTMLTimeElement} */ (document.getElementById('date')).dateTime = today;
   $('score').textContent = score.toFixed(2); $('score').style.color = hasActivity ? C3.scoreColor(score) : '';
   $('score-card').setAttribute('data-score', hasActivity ? C3.scoreBand(score) : 'none');
   $('score-status').textContent = !hasActivity ? 'A fresh start. Make something today.' : score >= 1 ? 'You’re making more than you’re taking in.' : score >= 0.5 ? 'A little more creating gets you to 1.0.' : 'One thoughtful reply is a great start.';
   $('create-min').textContent = minutes(total.createSec); $('consume-min').textContent = minutes(total.consumeSec);
-  for (const key of ['posts', 'replies', 'comments', 'likes', 'quotes', 'reposts', 'bookmarks']) $(key).textContent = total[key];
+  for (const key of ['posts', 'replies', 'comments', 'likes', 'quotes', 'reposts', 'bookmarks']) $(key).textContent = String(total[key]);
   $('sites').replaceChildren();
   const names = new Map(C3.SITES.map(site => [site.id, site.name]));
   for (const site of new Set([...names.keys(), ...C3.recordedSites(day)])) {
@@ -104,11 +105,12 @@ async function refresh(requested = false) {
     websiteTimeEnabled = snapshot.websiteTimeEnabled;
     intentionHistoryEnabled = snapshot.settings.intentionHistoryEnabled === true;
     const view = activeView;
-    const result = await messages.send(view === 'intentions' ? { type: 'access-history-list' } : { type: 'history', kind: view === 'ratio' ? 'ratio' : 'websites', range: view === 'ratio' ? 'week' : $('website-range').value }, 'Unable to load history.');
-    if (view === activeView) {
-      if (view === 'ratio') { intentions = []; renderRatio(result.days); }
-      else if (view === 'websites') { intentions = []; renderWebsites(result.days); }
-      else { intentions = result.intentions; renderIntentions(); }
+    if (view === 'intentions') {
+      const result = await messages.send({ type: 'access-history-list' }, 'Unable to load history.');
+      if (view === activeView) { intentions = result.intentions; renderIntentions(); }
+    } else {
+      const result = await messages.send({ type: 'history', kind: view === 'ratio' ? 'ratio' : 'websites', range: view === 'ratio' ? 'week' : /** @type {HistoryRange} */ ($('website-range').value) }, 'Unable to load history.');
+      if (view === activeView) { intentions = []; if (view === 'ratio') renderRatio(result.days); else renderWebsites(result.days); }
     }
     if (version === errorVersion) error();
   } catch (e) { error(e.message); } finally { refreshing = false; if (refreshPending) { refreshPending = false; void refresh(); } }
@@ -130,6 +132,7 @@ $('intention-clear').addEventListener('click', async () => {
   finally { $('intention-clear').disabled = !intentions.length; }
 });
 $('website-range').addEventListener('change', () => { void refresh(true); });
+/** @param {HistoryKind} kind */
 async function exportHistory(kind) {
   const version = reportVersion;
   const websites = kind === 'websites';
@@ -146,12 +149,12 @@ async function exportHistory(kind) {
     setTimeout(() => URL.revokeObjectURL(url), 10000); error();
   } catch (e) { error(e.message); }
 }
-const sharing = SocialSharing.mount({ messages, range: () => $('report-range').value, error });
+const sharing = SocialSharing.mount({ messages, range: () => /** @type {HistoryRange} */ ($('report-range').value), error });
 $('report-range').addEventListener('change', sharing.clear);
 $('report-export').addEventListener('click', async () => {
   const button = $('report-export');
   if (button.disabled) return;
-  const range = $('report-range').value, version = reportVersion;
+  const range = /** @type {HistoryRange} */ ($('report-range').value), version = reportVersion;
   button.disabled = true; $('report-status').textContent = '';
   try {
     const now = new Date(), date = C3.localDate(now);

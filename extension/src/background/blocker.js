@@ -1,4 +1,5 @@
 'use strict';
+/** @type {SiteAccessApi} */
 const SiteAccess = (() => {
   const MAX_BUDGET_MS = C3.ACCESS_LIMITS.maxMinutes * 60000;
   function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
@@ -39,7 +40,7 @@ const SiteAccess = (() => {
   async function reconcile(closeAll = false) {
     const restart = !(await api.storage.session.get('_accessInitialized'))._accessInitialized;
     const now = Date.now(), clock = new Date(now), date = C3.localDate(clock);
-    const stored = await api.storage.local.get(['_access', 'settings', date]);
+    const stored = /** @type {StoredData} */ (await api.storage.local.get(['_access', 'settings', date]));
     const goalAllowed = stored.settings?.allowAboveGoal === true && C3.score(C3.aggregate(stored[date])) > C3.dailyTarget(stored.settings);
     const current = await api.declarativeNetRequest.getSessionRules();
     const access = accessState(stored._access), original = JSON.stringify(stored._access === undefined ? {} : stored._access);
@@ -91,13 +92,13 @@ const SiteAccess = (() => {
   }
   async function setGoalAccess(message, sender) {
     contracts.preferences(message, sender);
-    const stored = await api.storage.local.get('settings');
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
     await api.storage.local.set({ settings: { ...stored.settings, allowAboveGoal: message.enabled } });
     return { ok: true, access: await reconcile() };
   }
   async function setIntentionHistory(message, sender) {
     contracts.preferences(message, sender);
-    const stored = await api.storage.local.get('settings');
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
     await api.storage.local.set({ settings: { ...stored.settings, intentionHistoryEnabled: message.enabled } });
     return { ok: true };
   }
@@ -112,14 +113,14 @@ const SiteAccess = (() => {
   }
   async function setDuration(message, sender) {
     contracts.preferences(message, sender);
-    const stored = await api.storage.local.get('settings');
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
     const settings = C3.updatePreferences(stored.settings, { [message.preference || 'accessMinutes']: message.minutes }, message.site);
     await api.storage.local.set({ settings });
     return { ok: true, access: await reconcile() };
   }
   async function setTracking(message, sender) {
     contracts.preferences(message, sender);
-    const stored = await api.storage.local.get('settings');
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
     const settings = { ...C3.DEFAULT_SETTINGS, ...stored.settings };
     const enabled = new Set(C3.settingsSnapshot(stored.settings).trackedSites);
     if (message.enabled) enabled.add(message.site); else enabled.delete(message.site);
@@ -135,7 +136,7 @@ const SiteAccess = (() => {
   }
   async function readAccessStatus() {
     const access = await reconcile();
-    const stored = await api.storage.local.get('settings');
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
     return { ok: true, access, intentionHistoryEnabled: stored.settings?.intentionHistoryEnabled === true };
   }
   async function beginWait(message, state, stored, now) {
@@ -175,7 +176,7 @@ const SiteAccess = (() => {
       if (message.type === 'access-end') throw MessageContracts.refuse('Turn off goal-based access in Settings to block sites above the goal.');
       if (['access-open', 'access-begin'].includes(message.type)) return { ok: true, access: statuses };
     }
-    const stored = await api.storage.local.get(['_access', 'settings', '_intentions']), access = accessState(stored._access), now = Date.now();
+    const stored = /** @type {StoredData} */ (await api.storage.local.get(['_access', 'settings', '_intentions'])), access = accessState(stored._access), now = Date.now();
     switch (message.type) {
       case 'access-begin': {
         const rejection = await beginWait(message, state, stored, now);
