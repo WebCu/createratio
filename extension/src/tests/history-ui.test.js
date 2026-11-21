@@ -2,18 +2,20 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { page, C3 } = require('./ui-harness.js');
-test('popup and dashboard use a neutral score for a fresh day and retain score colours for recorded activity', async () => {
+test('popup and dashboard score cards follow the score colour band, staying neutral for a fresh day', async () => {
   for (const name of ['popup', 'dashboard']) {
     const p = page(name, {}); await p.ready();
     assert.equal(p.nodes.score.textContent, '0.00');
-    assert.equal(p.nodes.score.style.color, '');
+    assert.equal(p.nodes.score.style.color, ''); assert.equal(p.nodes['score-card'].attributes['data-score'], 'none');
     assert.match(p.nodes['score-status'].textContent, /fresh start/i);
     p.setDay({ x: { consumeSec: 60 } }); p.refresh(); await p.ready();
-    assert.equal(p.nodes.score.style.color, C3.scoreColor(0));
+    assert.equal(p.nodes.score.style.color, C3.scoreColor(0)); assert.equal(p.nodes['score-card'].attributes['data-score'], 'low');
+    p.setDay({ x: { createSec: 45, consumeSec: 60 } }); p.refresh(); await p.ready();
+    assert.equal(p.nodes.score.style.color, C3.scoreColor(0.75)); assert.equal(p.nodes['score-card'].attributes['data-score'], 'mid');
     p.setDay({ x: { consumeSec: 60, posts: 1 } }); p.refresh(); await p.ready();
-    assert.equal(p.nodes.score.style.color, C3.scoreColor(2));
+    assert.equal(p.nodes.score.style.color, C3.scoreColor(2)); assert.equal(p.nodes['score-card'].attributes['data-score'], 'high');
     p.setDay({}); p.refresh(); await p.ready();
-    assert.equal(p.nodes.score.style.color, '');
+    assert.equal(p.nodes.score.style.color, ''); assert.equal(p.nodes['score-card'].attributes['data-score'], 'none');
   }
 });
 test('Settings exports both retained histories in the existing CSV formats', async () => {
