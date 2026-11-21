@@ -15,6 +15,50 @@ function value(p, site = '') {
   return [minutes, c.source];
 }
 
+test('storage changes during a refresh coalesce into one fresh snapshot and preserve duration drafts', async () => {
+  const p = settingsPage(); await p.ready();
+  const c = controls(p);
+  c.access.value = 'custom'; await c.access.fire('change'); c.custom.value = '23';
+  const stale = { ok: true, date: C3.localDate(), day: {}, access: {}, settings: p.settings, websiteTimeEnabled: false };
+  const release = p.holdMessage('snapshot');
+  p.refresh();
+  p.setSettings({ ...p.settings, intentionHistoryEnabled: true });
+  for (let count = 0; count < 20; count++) p.change();
+  const before = p.messages.length;
+  p.state.replies.set('snapshot', stale);
+  release();
+  queueMicrotask(() => p.state.replies.delete('snapshot'));
+  await p.ready();
+  assert.equal(p.nodes['intention-history-enabled'].checked, true);
+  assert.equal(p.messages.length, before + 1);
+  assert.equal(c.custom.value, '23'); assert.equal(c.editor.hidden, false);
+});
+test('a refresh without overlapping changes does not request another snapshot', async () => {
+  const p = settingsPage(); await p.ready();
+  const before = p.messages.length;
+  p.refresh(); await p.ready(); await p.ready();
+  assert.equal(p.messages.length, before + 1);
+});
+test('a pending storage refresh still renders after the in-flight snapshot fails', async () => {
+  const p = settingsPage(); await p.ready();
+  const release = p.holdMessage('snapshot');
+  p.refresh();
+  p.setSettings({ ...p.settings, intentionHistoryEnabled: true }); p.change();
+  const before = p.messages.length;
+  p.state.replies.set('snapshot', { ok: false, error: 'Snapshot failed.' });
+  release();
+  queueMicrotask(() => p.state.replies.delete('snapshot'));
+  await p.ready();
+  assert.equal(p.nodes['intention-history-enabled'].checked, true);
+  assert.equal(p.messages.length, before + 1);
+  assert.equal(p.nodes['intention-history-enabled'].disabled, false);
+});
+test('an ordinary storage update renders the saved intention preference', async () => {
+  const p = settingsPage(); await p.ready();
+  p.setSettings({ ...p.settings, intentionHistoryEnabled: true }); p.change(); await p.ready();
+  assert.equal(p.nodes['intention-history-enabled'].checked, true);
+});
+
 test('save confirmations fade after four seconds and polling does not extend their lifetime', async () => {
   const p = settingsPage(); await p.ready();
   p.toggle('x', false); await p.ready();
