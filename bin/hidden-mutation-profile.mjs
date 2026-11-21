@@ -23,6 +23,15 @@ export function mutationMetrics(coverage, profile, origin) {
   return { calls: modes.reduce((sum, fn) => sum + fn.calls, 0), modes, contentCpuMs: contentCpuUs / 1000 };
 }
 
+export function validateMutationRun(run) {
+  const hidden = run.phases.find(phase => phase.phase === 'hidden');
+  const returning = run.phases.find(phase => phase.phase === 'return');
+  const visible = run.phases.find(phase => phase.phase === 'visible');
+  if (run.variant === 'candidate') assert.equal(hidden.calls, 0, 'Candidate hidden mutations must not classify');
+  assert.ok(returning.calls > 0, 'return must classify');
+  assert.ok(visible.batches > 0 && visible.calls >= Math.ceil(visible.batches / 2), 'Visible mutations must classify at least half the batches');
+}
+
 async function workload(browser) {
   await seedAccess(browser, ['x'], { trackedSites: ['x'], scrollFrictionEnabled: false });
   const page = await browser.page('https://x.com/home');
@@ -91,8 +100,7 @@ export async function profileHiddenMutations(baseline, candidate, output) {
           const run = { repetition, variant, ...result, browser: (await browser.cdp.send('Browser.getVersion')).product };
           report.runs.push(run);
           await save();
-          if (variant === 'candidate') assert.equal(run.phases[0].calls, 0, 'Candidate hidden mutations must not classify');
-          for (const phase of run.phases.slice(1)) assert.ok(phase.calls > 0, `${phase.phase} must classify`);
+          validateMutationRun(run);
           assert.equal((await bundleFingerprint(bundle)).sha256, provenance[variant].sha256, 'Bundle changed during profiling');
           console.log(JSON.stringify(run));
         } finally {
