@@ -1,6 +1,7 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
+/** @type {(id: string) => any} */
 const $ = id => document.getElementById(id);
 let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
 let reportURL = null, reportTimer = null, reportVersion = 0;
@@ -31,7 +32,7 @@ function chart(days) {
   const tbody = $('chart-table').querySelector('tbody'); tbody.replaceChildren();
   dates.forEach((date, i) => {
     const x = 34 + i * 45;
-    for (const [j, key, color] of [[0, 'createSec', 'var(--green)'], [1, 'consumeSec', 'var(--consume)']]) {
+    for (const [j, key, color] of /** @type {const} */ ([[0, 'createSec', 'var(--green)'], [1, 'consumeSec', 'var(--consume)']])) {
       const height = totals[i][key] / 60 / top * 92;
       const bar = svgElement('rect', { x: x + j * 13, y: 112 - height, width: 10, height, rx: 2, fill: color });
       bar.append(svgElement('title', {}, `${date}: ${minutes(totals[i][key])} ${j === 0 ? 'creating' : 'consuming'}`)); svg.append(bar);

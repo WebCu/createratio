@@ -1,6 +1,7 @@
 'use strict';
 const api = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(api.runtime);
+/** @type {(id: string) => any} */
 const $ = id => document.getElementById(id);
 const site = new URLSearchParams(location.search).get('site');
 $('reason').minLength = C3.INTENTION_LIMITS.minLength;

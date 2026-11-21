@@ -1,6 +1,7 @@
 (function (root) {
   'use strict';
   function mount({ messages, range, error }) {
+    /** @type {(id: string) => any} */
     const $ = id => document.getElementById(id);
     const button = $('share-create'), label = button.textContent;
     const expandable = button.hasAttribute('aria-expanded');

@@ -1,6 +1,7 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
+/** @type {(id: string) => any} */
 const $ = id => document.getElementById(id);
 let refreshing = false, refreshFailed = false;
 const accessControls = new Map();

@@ -1,6 +1,7 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
+/** @type {(id: string) => any} */
 const $ = id => document.getElementById(id);
 const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
 let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;

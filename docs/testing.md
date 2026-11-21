@@ -14,7 +14,7 @@ pnpm check:browser
 pnpm smoke:browser
 ```
 
-`pnpm check` is the fast gate: JavaScript syntax, deterministic Node tests, all
+`pnpm check` is the fast gate: JavaScript syntax, types, deterministic Node tests, all
 browser builds, and the website build. `pnpm check:browser` builds Chrome and runs
 the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;
@@ -406,12 +406,21 @@ live composing behavior, physical comfort or cross-browser compatibility.
 
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
 JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
-reject code comments with file, line and column diagnostics. Files are checked
+reject code comments with file, line and column diagnostics. JSDoc blocks that
+contain only type tags with a type and name are allowed. Files are checked
 across at most four workers; any worker failure fails the command. An initial hashbang
 interpreter directive is allowed; comment-like text in strings, templates and
 regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS
 syntax check, including its wrapper bindings, to select Acorn's grammar. This
 guard covers JavaScript only, not CSS, HTML or other languages. `pnpm check` runs it before tests and builds.
+
+`pnpm check:types` runs `tsc --checkJs` without emitting files, so the shipped
+JavaScript is not compiled. `tsconfig.json` checks the packaged extension sources
+in `extension/core`, `extension/sites` and `extension/src`, excluding tests and
+test harnesses. Types come from inference and JSDoc annotations;
+`extension/types/globals.d.ts` declares the globals that classic scripts share in
+extension pages and the background worker, and the browser extension APIs, which
+stay untyped.
 The pre-commit hook checks staged whitespace, including newly added files.
 `pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
 paths, including skill-directory symlinks and files force-added while ignored.

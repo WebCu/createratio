@@ -16,6 +16,14 @@ function packageType(file) {
   }
 }
 
+const TYPE_ANNOTATION = /^(?:@(?:type|satisfies|returns) \{[^\n]+\}|@param \{[^\n]+\} \[?[A-Za-z_$][\w$.]*\]?|@typedef \{[^\n]+\} [A-Za-z_$][\w$]*|@template [A-Za-z_$][\w$]*)$/;
+
+function typeAnnotation(comment) {
+  if (comment.type !== 'Block' || !comment.value.startsWith('*')) return false;
+  const lines = comment.value.slice(1).split(/\r?\n/).map(line => line.replace(/^\s*\*?\s*/, '').trim()).filter(Boolean);
+  return lines.length > 0 && lines.every(line => TYPE_ANNOTATION.test(line));
+}
+
 function codeComments(file) {
   const source = readFileSync(file, 'utf8');
   const extension = path.extname(file);
@@ -33,7 +41,7 @@ function codeComments(file) {
   } catch (error) {
     throw new Error(`Comment parse failed: ${file}\n${error.message}`);
   }
-  return comments.filter(comment => !(comment.start === 0 && source.startsWith('#!')));
+  return comments.filter(comment => !(comment.start === 0 && source.startsWith('#!')) && !typeAnnotation(comment));
 }
 
 function checkSyntax(files) {
@@ -70,7 +78,7 @@ async function main() {
   const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
   const inventory = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.js', '*.mjs', '*.cjs'], { cwd: root, encoding: 'utf8' });
   const files = [...new Set(inventory.split('\0').filter(Boolean))].sort().map(file => path.join(root, file)).filter(file => existsSync(file));
-  console.log(`${await checkSyntaxParallel(files)} JavaScript syntax checks passed; no code comments.`);
+  console.log(`${await checkSyntaxParallel(files)} JavaScript syntax checks passed; no code comments outside JSDoc type annotations.`);
 }
 
 if (require.main === module) {

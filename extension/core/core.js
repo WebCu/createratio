@@ -19,8 +19,10 @@
     const selected = isRecord(settings) ? settings.trackedSites : undefined;
     return selected === undefined ? DEFAULT_SETTINGS.trackedSites : Array.isArray(selected) ? selected : [];
   }
+  /** @param {Record<string, any>} [settings] */
   function settingsSnapshot(settings = {}) {
     if (!isRecord(settings)) settings = {};
+    /** @type {typeof DEFAULT_SETTINGS & { siteOverrides?: Record<string, Record<string, any>>, nudgeEnabled?: unknown, nudgeMinutes?: unknown }} */
     const resolved = { ...DEFAULT_SETTINGS, ...settings };
     resolved.dailyTarget = dailyTarget(settings);
     resolved.trackedSites = trackingSelection(settings).filter(site => typeof site === 'string');

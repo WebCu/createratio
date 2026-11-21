@@ -115,7 +115,11 @@ access code, Settings, and the build discover gate support through the catalog.
   block, or documentation comments. Code must be self-explanatory through
   clear names, simple control flow, and small, focused functions. Refactor
   unclear code rather than explaining it with comments; put supporting
-  rationale in Markdown documentation.
+  rationale in Markdown documentation. The one exception is JSDoc type
+  annotations for the type check: `@type`, `@param`, `@returns`, `@typedef`,
+  `@template` and `@satisfies` tags with a type and name only, no prose.
+  Prefer inferred types and add an annotation only where `pnpm check:types`
+  needs one.
 - **Keep documentation minimal, specific, and current.** Describe verified
   behavior and constraints, not past implementations or future plans. Keep
   internal review transcripts, account-specific infrastructure details, publisher
