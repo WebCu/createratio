@@ -25,7 +25,8 @@ const SiteAccess = (() => {
     const remainingMs = Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0;
     const expiresAt = remainingMs && entry.expiresAt > now ? entry.expiresAt : 0;
     const readyAt = !remainingMs && validWait(entry, now) ? entry.readyAt : 0;
-    return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, requestExpiresAt: readyAt ? entry.requestExpiresAt : 0, refilledAt: entry.refilledAt || 0, waitSeconds: waitMinutes * 60, sessionMinutes: minutes };
+    const waitSeconds = readyAt && Number.isFinite(entry.waitMs) && C3.validAccessMinutes(entry.waitMs / 60000) ? entry.waitMs / 1000 : waitMinutes * 60;
+    return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, requestExpiresAt: readyAt ? entry.requestExpiresAt : 0, refilledAt: entry.refilledAt || 0, waitSeconds, sessionMinutes: minutes };
   }
   function validWait(entry, now) {
     return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && Number.isFinite(entry.requestExpiresAt) && entry.requestExpiresAt > entry.readyAt && entry.requestExpiresAt > now && entry.requestExpiresAt - entry.readyAt <= REQUEST_MS && entry.readyAt <= now + C3.ACCESS_LIMITS.maxMinutes * 60000;
@@ -77,7 +78,7 @@ const SiteAccess = (() => {
         delete entry.remainingMs;
         await api.alarms.clear('access-' + site);
       }
-      if (!validWait(entry, now)) { delete entry.readyAt; delete entry.requestExpiresAt; }
+      if (!validWait(entry, now)) { delete entry.readyAt; delete entry.requestExpiresAt; delete entry.waitMs; }
     }
     const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
     if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules))) await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: Object.keys(SITES).flatMap(ruleIds), addRules: rules });
@@ -142,7 +143,7 @@ const SiteAccess = (() => {
     if (state.remainingMs || state.readyAt) return;
     const site = message.site, access = accessState(stored._access);
     const waitMs = C3.siteSettings(site, stored.settings).waitMinutes * 60000;
-    access[site] = { readyAt: now + waitMs, requestExpiresAt: now + waitMs + REQUEST_MS };
+    access[site] = { readyAt: now + waitMs, requestExpiresAt: now + waitMs + REQUEST_MS, waitMs };
     const changes = { _access: access };
     if (stored.settings?.intentionHistoryEnabled === true) changes._intentions = [...savedIntentions(stored._intentions), { site, reason: message.reason.trim(), requestedAt: now }].slice(-100);
     await api.storage.local.set(changes);

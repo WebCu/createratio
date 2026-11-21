@@ -7,11 +7,12 @@ const path = require('node:path');
 const C3 = require('../../../core/core.js');
 const C3Sites = require('../../../sites/index.js');
 const { accessState } = require('../../tests/ui-harness.js');
+const { worker, gate, popupSender } = require('../../tests/background-harness.js');
 
 function page(options = {}) {
   const site = options.site || 'x';
-  let now = 0, fail = !!options.fail, access = accessState(site);
-  const elements = {}, intervals = {}, sent = [], redirects = [];
+  let now = options.now || 0, fail = !!options.fail, access = accessState(site);
+  const elements = {}, intervals = {}, sent = [], redirects = [], pending = new Set();
   const document = { body: { id: '', tagName: 'BODY', focus() { document.activeElement = this; } }, getElementById: id => elements[id], createElement: element };
   document.activeElement = document.body;
   const panels = { reason: 'request', begin: 'request', 'waiting-title': 'waiting', open: 'waiting', cancel: 'waiting', 'active-title': 'active', return: 'active', end: 'active' };
@@ -34,6 +35,11 @@ function page(options = {}) {
     chrome: { storage: { onChanged: { addListener() {} } }, runtime: { async sendMessage(message) {
       sent.push(structuredClone(message));
       if (options.beforeReply) await options.beforeReply(message);
+      if (options.send) {
+        const reply = options.send(message); pending.add(reply);
+        try { return await reply; }
+        finally { pending.delete(reply); }
+      }
       if (Object.hasOwn(options, 'reply')) return options.reply;
       if (fail) return { ok: false, error: 'Unable to check access.' };
       if (message.type === 'access-begin') {
@@ -51,7 +57,7 @@ function page(options = {}) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../shared/messages.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../shared/refill.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'blocked.js'), 'utf8'), context);
-  return { elements, document, sent, redirects, intervals, finishFill, set now(value) { now = value; }, set fail(value) { fail = value; }, set access(value) { access = { ...access, ...value }; }, async flush() { await new Promise(resolve => setImmediate(resolve)); }, submit() { elements.request.events.submit({ preventDefault() {} }); }, click(id) { elements[id].focus(); elements[id].events.click(); } };
+  return { elements, document, sent, redirects, intervals, finishFill, set now(value) { now = value; }, set fail(value) { fail = value; }, set access(value) { access = { ...access, ...value }; }, async flush() { await Promise.all([...pending]); await new Promise(resolve => setImmediate(resolve)); }, submit() { elements.request.events.submit({ preventDefault() {} }); }, click(id) { elements[id].focus(); elements[id].events.click(); } };
 }
 test('acknowledged intention moves focus to the waiting heading, not on later renders', async () => {
   const p = page(); await p.flush();
@@ -373,4 +379,36 @@ test('configured wait updates instructions and progress scale', async () => {
   p.now = 60000; p.intervals[1000]();
   assert.equal(p.elements.progress.value, 60);
   assert.equal(p.elements.open.disabled, true);
+});
+
+test('pending wait progress and instructions survive setting changes and reload with the request duration', async () => {
+  for (const [initial, updated] of [[1, 5], [5, 1]]) {
+    let w = worker({ settings: { waitMinutes: initial } });
+    const options = { now: w.now, random: 0.2, send: message => w.send(message, gate('x')) };
+    const p = page(options); await p.flush();
+    p.elements.reason.value = 'Reply to Alex about our launch, then leave.';
+    p.submit(); await p.flush();
+    w.advance(30000); p.now = w.now;
+    await w.send({ type: 'access-duration', preference: 'waitMinutes', minutes: updated }, popupSender);
+    p.intervals[5000](); await p.flush();
+    w = worker(structuredClone(w.data), 'chrome', w.now);
+    const reloaded = page({ ...options, now: w.now }); await reloaded.flush();
+    for (const current of [p, reloaded]) {
+      assert.equal(current.elements.waiting.hidden, false);
+      assert.equal(current.elements.progress.max, initial * 60);
+      assert.equal(current.elements.progress.value, 30);
+      assert.equal(current.elements.clock.textContent, initial === 1 ? '0:30' : '4:30');
+      assert.equal(current.elements['wait-step'].textContent, `Pause for ${initial * 60} seconds.`);
+      assert.equal(current.elements['reason-requirement'].textContent, `20–280 characters. A little clarity, then ${initial * 60} seconds to pause.`);
+      assert.equal(current.elements.heading.textContent, `Your next idea called. It wants ${initial === 1 ? 'a minute' : initial + ' minutes'}.`);
+      assert.equal(current.elements.open.disabled, true);
+    }
+    reloaded.click('cancel'); await reloaded.flush();
+    assert.equal(reloaded.elements.begin.textContent, `Start the ${updated * 60}-second wait`);
+    reloaded.elements.reason.value = 'Reply to Alex about our launch, then leave.';
+    reloaded.submit(); await reloaded.flush();
+    assert.equal(reloaded.elements.progress.max, updated * 60);
+    assert.equal(reloaded.elements.progress.value, 0);
+    assert.equal(reloaded.elements['wait-step'].textContent, `Pause for ${updated * 60} seconds.`);
+  }
 });
