@@ -428,13 +428,13 @@ test('pending waits retain their own duration across setting changes and worker 
   }
 });
 
-test('legacy or malformed stored wait durations fall back to the current setting without discarding a pending request', async () => {
+test('legacy or malformed stored wait durations retain the original 60-second wait without discarding a pending request', async () => {
   for (const waitMs of [undefined, null, 0, -60000, 60001, '60000', NaN, Infinity, (C.ACCESS_LIMITS.maxMinutes + 1) * 60000]) {
     const entry = { readyAt: now + 30000, requestExpiresAt: now + 630000, ...(waitMs === undefined ? {} : { waitMs }) };
     const w = worker({ settings: { waitMinutes: 2 }, _access: { x: entry } }, 'chrome', now);
     const result = (await w.send({ type: 'access-status' })).access.x;
     assert.equal(result.readyAt, entry.readyAt);
-    assert.equal(result.waitSeconds, 120);
+    assert.equal(result.waitSeconds, 60);
     assert.deepEqual(w.errors, []);
   }
   const w = worker({ settings: { waitMinutes: 2 }, _access: { x: { waitMs: 60000 } } }, 'chrome', now);
