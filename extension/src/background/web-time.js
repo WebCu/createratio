@@ -101,8 +101,13 @@
       if (typeof value !== 'boolean') throw Object.assign(new Error('Invalid website tracking setting'), { expected: true });
       if (value && !await allowed()) throw Object.assign(new Error('Allow the browser permissions to track all websites.'), { expected: true });
       if (enabled) await accrue(Date.now());
+      try {
+        await api.storage.local.set({ _websiteTimeEnabled: value });
+      } catch (error) {
+        if (enabled) await updateMonitoring().catch(error => console.error('CreateRatio website time:', error));
+        throw error;
+      }
       enabled = value; previous = null;
-      await api.storage.local.set({ _websiteTimeEnabled: value });
       await updateMonitoring();
       return { ok: true, enabled };
     }
