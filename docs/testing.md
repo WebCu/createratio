@@ -546,12 +546,6 @@ browser-world VM. Its own tests
 prove that lifecycle and static-rule changes fail. Intentional manifest or policy
 changes require separate review, not a skipped comparison. This is not browser QA.
 
-Baselines built before the global rename (`C3`, `C3Sites`) still work with the
-access comparison and the profile scripts: the comparison loads the site catalog
-from the candidate only, and worker setup uses `CORE_WITH_PRE_RENAME_FALLBACK` from
-`extension/browser-tests/chromium.mjs`. Remove that fallback once no pre-rename
-baseline is compared.
-
 ## Disposable Chromium smoke
 
 With Chromium, Python 3, and `browser-harness` installed in your agent environment:

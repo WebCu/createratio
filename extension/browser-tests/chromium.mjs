@@ -326,11 +326,9 @@ export async function evaluate(browser, session, expression) {
   return result.result.value;
 }
 
-export const CORE_WITH_PRE_RENAME_FALLBACK = '(globalThis.Core ?? globalThis.C3)';
-
 export async function seedAccess(browser, sites, settings) {
   await evaluate(browser, browser.worker, `(async () => {
-    const seed = { _access: Object.fromEntries(${JSON.stringify(sites)}.map(site => [site, { remainingMs: 300000, date: ${CORE_WITH_PRE_RENAME_FALLBACK}.localDate() }])) };
+    const seed = { _access: Object.fromEntries(${JSON.stringify(sites)}.map(site => [site, { remainingMs: 300000, date: Core.localDate() }])) };
     const preferences = ${JSON.stringify(settings ?? null)};
     if (preferences) {
       const { settings = {} } = await chrome.storage.local.get('settings');

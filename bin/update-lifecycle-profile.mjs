@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { CORE_WITH_PRE_RENAME_FALLBACK, launch, evaluate, eventually } from '../extension/browser-tests/chromium.mjs';
+import { launch, evaluate, eventually } from '../extension/browser-tests/chromium.mjs';
 
 async function fingerprint(directory) {
   const files = (await readdir(directory, { recursive: true })).sort();
@@ -25,7 +25,7 @@ async function resources(browser) {
 async function observe(directory, label, repetition) {
   const browser = await launch(directory);
   try {
-    await evaluate(browser, browser.worker, `(async()=>{await chrome.storage.local.set({settings:{...${CORE_WITH_PRE_RENAME_FALLBACK}.DEFAULT_SETTINGS,trackedSites:[]},_websiteTimeEnabled:true});await websiteTime.start();})()`);
+    await evaluate(browser, browser.worker, '(async()=>{await chrome.storage.local.set({settings:{...Core.DEFAULT_SETTINGS,trackedSites:[]},_websiteTimeEnabled:true});await websiteTime.start();})()');
     for (let n = 0; n < 8; n++) {
       const page = await browser.page('https://x.com/home');
       await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site")'), 'synthetic tab ready');

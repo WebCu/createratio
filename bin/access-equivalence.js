@@ -37,10 +37,9 @@ function engine(folder, initial = {}, url = '') {
   scripts.push('blocker.js');
   for (const file of scripts) vm.runInContext(fs.readFileSync(path.join(folder, file), 'utf8'), context);
   const access = vm.runInContext('SiteAccess', context);
+  const catalog = vm.runInContext('Sites.sites.filter(site => site.gated).map(site => ({ ...site, access: Sites.get(site.id).access }))', context);
   return {
-    get catalog() {
-      return JSON.parse(JSON.stringify(vm.runInContext('Sites.sites.filter(site => site.gated).map(site => ({ ...site, access: Sites.get(site.id).access }))', context)));
-    },
+    catalog: JSON.parse(JSON.stringify(catalog)),
     siteForURL: raw => access.siteForURL(raw),
     async snapshot() { return JSON.parse(JSON.stringify({ status: await access.reconcile(), rules, data, alarms, tabs })); },
   };

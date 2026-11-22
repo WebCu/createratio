@@ -2,13 +2,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { relative, sep } = require('node:path');
-const fs = require('node:fs/promises');
-const os = require('node:os');
-const path = require('node:path');
-const vm = require('node:vm');
-const { build } = require('../../extension/build.js');
-const core = require('../../extension/core/core.js');
-const { legacyBundle } = require('./legacy-bundle.js');
 
 const helper = () => import('../../extension/browser-tests/chromium.mjs');
 
@@ -67,20 +60,4 @@ test('ambiguous browser tracer worker identity fails closed', async () => {
   const url = 'chrome-extension://createratio/background.js';
   const worker = { type: 'service_worker', url };
   assert.throws(() => workerTarget([{ ...worker, targetId: 'one' }, { ...worker, targetId: 'two' }], url), error => error.fatal === true && /Multiple extension workers/.test(error.message));
-});
-
-test('seeded access works in workers of bundles built before and after the global rename', async t => {
-  const { seedAccess } = await helper();
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'createratio-seed-'));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const current = await build('chrome', path.join(directory, 'current'));
-  const legacy = await legacyBundle(current, path.join(directory, 'legacy'));
-  for (const [label, bundle] of [['current', current], ['legacy', legacy]]) {
-    let stored;
-    const context = vm.createContext({ URL, SiteAccess: { reconcile: async () => {} }, chrome: { storage: { local: { get: async () => ({}), set: async value => { stored = value; } } } } });
-    for (const file of ['sites.js', 'core.js']) vm.runInContext(await fs.readFile(path.join(bundle, file), 'utf8'), context);
-    const browser = { worker: 'worker', cdp: { send: async (method, params) => ({ result: { value: await vm.runInContext(params.expression, context) } }) } };
-    await seedAccess(browser, ['x'], undefined);
-    assert.equal(stored._access.x.date, core.localDate(), label);
-  }
 });

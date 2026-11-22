@@ -5,7 +5,6 @@ const os = require('node:os');
 const path = require('node:path');
 const { build } = require('../../extension/build.js');
 const { compare, matrix } = require('../access-equivalence.js');
-const { legacyBundle } = require('./legacy-bundle.js');
 
 async function bundles(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'createratio-equivalence-'));
@@ -23,13 +22,6 @@ test('equivalence compares all lifecycle states and metadata-derived URLs', asyn
   assert.ok(result.urls > 20);
   assert.equal(result.cases, result.states * result.urls);
   assert.match(result.verification, /not live-browser QA/);
-});
-
-test('equivalence accepts a baseline built before the global rename', async t => {
-  const { baseline, candidate } = await bundles(t);
-  const legacy = await legacyBundle(baseline, path.join(path.dirname(baseline), 'legacy'));
-  const result = await compare(legacy, candidate);
-  assert.equal(result.cases, result.states * result.urls);
 });
 
 test('equivalence detects changed lifecycle behavior', async t => {
