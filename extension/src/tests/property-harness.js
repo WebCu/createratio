@@ -13,12 +13,14 @@ function choiceEnvironment(name, choices) {
   return value;
 }
 
+const maximumBounds = { cases: 16, steps: 240 };
+
 function configuration() {
-  const cases = integerEnvironment('CR_PROPERTY_CASES', 6, 1, 16);
+  const cases = integerEnvironment('CR_PROPERTY_CASES', 6, 1, maximumBounds.cases);
   return {
     seed: integerEnvironment('CR_PROPERTY_SEED', 0xc3a710, 0, 0xffffffff),
     cases,
-    steps: integerEnvironment('CR_PROPERTY_STEPS', 160, 1, 240),
+    steps: integerEnvironment('CR_PROPERTY_STEPS', 160, 1, maximumBounds.steps),
     case: integerEnvironment('CR_PROPERTY_CASE', -1, -1, cases - 1),
     adapter: choiceEnvironment('CR_PROPERTY_ADAPTER', ['chrome', 'browser']),
     machine: choiceEnvironment('CR_PROPERTY_MACHINE', ['access', 'delivery'])
@@ -66,4 +68,4 @@ async function runCases(config, adapter, machine, execute) {
   return transitions;
 }
 
-module.exports = { configuration, random, caseSeed, replayCommand, runCases };
+module.exports = { maximumBounds, configuration, random, caseSeed, replayCommand, runCases };
