@@ -27,10 +27,10 @@
       const request = version;
       button.disabled = true; button.textContent = 'Preparing…';
       try {
-        const now = new Date(), date = C3.localDate(now), period = range();
+        const now = new Date(), date = Core.localDate(now), period = range();
         const data = await messages.send({ type: 'history', kind: 'ratio', range: period }, 'Unable to create share card.');
         if (request !== version) return;
-        if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
+        if (Core.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
         const next = SocialCard.create(data.days, period, now), canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('share-preview'));
         SocialCard.draw(canvas, next);
         const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Unable to create the PNG. Please try again.')), 'image/png'));

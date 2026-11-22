@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const C3 = require('../../core/core.js');
+const Core = require('../../core/core.js');
 const WebTime = require('./web-time.js');
 
 function harness(data = {}, session = {}) {
@@ -23,10 +23,10 @@ function harness(data = {}, session = {}) {
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
   const context = vm.createContext({ Date: Clock, URL, TextEncoder, console, crypto });
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'history.js'), 'utf8'), context);
-  const history = context.ActivityHistory.create(api.storage.local, C3);
+  const history = context.ActivityHistory.create(api.storage.local, Core);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'web-time.js'), 'utf8'), context);
   function serialize(task) { const next = queue.then(task); queue = next.catch(() => {}); return next; }
-  const tracker = context.WebTime.create(api, serialize, C3, history, { setInterval(fn, ms) { assert.equal(ms, 5000); timer = fn; return 1; }, clearInterval() { timer = null; } });
+  const tracker = context.WebTime.create(api, serialize, Core, history, { setInterval(fn, ms) { assert.equal(ms, 5000); timer = fn; return 1; }, clearInterval() { timer = null; } });
   return { data, session, api, state, tracker, history, alarms, advance(ms) { now += ms; }, setTime(value) { now = value; }, async tick(alarm) { return serialize(() => tracker.tick(alarm)); }, async drain() { return serialize(() => {}); }, get timer() { return timer; } };
 }
 
@@ -234,7 +234,7 @@ test('history clear resets website samples and pending entries and permits fresh
 
 for (const generation of [null, 'stable']) {
   test(`website receipt rollover preserves queued intervals across restart with generation ${generation}`, async () => {
-    const data = { _websiteTimeReceipts: Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i) };
+    const data = { _websiteTimeReceipts: Array.from({ length: Core.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i) };
     if (generation !== null) data._historyGeneration = generation;
     const h = harness(data); await h.tracker.setEnabled(true);
     const set = h.api.storage.local.set;
@@ -246,7 +246,7 @@ for (const generation of [null, 'stable']) {
     await replacement.tracker.start(); await replacement.tick();
     assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 15);
     assert.equal(h.data._historyGeneration ?? null, generation);
-    assert.equal(h.data._websiteTimeReceipts.length, C3.DELIVERY_LIMITS.receiptLimit);
+    assert.equal(h.data._websiteTimeReceipts.length, Core.DELIVERY_LIMITS.receiptLimit);
     replacement.advance(5000); await replacement.tick();
     assert.equal(h.data['_websiteTime:2026-10-11']['example.com'], 20);
   });
@@ -255,7 +255,7 @@ for (const generation of [null, 'stable']) {
 test('repeated checkpoint failures cannot evict replayable website receipts', async () => {
   const h = harness(); await h.tracker.setEnabled(true);
   h.api.storage.session.set = async () => { throw new Error('Checkpoint unavailable'); };
-  for (let i = 0; i < C3.DELIVERY_LIMITS.receiptLimit + 2; i++) {
+  for (let i = 0; i < Core.DELIVERY_LIMITS.receiptLimit + 2; i++) {
     h.advance(1); await assert.rejects(h.tick(), /Checkpoint unavailable/);
   }
   const saved = h.data['_websiteTime:2026-10-11']['example.com'];

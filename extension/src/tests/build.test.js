@@ -152,7 +152,7 @@ test('all distributions share source metadata and use Create > Consume as the su
     const dashboardScript = await fs.readFile(path.join(output, 'dashboard.js'), 'utf8');
     const filenames = [...dashboardScript.matchAll(/link\.download = (`[^`]+`);/g)].flatMap(([, expression]) =>
       [false, true].map(websites => vm.runInNewContext(expression, {
-        websites, C3: { localDate: () => '2026-01-02' }
+        websites, Core: { localDate: () => '2026-01-02' }
       })));
     assert.deepEqual([...new Set(filenames)].sort(), [
       'CreateRatio-2026-01-02.csv', 'CreateRatio-websites-2026-01-02.csv'
@@ -192,9 +192,9 @@ test('built plugin catalog and core execute in browser worlds and rebuilt bundle
   const originalBundle = await fs.readFile(path.join(output, 'sites.js'), 'utf8');
   const context = vm.createContext({ URL });
   for (const file of ['sites.js', 'core.js']) vm.runInContext(await fs.readFile(path.join(output, file), 'utf8'), context);
-  assert.equal(context.C3.siteForURL('https://x.com/home'), 'x');
-  assert.equal(context.C3.classifyPage({ url: 'https://www.linkedin.com/feed/' }), 'consume');
-  assert.equal(typeof context.C3Sites.get('x').create, 'function');
+  assert.equal(context.Core.siteForURL('https://x.com/home'), 'x');
+  assert.equal(context.Core.classifyPage({ url: 'https://www.linkedin.com/feed/' }), 'consume');
+  assert.equal(typeof context.Sites.get('x').create, 'function');
   await fs.mkdir(path.join(output, 'sites'));
   await fs.writeFile(path.join(output, 'sites', 'obsolete.js'), 'throw new Error("Do not ship");');
   await fs.writeFile(path.join(output, 'selectors.js'), 'obsolete selectors');
@@ -258,14 +258,14 @@ test('new gated and tracking-only modules need only site files and catalog regis
       classifyPage() { return 'neutral'; }, create() { return { mode() { return 'neutral'; }, action() { return null; } }; }
     };
     if (typeof module === 'object' && module.exports) module.exports = plugin;
-    else (root.C3_SITE_MODULES ||= {}).example = plugin;
+    else (root.SITE_MODULES ||= {}).example = plugin;
   })(globalThis);`);
   await fs.writeFile(path.join(extension, 'sites/reading.js'), `(function (root) {
     const plugin = { id: 'reading', name: 'Reading', hosts: ['reading.test'], actions: ['posts'],
       classifyPage() { return 'neutral'; }, create() { return { mode() { return 'neutral'; }, action() { return null; } }; }
     };
     if (typeof module === 'object' && module.exports) module.exports = plugin;
-    else (root.C3_SITE_MODULES ||= {}).reading = plugin;
+    else (root.SITE_MODULES ||= {}).reading = plugin;
   })(globalThis);`);
   const catalogPath = path.join(extension, 'sites/index.js');
   const catalog = await fs.readFile(catalogPath, 'utf8');
@@ -294,12 +294,12 @@ test('new gated and tracking-only modules need only site files and catalog regis
     assert.deepEqual(rules.at(-1).condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'reddit.com', 'example.test', 'alias.test']);
     const context = vm.createContext({ URL });
     for (const file of ['sites.js', 'core.js']) vm.runInContext(await fs.readFile(path.join(output, file), 'utf8'), context);
-    assert.equal(context.C3Sites.forAccessURL('http://mobile.alias.test/').id, 'example');
-    assert.equal(context.C3Sites.forAccessURL('https://reading.test/'), null);
-    assert.equal(context.C3.siteForURL('https://reading.test/'), 'reading');
-    assert.equal(context.C3.SITES.find(site => site.id === 'example').gated, true);
-    assert.equal(context.C3.SITES.find(site => site.id === 'reading').gated, false);
-    assert.deepEqual(Array.from(context.C3.DEFAULT_SETTINGS.trackedSites), ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit']);
+    assert.equal(context.Sites.forAccessURL('http://mobile.alias.test/').id, 'example');
+    assert.equal(context.Sites.forAccessURL('https://reading.test/'), null);
+    assert.equal(context.Core.siteForURL('https://reading.test/'), 'reading');
+    assert.equal(context.Core.SITES.find(site => site.id === 'example').gated, true);
+    assert.equal(context.Core.SITES.find(site => site.id === 'reading').gated, false);
+    assert.deepEqual(Array.from(context.Core.DEFAULT_SETTINGS.trackedSites), ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit']);
   }
 });
 

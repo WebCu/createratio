@@ -25,7 +25,7 @@ async function resources(browser) {
 async function observe(directory, label, repetition) {
   const browser = await launch(directory);
   try {
-    await evaluate(browser, browser.worker, '(async()=>{await chrome.storage.local.set({settings:{...C3.DEFAULT_SETTINGS,trackedSites:[]},_websiteTimeEnabled:true});await websiteTime.start();})()');
+    await evaluate(browser, browser.worker, '(async()=>{await chrome.storage.local.set({settings:{...Core.DEFAULT_SETTINGS,trackedSites:[]},_websiteTimeEnabled:true});await websiteTime.start();})()');
     for (let n = 0; n < 8; n++) {
       const page = await browser.page('https://x.com/home');
       await eventually(() => evaluate(browser, page.session, '!!document.querySelector("#synthetic-site")'), 'synthetic tab ready');

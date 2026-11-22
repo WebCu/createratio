@@ -35,7 +35,7 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
   const load = file => {
     if (file === 'sites.js') {
       for (const script of require('../../build.js').SITE_SCRIPTS) vm.runInContext(fs.readFileSync(path.join(__dirname, '../..', script), 'utf8'), context);
-      if (options.integrations) context.C3Sites = options.integrations;
+      if (options.integrations) context.Sites = options.integrations;
     } else vm.runInContext(fs.readFileSync(file === 'core.js' ? path.join(__dirname, '../../core/core.js') : path.join(__dirname, file === 'messages.js' ? '../shared' : '../background', file), 'utf8'), context);
   };
   if (browser === 'chrome') context.importScripts = (...files) => files.forEach(load);

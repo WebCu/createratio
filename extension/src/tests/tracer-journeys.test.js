@@ -4,10 +4,10 @@ const assert = require('node:assert/strict');
 const { worker, gate, intent, rulesFor } = require('./background-harness.js');
 const { tracker } = require('./content-harness.js');
 const { Element } = require('../../sites/test-support.js');
-const { page, C3 } = require('./ui-harness.js');
+const { page, Core } = require('./ui-harness.js');
 
 const start = new Date(2026, 9, 11, 12).getTime();
-const date = C3.localDate(new Date(start));
+const date = Core.localDate(new Date(start));
 const sender = name => ({ id: 'test-extension', url: `chrome-extension://test-extension/${name}.html` });
 
 async function until(predicate, description) {

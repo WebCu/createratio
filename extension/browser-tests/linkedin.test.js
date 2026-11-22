@@ -34,7 +34,7 @@ test('built LinkedIn post editor recognition requires the composer route and a v
           history.replaceState({}, '', entry.route);
           document.body.innerHTML = '<div id="editor" tabindex="0" ' + entry.attributes + '><span id="nested" tabindex="0">Synthetic draft</span></div><button id="outside">Outside editor</button>';
           document.querySelector(entry.nested ? '#nested' : '#editor').focus();
-          const adapter = C3Sites.get('linkedin').create({ document, location, dom: C3_DOM({ document, location, Element, getComputedStyle }) });
+          const adapter = Sites.get('linkedin').create({ document, location, dom: PageQueries({ document, location, Element, getComputedStyle }) });
           const focused = adapter.mode();
           document.querySelector('#outside').focus();
           return { focused, outside: adapter.mode() };
@@ -63,7 +63,7 @@ test('built LinkedIn post composer records trusted writing as creating time', as
       await click(browser, page, '#post-editor');
       await browser.cdp.send('Input.insertText', { text: 'Synthetic post draft; never submitted.' }, page.session);
       await eventually(() => evaluate(browser, page.session, 'document.activeElement.id === "post-editor" && document.querySelector("#post-editor").textContent === "Synthetic post draft; never submitted."'), 'trusted typing reaches the modern post editor');
-      await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.local.get(C3.localDate()).then(data => data[C3.localDate()]?.linkedin?.createSec > 0)'), 'post writing reaches saved creating time');
+      await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.local.get(Core.localDate()).then(data => data[Core.localDate()]?.linkedin?.createSec > 0)'), 'post writing reaches saved creating time');
       assert.deepEqual(browser.errors, []);
     });
   } finally { await browser.cleanup(); }
@@ -79,13 +79,13 @@ for (const [route, shadow] of [['/messaging/thread/synthetic-thread/', false], [
       await withFailureArtifacts(browser, 'LinkedIn direct-message creation time', async () => {
         await evaluate(browser, browser.worker, `(async () => {
           await chrome.storage.local.set({
-            settings: { ...C3.DEFAULT_SETTINGS, allowAboveGoal: false },
-            _access: { linkedin: { remainingMs: 300000, expiresAt: 0, date: C3.localDate() } }
+            settings: { ...Core.DEFAULT_SETTINGS, allowAboveGoal: false },
+            _access: { linkedin: { remainingMs: 300000, expiresAt: 0, date: Core.localDate() } }
           });
         })()`);
         await browser.page(browser.origin + '/popup.html');
         await eventually(() => evaluate(browser, browser.worker, 'chrome.declarativeNetRequest.getSessionRules().then(rules => rules.some(rule => rule.id === 102))'), 'LinkedIn access rules allow the synthetic page');
-        const totals = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(C3.localDate()).then(data => data[C3.localDate()]?.linkedin || {})');
+        const totals = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(Core.localDate()).then(data => data[Core.localDate()]?.linkedin || {})');
         const page = await browser.page('https://www.linkedin.com/feed/');
         await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#synthetic-site") && document.hasFocus() && !document.hidden'), 'synthetic LinkedIn page is focused');
         await eventually(() => scrolling.isEnabled(page), 'LinkedIn creation tracker has applied access preferences');

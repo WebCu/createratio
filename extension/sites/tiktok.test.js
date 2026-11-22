@@ -33,7 +33,7 @@ test('TikTok publishes a default-on module with explicit access policy in Node a
   assert.deepEqual(plugin.actions, ['posts', 'comments', 'likes', 'bookmarks']);
   const context = vm.createContext({});
   vm.runInContext(fs.readFileSync(require.resolve('./tiktok.js'), 'utf8'), context);
-  assert.equal(context.C3_SITE_MODULES.tiktok.id, plugin.id);
+  assert.equal(context.SITE_MODULES.tiktok.id, plugin.id);
 });
 
 test('TikTok classifies only recognized desktop routes', () => {

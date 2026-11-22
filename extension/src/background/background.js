@@ -6,32 +6,32 @@ let queue = Promise.resolve();
 function serialized(task) {
   const next = queue.then(task); queue = next.catch(() => {}); return next;
 }
-const contracts = MessageContracts.create(C3, extensionAPI.runtime, C3Sites);
-const history = ActivityHistory.create(extensionAPI.storage.local, C3);
-const websiteTime = WebTime.create(extensionAPI, serialized, C3, history);
+const contracts = MessageContracts.create(Core, extensionAPI.runtime, Sites);
+const history = ActivityHistory.create(extensionAPI.storage.local, Core);
+const websiteTime = WebTime.create(extensionAPI, serialized, Core, history);
 const updates = ExtensionUpdates.create(extensionAPI, serialized, async () => { await websiteTime.tick(); await SiteAccess.reconcile(); });
 async function badge(day) {
-  const value = C3.score(C3.aggregate(day));
+  const value = Core.score(Core.aggregate(day));
   await Promise.all([
-    extensionAPI.action.setBadgeText({ text: C3.badgeText(value) }),
-    extensionAPI.action.setBadgeBackgroundColor({ color: C3.scoreColor(value) }),
+    extensionAPI.action.setBadgeText({ text: Core.badgeText(value) }),
+    extensionAPI.action.setBadgeBackgroundColor({ color: Core.scoreColor(value) }),
     extensionAPI.action.setTitle({ title: `CreateRatio - today's score: ${value.toFixed(2)}` })
   ]);
 }
 async function snapshot() {
   await history.prepare();
-  const date = C3.localDate();
+  const date = Core.localDate();
   const stored = /** @type {StoredData} */ (await extensionAPI.storage.local.get([date, 'settings', '_historyGeneration']));
   const day = history.creationDay(stored[date]);
   await badge(day);
-  return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: C3.settingsSnapshot(stored.settings), access: await SiteAccess.reconcile(), websiteTimeEnabled: websiteTime.enabled };
+  return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: Core.settingsSnapshot(stored.settings), access: await SiteAccess.reconcile(), websiteTimeEnabled: websiteTime.enabled };
 }
 async function ingest(message, sender) {
   if (!contracts.creationSender(message, sender)) return { ok: false, error: 'Unsupported sender' };
   await history.prepare();
   const preferences = /** @type {StoredData} */ (await extensionAPI.storage.local.get(['settings', '_historyGeneration']));
   if ((message.generation ?? null) !== (preferences._historyGeneration ?? null)) return snapshot();
-  if (!C3.trackingEnabled(message.site, preferences.settings)) return snapshot();
+  if (!Core.trackingEnabled(message.site, preferences.settings)) return snapshot();
   contracts.packet(message);
   const access = (await SiteAccess.reconcile())[message.site];
   if (access && !(access.enabled && (access.goalAllowed || access.remainingMs > 0))) return snapshot();
@@ -67,7 +67,7 @@ async function handle(message, sender) {
       contracts.preferences(message, sender);
       const stored = /** @type {StoredData} */ (await extensionAPI.storage.local.get('settings'));
       await extensionAPI.storage.local.set({ settings: { ...stored.settings, scrollFrictionEnabled: message.enabled,
-        scrollFrictionStrength: message.strength ?? C3.settingsSnapshot(stored.settings).scrollFrictionStrength } });
+        scrollFrictionStrength: message.strength ?? Core.settingsSnapshot(stored.settings).scrollFrictionStrength } });
       return snapshot();
     }
     case 'website-time-setting':

@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const C3 = require('../../core/core.js');
+const Core = require('../../core/core.js');
 
 function stylesheet(file) {
   const css = fs.readFileSync(path.join(__dirname, file), 'utf8');
@@ -49,7 +49,7 @@ test('extension score-card text and chart bars remain readable', () => {
     for (const selector of ['.caption', '.score-card p', '.goal small']) assert.equal(css.declarations(selector).color, 'var(--card-text)', selector);
     contrast(card['--card-text'], card['--card-surface'], 4.5, `${band} score card text`);
     contrast(card['--card-accent'], card['--card-surface'], 3, `${band} score card target arrow`);
-    if (band !== 'none') contrast(C3.scoreColor({ high: 1, mid: 0.5, low: 0 }[band]), card['--card-surface'], 3, `${band} score on its card`);
+    if (band !== 'none') contrast(Core.scoreColor({ high: 1, mid: 0.5, low: 0 }[band]), card['--card-surface'], 3, `${band} score on its card`);
   }
   for (const token of ['--green', '--consume']) contrast(css.tokens[token], css.tokens['--paper'], 3, `${token}: chart bar`);
   contrast(css.tokens['--muted'], css.color('.view-nav', 'background'), 4.5, 'navigation text');

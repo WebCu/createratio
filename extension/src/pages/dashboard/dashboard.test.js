@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { page, C3 } = require('../../tests/ui-harness.js');
+const { page, Core } = require('../../tests/ui-harness.js');
 for (const kind of ['ratio', 'websites']) {
   test(`dashboard ${kind} CSV rejection survives a reset refresh that finishes later`, async () => {
     const p = page('dashboard'); await p.ready();
@@ -33,7 +33,7 @@ for (const kind of ['ratio', 'websites']) {
     assert.equal(p.nodes.error.hidden, true);
   });
   test(`dashboard ${kind} CSV rejects pre-reset replies and retries with empty history`, async () => {
-    const today = C3.localDate();
+    const today = Core.localDate();
     const data = { [today]: { x: { createSec: 180 } }, _websiteTime: { [today]: { 'cleared.test': 180 } } };
     const p = page('dashboard', data); await p.ready();
     const button = p.nodes[(kind === 'ratio' ? 'export' : 'website-export')];
@@ -81,7 +81,7 @@ test('intention view shows newest first and renders text without interpreting HT
   assert.equal(p.nodes['intention-empty'].hidden, true);
 });
 test('clearing intentions requires confirmation, handles failure, and preserves activity', async () => {
-  const p = dashboard({ [C3.localDate()]: { x: { consumeSec: 60 } }, _intentions: [{ site: 'x', reason: 'Reply to a colleague', requestedAt: 1 }] }); await p.ready(); p.nodes['intentions-view'].fire('click'); await p.ready();
+  const p = dashboard({ [Core.localDate()]: { x: { consumeSec: 60 } }, _intentions: [{ site: 'x', reason: 'Reply to a colleague', requestedAt: 1 }] }); await p.ready(); p.nodes['intentions-view'].fire('click'); await p.ready();
   assert.match(p.nodes['intention-status'].textContent, /Saving is off/);
   p.state.confirm = false; await p.nodes['intention-clear'].fire('click');
   assert.equal(p.messages.some(m => m.type === 'access-history-clear'), false);
@@ -89,10 +89,10 @@ test('clearing intentions requires confirmation, handles failure, and preserves 
   assert.equal(p.data._intentions.length, 1); assert.equal(p.nodes.error.textContent, 'Could not save.'); assert.equal(p.nodes['intention-clear'].disabled, false);
   p.fail = false; await p.nodes['intention-clear'].fire('click'); await p.ready();
   assert.deepEqual(p.data._intentions, []); assert.equal(p.nodes['intention-clear'].disabled, true); assert.equal(p.nodes['intention-empty'].hidden, false);
-  assert.equal(p.data[C3.localDate()].x.consumeSec, 60);
+  assert.equal(p.data[Core.localDate()].x.consumeSec, 60);
 });
 test('switching to intentions requests only that view and leaves range-based history intact', async () => {
-  const p = dashboard({ [C3.localDate()]: { x: { consumeSec: 60 } }, _websiteTime: { [C3.localDate()]: { 'example.com': 120 } }, _intentions: [{ site: 'x', reason: 'Reply to a colleague', requestedAt: 1 }] });
+  const p = dashboard({ [Core.localDate()]: { x: { consumeSec: 60 } }, _websiteTime: { [Core.localDate()]: { 'example.com': 120 } }, _intentions: [{ site: 'x', reason: 'Reply to a colleague', requestedAt: 1 }] });
   p.nodes['intentions-view'].fire('click'); await p.ready();
   assert.equal(p.messages.at(-1).type, 'access-history-list');
   assert.equal(p.nodes['intention-list'].children.length, 1); assert.deepEqual(p.state.storageReads, ['_pendingUpdate']);
@@ -125,8 +125,8 @@ test('all-websites view switches without changing the existing ratio view', asyn
   p.nodes['ratio-view'].fire('click'); assert.equal(p.nodes['ratio-panel'].hidden, false);
 });
 test('website filters show sorted rows and combined time, including paused totals', async () => {
-  const today = C3.localDate(), lastWeek = C3.recentDates()[0];
-  const p = dashboard({ _websiteTime: { [today]: { 'example.com': 120, 'x.com': 60 }, [lastWeek]: { 'x.com': 180 }, [C3.recentDates(30)[0]]: { 'older.test': 3600 } } }); await p.ready(); p.nodes['websites-view'].fire('click'); await p.ready();
+  const today = Core.localDate(), lastWeek = Core.recentDates()[0];
+  const p = dashboard({ _websiteTime: { [today]: { 'example.com': 120, 'x.com': 60 }, [lastWeek]: { 'x.com': 180 }, [Core.recentDates(30)[0]]: { 'older.test': 3600 } } }); await p.ready(); p.nodes['websites-view'].fire('click'); await p.ready();
   assert.equal(p.nodes['website-total'].textContent, '1h 6m'); assert.equal(p.nodes['website-count'].textContent, '3 websites');
   assert.equal(p.nodes['website-sites'].children[0].children[0].textContent, 'older.test'); assert.equal(p.nodes['website-export'].disabled, false);
   p.nodes['website-range'].value = 'week'; p.nodes['website-range'].fire('change'); await p.ready();
@@ -135,21 +135,21 @@ test('website filters show sorted rows and combined time, including paused total
   assert.equal(p.nodes['website-total'].textContent, '3m 0s'); assert.equal(p.nodes['website-sites'].children[0].children[0].textContent, 'example.com'); assert.equal(p.nodes['website-count'].textContent, '2 websites');
 });
 test('website shares are whole percentages that add up to 100', async () => {
-  const p = dashboard({ _websiteTime: { [C3.localDate()]: { 'a.test': 60, 'b.test': 60, 'c.test': 60 } } }); await p.ready(); p.nodes['websites-view'].fire('click'); await p.ready();
+  const p = dashboard({ _websiteTime: { [Core.localDate()]: { 'a.test': 60, 'b.test': 60, 'c.test': 60 } } }); await p.ready(); p.nodes['websites-view'].fire('click'); await p.ready();
   const shares = p.nodes['website-sites'].children.map(row => row.children[2].textContent);
   assert.deepEqual(shares, ['34%', '33%', '33%']);
 });
 test('dashboard exports both existing CSV formats without changing recorded history', async () => {
-  const data = { [C3.localDate()]: { x: { consumeSec: 60 } }, _websiteTime: { [C3.localDate()]: { 'example.com': 120 } }, _intentions: [{ site: 'x', reason: 'Private intention text', requestedAt: 1 }] };
+  const data = { [Core.localDate()]: { x: { consumeSec: 60 } }, _websiteTime: { [Core.localDate()]: { 'example.com': 120 } }, _intentions: [{ site: 'x', reason: 'Private intention text', requestedAt: 1 }] };
   const p = dashboard(data); await p.ready();
   await p.nodes.export.fire('click'); await p.nodes['website-export'].fire('click');
-  assert.equal(p.state.downloads[0].filename, `CreateRatio-${C3.localDate()}.csv`);
-  assert.equal(p.state.downloads[1].filename, `CreateRatio-websites-${C3.localDate()}.csv`);
+  assert.equal(p.state.downloads[0].filename, `CreateRatio-${Core.localDate()}.csv`);
+  assert.equal(p.state.downloads[1].filename, `CreateRatio-websites-${Core.localDate()}.csv`);
   assert.match(await p.blobs[0].text(), /consume/); assert.match(await p.blobs[1].text(), /example\.com/); assert.deepEqual(p.data, data);
   for (const blob of p.blobs) assert.equal((await blob.text()).includes('Private intention text'), false);
 });
 test('dashboard downloads daily and weekly readable reports without changing history or exporting intentions', async () => {
-  const today = C3.localDate(), first = C3.recentDates()[0], older = C3.recentDates(8)[0];
+  const today = Core.localDate(), first = Core.recentDates()[0], older = Core.recentDates(8)[0];
   const data = { [today]: { x: { createSec: 60, consumeSec: 120, posts: 1 } }, [first]: { retired: { createSec: 120 } }, [older]: { older: { createSec: 99999 } }, _intentions: [{ reason: 'Private intention text', site: 'x', requestedAt: 1 }] };
   const before = structuredClone(data), p = dashboard(data); await p.ready();
   p.nodes['report-range'].value = 'today';
@@ -176,7 +176,7 @@ test('dashboard downloads daily and weekly readable reports without changing his
 for (const range of ['today', 'week']) for (const step of [2000, -2000]) {
   test(`${range} report rejects a history reply after the local date moves ${step > 0 ? 'forward' : 'backward'} and can be retried`, async () => {
     let now = (step > 0 ? new Date(2026, 11, 31, 23, 59, 59) : new Date(2027, 0, 1, 0, 0, 1)).getTime();
-    const dates = C3.recentDates(range === 'today' ? 1 : 7, new Date(now));
+    const dates = Core.recentDates(range === 'today' ? 1 : 7, new Date(now));
     const days = Object.fromEntries(dates.map(date => [date, { x: { createSec: 120, consumeSec: 60, posts: 1 } }]));
     const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
     p.nodes['report-range'].value = range;
@@ -188,11 +188,11 @@ for (const range of ['today', 'week']) for (const step of [2000, -2000]) {
     assert.deepEqual(p.state.downloads, []);
     assert.equal(p.nodes.error.textContent, 'The local date changed while loading history. Please try again.');
     assert.equal(p.nodes['report-export'].disabled, false);
-    const today = C3.localDate(new Date(now));
+    const today = Core.localDate(new Date(now));
     p.state.replies.set('history', { ok: true, days: { [today]: { x: { createSec: 180, consumeSec: 120 } } } });
     await p.nodes['report-export'].fire('click');
     assert.match(await p.blobs[0].text(), /<dt>Creating<\/dt><dd>3\.0m<\/dd>/);
-    const selected = C3.recentDates(range === 'today' ? 1 : 7, new Date(now));
+    const selected = Core.recentDates(range === 'today' ? 1 : 7, new Date(now));
     assert.equal(p.state.downloads[0].filename, `CreateRatio-report-${selected[0]}${range === 'week' ? '-to-' + today : ''}.html`);
     assert.equal(p.nodes.error.hidden, true);
   });
@@ -201,7 +201,7 @@ test('a same-day delayed report keeps the date captured when export started', as
   const started = new Date(2026, 5, 15, 9).getTime();
   let now = started;
   const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
-  p.state.replies.set('history', { ok: true, days: { [C3.localDate(new Date(started))]: { x: { createSec: 120 } } } });
+  p.state.replies.set('history', { ok: true, days: { [Core.localDate(new Date(started))]: { x: { createSec: 120 } } } });
   const release = p.holdMessage('history');
   const exporting = p.nodes['report-export'].fire('click');
   now += 3600000; release(); await exporting;
@@ -210,7 +210,7 @@ test('a same-day delayed report keeps the date captured when export started', as
 });
 for (const range of ['today', 'week']) {
   test(`${range} report rejects a pre-reset history reply and retry exports only cleared history`, async () => {
-    const now = new Date(2026, 5, 15, 12).getTime(), today = C3.localDate(new Date(now));
+    const now = new Date(2026, 5, 15, 12).getTime(), today = Core.localDate(new Date(now));
     const data = { [today]: { x: { createSec: 180, consumeSec: 60, posts: 1 } } };
     const p = page('dashboard', data, false, { now: () => now }); await p.ready();
     p.nodes['report-range'].value = range;
@@ -232,7 +232,7 @@ for (const range of ['today', 'week']) {
   });
 }
 test('receipt-window rollover does not cancel an in-flight HTML snapshot', async () => {
-  const now = new Date(2026, 5, 15, 12).getTime(), today = C3.localDate(new Date(now));
+  const now = new Date(2026, 5, 15, 12).getTime(), today = Core.localDate(new Date(now));
   const p = page('dashboard', {}, false, { now: () => now }); await p.ready();
   p.state.replies.set('history', { ok: true, days: { [today]: { x: { createSec: 180 } } } });
   const release = p.holdMessage('history'), exporting = p.nodes['report-export'].fire('click');
@@ -306,7 +306,7 @@ test('dashboard sends no preference messages or permission requests', async () =
   assert.equal(p.nodes['access-minutes'], undefined); assert.equal(p.nodes['website-time-enabled'], undefined);
 });
 test('a view switch during history loading discards the stale render and loads the selected view', async () => {
-  const p = dashboard({ [C3.localDate()]: { x: { consumeSec: 60 } }, _intentions: [{ site: 'x', reason: 'Reply to a colleague', requestedAt: 1 }] });
+  const p = dashboard({ [Core.localDate()]: { x: { consumeSec: 60 } }, _intentions: [{ site: 'x', reason: 'Reply to a colleague', requestedAt: 1 }] });
   await p.ready();
   const release = p.holdMessage('history'), before = p.messages.length;
   p.setDay({ x: { consumeSec: 120, posts: 1 } }); p.refresh(); await p.ready();
@@ -330,6 +330,6 @@ test('website export requires a successful snapshot while ratio export only load
   assert.equal(p.nodes.error.textContent, 'Could not save.');
   await p.nodes.export.fire('click');
   assert.deepEqual(p.messages.at(-1), { type: 'history', kind: 'ratio', range: 'month' });
-  assert.equal(p.state.downloads[0].filename, `CreateRatio-${C3.localDate()}.csv`);
+  assert.equal(p.state.downloads[0].filename, `CreateRatio-${Core.localDate()}.csv`);
   assert.equal(p.nodes.error.hidden, true);
 });

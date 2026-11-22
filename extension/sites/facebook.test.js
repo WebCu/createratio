@@ -30,8 +30,8 @@ test('Facebook publishes a synchronous, default-on module with explicit access p
   assert.equal(plugin.access.unrestrictedRules.some(rule => rule.condition.excludedResourceTypes?.includes('main_frame')), true);
   const context = vm.createContext({});
   vm.runInContext(fs.readFileSync(require.resolve('./facebook.js'), 'utf8'), context);
-  assert.equal(context.C3_SITE_MODULES.facebook.id, plugin.id);
-  assert.equal(typeof context.C3_SITE_MODULES.facebook.create, 'function');
+  assert.equal(context.SITE_MODULES.facebook.id, plugin.id);
+  assert.equal(typeof context.SITE_MODULES.facebook.create, 'function');
 });
 
 test('Facebook classifies only conservative desktop routes on its two exact HTTPS hosts', () => {

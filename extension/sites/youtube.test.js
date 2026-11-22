@@ -68,7 +68,7 @@ test('YouTube publishes a default-on module with explicit access policy in Node 
   assert.equal(plugin.access.unrestrictedRules.some(rule => rule.condition.excludedResourceTypes?.includes('main_frame')), true);
   const context = vm.createContext({ URL });
   vm.runInContext(fs.readFileSync(require.resolve('./youtube.js'), 'utf8'), context);
-  const published = context.C3_SITE_MODULES.youtube;
+  const published = context.SITE_MODULES.youtube;
   assert.equal(published.id, plugin.id);
   assert.equal(published.classifyPage({ url: 'https://youtube.com/' }), 'consume');
   assert.equal(typeof published.create, 'function');
