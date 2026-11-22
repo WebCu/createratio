@@ -95,6 +95,24 @@ test('every external GitHub Action uses a full commit SHA and stable release lab
   assert.ok(count > 0);
 });
 
+test('every workflow limits token scope, keeps checkout credentials out, and bounds each job', () => {
+  for (const file of readdirSync(path.join(root, '.github/workflows'))) {
+    if (!/\.ya?ml$/.test(file)) continue;
+    const workflow = read(`.github/workflows/${file}`);
+    assert.match(workflow, /^permissions:\n/m, `${file} needs top-level permissions`);
+    const jobs = workflow.split(/^jobs:\n/m)[1]?.split(/^(?=  [\w-]+:\n)/m) ?? [];
+    assert.ok(jobs.length > 0, `${file} has jobs`);
+    for (const job of jobs) {
+      const name = job.match(/^  ([\w-]+):/)?.[1];
+      if (/^    uses: /m.test(job)) continue;
+      assert.match(job, /^    timeout-minutes: \d+$/m, `${file} ${name} needs timeout-minutes`);
+      for (const checkout of job.split(/uses: actions\/checkout@/).slice(1)) {
+        assert.match(checkout.split(/\n      - /)[0], /\n\s+persist-credentials: false(?:\n|$)/, `${file} ${name} checkout must not persist credentials`);
+      }
+    }
+  }
+});
+
 test('CI uses a frozen install, audits security, and runs the shared fail-fast check', () => {
   const workflow = read('.github/workflows/ci.yml');
   for (const command of ['pnpm install --frozen-lockfile', 'pnpm audit --audit-level=high', 'pnpm check']) {
