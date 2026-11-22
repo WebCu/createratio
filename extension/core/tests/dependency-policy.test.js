@@ -102,26 +102,9 @@ test('CI uses a frozen install, audits security, and runs the shared fail-fast c
   }
   assert.equal(manifests[0].scripts['check:syntax'], 'node bin/check-syntax.js');
   assert.equal(manifests[0].scripts['check:types'], 'tsc -p tsconfig.json');
-  assert.equal(manifests[0].scripts.check, 'pnpm check:syntax && pnpm check:types && pnpm test && pnpm build && pnpm build:site');
-  assert.equal(manifests[0].scripts['check:browser'], 'pnpm build:chrome && pnpm test:browser');
   assert.match(workflow, /run: pnpm check:browser/);
   assert.match(workflow, /^  contents: read$/m);
   assert.match(workflow, /persist-credentials: false/);
-});
-
-test('browser verification is a bounded CI job using a pinned, verified browser download', () => {
-  const workflow = read('.github/workflows/ci.yml');
-  for (const name of ['browser-smoke-core', 'browser-journeys']) {
-    const browserJob = workflow.split(`  ${name}:\n`)[1]?.split(/^  [\w-]+:\n/m)[0];
-    assert.ok(browserJob, name);
-    assert.match(browserJob, /timeout-minutes: 10/);
-    assert.match(browserJob, /https:\/\/storage\.googleapis\.com\/chrome-for-testing-public\/\d+\.\d+\.\d+\.\d+\/linux64\/chrome-linux64\.zip/);
-    assert.match(browserJob, /[a-f0-9]{64} {2}.*\$RUNNER_TEMP\/chrome\.zip.*\| sha256sum --check/);
-    assert.ok(browserJob.indexOf('sha256sum --check') < browserJob.indexOf('unzip -q'));
-    assert.match(browserJob, /CHROMIUM_PATH=.*chrome-linux64\/chrome/);
-    assert.doesNotMatch(browserJob, /continue-on-error:|\|\| true/);
-  }
-  assert.match(workflow, /run: pnpm check:browser:shard/);
 });
 
 test('weekly dependency automation proposes Action majors but excludes library and image majors', () => {

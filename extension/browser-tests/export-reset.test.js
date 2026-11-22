@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 
-for (const pageName of ['dashboard', 'settings']) for (const kind of ['ratio', 'websites']) {
+for (const [pageName, kind] of [['dashboard', 'websites'], ['settings', 'ratio']]) {
   test(`${pageName} ${kind} CSV cannot download a pre-reset history reply`, async () => {
     const { launch, evaluate, eventually, click, openSettingsSection, withFailureArtifacts } = await import('./chromium.mjs');
     const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));

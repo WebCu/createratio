@@ -315,7 +315,10 @@ CR_PROPERTY_SEED=42 CR_PROPERTY_CASE=0 CR_PROPERTY_ADAPTER=chrome \
 ```
 
 `CR_PROPERTY_CASES` and `CR_PROPERTY_STEPS` control bounded exploration; keep
-local/CI defaults deterministic. Record a discovered regression as a focused
+local/CI defaults deterministic. The daily `explore-properties.yml` workflow runs
+ten fresh random seeds at the maximum case and step bounds; it does not gate pull
+requests. Each run prints its seed, and failures print the exact replay command.
+Record a discovered regression as a focused
 example before changing the generator. These are seeded model-based properties,
 not automatic shrinking: the failure prefix is replayable but not guaranteed
 minimal. Generated models stay within one local day and exclude above-goal
