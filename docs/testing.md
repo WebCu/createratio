@@ -362,6 +362,14 @@ waiting for painted, stable geometry and a matching hit target before dispatch.
 The tests shift `Date` in pages and the worker to check the five-minute default wait and
 expiry without minute-long sleeps; native timers and monotonic time remain real.
 
+CI runs the journeys on Linux only. To choose an option in a native `<select>`,
+focus it and call `typeAhead(browser, page, text)` with the first letters of the
+option label; arrow, Home and End keys open a native menu on macOS instead of
+changing the value. Use `selectAllText(browser, page)` instead of a Ctrl+A key
+event. `launch(path, { developerMode: true })` turns on developer mode through
+`chrome.developerPrivate` and fails if it stays off. Without developer mode,
+`chrome.runtime.reload()` disables the unpacked extension.
+
 Use `findByRole(browser, page, role, name)` and `clickByRole(...)` from
 `extension/browser-tests/chromium.mjs` for accessibility-driven journeys. Names
 normalize whitespace, hidden nodes are excluded, and duplicate matches fail rather

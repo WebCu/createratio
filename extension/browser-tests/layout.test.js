@@ -5,7 +5,7 @@ const path = require('node:path');
 const { mkdir, writeFile } = require('node:fs/promises');
 
 test('built extension keeps focused settings, narrow tasks and history readable', async t => {
-  const { launch, evaluate, eventually, click, clickByRole, findByRole, openSettingsSection, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
+  const { launch, evaluate, eventually, click, clickByRole, findByRole, openSettingsSection, seedAccess, selectAllText, typeAhead, withFailureArtifacts } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   const inspect = (page, source) => evaluate(browser, page.session, source);
   const pageAt = async (url, width) => {
@@ -20,8 +20,8 @@ test('built extension keeps focused settings, narrow tasks and history readable'
     const sizes = await inspect(page, '({ width: innerWidth, document: document.documentElement.scrollWidth, body: document.body.scrollWidth })');
     assert.ok(sizes.document <= sizes.width && sizes.body <= sizes.width, JSON.stringify(sizes));
   };
-  const key = async (page, name, code, modifiers = 0) => {
-    const details = { key: name, code: name === 'a' ? 'KeyA' : name, windowsVirtualKeyCode: code, modifiers };
+  const key = async (page, name, code) => {
+    const details = { key: name, code: name, windowsVirtualKeyCode: code };
     await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...details, ...(name === 'Enter' ? { text: '\r' } : {}) }, page.session);
     await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...details }, page.session);
   };
@@ -31,9 +31,9 @@ test('built extension keeps focused settings, narrow tasks and history readable'
     await browser.cdp.send('DOM.focus', { backendNodeId: node.backendDOMNodeId }, page.session);
   };
   const customDuration = async (page, site, value) => {
-    await focusDuration(page, site.name); await key(page, 'End', 35);
+    await focusDuration(page, site.name); await typeAhead(browser, page, 'c');
     await eventually(() => inspect(page, `!document.querySelector('#custom-duration-site-${site.id}').hidden && document.activeElement.id === 'customMinutes-site-${site.id}'`), 'custom duration editor focused');
-    await key(page, 'a', 65, 2);
+    await selectAllText(browser, page);
     await browser.cdp.send('Input.insertText', { text: String(value) }, page.session);
     await clickByRole(browser, page, 'button', 'Save custom session time for ' + site.name);
     await eventually(() => inspect(page, `document.querySelector('#accessMinutes-site-${site.id}').value === '${value}' && document.querySelector('#custom-duration-site-${site.id}').hidden`), site.name + ' custom duration saved');
@@ -133,9 +133,9 @@ test('built extension keeps focused settings, narrow tasks and history readable'
           return send(message);
         };
       })()`);
-      await focusDuration(page, 'X'); await key(page, 'End', 35);
+      await focusDuration(page, 'X'); await typeAhead(browser, page, 'c');
       await eventually(() => inspect(page, 'document.activeElement.id === "customMinutes-site-x"'), 'custom editor focused');
-      await key(page, 'a', 65, 2); await browser.cdp.send('Input.insertText', { text: '17' }, page.session);
+      await selectAllText(browser, page); await browser.cdp.send('Input.insertText', { text: '17' }, page.session);
       await clickByRole(browser, page, 'button', 'Save custom session time for X');
       await eventually(() => inspect(page, '!document.querySelector("#error").hidden && !document.querySelector("#custom-save-site-x").disabled'), 'failed save acknowledged');
       assert.equal(await inspect(page, 'document.querySelector("#customMinutes-site-x").value'), '17');
@@ -181,9 +181,9 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
         const waitMenu = await findByRole(browser, page, 'combobox', 'Intention wait for X');
         await browser.cdp.send('DOM.focus', { backendNodeId: waitMenu.backendDOMNodeId }, page.session);
-        await key(page, 'End', 35);
+        await typeAhead(browser, page, 'c');
         await eventually(() => inspect(page, 'document.activeElement.id === "customWaitMinutes-site-x"'), 'custom wait editor focused');
-        await key(page, 'a', 65, 2);
+        await selectAllText(browser, page);
         await browser.cdp.send('Input.insertText', { text: '7' }, page.session);
         await clickByRole(browser, page, 'button', 'Save custom intention wait for X');
         await eventually(() => inspect(page, 'document.querySelector("#waitMinutes-site-x").value === "7" && document.querySelector("#custom-wait-duration-site-x").hidden'), 'custom wait saved');
@@ -217,9 +217,9 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         }
         await browser.cdp.send('Page.reload', {}, page.session);
         await eventually(() => inspect(page, 'document.querySelectorAll("#site-settings input:checked").length === 7'), 'saved On switches survive reload');
-        await focusDuration(page, 'X'); await key(page, 'End', 35);
+        await focusDuration(page, 'X'); await typeAhead(browser, page, 'c');
         await eventually(() => inspect(page, 'document.activeElement.id === "customMinutes-site-x"'), 'custom editor focused');
-        await key(page, 'a', 65, 2); await browser.cdp.send('Input.insertText', { text: '17' }, page.session);
+        await selectAllText(browser, page); await browser.cdp.send('Input.insertText', { text: '17' }, page.session);
         await evaluate(browser, browser.worker, `(async () => { const { settings } = await chrome.storage.local.get('settings'); await chrome.storage.local.set({ settings: { ...settings, allowAboveGoal: ${width === 320} } }); })()`);
         await eventually(() => inspect(page, `document.querySelector('#allow-above-goal').checked === ${width === 320}`), 'external settings refresh');
         assert.equal(await inspect(page, 'document.activeElement.id === "customMinutes-site-x" && document.activeElement.value === "17"'), true);
@@ -233,7 +233,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       await seedAccess(browser, sites.map(site => site.id), { trackedSites: sites.map(site => site.id), accessMinutes: 5, siteOverrides: {}, allowAboveGoal: false });
       const page = await pageAt('/settings.html', 1000);
       await eventually(() => inspect(page, '!!document.querySelector("#accessMinutes-default")'), 'Settings ready');
-      await focusDuration(page, 'Default'); await key(page, 'ArrowDown', 40);
+      await focusDuration(page, 'Default'); await typeAhead(browser, page, '1');
       await eventually(() => inspect(page, 'document.querySelector("#accessMinutes-default").value === "10" && !document.querySelector("#accessMinutes-default").disabled'), 'preset saved');
       assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => data.settings.accessMinutes)'), 10);
       for (const [index, site] of sites.entries()) await customDuration(page, site, 17 + index);
@@ -243,7 +243,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         assert.equal(stored._access[site.id].remainingMs, 300000, 'editing time does not change a running session');
       }
       assert.equal(await inspect(page, '(() => { const notice = document.querySelector("#save-status").getBoundingClientRect(); return notice.top >= 0 && notice.bottom <= innerHeight; })()'), true);
-      await focusDuration(page, 'X'); await key(page, 'Home', 36);
+      await focusDuration(page, 'X'); await typeAhead(browser, page, 'd');
       await eventually(() => inspect(page, 'document.querySelector("#accessMinutes-site-x").value === "default" && !document.querySelector("#accessMinutes-site-x").disabled'), 'Default restored');
       assert.equal(await evaluate(browser, browser.worker, 'chrome.storage.local.get("settings").then(data => Object.hasOwn(data.settings.siteOverrides?.x || {}, "accessMinutes"))'), false);
       await browser.cdp.send('Page.reload', {}, page.session);
