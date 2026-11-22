@@ -328,20 +328,32 @@ access; existing focused regression tests cover those policies.
 
 ## Browser setup
 
-Set `CHROMIUM_PATH` (or `CHROMIUM`, shared with the broader smoke runner) to an
-installed Chromium or Chrome for Testing executable, then run
-`pnpm check:browser`. CI downloads a version-pinned, SHA-256-verified
-Chrome for Testing archive; the workflow is the source of truth for the version
-and checksum. Update both together after verifying the official download and
-running the browser journeys. Regular branded Chrome may reject unpacked-extension
-launch flags; use Chromium or Chrome for Testing for this runner.
+Run `pnpm setup:chromium` once per machine. It downloads the Chrome for Testing
+build that CI uses for `linux64`, `mac-arm64` or `mac-x64`, and checks its SHA-256
+before it unpacks the archive. A failed checksum leaves nothing unpacked. The
+build goes to a per-user cache that all worktrees share
+(`~/Library/Caches/createratio` on macOS, `$XDG_CACHE_HOME/createratio` or
+`~/.cache/createratio` on Linux; `CREATERATIO_CACHE_DIR` overrides it). A second
+run does nothing.
+
+Both browser runners select the browser in this order: `CHROMIUM_PATH`,
+`CHROMIUM`, the cached pinned build, then `/usr/bin/chromium`. They stop before
+launch if the browser is missing or is branded Google Chrome, which ignores
+unpacked-extension launch flags. They warn if its version differs from the pinned
+version. The smoke also warns if `browser-harness` differs from its pinned version.
+
+`bin/browser-pins.json` holds the Chrome for Testing version, the per-platform
+checksums and the `browser-harness` version. CI installs the same versions, and
+`bin/tests/setup-chromium.test.js` fails if the workflow differs from the pins. To
+change the version, download each official archive, record its checksum in the
+pins, update the workflow, and run the browser journeys and the smoke.
 
 On macOS, both disposable browser runners use Chromium's mock keychain rather
 than requesting access to the login keychain. This does not change macOS or
 normal-browser settings.
 
-The runner defaults to `/usr/bin/chromium` and a 90-second watchdog;
-`BROWSER_TIMEOUT_MS` can override the bounded timeout. Sandbox disabling requires
+The runner has a 90-second watchdog; `BROWSER_TIMEOUT_MS` can override the
+bounded timeout. Sandbox disabling requires
 `CHROMIUM_NO_SANDBOX=1` and is only appropriate in an isolated Linux sandbox that
 cannot support Chromium's sandbox. External traffic is blocked
 by interception, an unusable proxy, and DNS isolation; supported-site navigations
@@ -558,14 +570,17 @@ changes require separate review, not a skipped comparison. This is not browser Q
 
 ## Disposable Chromium smoke
 
-With Chromium, Python 3, and `browser-harness` installed in your agent environment:
+With Python 3 and the pinned `browser-harness` installed in your agent
+environment (for example `uv tool install browser-harness==0.1.13`):
 
 ```sh
+pnpm setup:chromium
 pnpm smoke:browser
 ```
 
-`CHROMIUM` selects the browser executable. Only in an isolated Linux sandbox that
-cannot support Chromium's sandbox, set `CHROMIUM_NO_SANDBOX=1`.
+The smoke selects its browser as described in [Browser setup](#browser-setup).
+Only in an isolated Linux sandbox that cannot support Chromium's sandbox, set
+`CHROMIUM_NO_SANDBOX=1`.
 
 The command builds Chrome, runs worker-selection regressions, launches a unique
 temporary profile, and uses browser-harness to verify the real extension worker,

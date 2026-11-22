@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import integrations from '../sites/index.js';
+import browserSetup from '../../bin/setup-chromium.js';
 
 const syntheticHosts = new Set([...integrations.sites.flatMap(site => site.hosts), 'twitter.com', 'www.twitter.com']);
 
@@ -158,7 +159,19 @@ export function devToolsEndpoint(contents) {
   return `ws://127.0.0.1:${port}${path}`;
 }
 
+let resolvedBrowser;
+
+function browserExecutable() {
+  if (!resolvedBrowser) {
+    resolvedBrowser = browserSetup.resolveBrowser();
+    if (resolvedBrowser.warning) console.warn(`Warning: ${resolvedBrowser.warning}`);
+  }
+  if (resolvedBrowser.problem) throw new Error(resolvedBrowser.problem);
+  return resolvedBrowser.executable;
+}
+
 export async function launch(extensionPath, options = {}) {
+  const executable = browserExecutable();
   extensionPath = resolve(extensionPath);
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
   const workerURL = extensionWorkerURL(extensionPath, manifest);
@@ -167,7 +180,6 @@ export async function launch(extensionPath, options = {}) {
     await mkdir(join(directory, 'profile', 'Default'), { recursive: true });
     await writeFile(join(directory, 'profile', 'Default', 'Preferences'), JSON.stringify({ extensions: { ui: { developer_mode: true } } }));
   }
-  const executable = process.env.CHROMIUM_PATH || process.env.CHROMIUM || '/usr/bin/chromium';
   const args = [
     `--user-data-dir=${join(directory, 'profile')}`, '--remote-debugging-port=0',
     '--remote-debugging-address=127.0.0.1', '--headless=new',
