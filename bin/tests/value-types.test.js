@@ -71,6 +71,9 @@ test('duration converters reject mismatched source units and raw numbers', t => 
       'Core.secondsFromMilliseconds(1);',
       'Core.minutesFromMilliseconds(1);',
       'Core.secondsFromMinutes(1);',
+      "Core.asMilliseconds('1000');",
+      'Core.asSeconds({});',
+      'Core.asMinutes(true);',
       ''
     ].join('\n')
   });
@@ -85,6 +88,9 @@ test('duration converters reject mismatched source units and raw numbers', t => 
     [9, 'number', 'Seconds'],
     [10, 'number', 'Milliseconds'],
     [11, 'number', 'Milliseconds'],
-    [12, 'number', 'Minutes']
+    [12, 'number', 'Minutes'],
+    [13, 'string', 'number'],
+    [14, '{}', 'number'],
+    [15, 'boolean', 'number']
   ]) assert.match(result.stdout, new RegExp(`converters\\.js\\(${line},\\d+\\): error TS2345: Argument of type '${source}' is not assignable to parameter of type '${target}'`));
 });

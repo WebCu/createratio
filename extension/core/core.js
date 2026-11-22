@@ -23,8 +23,11 @@
   function secondsFromMinutes(minutes) { return /** @type {Seconds} */ (minutes * 60); }
   /** @param {Seconds} seconds */
   function minutesFromSeconds(seconds) { return /** @type {Minutes} */ (seconds / 60); }
+  /** @param {number} milliseconds */
   function asMilliseconds(milliseconds) { return /** @type {Milliseconds} */ (milliseconds); }
+  /** @param {number} seconds */
   function asSeconds(seconds) { return /** @type {Seconds} */ (seconds); }
+  /** @param {number} minutes */
   function asMinutes(minutes) { return /** @type {Minutes} */ (minutes); }
   function validScrollFrictionStrength(value) { return Number.isInteger(value) && value >= SCROLL_FRICTION_LIMITS.minStrength && value <= SCROLL_FRICTION_LIMITS.maxStrength && value % SCROLL_FRICTION_LIMITS.step === 0; }
   /** @type {Record<AccessPreference, true>} */
