@@ -431,6 +431,11 @@ against `@types/chrome`, and Firefox's `browser` global is declared with the sam
 accepts only `RuntimeMessage` shapes, and `message-contracts.js` keeps its
 allowed values in `Record<…, true>` tables, so a value missing from either side
 fails `pnpm check:types`. `bin/tests/message-types.test.js` covers both failures.
+`globals.d.ts` also brands local dates and durations as `LocalDate`,
+`Milliseconds`, `Seconds` and `Minutes`. Raw values enter through
+`Core.validLocalDate`, `Core.validAccessMinutes`, `Core.asMilliseconds`,
+`Core.asSeconds` and `Core.asMinutes`. `bin/tests/value-types.test.js` checks
+that mixed units fail.
 The pre-commit hook checks staged whitespace, including newly added files.
 `pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
 paths, including skill-directory symlinks and files force-added while ignored.

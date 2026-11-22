@@ -35,6 +35,7 @@ function createAccessControl(site, state) {
   row.append(label, button); $('access-sites').append(row);
   return control;
 }
+/** @param {Record<string, ReplyAccess>} access */
 function renderAccess(access) {
   if (!accessControls.size && Object.keys(access).length) $('access-sites').replaceChildren();
   for (const [site, state] of Object.entries(access)) {
@@ -44,8 +45,8 @@ function renderAccess(access) {
     const { status, pending, button } = control;
     control.row.setAttribute('data-state', state.enabled === false ? 'off' : state.goalAllowed || state.remainingMs > 0 ? 'open' : 'blocked');
     const open = state.remainingMs > 0;
-    const left = state.expiresAt ? Math.max(0, state.expiresAt - Date.now()) : state.remainingMs;
-    const seconds = Math.ceil(left / 1000);
+    const left = state.expiresAt ? Core.asMilliseconds(Math.max(0, state.expiresAt - Date.now())) : state.remainingMs;
+    const seconds = Math.ceil(Core.secondsFromMilliseconds(left));
     pending.hidden = state.enabled === false || !state.goalAllowed || !state.readyAt;
     status.textContent = state.enabled === false ? 'Limit & track off' : state.goalAllowed ? 'Open · above daily goal' : open ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} left${state.expiresAt ? '' : ' · paused'}` : state.readyAt ? 'Access requested' : 'Blocked';
     button.textContent = state.enabled === false || state.goalAllowed ? 'Open site' : open ? 'End session' : 'Request access';

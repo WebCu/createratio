@@ -3,8 +3,8 @@ declare global {
   type HistoryKind = 'ratio' | 'websites';
   type HistoryRange = 'today' | 'week' | 'month';
   type SegmentMode = 'create' | 'consume';
-  type TimeSegment = { date: string; mode: SegmentMode; sec: number };
-  type SiteActionEntry = { date: string; action: string };
+  type TimeSegment = { date: LocalDate; mode: SegmentMode; sec: Seconds };
+  type SiteActionEntry = { date: LocalDate; action: string };
   type PreferenceMessage =
     | { type: 'tracking'; site: string; enabled: boolean }
     | { type: 'access-duration'; site?: string; minutes: number | null; preference?: AccessPreference }
@@ -22,7 +22,7 @@ declare global {
   type HistoryStore = ReturnType<typeof ActivityHistory.create>;
   type ReplySettings = { trackedSites?: string[]; scrollFrictionEnabled?: boolean; scrollFrictionStrength?: number; [key: string]: unknown };
   type ReplyAccess = Omit<AccessStatus, 'site' | 'goalAllowed' | 'refilledAt' | 'waitSeconds'> & { goalAllowed?: boolean; refilledAt?: unknown; waitSeconds?: unknown };
-  type SnapshotReply = { ok: true; generation?: string | null; date: string; day: ReturnType<HistoryStore['creationDay']>; settings: ReplySettings; access: Record<string, ReplyAccess>; websiteTimeEnabled: boolean };
+  type SnapshotReply = { ok: true; generation?: string | null; date: LocalDate; day: ReturnType<HistoryStore['creationDay']>; settings: ReplySettings; access: Record<string, ReplyAccess>; websiteTimeEnabled: boolean };
   type AccessReply = { ok: true; access: Record<string, ReplyAccess> };
   type SavedIntention = { site: string; reason: string; requestedAt: number };
   type ReplyTable<T extends Record<RuntimeMessage['type'], { ok: true }>> = T;

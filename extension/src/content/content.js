@@ -46,7 +46,7 @@
       if (segments.reduce((sum, segment) => sum + segment.sec, 0) + part.sec > MAX_SECONDS) queuePacket();
       if (recordingPaused) break;
       const tail = segments.at(-1);
-      if (tail && tail.mode === segmentMode && tail.date === part.date) tail.sec += part.sec;
+      if (tail && tail.mode === segmentMode && tail.date === part.date) tail.sec = Core.asSeconds(tail.sec + part.sec);
       else segments.push({ ...part, mode: segmentMode });
       if (segments.length === MAX_ITEMS) queuePacket();
       if (recordingPaused) break;
@@ -54,7 +54,7 @@
   }
   function settle() {
     const now = performance.now();
-    const ms = recordingPaused ? 0 : Core.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
+    const ms = recordingPaused ? 0 : Core.activeMilliseconds({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
     if (ms > 0 && (mode === 'create' || mode === 'consume')) {
       const activeEnd = Math.min(now, lastInput + 30000);
       const endWall = Date.now() - (now - activeEnd);
