@@ -52,7 +52,7 @@ for (const surface of ['popup', 'dashboard']) test(`pending caption writes stay 
         assert.equal(await inspect('captionWrites.at(-1).text'), caption);
         assert.equal(await inspect('document.querySelector("#share-copy").disabled'), true);
         if (transition === 'preview') {
-          await evaluate(browser, browser.worker, `chrome.storage.local.set({ [C3.localDate()]: { x: { createSec: ${120 + before}, consumeSec: 60 } } })`);
+          await evaluate(browser, browser.worker, `chrome.storage.local.set({ [Core.localDate()]: { x: { createSec: ${120 + before}, consumeSec: 60 } } })`);
           await preview();
           assert.notEqual(await inspect('document.querySelector("#share-caption").value'), caption);
         } else if (transition !== 'same') {

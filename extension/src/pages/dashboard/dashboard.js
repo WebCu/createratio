@@ -18,8 +18,8 @@ function svgElement(tag, attrs = {}, text) {
   if (text !== undefined) node.textContent = text; return node;
 }
 function chart(days) {
-  const dates = C3.recentDates();
-  const totals = dates.map(date => C3.aggregate(days[date]));
+  const dates = Core.recentDates();
+  const totals = dates.map(date => Core.aggregate(days[date]));
   const max = Math.max(1, ...totals.flatMap(s => [s.consumeSec / 60, s.createSec / 60]));
   const top = Math.ceil(max / 5) * 5;
   const svg = $('chart');
@@ -70,7 +70,7 @@ function renderIntentions() {
   $('intention-empty').hidden = entries.length > 0;
   $('intention-clear').disabled = entries.length === 0;
   $('intention-list').replaceChildren();
-  const names = new Map(C3.SITES.map(site => [site.id, site.name]));
+  const names = new Map(Core.SITES.map(site => [site.id, site.name]));
   for (const entry of [...entries].reverse()) {
     const item = document.createElement('li'), meta = document.createElement('div'), reason = document.createElement('p');
     meta.textContent = `${names.get(entry.site) || entry.site} · ${new Date(entry.requestedAt).toLocaleString()}`;
@@ -79,20 +79,20 @@ function renderIntentions() {
   }
 }
 function renderRatio(days) {
-  const today = C3.localDate(), day = days[today] || {}, total = C3.aggregate(day), score = C3.score(total);
+  const today = Core.localDate(), day = days[today] || {}, total = Core.aggregate(day), score = Core.score(total);
   const hasActivity = ['createSec', 'consumeSec', 'posts', 'replies', 'comments'].some(key => total[key] > 0);
   $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); /** @type {HTMLTimeElement} */ (document.getElementById('date')).dateTime = today;
-  $('score').textContent = score.toFixed(2); $('score').style.color = hasActivity ? C3.scoreColor(score) : '';
-  $('score-card').setAttribute('data-score', hasActivity ? C3.scoreBand(score) : 'none');
+  $('score').textContent = score.toFixed(2); $('score').style.color = hasActivity ? Core.scoreColor(score) : '';
+  $('score-card').setAttribute('data-score', hasActivity ? Core.scoreBand(score) : 'none');
   $('score-status').textContent = !hasActivity ? 'A fresh start. Make something today.' : score >= 1 ? 'You’re making more than you’re taking in.' : score >= 0.5 ? 'A little more creating gets you to 1.0.' : 'One thoughtful reply is a great start.';
   $('create-min').textContent = minutes(total.createSec); $('consume-min').textContent = minutes(total.consumeSec);
   for (const key of ['posts', 'replies', 'comments', 'likes', 'quotes', 'reposts', 'bookmarks']) $(key).textContent = String(total[key]);
   $('sites').replaceChildren();
-  const names = new Map(C3.SITES.map(site => [site.id, site.name]));
-  for (const site of new Set([...names.keys(), ...C3.recordedSites(day)])) {
+  const names = new Map(Core.SITES.map(site => [site.id, site.name]));
+  for (const site of new Set([...names.keys(), ...Core.recordedSites(day)])) {
     const name = names.get(site) || site + ' (unavailable)';
-    const s = { ...C3.emptyStats(), ...day[site] }, row = document.createElement('tr');
-    for (const value of [name, minutes(s.createSec), minutes(s.consumeSec), C3.score(s).toFixed(2)]) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }
+    const s = { ...Core.emptyStats(), ...day[site] }, row = document.createElement('tr');
+    for (const value of [name, minutes(s.createSec), minutes(s.consumeSec), Core.score(s).toFixed(2)]) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }
     $('sites').append(row);
   }
   $('export').disabled = false; chart(days);
@@ -143,9 +143,9 @@ async function exportHistory(kind) {
     }
     const data = await messages.send({ type: 'history', kind, range: 'month' }, failure);
     if (version !== reportVersion) throw new Error('History changed while loading. Please try again.');
-    const csv = websites ? WebTime.csv(data.days) : C3.csv(data.days);
+    const csv = websites ? WebTime.csv(data.days) : Core.csv(data.days);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a'); link.href = url; link.download = `CreateRatio${websites ? '-websites' : ''}-${C3.localDate()}.csv`; document.body.append(link); link.click(); link.remove();
+    const link = document.createElement('a'); link.href = url; link.download = `CreateRatio${websites ? '-websites' : ''}-${Core.localDate()}.csv`; document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000); error();
   } catch (e) { error(e.message); }
 }
@@ -157,10 +157,10 @@ $('report-export').addEventListener('click', async () => {
   const range = /** @type {HistoryRange} */ ($('report-range').value), version = reportVersion;
   button.disabled = true; $('report-status').textContent = '';
   try {
-    const now = new Date(), date = C3.localDate(now);
+    const now = new Date(), date = Core.localDate(now);
     const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to export report.');
     if (version !== reportVersion) throw new Error('History changed while loading. Please try again.');
-    if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
+    if (Core.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
     const report = CreationReport.create(data.days, range, now);
     clearTimeout(reportTimer);
     if (reportURL) URL.revokeObjectURL(reportURL);

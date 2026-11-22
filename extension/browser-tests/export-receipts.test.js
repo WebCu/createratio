@@ -13,10 +13,10 @@ test('receipt rollover preserves ready and pending PNG snapshots but Clear histo
     const dashboard = await browser.page('about:blank'), settings = await browser.page(browser.origin + '/settings.html');
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: 'globalThis.setInterval = () => 0;' }, dashboard.session);
     await eventually(() => inspect(settings, '!!document.querySelector("#clear-history")'), 'Settings ready');
-    const date = await evaluate(browser, browser.worker, 'C3.localDate()');
+    const date = await evaluate(browser, browser.worker, 'Core.localDate()');
     const ready = () => eventually(() => inspect(dashboard, '!document.querySelector("#share-result").hidden && !document.querySelector("#share-create").disabled && document.querySelector("#share-preview").width === 1200 && document.querySelector("#share-preview").height === 1200'), 'PNG ready');
     const rollover = async seconds => {
-      await evaluate(browser, browser.worker, `chrome.storage.local.set({ _historyGeneration: crypto.randomUUID(), _receipts: [crypto.randomUUID()], [C3.localDate()]: { x: { createSec: ${seconds}, consumeSec: 60, posts: 1 } } })`);
+      await evaluate(browser, browser.worker, `chrome.storage.local.set({ _historyGeneration: crypto.randomUUID(), _receipts: [crypto.randomUUID()], [Core.localDate()]: { x: { createSec: ${seconds}, consumeSec: 60, posts: 1 } } })`);
       await eventually(() => inspect(dashboard, `document.querySelector('#create-min').textContent === '${(seconds / 60).toFixed(1)}m'`), 'rollover update reaches dashboard');
     };
     const hold = stage => inspect(dashboard, `(() => {

@@ -15,7 +15,7 @@ for (const pageName of ['dashboard', 'settings']) for (const kind of ['ratio', '
     try {
       await withFailureArtifacts(browser, `${pageName} ${kind} CSV reset`, async () => {
         await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: browser.directory, eventsEnabled: true });
-        const date = await evaluate(browser, browser.worker, 'C3.localDate()');
+        const date = await evaluate(browser, browser.worker, 'Core.localDate()');
         await evaluate(browser, browser.worker, `chrome.storage.local.set(${JSON.stringify({ [date]: { x: { createSec: 180 } }, ['_websiteTime:' + date]: { 'cleared.test': 180 } })})`);
         const page = await browser.page(browser.origin + '/' + pageName + '.html');
         const settings = pageName === 'settings' ? page : await browser.page(browser.origin + '/settings.html');
@@ -80,7 +80,7 @@ test('pending HTML exports cannot download activity after Clear history', async 
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: 'globalThis.setInterval = () => 0;' }, dashboard.session);
     await eventually(() => inspect(settings, '!!document.querySelector("#clear-history")'), 'Settings loaded');
     await openSettingsSection(browser, settings, 'data');
-    const date = await evaluate(browser, browser.worker, 'C3.localDate()');
+    const date = await evaluate(browser, browser.worker, 'Core.localDate()');
     for (const range of ['today', 'week']) await t.test(range, () => withFailureArtifacts(browser, `HTML ${range} reset race`, async () => {
       await evaluate(browser, browser.worker, `chrome.storage.local.set(${JSON.stringify({ [date]: { x: { createSec: 180, consumeSec: 60, posts: 1 } } })})`);
       await cdp.send('Page.navigate', { url: browser.origin + '/dashboard.html' }, dashboard.session);

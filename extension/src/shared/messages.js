@@ -1,6 +1,6 @@
 (function (root, factory) {
   const commonJS = typeof module === 'object' && module.exports;
-  const api = factory(() => commonJS ? require('../../core/core.js') : root.C3, commonJS ? require('../../sites/index.js') : root.C3Sites);
+  const api = factory(() => commonJS ? require('../../core/core.js') : root.Core, commonJS ? require('../../sites/index.js') : root.Sites);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.RuntimeMessages = api;
 })(globalThis, function (core, sites) {

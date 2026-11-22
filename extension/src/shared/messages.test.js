@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const RuntimeMessages = require('./messages.js');
-const C3Sites = require('../../sites/index.js');
+const Sites = require('../../sites/index.js');
 
 const access = { x: { name: 'X', home: 'https://x.com/home', enabled: true, goalAllowed: false, remainingMs: 0, expiresAt: 0, readyAt: 0, sessionMinutes: 5 } };
 const snapshot = { ok: true, date: '2026-10-11', day: {}, settings: { trackedSites: ['x'] }, access, websiteTimeEnabled: false };
@@ -35,14 +35,14 @@ test('access replies reject unusable budgets and flags, but need no undocumented
   }
 });
 test('access homes must be parseable credential-free HTTPS URLs for the matching vetted canonical site', async () => {
-  for (const { id } of C3Sites.sites.filter(site => site.gated)) {
-    const definition = C3Sites.get(id);
+  for (const { id } of Sites.sites.filter(site => site.gated)) {
+    const definition = Sites.get(id);
     const state = { ...access.x, name: definition.name, home: definition.access.home };
     const reply = { ok: true, access: { [id]: state } };
     assert.equal(await client(reply).send({ type: 'access-status' }, 'Site stays blocked.'), reply);
-    const other = C3Sites.sites.find(site => site.gated && site.id !== id);
+    const other = Sites.sites.find(site => site.gated && site.id !== id);
     const credentialURL = new URL(state.home); credentialURL.username = 'user'; credentialURL.password = 'secret';
-    for (const home of ['https://[/', 'https://evil.test/', 'http://' + new URL(state.home).host + '/', credentialURL.href, C3Sites.get(other.id).access.home, state.home + '?redirect=https://evil.test/']) {
+    for (const home of ['https://[/', 'https://evil.test/', 'http://' + new URL(state.home).host + '/', credentialURL.href, Sites.get(other.id).access.home, state.home + '?redirect=https://evil.test/']) {
       await assert.rejects(client({ ok: true, access: { [id]: { ...state, home } } }).send({ type: 'access-status' }, 'Site stays blocked.'), { message: 'Site stays blocked.' });
     }
   }

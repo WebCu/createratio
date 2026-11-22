@@ -24,7 +24,7 @@ for (const surface of ['dashboard', 'popup']) test(`${surface} previews keep one
       });
       try {
         for (let i = 1; i <= 6; i++) {
-          await evaluate(browser, browser.worker, `chrome.storage.local.set({ [C3.localDate()]: { x: { createSec: ${i * 60}, consumeSec: 60 } } })`);
+          await evaluate(browser, browser.worker, `chrome.storage.local.set({ [Core.localDate()]: { x: { createSec: ${i * 60}, consumeSec: 60 } } })`);
           await click(browser, page, '#share-create');
           await eventually(() => inspect('!document.querySelector("#share-create").disabled && !document.querySelector("#share-result").hidden'), 'changing preview ready');
           assert.deepEqual(imageRequests, [], 'the preview must not populate the decoded blob-image cache');

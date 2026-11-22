@@ -37,7 +37,7 @@ function engine(folder, initial = {}, url = '') {
   scripts.push('blocker.js');
   for (const file of scripts) vm.runInContext(fs.readFileSync(path.join(folder, file), 'utf8'), context);
   const access = vm.runInContext('SiteAccess', context);
-  const catalog = vm.runInContext('C3Sites.sites.filter(site => site.gated).map(site => ({ ...site, access: C3Sites.get(site.id).access }))', context);
+  const catalog = vm.runInContext('Sites.sites.filter(site => site.gated).map(site => ({ ...site, access: Sites.get(site.id).access }))', context);
   return {
     catalog: JSON.parse(JSON.stringify(catalog)),
     siteForURL: raw => access.siteForURL(raw),

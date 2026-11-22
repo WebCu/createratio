@@ -35,8 +35,8 @@ test('Reddit publishes a synchronous, default-on module with explicit access pol
   ]);
   const context = vm.createContext({});
   vm.runInContext(fs.readFileSync(require.resolve('./reddit.js'), 'utf8'), context);
-  assert.equal(context.C3_SITE_MODULES.reddit.id, plugin.id);
-  assert.equal(typeof context.C3_SITE_MODULES.reddit.create, 'function');
+  assert.equal(context.SITE_MODULES.reddit.id, plugin.id);
+  assert.equal(typeof context.SITE_MODULES.reddit.create, 'function');
 });
 
 test('Reddit classifies only conservative feed, search, thread and profile routes on exact HTTPS hosts', () => {

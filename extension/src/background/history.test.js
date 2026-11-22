@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const C3 = require('../../core/core.js');
+const Core = require('../../core/core.js');
 const { DAYS, PREFIX, MAX_BYTES } = require('./history.js');
 const { worker } = require('../tests/background-harness.js');
 function harness(data = {}, limit = MAX_BYTES, initial = new Date(2026, 9, 31, 12).getTime()) {
@@ -29,7 +29,7 @@ function harness(data = {}, limit = MAX_BYTES, initial = new Date(2026, 9, 31, 1
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } }
   const context = vm.createContext({ Date: Clock, TextEncoder, crypto });
   vm.runInContext(fs.readFileSync(require.resolve('./history.js'), 'utf8'), context);
-  const history = context.ActivityHistory.create(storage, C3, limit);
+  const history = context.ActivityHistory.create(storage, Core, limit);
   return { history, data, reads, writes, state, advanceDay(days = 1) { const date = new Date(now); date.setDate(date.getDate() + days); now = date.getTime(); } };
 }
 test('stored history prunes expired and invalid dates while reads select only the last 30 local days', async () => {
@@ -71,7 +71,7 @@ test('timezone rollback preserves saved history through worker replacement until
       const websites = await restarted.send({ type: 'history', kind: 'websites', range: 'today' }, sender);
       assert.deepEqual(ratio.days[date], before[date]);
       assert.deepEqual(websites.days[date], before[PREFIX + date]);
-      assert.ok(C3.csv(ratio.days).includes(`${date},retired,0.000,300.000,2`));
+      assert.ok(Core.csv(ratio.days).includes(`${date},retired,0.000,300.000,2`));
       assert.ok(WebTime.csv(websites.days).includes(`${date},"saved.test",120.000`));
       assert.deepEqual(data.settings, before.settings);
       assert.deepEqual(w.errors, []);
@@ -111,7 +111,7 @@ test('new creation and website segments cannot add future credit to saved or mis
   await h.history.prepare();
   await h.history.recordCreation(packet);
   await h.history.recordWebsiteTime('saved.test', [{ date, sec: 3 }, { date: future, sec: 100 }, { date: '2026-11-02', sec: 100 }, { date: '2026-10-01', sec: 100 }]);
-  assert.deepEqual(data[date].x, { ...C3.emptyStats(), posts: 1, createSec: 3 });
+  assert.deepEqual(data[date].x, { ...Core.emptyStats(), posts: 1, createSec: 3 });
   assert.deepEqual(data[PREFIX + date], { 'saved.test': 3 });
   assert.deepEqual(data[future], before[future]);
   assert.deepEqual(data[PREFIX + future], before[PREFIX + future]);
@@ -221,13 +221,13 @@ test('creation recording owns retained totals, quote credit and receipt deduplic
   ], actions: [{ date, action: 'quotes' }, { date: '2026-10-01', action: 'posts' }] };
   await h.history.recordCreation(packet);
   await h.history.recordCreation(packet);
-  assert.deepEqual(data[date].x, { ...C3.emptyStats(), createSec: 2, consumeSec: 5, posts: 1, quotes: 1 });
+  assert.deepEqual(data[date].x, { ...Core.emptyStats(), createSec: 2, consumeSec: 5, posts: 1, quotes: 1 });
   assert.deepEqual(data._receipts, ['creation']);
   assert.equal(data['2026-10-01'], undefined);
   assert.deepEqual(data.settings, { trackedSites: ['x'] });
 });
 test('only an explicit clear changes the history reset marker, not receipt rollover or journal repair', async () => {
-  const date = '2026-10-31', receipts = () => Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i);
+  const date = '2026-10-31', receipts = () => Array.from({ length: Core.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i);
   const data = { _historyGeneration: 'before-rollover', _historyReset: true, _receipts: receipts() }, h = harness(data);
   await h.history.prepare();
   await h.history.recordCreation({ id: 'new-packet', site: 'x', segments: [{ date, mode: 'create', sec: 1 }], actions: [] });
@@ -287,7 +287,7 @@ test('website receipts are saved atomically with midnight totals and deduplicate
 });
 
 test('website receipts trim FIFO without rotating packet generations and clear permits new data', async () => {
-  const date = '2026-10-31', receipts = Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i);
+  const date = '2026-10-31', receipts = Array.from({ length: Core.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'receipt-' + i);
   const data = { _historyGeneration: 'packets', _websiteTimeReceipts: receipts }, h = harness(data);
   const segments = [{ date, sec: 5 }];
   await h.history.recordWebsiteTime('example.com', segments, 'website:first');
@@ -306,7 +306,7 @@ test('website receipts trim FIFO without rotating packet generations and clear p
 
 test('website receipt repair preserves packet generations and recorded totals', async () => {
   const date = '2026-10-31', segments = [{ date, sec: 5 }];
-  for (const receipts of [{ broken: true }, ['duplicate', 'duplicate'], [7], ['x'.repeat(C3.DELIVERY_LIMITS.maxIdLength + 1)]]) {
+  for (const receipts of [{ broken: true }, ['duplicate', 'duplicate'], [7], ['x'.repeat(Core.DELIVERY_LIMITS.maxIdLength + 1)]]) {
     const data = { _historyGeneration: 'packets', _websiteTimeReceipts: receipts, [PREFIX + date]: { 'example.com': 3 } }, h = harness(data);
     await h.history.prepare();
     assert.equal(data._historyGeneration, 'packets');
@@ -318,7 +318,7 @@ test('website receipt repair preserves packet generations and recorded totals', 
 });
 
 test('packet receipt rollover preserves pending website time', async () => {
-  const date = '2026-10-31', data = { _historyGeneration: 'packets', _receipts: Array.from({ length: C3.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'packet-' + i) }, h = harness(data);
+  const date = '2026-10-31', data = { _historyGeneration: 'packets', _receipts: Array.from({ length: Core.DELIVERY_LIMITS.receiptLimit }, (_, i) => 'packet-' + i) }, h = harness(data);
   await h.history.prepare();
   await h.history.recordCreation({ id: 'packet:fresh', site: 'x', segments: [{ date, mode: 'consume', sec: 5 }], actions: [] });
   assert.notEqual(data._historyGeneration, 'packets');
@@ -343,7 +343,7 @@ test('creation accrual normalizes known stats without coercion and preserves oth
     const h = harness(data);
     await h.history.prepare();
     await h.history.recordCreation({ id: 'fresh', site: 'x', segments: [{ date, mode: 'consume', sec: 5 }], actions: [{ date, action: 'quotes' }] });
-    assert.deepEqual(data[date].x, { ...C3.emptyStats(), consumeSec: 5, createSec: 4, posts: 1, quotes: 1, unknown: { kept: true } });
+    assert.deepEqual(data[date].x, { ...Core.emptyStats(), consumeSec: 5, createSec: 4, posts: 1, quotes: 1, unknown: { kept: true } });
     assert.deepEqual(data[date].retired, retired);
     assert.deepEqual(data._receipts, ['prior', 'fresh']);
   }
@@ -373,7 +373,7 @@ test('creation accrual repairs malformed days and site stats without discarding 
       const data = { [date]: day, '2026-10-30': { retired } }, h = harness(data);
       await h.history.prepare();
       await h.history.recordCreation({ id: 'fresh', site: 'x', segments: [{ date, mode: 'consume', sec: 5 }], actions: [{ date, action: 'posts' }] });
-      assert.deepEqual(data[date].x, { ...C3.emptyStats(), consumeSec: 5, posts: 1 });
+      assert.deepEqual(data[date].x, { ...Core.emptyStats(), consumeSec: 5, posts: 1 });
       if (day && typeof day === 'object' && !Array.isArray(day)) assert.deepEqual(data[date].retired, retired);
       assert.deepEqual(data['2026-10-30'], { retired });
     }
@@ -491,7 +491,7 @@ test('worker accrues numeric creation and website totals from malformed saved nu
     w.advance(5000); w.alarm('website-time');
     const response = await w.send({ type: 'ingest', id: 'fresh', generation: initial.generation, site: 'x', segments: [{ date, mode: 'consume', sec: 5 }], actions: [{ date, action: 'quotes' }] });
     assert.equal(response.ok, true);
-    assert.deepEqual(response.day.x, { ...C3.emptyStats(), consumeSec: 5, createSec: 2, posts: 1, quotes: 1, unknown: 'saved' });
+    assert.deepEqual(response.day.x, { ...Core.emptyStats(), consumeSec: 5, createSec: 2, posts: 1, quotes: 1, unknown: 'saved' });
     assert.deepEqual(response.day.retired, { posts: 3 });
     assert.deepEqual(data[PREFIX + date], { 'example.test': 5, 'retained.test': 8 });
     assert.deepEqual(data._receipts, ['fresh']);
@@ -520,8 +520,8 @@ test('history reads return usable day maps for malformed restored envelopes with
     assert.deepEqual(structuredClone(ratio[date]), {});
     assert.deepEqual(structuredClone(websites[date]), {});
     assert.deepEqual(structuredClone(ratio[older].retired), { consumeSec: 8, unknown: 'saved' });
-    assert.equal(C3.aggregate(ratio[date]).consumeSec, 0);
-    assert.ok(C3.csv(ratio).includes(`${older},retired,8.000`));
+    assert.equal(Core.aggregate(ratio[date]).consumeSec, 0);
+    assert.ok(Core.csv(ratio).includes(`${older},retired,8.000`));
     assert.deepEqual(WebTime.summarize(websites), [['saved.test', 9]]);
     assert.ok(WebTime.csv(websites).includes(`${older},"saved.test",9.000`));
     delete before._websiteTime;
@@ -550,8 +550,8 @@ test('creationDay supplies non-mutating usable rows for snapshots and history re
   const ratio = await h.history.read('ratio', 'today');
   assert.deepEqual(structuredClone(ratio[date]), structuredClone(normalized));
   assert.deepEqual(data, before);
-  assert.equal(C3.aggregate(ratio[date]).consumeSec, 8);
-  assert.ok(C3.csv(ratio).includes(`${date},retired,8.000`));
+  assert.equal(Core.aggregate(ratio[date]).consumeSec, 8);
+  assert.ok(Core.csv(ratio).includes(`${date},retired,8.000`));
   for (const malformed of [undefined, null, [], [7], 'broken', 12, true]) assert.deepEqual(structuredClone(h.history.creationDay(malformed)), {});
 });
 test('website history reads normalize invalid totals without rewriting saved domain records', async () => {
@@ -585,6 +585,6 @@ test('calendar retention handles month ends, leap days and daylight saving trans
     const h = harness({}, MAX_BYTES, now.getTime());
     assert.equal(h.history.retained(first), true);
     const older = new Date(first + 'T12:00:00'); older.setDate(older.getDate() - 1);
-    assert.equal(h.history.retained(C3.localDate(older)), false);
+    assert.equal(h.history.retained(Core.localDate(older)), false);
   }
 });

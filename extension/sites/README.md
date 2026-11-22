@@ -22,7 +22,7 @@ file without registering it does not ship or activate it.
 ## Plugin interface
 
 A module publishes the same object through `module.exports` in Node and
-`globalThis.C3_SITE_MODULES[id]` in the browser. Copy the small publication pattern
+`globalThis.SITE_MODULES[id]` in the browser. Copy the small publication pattern
 from `x.js` or `linkedin.js`; no browser objects are touched until `create(...)`.
 The exported object is:
 

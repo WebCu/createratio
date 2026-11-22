@@ -251,7 +251,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       await noOverflow(page);
     });
     await journey('narrow history exposes readable values instead of shrinking the chart', async () => {
-      await evaluate(browser, browser.worker, 'chrome.storage.local.set({ [C3.localDate()]: { x: { createSec: 2880, consumeSec: 1920, posts: 2 } } })');
+      await evaluate(browser, browser.worker, 'chrome.storage.local.set({ [Core.localDate()]: { x: { createSec: 2880, consumeSec: 1920, posts: 2 } } })');
       const page = await pageAt('/dashboard.html', 320);
       await eventually(() => inspect(page, 'document.querySelectorAll("#chart-table tbody tr").length === 7'), 'history populated');
       const table = await inspect(page, '(() => { const table = document.querySelector("#chart-table"), rect = table.parentElement.getBoundingClientRect(); return { width: rect.width, height: rect.height, sizes: [...table.querySelectorAll("th, td")].map(element => parseFloat(getComputedStyle(element).fontSize)), last: [...table.querySelector("tbody").lastElementChild.children].map(element => element.textContent) }; })()');
