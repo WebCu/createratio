@@ -6,7 +6,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const script = path.resolve(__dirname, '../release.js');
-const files = ['package.json', 'extension/package.json', 'extension/src/manifest.json'];
+const versionFiles = ['package.json', 'extension/package.json', 'extension/src/manifest.json'];
 
 function repository(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-release-command-'));
@@ -47,7 +47,7 @@ cp.spawnSync = (program, args, options) => {
   git('remote', 'add', 'origin', 'https://github.com/WebCu/createratio.git');
   assert.equal(git('remote', 'get-url', '--push', 'origin'), `file://${remote}`);
   fs.mkdirSync(path.join(checkout, 'extension/src'), { recursive: true });
-  for (const file of files) fs.writeFileSync(path.join(checkout, file), '{\n  "version": "0.0.1",\n  "description": "keep formatting"\n}\n');
+  for (const file of versionFiles) fs.writeFileSync(path.join(checkout, file), '{\n  "version": "0.0.1",\n  "description": "keep formatting"\n}\n');
   git('add', '.');
   git('commit', '-m', 'Initial fixture');
   git('push', '--set-upstream', 'origin', 'main');
@@ -73,4 +73,4 @@ if (args[0] === 'release' && args[1] === 'create') {
   };
 }
 
-module.exports = { files, repository };
+module.exports = { versionFiles, repository };

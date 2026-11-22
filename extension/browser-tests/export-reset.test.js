@@ -4,7 +4,12 @@ const assert = require('node:assert/strict');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 
-for (const [pageName, kind] of [['dashboard', 'websites'], ['settings', 'ratio']]) {
+const csvExportCases = [
+  { pageName: 'dashboard', kind: 'websites', selector: '#website-export', view: '#websites-view', cleared: { selector: '#website-total', text: '0s' } },
+  { pageName: 'settings', kind: 'ratio', selector: '#export-ratio' }
+];
+
+for (const { pageName, kind, selector, view, cleared } of csvExportCases) {
   test(`${pageName} ${kind} CSV cannot download a pre-reset history reply`, async () => {
     const { launch, evaluate, eventually, click, openSettingsSection, withFailureArtifacts } = await import('./chromium.mjs');
     const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
@@ -20,8 +25,7 @@ for (const [pageName, kind] of [['dashboard', 'websites'], ['settings', 'ratio']
         const page = await browser.page(browser.origin + '/' + pageName + '.html');
         const settings = pageName === 'settings' ? page : await browser.page(browser.origin + '/settings.html');
         await openSettingsSection(browser, settings, 'data');
-        const selector = pageName === 'settings' ? '#export-' + kind : kind === 'ratio' ? '#export' : '#website-export';
-        if (pageName === 'dashboard' && kind === 'websites') await click(browser, page, '#websites-view');
+        if (view) await click(browser, page, view);
         await eventually(() => inspect(page, `!document.querySelector('${selector}').disabled`), 'CSV export ready');
         await inspect(page, `(() => {
           const send = chrome.runtime.sendMessage.bind(chrome.runtime);
@@ -47,11 +51,7 @@ for (const [pageName, kind] of [['dashboard', 'websites'], ['settings', 'ratio']
           await clearing;
         } finally { removeDialog(); }
         await eventually(() => inspect(settings, 'document.querySelector("#save-status").textContent.startsWith("History cleared and creation score reset.")'), 'history cleared');
-        if (pageName === 'dashboard') {
-          const total = kind === 'ratio' ? '#create-min' : '#website-total';
-          const empty = kind === 'ratio' ? '0.0m' : '0s';
-          await eventually(() => inspect(page, `document.querySelector('${total}').textContent === '${empty}'`), 'dashboard renders cleared history');
-        }
+        if (cleared) await eventually(() => inspect(page, `document.querySelector('${cleared.selector}').textContent === '${cleared.text}'`), 'dashboard renders cleared history');
         await inspect(page, 'releaseExportHistory()');
         await eventually(() => inspect(page, 'document.querySelector("#error").textContent === "History changed while loading. Please try again."'), 'stale CSV rejected');
         assert.equal(downloads.length, 0);

@@ -318,6 +318,8 @@ CR_PROPERTY_SEED=42 CR_PROPERTY_CASE=0 CR_PROPERTY_ADAPTER=chrome \
 local/CI defaults deterministic. The daily `explore-properties.yml` workflow runs
 ten fresh random seeds at the maximum case and step bounds; it does not gate pull
 requests. Each run prints its seed, and failures print the exact replay command.
+GitHub emails scheduled-workflow failures only to the last person who edited the
+cron schedule.
 Record a discovered regression as a focused
 example before changing the generator. These are seeded model-based properties,
 not automatic shrinking: the failure prefix is replayable but not guaranteed

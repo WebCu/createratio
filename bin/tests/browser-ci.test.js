@@ -24,8 +24,7 @@ for (const name of ['browser-smoke-core', 'browser-journeys']) {
     assert.equal(source.match(pnpm)?.[1], build.match(pnpm)?.[1]);
     assert.match(source, /run: pnpm install --frozen-lockfile/);
     assert.match(source, /https:\/\/storage\.googleapis\.com\/chrome-for-testing-public\/155\.0\.8059\.79\/linux64\/chrome-linux64\.zip/);
-    assert.match(source, /[a-f0-9]{64}  .*chrome\.zip/);
-    assert.match(source, /sha256sum --check/);
+    assert.match(source, /[a-f0-9]{64} {2}.*\$RUNNER_TEMP\/chrome\.zip.*\| sha256sum --check/);
     assert.ok(source.indexOf('sha256sum --check') < source.indexOf('unzip -q'));
     assert.match(source, /CHROMIUM_PATH=.*chrome-linux64\/chrome/);
     assert.doesNotMatch(source, /\|\| true/);

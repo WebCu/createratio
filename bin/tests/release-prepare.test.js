@@ -3,18 +3,18 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { files, repository } = require('./release-fixture.js');
+const { versionFiles, repository } = require('./release-fixture.js');
 
 test('prepare patch bumps all three version fields and opens a checked release PR', t => {
   const repo = repository(t);
   const result = repo.run(['prepare', 'patch']);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(repo.git('branch', '--show-current'), 'release/v0.0.2');
-  for (const file of files) {
+  for (const file of versionFiles) {
     assert.equal(JSON.parse(fs.readFileSync(path.join(repo.checkout, file), 'utf8')).version, '0.0.2');
     assert.equal(fs.readFileSync(path.join(repo.checkout, file), 'utf8'), '{\n  "version": "0.0.2",\n  "description": "keep formatting"\n}\n');
   }
-  assert.deepEqual(repo.git('diff', '--name-only', 'main...HEAD').split('\n').sort(), files.slice().sort());
+  assert.deepEqual(repo.git('diff', '--name-only', 'main...HEAD').split('\n').sort(), versionFiles.slice().sort());
   assert.equal(repo.git('status', '--porcelain'), '');
   assert.equal(repo.git('--git-dir', repo.remote, 'rev-parse', 'refs/heads/release/v0.0.2'), repo.git('rev-parse', 'HEAD'));
   const calls = repo.calls();
@@ -63,7 +63,7 @@ test('minor and major preparation keep the shared version synchronized', t => {
     const repo = repository(t);
     const result = repo.run(['prepare', increment]);
     assert.equal(result.status, 0, result.stderr);
-    for (const file of files) assert.equal(JSON.parse(fs.readFileSync(path.join(repo.checkout, file))).version, expected);
+    for (const file of versionFiles) assert.equal(JSON.parse(fs.readFileSync(path.join(repo.checkout, file))).version, expected);
   }
 });
 
@@ -94,7 +94,7 @@ test('version limits and ambiguous version fields fail before branch creation', 
     '{"version":"0.0.1","nested":{"version":"0.0.1"}}\n'
   ]) {
     const repo = repository(t);
-    for (const file of files) fs.writeFileSync(path.join(repo.checkout, file), contents);
+    for (const file of versionFiles) fs.writeFileSync(path.join(repo.checkout, file), contents);
     repo.git('add', '.'); repo.git('commit', '-m', 'Version constraint fixture'); repo.git('push', 'origin', 'main');
     const result = repo.run(['prepare', 'patch']);
     assert.notEqual(result.status, 0);

@@ -1,9 +1,11 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 const { worker, gate, intent, popupSender } = require('./background-harness.js');
-const { configuration, random, caseSeed, replayCommand, runCases } = require('./property-harness.js');
+const { maximumBounds, configuration, random, caseSeed, replayCommand, runCases } = require('./property-harness.js');
 
 const config = configuration();
 const start = new Date(2026, 9, 11, 12).getTime();
@@ -216,6 +218,9 @@ test('seeded commands and failure reports are reproducible', async () => {
   assert.equal(await failure(), await failure());
   assert.ok((await failure()).includes(replayCommand(replayConfig, 'chrome', 'access', 1)));
   assert.ok((await failure()).includes(`Sequence: [${JSON.stringify(command)}]`));
+  const exploration = readFileSync(path.resolve(__dirname, '../../../.github/workflows/explore-properties.yml'), 'utf8');
+  assert.match(exploration, new RegExp(`CR_PROPERTY_CASES: '${maximumBounds.cases}'\\n`));
+  assert.match(exploration, new RegExp(`CR_PROPERTY_STEPS: '${maximumBounds.steps}'\\n`));
 });
 
 for (const adapter of ['chrome', 'browser']) {
