@@ -20,13 +20,13 @@ const SiteAccess = (() => {
   function siteForURL(raw) { return Sites.forAccessURL(raw)?.id || null; }
   function gateURL(site) { return api.runtime.getURL('blocked.html') + '?site=' + site; }
   function ruleIds(site) { return SITES[site].ruleIds; }
-  function waitDurationMs(entry) { return Number.isFinite(entry.waitMs) && Core.validAccessMinutes(Core.minutesFromMillis(entry.waitMs)) ? entry.waitMs : Core.millisFromMinutes(1); }
+  function waitDurationMs(entry) { return Number.isFinite(entry.waitMs) && Core.validAccessMinutes(Core.minutesFromMillis(Core.millisFromNumber(entry.waitMs))) ? Core.millisFromNumber(entry.waitMs) : Core.millisFromMinutes(Core.ACCESS_LIMITS.minMinutes); }
   function status(site, entry = {}, now = Date.now(), minutes = Core.DEFAULT_SETTINGS.accessMinutes, enabled = true, goalAllowed = false, waitMinutes = Core.DEFAULT_SETTINGS.waitMinutes) {
     if (!Object.hasOwn(SITES, site)) throw new Error('Unsupported site');
     const remainingMs = Core.millisFromNumber(Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0);
     const expiresAt = remainingMs && entry.expiresAt > now ? entry.expiresAt : 0;
     const readyAt = !remainingMs && validWait(entry, now) ? entry.readyAt : 0;
-    const waitSeconds = readyAt ? Core.secondsFromMillis(waitDurationMs(entry)) : Core.secondsFromMillis(Core.millisFromMinutes(waitMinutes));
+    const waitSeconds = readyAt ? Core.secondsFromMillis(waitDurationMs(entry)) : Core.secondsFromMinutes(waitMinutes);
     return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, refilledAt: entry.refilledAt || 0, waitSeconds, sessionMinutes: minutes };
   }
   function validWait(entry, now) {

@@ -44,7 +44,7 @@ function renderAccess(access) {
     const { status, pending, button } = control;
     control.row.setAttribute('data-state', state.enabled === false ? 'off' : state.goalAllowed || state.remainingMs > 0 ? 'open' : 'blocked');
     const open = state.remainingMs > 0;
-    const left = state.expiresAt ? Math.max(0, state.expiresAt - Date.now()) : state.remainingMs;
+    const left = state.expiresAt ? Core.millisFromNumber(Math.max(0, state.expiresAt - Date.now())) : state.remainingMs;
     const seconds = Math.ceil(Core.secondsFromMillis(left));
     pending.hidden = state.enabled === false || !state.goalAllowed || !state.readyAt;
     status.textContent = state.enabled === false ? 'Limit & track off' : state.goalAllowed ? 'Open · above daily goal' : open ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} left${state.expiresAt ? '' : ' · paused'}` : state.readyAt ? 'Access requested' : 'Blocked';

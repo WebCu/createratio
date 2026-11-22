@@ -5,12 +5,14 @@ const C = require('../core.js');
 
 test('duration converters preserve arithmetic without rounding or validation', () => {
   for (const value of [0, 1, 1.25, -1, NaN, Infinity, -Infinity]) {
-    assert.equal(C.millisFromMinutes(value), value * 60000);
-    assert.equal(C.millisFromSeconds(value), value * 1000);
-    assert.equal(C.secondsFromMillis(value), value / 1000);
-    assert.equal(C.minutesFromMillis(value), value / 60000);
+    assert.equal(C.millisFromMinutes(C.minutesFromNumber(value)), value * 60000);
+    assert.equal(C.millisFromSeconds(C.secondsFromNumber(value)), value * 1000);
+    assert.equal(C.secondsFromMillis(C.millisFromNumber(value)), value / 1000);
+    assert.equal(C.minutesFromMillis(C.millisFromNumber(value)), value / 60000);
+    assert.equal(C.secondsFromMinutes(C.minutesFromNumber(value)), value * 60);
     assert.equal(C.millisFromNumber(value), value);
     assert.equal(C.secondsFromNumber(value), value);
+    assert.equal(C.minutesFromNumber(value), value);
   }
 });
 
