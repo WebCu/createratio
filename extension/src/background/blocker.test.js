@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const C = require('../../core/core.js');
-const C3Sites = require('../../sites/index.js');
+const Sites = require('../../sites/index.js');
 const MessageContracts = require('./message-contracts.js');
 const { worker, gate, intent, popupSender, rulesFor } = require('../tests/background-harness.js');
 const now = new Date(2026, 9, 11, 12).getTime();
@@ -57,7 +57,7 @@ function blocker(data = {}, browser = 'chrome', core = C) {
       async update(id, changes) { call('tabs.update', { id, changes }); Object.assign(tabs.find(tab => tab.id === id), changes); }
     }
   };
-  const context = vm.createContext({ [browser]: api, C3: core, C3Sites, MessageContracts, URL, Date: Clock });
+  const context = vm.createContext({ [browser]: api, Core: core, Sites, MessageContracts, URL, Date: Clock });
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'blocker.js'), 'utf8') + '\n globalThis.access = SiteAccess;', context);
   return {
     ...context.access, data, calls, alarms, tabs,

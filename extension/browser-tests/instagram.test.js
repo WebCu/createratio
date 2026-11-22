@@ -29,7 +29,7 @@ test('built Instagram counts a rich-text Reel caption Share once in saved histor
           <button>Next</button>
           <div role="button" tabindex="0"><span>Share</span></div>
         </div>`)};`);
-      const totals = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(C3.localDate()).then(data => data[C3.localDate()]?.instagram || {})');
+      const totals = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(Core.localDate()).then(data => data[Core.localDate()]?.instagram || {})');
       await clickByRole(browser, page, 'textbox', 'Write a caption...');
       await browser.cdp.send('Input.insertText', { text: 'Synthetic Reel caption; never published.' }, page.session);
       assert.equal((await totals()).posts || 0, 0, 'writing a caption is not a submission');

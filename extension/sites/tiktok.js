@@ -1,7 +1,7 @@
 (function (root, factory) {
   const plugin = factory();
   if (typeof module === 'object' && module.exports) module.exports = plugin;
-  else (root.C3_SITE_MODULES ||= {}).tiktok = plugin;
+  else (root.SITE_MODULES ||= {}).tiktok = plugin;
 })(globalThis, function () {
   'use strict';
   const hosts = ['tiktok.com', 'www.tiktok.com'];
@@ -42,6 +42,7 @@
     if (path === '/messages') return { kind: 'messages' };
     return null;
   }
+  /** @param {{ url?: string, tiktokEditorFocused?: boolean, ownProfilePath?: string | null }} [page] */
   function classifyPage({ url, tiktokEditorFocused = false, ownProfilePath = null } = {}) {
     const route = page(url);
     if (!route) return 'neutral';

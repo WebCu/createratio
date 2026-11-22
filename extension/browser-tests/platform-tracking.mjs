@@ -8,7 +8,7 @@ export async function platformJourney(platform) {
     try {
       await withFailureArtifacts(browser, `${platform.id} tracking and scroll resistance`, async () => {
         const id = JSON.stringify(platform.id);
-        const metadata = await evaluate(browser, browser.worker, `C3.SITES.find(site => site.id === ${id})`);
+        const metadata = await evaluate(browser, browser.worker, `Core.SITES.find(site => site.id === ${id})`);
         assert.ok(metadata, `${platform.name} must be registered in the built catalog`);
         assert.equal(metadata.defaultEnabled, true);
         const gated = platform.gated ?? true;
@@ -19,7 +19,7 @@ export async function platformJourney(platform) {
           chrome.runtime.onMessage.addListener((message, sender) => {
             if (message.type === 'snapshot' && sender.url?.startsWith(${JSON.stringify(new URL(platform.url).origin + '/')})) platformSnapshots++;
           });`);
-        const totals = () => evaluate(browser, browser.worker, `chrome.storage.local.get(C3.localDate()).then(data => data[C3.localDate()]?.[${id}] || {})`);
+        const totals = () => evaluate(browser, browser.worker, `chrome.storage.local.get(Core.localDate()).then(data => data[Core.localDate()]?.[${id}] || {})`);
         const scrolling = scrollFixture(browser);
         const settings = await browser.page(browser.origin + '/settings.html');
         const toggle = '#track-' + platform.id;

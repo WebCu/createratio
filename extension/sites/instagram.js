@@ -1,7 +1,7 @@
 (function (root, factory) {
   const plugin = factory();
   if (typeof module === 'object' && module.exports) module.exports = plugin;
-  else (root.C3_SITE_MODULES ||= {}).instagram = plugin;
+  else (root.SITE_MODULES ||= {}).instagram = plugin;
 })(globalThis, function () {
   'use strict';
   const hosts = ['instagram.com', 'www.instagram.com'];
@@ -46,6 +46,7 @@
     if (profile && !reserved.test(profile[1])) return { kind: 'profile', profile: '/' + profile[1] };
     return null;
   }
+  /** @param {{ url?: string, instagramEditorFocused?: boolean, ownProfilePath?: string | null }} [page] */
   function classifyPage({ url, instagramEditorFocused = false, ownProfilePath = null } = {}) {
     const route = page(url);
     if (!route) return 'neutral';

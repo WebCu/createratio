@@ -1,9 +1,9 @@
 (function (root, factory) {
   const commonJS = typeof module === 'object' && module.exports;
-  const api = factory(commonJS ? require('../../../core/core.js') : root.C3, commonJS ? require('./report.js') : root.CreationReport);
+  const api = factory(commonJS ? require('../../../core/core.js') : root.Core, commonJS ? require('./report.js') : root.CreationReport);
   if (commonJS) module.exports = api;
   else root.SocialCard = api;
-})(globalThis, function (C3, report) {
+})(globalThis, function (Core, report) {
   'use strict';
   const URL = 'https://createratio.com/';
   function time(seconds) { return seconds > 0 && seconds < 60 ? `${Math.round(seconds)}s` : `${(seconds / 60).toFixed(1).replace(/\.0$/, '')}m`; }
@@ -11,8 +11,8 @@
     const { first, last, total } = report.summarize(days, range, now);
     const contributions = total.posts + total.replies + total.comments;
     const headline = total.createSec > 0 || contributions > 0 ? ['Made room', 'for creating.']
-      : C3.FIELDS.some(key => total[key] > 0) ? ['Make room', 'for creating.'] : ['A fresh start.', 'Room to create.'];
-    const creating = time(total.createSec), consuming = time(total.consumeSec), score = C3.score(total).toFixed(2);
+      : Core.FIELDS.some(key => total[key] > 0) ? ['Make room', 'for creating.'] : ['A fresh start.', 'Room to create.'];
+    const creating = time(total.createSec), consuming = time(total.consumeSec), score = Core.score(total).toFixed(2);
     const label = range === 'today' ? 'Today so far' : 'Last 7 days';
     const period = first === last ? last : `${first} – ${last}`;
     const caption = `${headline.join(' ')}\n\n${label}: ${creating} creating · ${consuming} consuming · ${contributions} detected post/reply/comment actions.\nCreation score: ${score} (approximate; includes action credits). Tracked sites only.\n\nCreate > Consume. Free and open source: ${URL}`;

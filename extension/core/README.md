@@ -1,6 +1,6 @@
 # Shared core
 
-`core.js` is dependency-free and has no DOM, browser-storage, or network access. It exports CommonJS in Node and exposes `globalThis.C3` in browser bundles.
+`core.js` is dependency-free and has no DOM, browser-storage, or network access. It exports CommonJS in Node and exposes `globalThis.Core` in browser bundles.
 
 ```js
 const core = require('./extension/core/core.js');

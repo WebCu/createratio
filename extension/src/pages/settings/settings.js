@@ -1,10 +1,13 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
-const $ = id => document.getElementById(id);
-const accessSites = new Set(C3.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
-let currentSettings = C3.DEFAULT_SETTINGS, refreshing = false, refreshPending = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
-let scrollEditing = false, scrollPending = null, scrollSaving = null;
+/** @type {(id: string) => HTMLInputElement} */
+const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
+const accessSites = new Set(Core.SITES.filter(site => site.gated).map(site => site.id)), siteControls = new Map();
+let currentSettings = Core.DEFAULT_SETTINGS, refreshing = false, refreshPending = false, websiteSettingBusy = false, goalSettingBusy = false, intentionSettingBusy = false, scrollSettingBusy = false, websiteTimeEnabled = false;
+let scrollEditing = false;
+/** @type {{ enabled: boolean, strength: number } | null} */
+let scrollPending = null, scrollSaving = null;
 let saveDismissTimer = null, saveCleanupTimer = null;
 let historyVersion = 0;
 function clearSaved() {
@@ -49,7 +52,7 @@ function createAccessField(site) {
   const editor = document.createElement('form'); editor.className = 'custom-duration'; editor.id = 'custom-duration-' + suffix; editor.hidden = true;
   const customLabel = document.createElement('label'); customLabel.textContent = 'Custom time'; customLabel.htmlFor = 'customMinutes-' + suffix;
   const custom = document.createElement('input'); custom.type = 'number'; custom.id = customLabel.htmlFor; custom.required = true;
-  custom.min = String(C3.ACCESS_LIMITS.minMinutes); custom.max = String(C3.ACCESS_LIMITS.maxMinutes); custom.step = '1';
+  custom.min = String(Core.ACCESS_LIMITS.minMinutes); custom.max = String(Core.ACCESS_LIMITS.maxMinutes); custom.step = '1';
   custom.setAttribute('aria-label', 'Custom session time for ' + site.name); custom.setAttribute('aria-describedby', 'site-time-note');
   const unit = document.createElement('span'); unit.textContent = 'min';
   const apply = document.createElement('button'); apply.type = 'submit'; apply.textContent = 'Save'; apply.id = 'custom-save-' + suffix;
@@ -88,7 +91,7 @@ function createWaitField(site) {
   const editor = document.createElement('form'); editor.className = 'custom-duration custom-wait-duration'; editor.id = 'custom-wait-duration-' + suffix; editor.hidden = true;
   const customLabel = document.createElement('label'); customLabel.textContent = 'Custom time'; customLabel.htmlFor = 'customWaitMinutes-' + suffix;
   const custom = document.createElement('input'); custom.type = 'number'; custom.id = customLabel.htmlFor; custom.required = true;
-  custom.min = String(C3.ACCESS_LIMITS.minMinutes); custom.max = String(C3.ACCESS_LIMITS.maxMinutes); custom.step = '1';
+  custom.min = String(Core.ACCESS_LIMITS.minMinutes); custom.max = String(Core.ACCESS_LIMITS.maxMinutes); custom.step = '1';
   custom.setAttribute('aria-label', 'Custom intention wait for ' + site.name); custom.setAttribute('aria-describedby', 'site-time-note');
   const unit = document.createElement('span'); unit.textContent = 'min';
   const apply = document.createElement('button'); apply.type = 'submit'; apply.textContent = 'Save'; apply.id = 'custom-wait-save-' + suffix;
@@ -128,13 +131,13 @@ function createSite(site) {
 }
 function renderSite(control, settings, force) {
   const { site, access } = control;
-  const effective = C3.siteSettings(site.id, settings), overridden = Object.hasOwn(settings.siteOverrides?.[site.id] || {}, 'accessMinutes');
-  const enabled = !site.id || C3.trackingEnabled(site.id, settings);
+  const effective = Core.siteSettings(site.id, settings), overridden = Object.hasOwn(settings.siteOverrides?.[site.id] || {}, 'accessMinutes');
+  const enabled = !site.id || Core.trackingEnabled(site.id, settings);
   const inactive = !!site.id && !enabled, switching = control.busy.has('tracking');
   control.row.setAttribute('aria-busy', String(control.busy.size > 0));
   control.row.setAttribute('data-enabled', String(enabled));
   if (access) {
-    if (access.defaultOption) access.defaultOption.textContent = 'Default · ' + C3.siteSettings('', settings).accessMinutes + ' min';
+    if (access.defaultOption) access.defaultOption.textContent = 'Default · ' + Core.siteSettings('', settings).accessMinutes + ' min';
     access.savedOption.value = String(effective.accessMinutes); access.savedOption.textContent = effective.accessMinutes + ' min';
     access.savedOption.hidden = durationPresets.includes(effective.accessMinutes);
     if (inactive) access.editing = false;
@@ -147,7 +150,7 @@ function renderSite(control, settings, force) {
   }
   const wait = control.wait, waitOverridden = Object.hasOwn(settings.siteOverrides?.[site.id] || {}, 'waitMinutes');
   if (wait) {
-    if (wait.defaultOption) wait.defaultOption.textContent = 'Default · ' + C3.siteSettings('', settings).waitMinutes + ' min';
+    if (wait.defaultOption) wait.defaultOption.textContent = 'Default · ' + Core.siteSettings('', settings).waitMinutes + ' min';
     wait.savedOption.value = String(effective.waitMinutes); wait.savedOption.textContent = effective.waitMinutes + ' min';
     wait.savedOption.hidden = [1, ...durationPresets].includes(effective.waitMinutes);
     if (inactive) wait.editing = false;
@@ -159,7 +162,7 @@ function renderSite(control, settings, force) {
     if (wait.reset) { wait.reset.hidden = !waitOverridden; wait.reset.disabled = wait.input.disabled; }
   }
   if (control.tracking) {
-    if (!switching) control.tracking.checked = C3.trackingEnabled(site.id, settings);
+    if (!switching) control.tracking.checked = Core.trackingEnabled(site.id, settings);
     control.tracking.disabled = switching; control.trackingStatus.textContent = control.tracking.checked ? 'On' : 'Off';
   }
 }
@@ -167,11 +170,11 @@ function renderScroll(settings) {
   const toggle = $('scroll-friction-enabled'), slider = $('scroll-friction-strength');
   if (!scrollSettingBusy && !scrollEditing) {
     toggle.checked = settings.scrollFrictionEnabled;
-    slider.value = settings.scrollFrictionStrength ?? C3.DEFAULT_SETTINGS.scrollFrictionStrength;
+    slider.value = settings.scrollFrictionStrength ?? Core.DEFAULT_SETTINGS.scrollFrictionStrength;
   }
   toggle.disabled = false; slider.disabled = !toggle.checked;
   const strength = Number(slider.value), distance = 100 - strength;
-  const { minStrength, maxStrength } = C3.SCROLL_FRICTION_LIMITS;
+  const { minStrength, maxStrength } = Core.SCROLL_FRICTION_LIMITS;
   slider.style.setProperty('--scroll-fill', `${(strength - minStrength) / (maxStrength - minStrength) * 100}%`);
   slider.setAttribute('aria-valuetext', `${strength}% resistance, ${distance}% of normal scroll distance`);
   $('scroll-resistance').setAttribute('data-enabled', String(toggle.checked));
@@ -182,9 +185,9 @@ function render(settings, force = '') {
   currentSettings = settings;
   if (!siteControls.size) {
     $('default-settings').replaceChildren(); $('site-settings').replaceChildren(); $('tracking-only-settings').replaceChildren();
-    $('tracking-only-section').hidden = !C3.SITES.some(site => !site.gated);
+    $('tracking-only-section').hidden = !Core.SITES.some(site => !site.gated);
   }
-  for (const site of [{ id: '', name: 'Default' }, ...C3.SITES]) {
+  for (const site of [{ id: '', name: 'Default' }, ...Core.SITES]) {
     let control = siteControls.get(site.id);
     if (!control) { control = createSite(site); siteControls.set(site.id, control); }
     renderSite(control, settings, force);
@@ -192,7 +195,7 @@ function render(settings, force = '') {
   renderScroll(settings);
   if (!goalSettingBusy) $('allow-above-goal').checked = settings.allowAboveGoal;
   $('allow-above-goal').disabled = goalSettingBusy;
-  if (!intentionSettingBusy) $('intention-history-enabled').checked = settings.intentionHistoryEnabled;
+  if (!intentionSettingBusy) $('intention-history-enabled').checked = settings.intentionHistoryEnabled === true;
   $('intention-history-enabled').disabled = intentionSettingBusy;
   if (!websiteSettingBusy) $('website-time-enabled').checked = websiteTimeEnabled;
   $('website-time-enabled').disabled = websiteSettingBusy;
@@ -213,12 +216,12 @@ async function saveAccessDuration(site, reset = false, custom = false) {
   const control = siteControls.get(site), access = control.access, input = access.input;
   if (control.busy.has('access') || input.disabled) return;
   if (!reset && !custom && input.value === 'custom') {
-    access.editing = true; access.custom.value = C3.siteSettings(site, currentSettings).accessMinutes;
+    access.editing = true; access.custom.value = Core.siteSettings(site, currentSettings).accessMinutes;
     clearSaved(); error(); renderSite(control, currentSettings); access.custom.focus(); return;
   }
   const field = custom ? access.custom : input;
   const minutes = reset || !custom && site && input.value === 'default' ? null : Number(field.value);
-  if (minutes !== null && (!field.reportValidity() || !C3.validAccessMinutes(minutes))) { error(`Choose a whole number from ${C3.ACCESS_LIMITS.minMinutes} to ${C3.ACCESS_LIMITS.maxMinutes} minutes.`); return; }
+  if (minutes !== null && (!field.reportValidity() || !Core.validAccessMinutes(minutes))) { error(`Choose a whole number from ${Core.ACCESS_LIMITS.minMinutes} to ${Core.ACCESS_LIMITS.maxMinutes} minutes.`); return; }
   if (await saveSitePreference(control, 'access', { type: 'access-duration', minutes, ...(site ? { site } : {}) })) {
     if (access.editing) { access.editing = false; renderSite(control, currentSettings, site + ':access'); input.focus(); }
   }
@@ -227,12 +230,12 @@ async function saveWaitDuration(site, reset = false, custom = false) {
   const control = siteControls.get(site), access = control.wait, input = access.input;
   if (control.busy.has('wait') || input.disabled) return;
   if (!reset && !custom && input.value === 'custom') {
-    access.editing = true; access.custom.value = C3.siteSettings(site, currentSettings).waitMinutes;
+    access.editing = true; access.custom.value = Core.siteSettings(site, currentSettings).waitMinutes;
     clearSaved(); error(); renderSite(control, currentSettings); access.custom.focus(); return;
   }
   const field = custom ? access.custom : input;
   const minutes = reset || !custom && site && input.value === 'default' ? null : Number(field.value);
-  if (minutes !== null && (!field.reportValidity() || !C3.validAccessMinutes(minutes))) { error(`Choose a whole number from ${C3.ACCESS_LIMITS.minMinutes} to ${C3.ACCESS_LIMITS.maxMinutes} minutes.`); return; }
+  if (minutes !== null && (!field.reportValidity() || !Core.validAccessMinutes(minutes))) { error(`Choose a whole number from ${Core.ACCESS_LIMITS.minMinutes} to ${Core.ACCESS_LIMITS.maxMinutes} minutes.`); return; }
   if (await saveSitePreference(control, 'wait', { type: 'access-duration', preference: 'waitMinutes', minutes, ...(site ? { site } : {}) })) {
     if (access.editing) { access.editing = false; renderSite(control, currentSettings, site + ':wait'); input.focus(); }
   }
@@ -242,6 +245,7 @@ async function saveTracking(site) {
   if (control.busy.has('tracking')) return;
   await saveSitePreference(control, 'tracking', { type: 'tracking', site, enabled: control.tracking.checked });
 }
+/** @param {PreferenceMessage} message */
 async function saveSitePreference(control, group, message) {
   const site = control.site.id, field = group === 'wait' ? control.wait : control.access, input = field?.input;
   control.busy.add(group); control.row.setAttribute('aria-busy', 'true');
@@ -254,12 +258,13 @@ async function saveSitePreference(control, group, message) {
   let success = false;
   try {
     const result = await messages.send(message, 'Unable to save settings.');
-    const snapshot = message.type === 'tracking' ? result : await messages.send({ type: 'snapshot' }, 'Unable to load your saved settings.');
+    const snapshot = message.type === 'tracking' && 'settings' in result ? result : await messages.send({ type: 'snapshot' }, 'Unable to load your saved settings.');
     render(snapshot.settings);
     if (group === 'tracking') {
+      const enabled = message.type === 'tracking' && message.enabled;
       const description = accessSites.has(site)
-        ? message.enabled ? 'Limit & track is on.' : 'Limit & track is off.'
-        : message.enabled ? 'Creating/consuming and action measurements are on.' : 'Creation-score tracking is off.';
+        ? enabled ? 'Limit & track is on.' : 'Limit & track is off.'
+        : enabled ? 'Creating/consuming and action measurements are on.' : 'Creation-score tracking is off.';
       saved(`${control.site.name}: ${description} Your history is kept.`);
     } else saved(group === 'wait' ? `${control.site.name} intention wait saved for new requests.` : `${control.site.name} session time saved for new sessions and midnight refills.`);
     if (group === 'tracking') await notifyTrackers();
@@ -272,7 +277,7 @@ async function saveScrollSettings() {
   const choice = { enabled: $('scroll-friction-enabled').checked, strength: Number($('scroll-friction-strength').value) };
   scrollEditing = false;
   clearSaved();
-  if (!C3.validScrollFrictionStrength(choice.strength)) { error('Choose a valid scroll resistance.'); renderScroll(currentSettings); return; }
+  if (!Core.validScrollFrictionStrength(choice.strength)) { error('Choose a valid scroll resistance.'); renderScroll(currentSettings); return; }
   scrollPending = scrollSaving?.enabled === choice.enabled && scrollSaving?.strength === choice.strength ? null : choice;
   if (scrollSettingBusy) { renderScroll(currentSettings); return; }
   scrollSettingBusy = true; renderScroll(currentSettings);
@@ -291,9 +296,9 @@ async function saveScrollSettings() {
   } finally { scrollSettingBusy = false; scrollSaving = null; renderScroll(currentSettings); }
 }
 const scrollSlider = $('scroll-friction-strength');
-scrollSlider.min = C3.SCROLL_FRICTION_LIMITS.minStrength;
-scrollSlider.max = C3.SCROLL_FRICTION_LIMITS.maxStrength;
-scrollSlider.step = C3.SCROLL_FRICTION_LIMITS.step;
+scrollSlider.min = String(Core.SCROLL_FRICTION_LIMITS.minStrength);
+scrollSlider.max = String(Core.SCROLL_FRICTION_LIMITS.maxStrength);
+scrollSlider.step = String(Core.SCROLL_FRICTION_LIMITS.step);
 scrollSlider.addEventListener('input', () => { scrollEditing = true; renderScroll(currentSettings); });
 scrollSlider.addEventListener('change', saveScrollSettings);
 scrollSlider.addEventListener('blur', () => { scrollEditing = false; renderScroll(currentSettings); });
@@ -338,16 +343,17 @@ $('intention-history-enabled').addEventListener('change', async () => {
   } catch (e) { error(e.message); }
   finally { intentionSettingBusy = false; void refresh(); }
 });
+/** @param {HistoryKind} kind */
 async function exportHistory(kind, button) {
   const version = historyVersion;
   button.disabled = true;
   try {
     const result = await messages.send({ type: 'history', kind, range: 'month' }, 'Unable to export history.');
     if (version !== historyVersion) throw new Error('History changed while loading. Please try again.');
-    const csv = kind === 'ratio' ? C3.csv(result.days) : WebTime.csv(result.days);
+    const csv = kind === 'ratio' ? Core.csv(result.days) : WebTime.csv(result.days);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
-    link.download = `CreateRatio${kind === 'websites' ? '-websites' : ''}-${C3.localDate()}.csv`;
+    link.download = `CreateRatio${kind === 'websites' ? '-websites' : ''}-${Core.localDate()}.csv`;
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000); saved('History exported.');
   } catch (e) { error(e.message); } finally { button.disabled = false; }

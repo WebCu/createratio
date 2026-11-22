@@ -346,13 +346,13 @@ test('malformed saved tracking selections recover to Off without changing missin
 test('default activation follows module declarations without treating familiar IDs specially', () => {
   const vm = require('node:vm'), fs = require('node:fs');
   const sites = [{ id: 'x', defaultEnabled: false }, { id: 'linkedin', defaultEnabled: false }, { id: 'example', defaultEnabled: true }, { id: 'reading' }];
-  const context = vm.createContext({ C3Sites: { sites } });
+  const context = vm.createContext({ Sites: { sites } });
   vm.runInContext(fs.readFileSync(require.resolve('../core.js'), 'utf8'), context);
-  assert.deepEqual(Array.from(context.C3.DEFAULT_SETTINGS.trackedSites), ['example']);
-  assert.equal(context.C3.trackingEnabled('x'), false);
-  assert.equal(context.C3.trackingEnabled('example'), true);
-  assert.equal(context.C3.trackingEnabled('reading'), false);
-  assert.equal(context.C3.trackingEnabled('x', { trackedSites: ['x'] }), true);
+  assert.deepEqual(Array.from(context.Core.DEFAULT_SETTINGS.trackedSites), ['example']);
+  assert.equal(context.Core.trackingEnabled('x'), false);
+  assert.equal(context.Core.trackingEnabled('example'), true);
+  assert.equal(context.Core.trackingEnabled('reading'), false);
+  assert.equal(context.Core.trackingEnabled('x', { trackedSites: ['x'] }), true);
 });
 
 test('saved site choices never gain newly available integrations', () => {
