@@ -1,11 +1,11 @@
 declare global {
   type LocalDate = string & { readonly __brand: 'LocalDate' };
-  type Millis = number & { readonly __brand: 'Millis' };
+  type Milliseconds = number & { readonly __brand: 'Milliseconds' };
   type Seconds = number & { readonly __brand: 'Seconds' };
   type Minutes = number & { readonly __brand: 'Minutes' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & { siteOverrides?: Record<string, Record<string, unknown>> };
   type StoredData = { settings?: StoredSettings; [key: string]: unknown };
-  type AccessStatus = { site: string; enabled: boolean; goalAllowed: boolean; name: string; home: string; remainingMs: Millis; expiresAt: number; readyAt: number; refilledAt: number; waitSeconds: Seconds; sessionMinutes: Minutes };
+  type AccessStatus = { site: string; enabled: boolean; goalAllowed: boolean; name: string; home: string; remainingMs: Milliseconds; expiresAt: number; readyAt: number; refilledAt: number; waitSeconds: Seconds; sessionMinutes: Minutes };
   type SiteAccessApi = {
     handle(message: RuntimeMessage, sender: chrome.runtime.MessageSender): Promise<unknown>;
     reconcile(closeAll?: boolean): Promise<Record<string, AccessStatus>>;

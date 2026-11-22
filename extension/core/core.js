@@ -6,7 +6,7 @@
   'use strict';
   const FIELDS = ['consumeSec', 'createSec', 'posts', 'replies', 'comments', 'likes', 'bookmarks', 'quotes', 'reposts'];
   const SITES = integrations.sites;
-  const ACCESS_LIMITS = { minMinutes: minutesFromNumber(1), maxMinutes: minutesFromNumber(240) };
+  const ACCESS_LIMITS = { minMinutes: asMinutes(1), maxMinutes: asMinutes(240) };
   const INTENTION_LIMITS = { minLength: 20, maxLength: 280 };
   const SCROLL_FRICTION_LIMITS = { minStrength: 50, maxStrength: 95, step: 5 };
   const DELIVERY_LIMITS = { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 };
@@ -14,26 +14,23 @@
   /** @returns {value is Minutes} */
   function validAccessMinutes(value) { return Number.isInteger(value) && value >= ACCESS_LIMITS.minMinutes && value <= ACCESS_LIMITS.maxMinutes; }
   /** @param {Minutes} minutes */
-  function millisFromMinutes(minutes) { return /** @type {Millis} */ (minutes * 60000); }
-  /** @param {Seconds} seconds */
-  function millisFromSeconds(seconds) { return /** @type {Millis} */ (seconds * 1000); }
-  /** @param {Millis} millis */
-  function secondsFromMillis(millis) { return /** @type {Seconds} */ (millis / 1000); }
-  /** @param {Millis} millis */
-  function minutesFromMillis(millis) { return /** @type {Minutes} */ (millis / 60000); }
+  function millisecondsFromMinutes(minutes) { return /** @type {Milliseconds} */ (minutes * 60000); }
+  /** @param {Milliseconds} milliseconds */
+  function secondsFromMilliseconds(milliseconds) { return /** @type {Seconds} */ (milliseconds / 1000); }
+  /** @param {Milliseconds} milliseconds */
+  function minutesFromMilliseconds(milliseconds) { return /** @type {Minutes} */ (milliseconds / 60000); }
   /** @param {Minutes} minutes */
   function secondsFromMinutes(minutes) { return /** @type {Seconds} */ (minutes * 60); }
-  /** @param {number} millis */
-  function millisFromNumber(millis) { return /** @type {Millis} */ (millis); }
-  /** @param {number} seconds */
-  function secondsFromNumber(seconds) { return /** @type {Seconds} */ (seconds); }
-  /** @param {number} minutes */
-  function minutesFromNumber(minutes) { return /** @type {Minutes} */ (minutes); }
+  /** @param {Seconds} seconds */
+  function minutesFromSeconds(seconds) { return /** @type {Minutes} */ (seconds / 60); }
+  function asMilliseconds(milliseconds) { return /** @type {Milliseconds} */ (milliseconds); }
+  function asSeconds(seconds) { return /** @type {Seconds} */ (seconds); }
+  function asMinutes(minutes) { return /** @type {Minutes} */ (minutes); }
   function validScrollFrictionStrength(value) { return Number.isInteger(value) && value >= SCROLL_FRICTION_LIMITS.minStrength && value <= SCROLL_FRICTION_LIMITS.maxStrength && value % SCROLL_FRICTION_LIMITS.step === 0; }
   /** @type {Record<AccessPreference, true>} */
   const ACCESS_PREFERENCES = { accessMinutes: true, waitMinutes: true };
   const ACCESS_PREFERENCE_KEYS = Object.keys(ACCESS_PREFERENCES);
-  const DEFAULT_SETTINGS = { accessMinutes: minutesFromNumber(5), waitMinutes: minutesFromNumber(5), dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, scrollFrictionEnabled: true, scrollFrictionStrength: 50, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
+  const DEFAULT_SETTINGS = { accessMinutes: asMinutes(5), waitMinutes: asMinutes(5), dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, scrollFrictionEnabled: true, scrollFrictionStrength: 50, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
   function isRecord(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function trackingSelection(settings) {
     const selected = isRecord(settings) ? settings.trackedSites : undefined;
@@ -123,7 +120,7 @@
   }
   function siteForURL(raw) { return integrations.forURL(raw)?.id || null; }
   function classifyPage(state) { return integrations.forURL(state.url)?.classifyPage(state) || 'neutral'; }
-  function activeMillis({ start, end, lastInput, visible, focused, mode }) {
+  function activeMilliseconds({ start, end, lastInput, visible, focused, mode }) {
     if (!visible || !focused || !['create', 'consume'].includes(mode) || end < start || end - start > 15000) return 0;
     return Math.max(0, Math.min(end, lastInput + 30000) - Math.max(start, lastInput));
   }
@@ -133,7 +130,7 @@
       const date = new Date(cursor);
       const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
       const end = Math.min(endMs, midnight);
-      parts.push({ date: localDate(date), sec: secondsFromMillis(millisFromNumber(end - cursor)) }); cursor = end;
+      parts.push({ date: localDate(date), sec: secondsFromMilliseconds(asMilliseconds(end - cursor)) }); cursor = end;
     }
     return parts;
   }
@@ -148,5 +145,5 @@
     }
     return rows.join('\r\n') + '\r\n';
   }
-  return { FIELDS, SITES, ACCESS_LIMITS, INTENTION_LIMITS, DELIVERY_LIMITS, SCROLL_FRICTION_LIMITS, validScrollFrictionStrength, validAccessMinutes, millisFromMinutes, millisFromSeconds, secondsFromMillis, minutesFromMillis, secondsFromMinutes, millisFromNumber, secondsFromNumber, minutesFromNumber, validIntention, DEFAULT_SETTINGS, settingsSnapshot, siteSettings, updatePreferences, trackingEnabled, recordedSites, emptyStats, statsSnapshot, aggregate, score, validDailyTarget, dailyTarget, scoreBand, scoreColor, badgeText, localDate, validLocalDate, recentDates, siteForURL, classifyPage, activeMillis, splitInterval, csv };
+  return { FIELDS, SITES, ACCESS_LIMITS, INTENTION_LIMITS, DELIVERY_LIMITS, SCROLL_FRICTION_LIMITS, validScrollFrictionStrength, validAccessMinutes, millisecondsFromMinutes, secondsFromMilliseconds, minutesFromMilliseconds, secondsFromMinutes, minutesFromSeconds, asMilliseconds, asSeconds, asMinutes, validIntention, DEFAULT_SETTINGS, settingsSnapshot, siteSettings, updatePreferences, trackingEnabled, recordedSites, emptyStats, statsSnapshot, aggregate, score, validDailyTarget, dailyTarget, scoreBand, scoreColor, badgeText, localDate, validLocalDate, recentDates, siteForURL, classifyPage, activeMilliseconds, splitInterval, csv };
 });

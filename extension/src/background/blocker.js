@@ -1,7 +1,7 @@
 'use strict';
 /** @type {SiteAccessApi} */
 const SiteAccess = (() => {
-  const MAX_BUDGET_MS = Core.millisFromMinutes(Core.ACCESS_LIMITS.maxMinutes);
+  const MAX_BUDGET_MS = Core.millisecondsFromMinutes(Core.ACCESS_LIMITS.maxMinutes);
   function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function accessState(value) { return record(value) ? value : {}; }
   function validSession(entry, now) {
@@ -20,13 +20,16 @@ const SiteAccess = (() => {
   function siteForURL(raw) { return Sites.forAccessURL(raw)?.id || null; }
   function gateURL(site) { return api.runtime.getURL('blocked.html') + '?site=' + site; }
   function ruleIds(site) { return SITES[site].ruleIds; }
-  function waitDurationMs(entry) { return Number.isFinite(entry.waitMs) && Core.validAccessMinutes(Core.minutesFromMillis(Core.millisFromNumber(entry.waitMs))) ? Core.millisFromNumber(entry.waitMs) : Core.millisFromMinutes(Core.ACCESS_LIMITS.minMinutes); }
+  function waitDurationMs(entry) {
+    const wait = Core.asMilliseconds(entry.waitMs);
+    return Number.isFinite(wait) && Core.validAccessMinutes(Core.minutesFromMilliseconds(wait)) ? wait : Core.millisecondsFromMinutes(Core.ACCESS_LIMITS.minMinutes);
+  }
   function status(site, entry = {}, now = Date.now(), minutes = Core.DEFAULT_SETTINGS.accessMinutes, enabled = true, goalAllowed = false, waitMinutes = Core.DEFAULT_SETTINGS.waitMinutes) {
     if (!Object.hasOwn(SITES, site)) throw new Error('Unsupported site');
-    const remainingMs = Core.millisFromNumber(Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0);
+    const remainingMs = Core.asMilliseconds(Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0);
     const expiresAt = remainingMs && entry.expiresAt > now ? entry.expiresAt : 0;
     const readyAt = !remainingMs && validWait(entry, now) ? entry.readyAt : 0;
-    const waitSeconds = readyAt ? Core.secondsFromMillis(waitDurationMs(entry)) : Core.secondsFromMinutes(waitMinutes);
+    const waitSeconds = readyAt ? Core.secondsFromMilliseconds(waitDurationMs(entry)) : Core.secondsFromMinutes(waitMinutes);
     return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, refilledAt: entry.refilledAt || 0, waitSeconds, sessionMinutes: minutes };
   }
   function validWait(entry, now) {
@@ -62,7 +65,7 @@ const SiteAccess = (() => {
       if (!Number.isFinite(entry.remainingMs) && Number.isFinite(entry.expiresAt)) entry.remainingMs = Math.max(0, entry.expiresAt - now);
       if (entry.date && entry.date !== date) {
         const runningAtMidnight = !restart && entry.expiresAt >= dayStart;
-        entry.remainingMs = Core.millisFromMinutes(minutes);
+        entry.remainingMs = Core.millisecondsFromMinutes(minutes);
         entry.refilledAt = dayStart;
         entry.expiresAt = runningAtMidnight ? dayStart + entry.remainingMs : 0;
       }
@@ -143,7 +146,7 @@ const SiteAccess = (() => {
     if (!Core.validIntention(message.reason)) return { ok: false, error: `Write a specific intention of ${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters.` };
     if (state.remainingMs || state.readyAt) return;
     const site = message.site, access = accessState(stored._access);
-    const waitMs = Core.millisFromMinutes(Core.siteSettings(site, stored.settings).waitMinutes);
+    const waitMs = Core.millisecondsFromMinutes(Core.siteSettings(site, stored.settings).waitMinutes);
     access[site] = { readyAt: now + waitMs, waitMs };
     const changes = { _access: access };
     if (stored.settings?.intentionHistoryEnabled === true) changes._intentions = [...savedIntentions(stored._intentions), { site, reason: message.reason.trim(), requestedAt: now }].slice(-100);
@@ -152,7 +155,7 @@ const SiteAccess = (() => {
   async function confirmAccess(site, state, access, now) {
     const entry = access[site] || {};
     if (!state.readyAt || now < entry.readyAt) throw MessageContracts.refuse('Finish the waiting period before opening the site.');
-    access[site] = { remainingMs: Core.millisFromMinutes(state.sessionMinutes), expiresAt: 0, refilledAt: now };
+    access[site] = { remainingMs: Core.millisecondsFromMinutes(state.sessionMinutes), expiresAt: 0, refilledAt: now };
     await api.storage.local.set({ _access: access });
   }
   async function cancelWait(site, state, access) {

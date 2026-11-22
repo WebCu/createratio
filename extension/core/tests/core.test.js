@@ -5,14 +5,14 @@ const C = require('../core.js');
 
 test('duration converters preserve arithmetic without rounding or validation', () => {
   for (const value of [0, 1, 1.25, -1, NaN, Infinity, -Infinity]) {
-    assert.equal(C.millisFromMinutes(C.minutesFromNumber(value)), value * 60000);
-    assert.equal(C.millisFromSeconds(C.secondsFromNumber(value)), value * 1000);
-    assert.equal(C.secondsFromMillis(C.millisFromNumber(value)), value / 1000);
-    assert.equal(C.minutesFromMillis(C.millisFromNumber(value)), value / 60000);
-    assert.equal(C.secondsFromMinutes(C.minutesFromNumber(value)), value * 60);
-    assert.equal(C.millisFromNumber(value), value);
-    assert.equal(C.secondsFromNumber(value), value);
-    assert.equal(C.minutesFromNumber(value), value);
+    assert.equal(C.millisecondsFromMinutes(C.asMinutes(value)), value * 60000);
+    assert.equal(C.minutesFromSeconds(C.asSeconds(value)), value / 60);
+    assert.equal(C.secondsFromMilliseconds(C.asMilliseconds(value)), value / 1000);
+    assert.equal(C.minutesFromMilliseconds(C.asMilliseconds(value)), value / 60000);
+    assert.equal(C.secondsFromMinutes(C.asMinutes(value)), value * 60);
+    assert.equal(C.asMilliseconds(value), value);
+    assert.equal(C.asSeconds(value), value);
+    assert.equal(C.asMinutes(value), value);
   }
 });
 
@@ -134,11 +134,11 @@ test('delivery policy exposes bounded batches, seconds, identifiers and receipts
 
 test('active time clips exactly at 30 seconds and never backfills after new input', () => {
   const state = { start: 28000, end: 33000, lastInput: 0, visible: true, focused: true, mode: 'consume' };
-  assert.equal(C.activeMillis(state), 2000);
-  assert.equal(C.activeMillis({ ...state, start: 33000, end: 38000 }), 0);
-  assert.equal(C.activeMillis({ ...state, lastInput: 32000 }), 1000);
-  assert.equal(C.activeMillis({ ...state, lastInput: -Infinity }), 0);
-  for (const change of [{ visible: false }, { focused: false }, { mode: 'neutral' }, { end: 60000 }, { end: 27000 }]) assert.equal(C.activeMillis({ ...state, ...change }), 0);
+  assert.equal(C.activeMilliseconds(state), 2000);
+  assert.equal(C.activeMilliseconds({ ...state, start: 33000, end: 38000 }), 0);
+  assert.equal(C.activeMilliseconds({ ...state, lastInput: 32000 }), 1000);
+  assert.equal(C.activeMilliseconds({ ...state, lastInput: -Infinity }), 0);
+  for (const change of [{ visible: false }, { focused: false }, { mode: 'neutral' }, { end: 60000 }, { end: 27000 }]) assert.equal(C.activeMilliseconds({ ...state, ...change }), 0);
 });
 test('local dates require an exact calendar day including leap years and years below 100', () => {
   for (const value of ['2026-10-11', '2024-02-29', '2000-02-29', '0099-01-01', '0000-02-29', '2026-12-31']) assert.equal(C.validLocalDate(value), true, value);
