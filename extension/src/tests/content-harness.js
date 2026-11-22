@@ -24,11 +24,11 @@ async function tracker(browser = 'chrome', options = {}) {
   });
   doc.createElement = () => { const node = new Element([], '', listen); elements.push(node); return node; };
   let snapshot = options.snapshot || { day: {}, settings: C.DEFAULT_SETTINGS };
-  const context = vm.createContext({ C3: { ...C, localDate: () => C.localDate(new Date(base + now)),
+  const context = vm.createContext({ Core: { ...C, localDate: () => C.localDate(new Date(base + now)),
       trackingEnabled: (id, settings) => C.trackingEnabled(id, settings) || options.integration?.id === id && settings.trackedSites?.includes(id)
-    }, C3Sites: { ...integrations, get: id => options.integration?.id === id ? options.integration : integrations.get(id), forURL: raw => options.integration || integrations.forURL(raw) }, URL,
+    }, Sites: { ...integrations, get: id => options.integration?.id === id ? options.integration : integrations.get(id), forURL: raw => options.integration || integrations.forURL(raw) }, URL,
     ScrollFriction: require('../content/scroll-friction.js'),
-    C3_DOM: require('../content/dom.js'), Element, getComputedStyle: node => ({ ...fixture.getComputedStyle(node), overflowY: node.style.overflowY || 'visible', overflowX: node.style.overflowX || 'visible' }),
+    PageQueries: require('../content/dom.js'), Element, getComputedStyle: node => ({ ...fixture.getComputedStyle(node), overflowY: node.style.overflowY || 'visible', overflowX: node.style.overflowX || 'visible' }),
     document: doc, location, window: { addEventListener: listen, removeEventListener: unlisten },
     crypto: { randomUUID: () => crypto.randomUUID() }, performance: { now: () => now }, Date: { now: () => base + now }, console: { ...console, warn(...args) { warnings.push(args); } },
     MutationObserver: class { observe() {} disconnect() {} },

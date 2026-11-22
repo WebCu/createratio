@@ -65,11 +65,11 @@ test('tracking readiness rejects a guard-only client and a pending tracker snaps
           await chrome.scripting.executeScript({target:{tabId:tab.id},func:() => globalThis.releaseTrackerSnapshot()});
         })()`);
         await readiness;
-        const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec;})()');
+        const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(Core.localDate());return Core.aggregate(data[Core.localDate()]).consumeSec;})()');
         await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }, site.session);
         await evaluate(browser, site.session, 'new Promise(resolve => setTimeout(resolve, 200))');
         await evaluate(browser, browser.worker, '(async()=>{const [tab]=await chrome.tabs.query({url:"https://x.com/home"});return chrome.tabs.sendMessage(tab.id,{type:"prepare-update",force:true});})()');
-        const after = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec;})()');
+        const after = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(Core.localDate());return Core.aggregate(data[Core.localDate()]).consumeSec;})()');
         assert.ok(after > before, `${phase}: fresh trusted input reaches saved measurements`);
         await evaluate(browser, browser.worker, '(async()=>{const [tab]=await chrome.tabs.query({url:"https://x.com/home"});return chrome.tabs.sendMessage(tab.id,{type:"commit-update"});})()');
       }
@@ -81,7 +81,7 @@ test('a focused inactive website lets the actual worker stop with every debugger
   const { launch, evaluate, eventually } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   try {
-    await evaluate(browser, browser.worker, 'chrome.storage.local.set({settings:{...C3.DEFAULT_SETTINGS,trackedSites:[]}})');
+    await evaluate(browser, browser.worker, 'chrome.storage.local.set({settings:{...Core.DEFAULT_SETTINGS,trackedSites:[]}})');
     const site = await browser.page('https://x.com/home');
     await eventually(() => evaluate(browser, site.session, '!!document.querySelector("#synthetic-site") && document.hasFocus()'), 'inactive website ready');
     await browser.cdp.send('Target.setAutoAttach', { autoAttach: false, waitForDebuggerOnStart: false, flatten: true });
@@ -144,11 +144,11 @@ test('worker replacement after committed teardown restores the same website docu
         return result.result>=2;
       })()`), 'transient initialization failure retried without navigation or a focus change', 15000);
       assert.deepEqual(await evaluate(browser, site.session, '({token:documentToken,draft:document.querySelector("#draft").value})'), { token: 'preserved', draft: 'Unsaved synthetic draft' });
-      const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec;})()');
+      const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(Core.localDate());return Core.aggregate(data[Core.localDate()]).consumeSec;})()');
       assert.ok(before > 0);
       await waitForTracking(browser, site, scrolling);
       await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }, site.session);
-      await eventually(() => evaluate(browser, browser.worker, `(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec > ${before};})()`), 'recovered tracker saves new measurements');
+      await eventually(() => evaluate(browser, browser.worker, `(async()=>{const data=await chrome.storage.local.get(Core.localDate());return Core.aggregate(data[Core.localDate()]).consumeSec > ${before};})()`), 'recovered tracker saves new measurements');
     });
   } finally { await browser.cleanup(); }
 });
@@ -293,10 +293,10 @@ test('a prepared extension reload preserves website drafts and resumes tracking 
       assert.deepEqual(await evaluate(browser, site.session, '({token:documentToken,draft:document.querySelector("#draft").value,url:location.href})'), { token: 'same document', draft: 'Unsaved synthetic draft', url: 'https://x.com/home' });
       await browser.cdp.send('Target.activateTarget', { targetId: site.targetId });
       await waitForTracking(browser, site, scrolling);
-      const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec;})()');
+      const before = await evaluate(browser, browser.worker, '(async()=>{const data=await chrome.storage.local.get(Core.localDate());return Core.aggregate(data[Core.localDate()]).consumeSec;})()');
       assert.ok(before > 0, 'partial measurements from before the update were saved');
       await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }, site.session);
-      await eventually(() => evaluate(browser, browser.worker, `(async()=>{const data=await chrome.storage.local.get(C3.localDate());return C3.aggregate(data[C3.localDate()]).consumeSec > ${before};})()`), 'fresh trusted input saves measurements after update');
+      await eventually(() => evaluate(browser, browser.worker, `(async()=>{const data=await chrome.storage.local.get(Core.localDate());return Core.aggregate(data[Core.localDate()]).consumeSec > ${before};})()`), 'fresh trusted input saves measurements after update');
     });
   } finally { await browser.cleanup(); }
 });

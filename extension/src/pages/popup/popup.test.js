@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { page, C3, accessState } = require('../../tests/ui-harness.js');
+const { page, Core, accessState } = require('../../tests/ui-harness.js');
 test('popup sharing loads only today on demand and recovers from history failure', async () => {
   const p = page('popup'); await p.ready();
   assert.ok(p.messages.every(message => message.type === 'snapshot'));
@@ -115,10 +115,10 @@ test('popup animates a daily refill once without replacing the countdown or acce
 });
 test('popup exposes all access actions without session-time editing', async () => {
   const p = page('popup'); await p.ready();
-  p.state.access = Object.fromEntries(C3.SITES.filter(site => site.gated).map(site => [site.id, accessState(site.id, { remainingMs: 60000 })]));
+  p.state.access = Object.fromEntries(Core.SITES.filter(site => site.gated).map(site => [site.id, accessState(site.id, { remainingMs: 60000 })]));
   p.change(); await p.ready();
-  assert.equal(p.nodes['access-sites'].children.length, C3.SITES.filter(site => site.gated).length);
-  for (const site of C3.SITES) assert.equal(p.nodes['session-time-' + site.id], undefined);
+  assert.equal(p.nodes['access-sites'].children.length, Core.SITES.filter(site => site.gated).length);
+  for (const site of Core.SITES) assert.equal(p.nodes['session-time-' + site.id], undefined);
   assert.equal(p.messages.some(message => message.type === 'access-duration'), false);
   await p.nodes.settings.fire('click'); assert.equal(p.state.optionsOpened, 1);
 });

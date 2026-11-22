@@ -38,8 +38,8 @@ try {
   await browser.setTime(new Date(2026, 2, 9, 12).getTime());
   await evaluate(browser, browser.worker, `(async () => {
     const { settings } = await chrome.storage.local.get('settings');
-    await chrome.storage.local.set({ settings: { ...settings, trackedSites: C3.SITES.map(site => site.id), allowAboveGoal: false, intentionHistoryEnabled: false }, _websiteTimeEnabled: false,
-      [C3.localDate()]: {
+    await chrome.storage.local.set({ settings: { ...settings, trackedSites: Core.SITES.map(site => site.id), allowAboveGoal: false, intentionHistoryEnabled: false }, _websiteTimeEnabled: false,
+      [Core.localDate()]: {
         x: { createSec: 900, consumeSec: 600, posts: 1 },
         linkedin: { createSec: 900, consumeSec: 600, comments: 1 },
         instagram: { createSec: 600, consumeSec: 480, comments: 1 },

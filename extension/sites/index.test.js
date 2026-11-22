@@ -6,8 +6,8 @@ const fs = require('node:fs');
 const integrations = require('./index.js');
 const source = fs.readFileSync(require.resolve('./index.js'), 'utf8');
 function browserCatalog(modules) {
-  const context = vm.createContext({ URL, C3_SITE_MODULES: modules });
-  vm.runInContext(source, context); return context.C3Sites;
+  const context = vm.createContext({ URL, SITE_MODULES: modules });
+  vm.runInContext(source, context); return context.Sites;
 }
 function modules() { return Object.fromEntries(integrations.sites.map(site => [site.id, require('./' + site.id + '.js')])); }
 

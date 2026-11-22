@@ -4,8 +4,8 @@ const messages = RuntimeMessages.create(api.runtime);
 /** @type {(id: string) => HTMLInputElement} */
 const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
 const site = new URLSearchParams(location.search).get('site');
-$('reason').minLength = C3.INTENTION_LIMITS.minLength;
-$('reason').maxLength = C3.INTENTION_LIMITS.maxLength;
+$('reason').minLength = Core.INTENTION_LIMITS.minLength;
+$('reason').maxLength = Core.INTENTION_LIMITS.maxLength;
 /** @type {ReplyAccess | undefined} */
 let access;
 let busy = false, refreshing = false;
@@ -51,13 +51,13 @@ function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
   const waiting = !active && access.readyAt > 0;
-  const waitSeconds = typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0 ? access.waitSeconds : C3.DEFAULT_SETTINGS.waitMinutes * 60;
+  const waitSeconds = typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0 ? access.waitSeconds : Core.DEFAULT_SETTINGS.waitMinutes * 60;
   const waitMinutes = waitSeconds / 60;
   const waitDuration = `${waitMinutes} minute${waitMinutes === 1 ? '' : 's'}`;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
   $('wait-step').textContent = `Pause for ${waitDuration}.`;
   $('begin').textContent = `Start the ${waitMinutes}-minute wait`;
-  $('reason-requirement').textContent = `${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters. A little clarity, then ${waitDuration} to pause.`;
+  $('reason-requirement').textContent = `${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters. A little clarity, then ${waitDuration} to pause.`;
   $('session-step').textContent = `Open a ${access.sessionMinutes}-minute session.`;
   $('heading').textContent = active ? `${access.name} is open.` : blockedLine.replace('{wait}', waitMinutes === 1 ? 'a minute' : waitDuration);
   $('access-steps').hidden = active;
@@ -144,8 +144,8 @@ $('reason').addEventListener('input', clearIntentionError);
 $('request').addEventListener('submit', event => {
   event.preventDefault();
   const reason = $('reason').value.trim();
-  if (!C3.validIntention(reason)) {
-    intentionError = `Write a specific intention of ${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters.`;
+  if (!Core.validIntention(reason)) {
+    intentionError = `Write a specific intention of ${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters.`;
     renderError();
     return;
   }

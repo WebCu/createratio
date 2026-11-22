@@ -11,7 +11,7 @@ function guard(host = 'x.com', browser = 'chrome', options = {}) {
   const events = {}, redirects = [], runtimeListeners = new Set();
   const listen = (name, fn) => { events[name] = fn; };
   const document = { hidden: false, hasFocus: () => focused, addEventListener: listen, removeEventListener(name) { delete events[name]; } };
-  const context = vm.createContext({ URL, Date, document, addEventListener: listen, removeEventListener(name) { delete events[name]; }, C3Sites: require('../../sites/index.js'),
+  const context = vm.createContext({ URL, Date, document, addEventListener: listen, removeEventListener(name) { delete events[name]; }, Sites: require('../../sites/index.js'),
     location: { hostname: host, href: 'https://' + host + '/', replace: url => redirects.push(url) },
     setTimeout(fn, delay) { timer = { fn, delay }; return 1; }, clearTimeout() { timer = undefined; },
     [browser]: { runtime: { id: 'extension', onMessage: { addListener(fn) { runtimeListeners.add(fn); }, removeListener(fn) { runtimeListeners.delete(fn); } }, getURL: file => 'chrome-extension://extension/' + file, async sendMessage(message) {

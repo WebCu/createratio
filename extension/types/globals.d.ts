@@ -1,5 +1,5 @@
 declare global {
-  type StoredSettings = Partial<typeof C3.DEFAULT_SETTINGS> & { siteOverrides?: Record<string, Record<string, unknown>> };
+  type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & { siteOverrides?: Record<string, Record<string, unknown>> };
   type StoredData = { settings?: StoredSettings; [key: string]: unknown };
   type AccessStatus = { site: string; enabled: boolean; goalAllowed: boolean; name: string; home: string; remainingMs: number; expiresAt: number; readyAt: number; refilledAt: number; waitSeconds: number; sessionMinutes: number };
   type SiteAccessApi = {
@@ -15,10 +15,10 @@ declare global {
     waitForFill(target: HTMLElement): Promise<void> | undefined;
   };
   type SocialSharingApi = { mount(options: { messages: RuntimeMessenger; range: () => HistoryRange; error: (message?: string) => void }): { clear(): void } };
-  var C3: typeof import('../core/core.js');
-  var C3Sites: typeof import('../sites/index.js');
-  var C3_SITE_MODULES: Record<string, unknown> | undefined;
-  var C3_DOM: typeof import('../src/content/dom.js');
+  var Core: typeof import('../core/core.js');
+  var Sites: typeof import('../sites/index.js');
+  var SITE_MODULES: Record<string, unknown> | undefined;
+  var PageQueries: typeof import('../src/content/dom.js');
   var RuntimeMessages: typeof import('../src/shared/messages.js');
   var MessageContracts: typeof import('../src/background/message-contracts.js');
   var ActivityHistory: typeof import('../src/background/history.js');

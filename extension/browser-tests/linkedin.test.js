@@ -34,7 +34,7 @@ test('built LinkedIn post editor recognition requires the composer route and a v
           history.replaceState({}, '', entry.route);
           document.body.innerHTML = '<div id="editor" tabindex="0" ' + entry.attributes + '><span id="nested" tabindex="0">Synthetic draft</span></div><button id="outside">Outside editor</button>';
           document.querySelector(entry.nested ? '#nested' : '#editor').focus();
-          const adapter = C3Sites.get('linkedin').create({ document, location, dom: C3_DOM({ document, location, Element, getComputedStyle }) });
+          const adapter = Sites.get('linkedin').create({ document, location, dom: PageQueries({ document, location, Element, getComputedStyle }) });
           const focused = adapter.mode();
           document.querySelector('#outside').focus();
           return { focused, outside: adapter.mode() };
@@ -49,21 +49,21 @@ test('built LinkedIn post editor recognition requires the composer route and a v
 
 test('built LinkedIn post composer records trusted writing as creating time', async () => {
   const { launch, evaluate, eventually, click, seedAccess, withFailureArtifacts } = await import('./chromium.mjs');
+  const { scrollFixture } = await import('./scrolling.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+  const scrolling = scrollFixture(browser);
   try {
     await withFailureArtifacts(browser, 'LinkedIn post composer creation time', async () => {
       await seedAccess(browser, ['linkedin'], { allowAboveGoal: false });
-      await evaluate(browser, browser.worker, `chrome.runtime.onMessage.addListener((message, sender) => {
-        if (sender.url?.startsWith('https://www.linkedin.com/') && message.type === 'snapshot') globalThis.postTrackerReady = true;
-      })`);
-      const page = await browser.page('https://www.linkedin.com/sharing/compose');
+      const page = await browser.page('https://www.linkedin.com/feed/');
       await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#synthetic-site") && document.hasFocus() && !document.hidden'), 'synthetic LinkedIn composer is focused');
-      await eventually(() => evaluate(browser, browser.worker, 'globalThis.postTrackerReady === true'), 'post tracker has access preferences');
+      await eventually(() => scrolling.isEnabled(page), 'post tracker has applied access preferences');
+      await evaluate(browser, page.session, `history.pushState({}, '', '/sharing/compose')`);
       await evaluate(browser, page.session, `document.body.innerHTML = '<div><div id="post-editor" class="tiptap ProseMirror" role="textbox" contenteditable="true" style="min-height:80px;border:1px solid"></div></div>'`);
       await click(browser, page, '#post-editor');
       await browser.cdp.send('Input.insertText', { text: 'Synthetic post draft; never submitted.' }, page.session);
       await eventually(() => evaluate(browser, page.session, 'document.activeElement.id === "post-editor" && document.querySelector("#post-editor").textContent === "Synthetic post draft; never submitted."'), 'trusted typing reaches the modern post editor');
-      await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.local.get(C3.localDate()).then(data => data[C3.localDate()]?.linkedin?.createSec > 0)'), 'post writing reaches saved creating time');
+      await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.local.get(Core.localDate()).then(data => data[Core.localDate()]?.linkedin?.createSec > 0)'), 'post writing reaches saved creating time');
       assert.deepEqual(browser.errors, []);
     });
   } finally { await browser.cleanup(); }
@@ -72,26 +72,25 @@ test('built LinkedIn post composer records trusted writing as creating time', as
 for (const [route, shadow] of [['/messaging/thread/synthetic-thread/', false], ['/feed/', false], ['/feed/', true], ['/in/synthetic-profile/', true]]) {
   test(`built LinkedIn integration records focused ${shadow ? 'shadow ' : ''}DM writing on ${route} without submission bonuses`, async () => {
     const { launch, evaluate, eventually, click, clickByRole, withFailureArtifacts } = await import('./chromium.mjs');
+    const { scrollFixture } = await import('./scrolling.mjs');
     const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+    const scrolling = scrollFixture(browser);
     try {
       await withFailureArtifacts(browser, 'LinkedIn direct-message creation time', async () => {
         await evaluate(browser, browser.worker, `(async () => {
           await chrome.storage.local.set({
-            settings: { ...C3.DEFAULT_SETTINGS, allowAboveGoal: false },
-            _access: { linkedin: { remainingMs: 300000, expiresAt: 0, date: C3.localDate() } }
-          });
-          globalThis.linkedinSnapshots = 0;
-          chrome.runtime.onMessage.addListener((message, sender) => {
-            if (sender.url?.startsWith('https://www.linkedin.com/') && message.type === 'snapshot') linkedinSnapshots++;
+            settings: { ...Core.DEFAULT_SETTINGS, allowAboveGoal: false },
+            _access: { linkedin: { remainingMs: 300000, expiresAt: 0, date: Core.localDate() } }
           });
         })()`);
         await browser.page(browser.origin + '/popup.html');
         await eventually(() => evaluate(browser, browser.worker, 'chrome.declarativeNetRequest.getSessionRules().then(rules => rules.some(rule => rule.id === 102))'), 'LinkedIn access rules allow the synthetic page');
-        const totals = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(C3.localDate()).then(data => data[C3.localDate()]?.linkedin || {})');
-        const page = await browser.page('https://www.linkedin.com' + route);
+        const totals = () => evaluate(browser, browser.worker, 'chrome.storage.local.get(Core.localDate()).then(data => data[Core.localDate()]?.linkedin || {})');
+        const page = await browser.page('https://www.linkedin.com/feed/');
         await eventually(() => evaluate(browser, page.session, 'document.readyState === "complete" && !!document.querySelector("#synthetic-site") && document.hasFocus() && !document.hidden'), 'synthetic LinkedIn page is focused');
-        await eventually(() => evaluate(browser, browser.worker, 'linkedinSnapshots > 0'), 'LinkedIn creation tracker has access preferences');
+        await eventually(() => scrolling.isEnabled(page), 'LinkedIn creation tracker has applied access preferences');
         await evaluate(browser, page.session, `(() => {
+          history.pushState({}, '', ${JSON.stringify(route)});
           document.body.innerHTML = '<div id="overlay"></div><button id="close" type="button">Close conversation</button>';
           const host = document.querySelector('#overlay');
           const root = ${shadow} ? host.attachShadow({ mode: 'open' }) : host;

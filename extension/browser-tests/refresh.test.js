@@ -41,7 +41,7 @@ test('hidden Settings and access pages do not amplify active-budget writes', asy
       await evaluate(browser, browser.worker, `(async () => {
         globalThis.budgetWrites = 0;
         chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes._access) budgetWrites++; });
-        await chrome.storage.local.set({ _access: { x: { remainingMs: 300000, expiresAt: 0, date: C3.localDate() } } });
+        await chrome.storage.local.set({ _access: { x: { remainingMs: 300000, expiresAt: 0, date: Core.localDate() } } });
       })()`);
       const settings = await browser.page(browser.origin + '/settings.html');
       await eventually(() => evaluate(browser, settings.session, '!!document.querySelector("#track-x")'), 'first Settings renders');

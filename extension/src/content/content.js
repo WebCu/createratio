@@ -2,7 +2,7 @@
   'use strict';
   const extensionAPI = globalThis.browser || globalThis.chrome;
   const messages = RuntimeMessages.create(extensionAPI.runtime);
-  const integration = C3Sites.forURL(location.href);
+  const integration = Sites.forURL(location.href);
   if (!integration) return;
   const site = integration.id;
   const scrollFriction = ScrollFriction.create({ document, Element, getComputedStyle });
@@ -23,7 +23,7 @@
   let adapter = null, failed = false;
   let refreshTimer = null, generation = null, recordingPaused = false, activeBeforeUpdate = false;
   let syncPending = true, syncRetryAt = 0, syncRetryDelay = 5000;
-  const { maxPackets: MAX_PACKETS, maxItems: MAX_ITEMS, maxSeconds: MAX_SECONDS } = C3.DELIVERY_LIMITS;
+  const { maxPackets: MAX_PACKETS, maxItems: MAX_ITEMS, maxSeconds: MAX_SECONDS } = Core.DELIVERY_LIMITS;
   const clicks = new WeakMap();
 
   function resetInput() {
@@ -42,7 +42,7 @@
    * @param {number} end
    * @param {SegmentMode} segmentMode */
   function appendTime(start, end, segmentMode) {
-    for (const part of C3.splitInterval(start, end)) {
+    for (const part of Core.splitInterval(start, end)) {
       if (segments.reduce((sum, segment) => sum + segment.sec, 0) + part.sec > MAX_SECONDS) queuePacket();
       if (recordingPaused) break;
       const tail = segments.at(-1);
@@ -54,7 +54,7 @@
   }
   function settle() {
     const now = performance.now();
-    const ms = recordingPaused ? 0 : C3.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
+    const ms = recordingPaused ? 0 : Core.activeMillis({ start: lastSample, end: now, lastInput, visible: pageActive && wasVisible, focused: wasFocused, mode });
     if (ms > 0 && (mode === 'create' || mode === 'consume')) {
       const activeEnd = Math.min(now, lastInput + 30000);
       const endWall = Date.now() - (now - activeEnd);
@@ -98,7 +98,7 @@
     enabled = nextEnabled; adapter = null;
     if (!enabled) return;
     try {
-      const dom = C3_DOM({ document, location, Element, getComputedStyle });
+      const dom = PageQueries({ document, location, Element, getComputedStyle });
       adapter = integration.create({ document, location, dom });
       if (typeof adapter?.mode !== 'function' || typeof adapter?.action !== 'function') throw new Error('Invalid site adapter');
     } catch (error) { pauseIntegration(error); }
@@ -106,9 +106,9 @@
   function acceptSnapshot(result) {
     const access = result.access[site];
     if (integration.access && !access) throw new Error('No response');
-    const nextEnabled = !failed && C3.trackingEnabled(site, result.settings) && (!access || access.enabled !== false && (access.goalAllowed || access.remainingMs > 0));
+    const nextEnabled = !failed && Core.trackingEnabled(site, result.settings) && (!access || access.enabled !== false && (access.goalAllowed || access.remainingMs > 0));
     scrollFrictionEnabled = result.settings.scrollFrictionEnabled === true;
-    scrollSpeed = (100 - (result.settings.scrollFrictionStrength ?? C3.DEFAULT_SETTINGS.scrollFrictionStrength)) / 100;
+    scrollSpeed = (100 - (result.settings.scrollFrictionStrength ?? Core.DEFAULT_SETTINGS.scrollFrictionStrength)) / 100;
     synchronizeTracking(nextEnabled, result.generation ?? null);
     syncPending = false; syncRetryAt = 0; syncRetryDelay = 5000;
     refresh();
@@ -155,7 +155,7 @@
     if (!result) return;
     if (!integration.actions.includes(result.action) || typeof result.submission !== 'boolean' || !(result.button instanceof Element)) throw new Error('Invalid action recognition');
     if (!counted(result.button)) return;
-    actions.push({ date: C3.localDate(), action: result.action });
+    actions.push({ date: Core.localDate(), action: result.action });
     flush();
   }
   function onInteraction(event) {

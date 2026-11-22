@@ -1,6 +1,6 @@
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(id => require('./' + id + '.js'));
-  else root.C3Sites = factory(id => root.C3_SITE_MODULES?.[id]);
+  else root.Sites = factory(id => root.SITE_MODULES?.[id]);
 })(globalThis, function (load) {
   'use strict';
   const MIN_RULE_ID = 1;

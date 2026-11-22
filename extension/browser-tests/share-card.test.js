@@ -57,7 +57,7 @@ test('built dashboard previews and downloads a private social PNG with a copyabl
             bounds.push({ text: String(value), size: parseFloat(this.font.match(/[0-9.]+px/)[0]), left: x - metrics.actualBoundingBoxLeft * scale, right: x + metrics.actualBoundingBoxRight * scale, top: y - metrics.actualBoundingBoxAscent, bottom: y + metrics.actualBoundingBoxDescent });
             return paint(value, x, y, maxWidth);
           };
-          const card = SocialCard.create({ [C3.localDate()]: { x: stats } }, 'week');
+          const card = SocialCard.create({ [Core.localDate()]: { x: stats } }, 'week');
           SocialCard.draw(canvas, card);
           const bars = [[314, [96, 67, 181]], [886, [140, 124, 159]]].map(([x, color]) => {
             const pixels = ctx.getImageData(x, 636, 1, 140).data;

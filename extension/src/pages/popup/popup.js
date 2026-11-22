@@ -55,11 +55,11 @@ function renderAccess(access) {
   }
 }
 function render(snapshot) {
-  const total = C3.aggregate(snapshot.day), score = C3.score(total);
+  const total = Core.aggregate(snapshot.day), score = Core.score(total);
   const hasActivity = ['createSec', 'consumeSec', 'posts', 'replies', 'comments'].some(key => total[key] > 0);
   $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); /** @type {HTMLTimeElement} */ (document.getElementById('date')).dateTime = snapshot.date;
-  $('score').textContent = score.toFixed(2); $('score').style.color = hasActivity ? C3.scoreColor(score) : '';
-  $('score-card').setAttribute('data-score', hasActivity ? C3.scoreBand(score) : 'none');
+  $('score').textContent = score.toFixed(2); $('score').style.color = hasActivity ? Core.scoreColor(score) : '';
+  $('score-card').setAttribute('data-score', hasActivity ? Core.scoreBand(score) : 'none');
   $('score-status').textContent = !hasActivity ? 'A fresh start. Make something today.' : score >= 1 ? 'You’re making more than you’re taking in.' : 'A little more creating gets you to 1.0.';
   $('create-min').textContent = minutes(total.createSec); $('consume-min').textContent = minutes(total.consumeSec);
   renderAccess(snapshot.access);

@@ -9,7 +9,7 @@ test('hidden creation trackers stop snapshot polling and synchronize when foregr
   try {
     await withFailureArtifacts(browser, 'inactive tracker worker wakeups', async () => {
       await evaluate(browser, browser.worker, `(async () => {
-        await chrome.storage.local.set({ settings: { ...C3.DEFAULT_SETTINGS, trackedSites: [] } });
+        await chrome.storage.local.set({ settings: { ...Core.DEFAULT_SETTINGS, trackedSites: [] } });
         globalThis.trackerSnapshots = 0;
         chrome.runtime.onMessage.addListener((message, sender) => {
           if (sender.tab && message.type === 'snapshot') trackerSnapshots++;

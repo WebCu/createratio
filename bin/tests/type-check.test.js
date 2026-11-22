@@ -13,7 +13,7 @@ function typeCheck(t, source) {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   fs.writeFileSync(path.join(directory, 'fixture.js'), source);
   fs.writeFileSync(path.join(directory, 'tsconfig.json'), JSON.stringify({ extends: path.join(root, 'tsconfig.json'), include: ['fixture.js'], exclude: [] }));
-  const result = spawnSync(process.execPath, [tsc, '-p', 'tsconfig.json'], { cwd: directory, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [tsc, '-p', 'tsconfig.json', '--pretty', 'false'], { cwd: directory, encoding: 'utf8' });
   return { ...result, files: fs.readdirSync(directory).sort() };
 }
 

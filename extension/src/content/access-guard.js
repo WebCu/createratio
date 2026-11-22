@@ -2,7 +2,7 @@
 (() => {
   const api = globalThis.browser || globalThis.chrome;
   const messages = RuntimeMessages.create(api.runtime);
-  const site = C3Sites.forAccessURL(location.href)?.id;
+  const site = Sites.forAccessURL(location.href)?.id;
   if (!site) return;
   let timer, checking = false, paused = false, stopped = false;
   const listeners = [];

@@ -1,7 +1,7 @@
 (function (root, factory) {
-  const api = factory(typeof module === 'object' && module.exports ? require('../sites/index.js') : root.C3Sites);
+  const api = factory(typeof module === 'object' && module.exports ? require('../sites/index.js') : root.Sites);
   if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.C3 = api;
+  else root.Core = api;
 })(globalThis, function (integrations) {
   'use strict';
   const FIELDS = ['consumeSec', 'createSec', 'posts', 'replies', 'comments', 'likes', 'bookmarks', 'quotes', 'reposts'];

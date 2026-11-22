@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
-const C3 = require('../../../core/core.js');
-const C3Sites = require('../../../sites/index.js');
+const Core = require('../../../core/core.js');
+const Sites = require('../../../sites/index.js');
 const { accessState } = require('../../tests/ui-harness.js');
 const { worker, gate, popupSender } = require('../../tests/background-harness.js');
 
@@ -27,7 +27,7 @@ function page(options = {}) {
   }
   Object.assign(elements['active-countdown'], element());
   const saved = options.saved || new Map();
-  const context = vm.createContext({ C3, C3Sites, URL, URLSearchParams, Date: { now: () => now }, Math: Object.assign(Object.create(Math), { random: () => options.random ?? 0 }),
+  const context = vm.createContext({ Core, Sites, URL, URLSearchParams, Date: { now: () => now }, Math: Object.assign(Object.create(Math), { random: () => options.random ?? 0 }),
     localStorage: { getItem(key) { if (options.storageUnavailable) throw new Error('Storage unavailable'); return saved.get(key) ?? null; }, setItem(key, value) { if (options.storageUnavailable) throw new Error('Storage unavailable'); saved.set(key, String(value)); } },
     document,
     location: { search: '?site=' + site, replace: url => redirects.push(url) },
@@ -43,7 +43,7 @@ function page(options = {}) {
       if (Object.hasOwn(options, 'reply')) return options.reply;
       if (fail) return { ok: false, error: 'Unable to check access.' };
       if (message.type === 'access-begin') {
-        if (!C3.validIntention(message.reason)) return { ok: false, error: 'Write a specific intention of 20–280 characters.' };
+        if (!Core.validIntention(message.reason)) return { ok: false, error: 'Write a specific intention of 20–280 characters.' };
         access = { ...access, readyAt: now + access.waitSeconds * 1000 };
       }
       if (message.type === 'access-open' && !access.remainingMs) {
@@ -194,11 +194,11 @@ test('gate stays closed on malformed replies and requires access for its request
   assert.equal(p.elements.begin.disabled, true); assert.deepEqual(p.redirects, []);
 });
 test('blocked-page refresh refuses Off-site navigation to malformed, unvetted, mismatched or credentialed homes', async () => {
-  for (const { id } of C3Sites.sites.filter(site => site.gated)) {
+  for (const { id } of Sites.sites.filter(site => site.gated)) {
     const valid = accessState(id, { enabled: false });
     const credentialURL = new URL(valid.home); credentialURL.username = 'user';
-    const other = C3Sites.sites.find(site => site.gated && site.id !== id);
-    for (const home of ['https://[/', 'https://evil.test/', C3Sites.get(other.id).access.home, credentialURL.href, valid.home + '?redirect=https://evil.test/']) {
+    const other = Sites.sites.find(site => site.gated && site.id !== id);
+    for (const home of ['https://[/', 'https://evil.test/', Sites.get(other.id).access.home, credentialURL.href, valid.home + '?redirect=https://evil.test/']) {
       const options = { site: id, reply: { ok: true, access: { [id]: { ...valid, home } } } };
       const p = page(options); await p.flush();
       assert.deepEqual(p.redirects, []);
@@ -295,8 +295,8 @@ test('an open session hides blocked-only instructions and restores them when the
 });
 test('gate validates trimmed intentions before contacting the worker', async () => {
   const p = page(); await p.flush();
-  assert.equal(p.elements.reason.minLength, C3.INTENTION_LIMITS.minLength);
-  assert.equal(p.elements.reason.maxLength, C3.INTENTION_LIMITS.maxLength);
+  assert.equal(p.elements.reason.minLength, Core.INTENTION_LIMITS.minLength);
+  assert.equal(p.elements.reason.maxLength, Core.INTENTION_LIMITS.maxLength);
   for (const reason of ['', 'short', ' '.repeat(20), ' '.repeat(20) + 'short', 'a'.repeat(281)]) {
     p.elements.reason.value = reason; p.submit(); await p.flush();
     assert.equal(p.sent.some(message => message.type === 'access-begin'), false);
