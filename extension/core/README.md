@@ -37,7 +37,7 @@ site's pure classifier; it returns `create`, `consume`, or `neutral`. The actual
 routes, selectors, and DOM/action interpretation live together in `extension/sites/<id>.js`.
 The core never chooses X-versus-LinkedIn behavior itself.
 
-`activeMillis` clips active intervals to the 30-second idle window and discards gaps over 15 seconds. `splitInterval` divides time at local midnight; `localDate` and `recentDates` use the local calendar.
+`activeMilliseconds` clips active intervals to the 30-second idle window and discards gaps over 15 seconds. `splitInterval` divides time at local midnight; `localDate` and `recentDates` use the local calendar.
 
 ## Data contract
 

@@ -34,13 +34,14 @@ function nextBlockedLine() {
 const blockedLine = nextBlockedLine();
 $('heading').textContent = blockedLine.replace('{wait}', 'a deliberate pause');
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
-function remaining(ms) { const seconds = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }
+/** @param {Milliseconds} milliseconds */
+function remaining(milliseconds) { const seconds = Math.max(0, Math.ceil(Core.secondsFromMilliseconds(milliseconds))); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }
 function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
   const waiting = !active && access.readyAt > 0;
-  const waitSeconds = typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0 ? access.waitSeconds : Core.DEFAULT_SETTINGS.waitMinutes * 60;
-  const waitMinutes = waitSeconds / 60;
+  const waitSeconds = typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0 ? Core.asSeconds(access.waitSeconds) : Core.secondsFromMinutes(Core.DEFAULT_SETTINGS.waitMinutes);
+  const waitMinutes = Core.minutesFromSeconds(waitSeconds);
   const waitDuration = `${waitMinutes} minute${waitMinutes === 1 ? '' : 's'}`;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
   $('wait-step').textContent = `Pause for ${waitDuration}.`;
@@ -65,8 +66,9 @@ function render() {
   $('end').hidden = !!access.goalAllowed;
   $('return').disabled = busy || !active;
   if (waiting) {
-    const seconds = Math.max(0, Math.ceil((access.readyAt - now) / 1000));
-    $('clock').textContent = remaining(access.readyAt - now);
+    const untilReady = Core.asMilliseconds(access.readyAt - now);
+    const seconds = Math.max(0, Math.ceil(Core.secondsFromMilliseconds(untilReady)));
+    $('clock').textContent = remaining(untilReady);
     const progress = /** @type {HTMLProgressElement} */ (document.getElementById('progress'));
     progress.max = waitSeconds;
     progress.value = Math.max(0, waitSeconds - seconds);
@@ -75,7 +77,7 @@ function render() {
     const message = seconds > 0 ? 'A deliberate pause, not an instant override.' : 'Ready when you are. Confirm to start your session.';
     if ($('wait-status').textContent !== message) $('wait-status').textContent = message;
   }
-  if (active) $('active-time').textContent = access.goalAllowed ? 'Blocking returns at or below your current daily target, or on a new day, unless a timed session still has time left.' : `${remaining(access.expiresAt ? access.expiresAt - now : access.remainingMs)} remaining${access.expiresAt ? '' : ' · paused'}. All ${access.name} tabs will block again when time runs out.`;
+  if (active) $('active-time').textContent = access.goalAllowed ? 'Blocking returns at or below your current daily target, or on a new day, unless a timed session still has time left.' : `${remaining(access.expiresAt ? Core.asMilliseconds(access.expiresAt - now) : access.remainingMs)} remaining${access.expiresAt ? '' : ' · paused'}. All ${access.name} tabs will block again when time runs out.`;
   RefillAnimation.render($('active-countdown'), access.goalAllowed ? { ...access, remainingMs: 0 } : access);
 }
 /** @param {AccessSessionMessage['type']} type
