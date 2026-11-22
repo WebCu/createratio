@@ -6,17 +6,30 @@
   'use strict';
   const FIELDS = ['consumeSec', 'createSec', 'posts', 'replies', 'comments', 'likes', 'bookmarks', 'quotes', 'reposts'];
   const SITES = integrations.sites;
-  const ACCESS_LIMITS = { minMinutes: 1, maxMinutes: 240 };
+  const ACCESS_LIMITS = { minMinutes: /** @type {Minutes} */ (1), maxMinutes: /** @type {Minutes} */ (240) };
   const INTENTION_LIMITS = { minLength: 20, maxLength: 280 };
   const SCROLL_FRICTION_LIMITS = { minStrength: 50, maxStrength: 95, step: 5 };
   const DELIVERY_LIMITS = { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 };
   function validIntention(value) { return typeof value === 'string' && value.length <= INTENTION_LIMITS.maxLength && value.trim().length >= INTENTION_LIMITS.minLength; }
+  /** @returns {value is Minutes} */
   function validAccessMinutes(value) { return Number.isInteger(value) && value >= ACCESS_LIMITS.minMinutes && value <= ACCESS_LIMITS.maxMinutes; }
+  /** @param {number} minutes */
+  function millisFromMinutes(minutes) { return /** @type {Millis} */ (minutes * 60000); }
+  /** @param {number} seconds */
+  function millisFromSeconds(seconds) { return /** @type {Millis} */ (seconds * 1000); }
+  /** @param {number} millis */
+  function secondsFromMillis(millis) { return /** @type {Seconds} */ (millis / 1000); }
+  /** @param {number} millis */
+  function minutesFromMillis(millis) { return /** @type {Minutes} */ (millis / 60000); }
+  /** @param {number} millis */
+  function millisFromNumber(millis) { return /** @type {Millis} */ (millis); }
+  /** @param {number} seconds */
+  function secondsFromNumber(seconds) { return /** @type {Seconds} */ (seconds); }
   function validScrollFrictionStrength(value) { return Number.isInteger(value) && value >= SCROLL_FRICTION_LIMITS.minStrength && value <= SCROLL_FRICTION_LIMITS.maxStrength && value % SCROLL_FRICTION_LIMITS.step === 0; }
   /** @type {Record<AccessPreference, true>} */
   const ACCESS_PREFERENCES = { accessMinutes: true, waitMinutes: true };
   const ACCESS_PREFERENCE_KEYS = Object.keys(ACCESS_PREFERENCES);
-  const DEFAULT_SETTINGS = { accessMinutes: 5, waitMinutes: 5, dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, scrollFrictionEnabled: true, scrollFrictionStrength: 50, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
+  const DEFAULT_SETTINGS = { accessMinutes: /** @type {Minutes} */ (5), waitMinutes: /** @type {Minutes} */ (5), dailyTarget: 1, allowAboveGoal: false, intentionHistoryEnabled: false, scrollFrictionEnabled: true, scrollFrictionStrength: 50, trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id) };
   function isRecord(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
   function trackingSelection(settings) {
     const selected = isRecord(settings) ? settings.trackedSites : undefined;
@@ -88,8 +101,9 @@
   function scoreColor(value) { return SCORE_COLORS[scoreBand(value)]; }
   function badgeText(value) { return value >= 100 ? '99+' : value >= 10 ? value.toFixed(0) : value.toFixed(1); }
   function localDate(date = new Date()) {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return /** @type {LocalDate} */ (`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`);
   }
+  /** @returns {value is LocalDate} */
   function validLocalDate(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const [year, month, day] = value.split('-').map(Number);
@@ -115,7 +129,7 @@
       const date = new Date(cursor);
       const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
       const end = Math.min(endMs, midnight);
-      parts.push({ date: localDate(date), sec: (end - cursor) / 1000 }); cursor = end;
+      parts.push({ date: localDate(date), sec: secondsFromMillis(end - cursor) }); cursor = end;
     }
     return parts;
   }
@@ -130,5 +144,5 @@
     }
     return rows.join('\r\n') + '\r\n';
   }
-  return { FIELDS, SITES, ACCESS_LIMITS, INTENTION_LIMITS, DELIVERY_LIMITS, SCROLL_FRICTION_LIMITS, validScrollFrictionStrength, validAccessMinutes, validIntention, DEFAULT_SETTINGS, settingsSnapshot, siteSettings, updatePreferences, trackingEnabled, recordedSites, emptyStats, statsSnapshot, aggregate, score, validDailyTarget, dailyTarget, scoreBand, scoreColor, badgeText, localDate, validLocalDate, recentDates, siteForURL, classifyPage, activeMillis, splitInterval, csv };
+  return { FIELDS, SITES, ACCESS_LIMITS, INTENTION_LIMITS, DELIVERY_LIMITS, SCROLL_FRICTION_LIMITS, validScrollFrictionStrength, validAccessMinutes, millisFromMinutes, millisFromSeconds, secondsFromMillis, minutesFromMillis, millisFromNumber, secondsFromNumber, validIntention, DEFAULT_SETTINGS, settingsSnapshot, siteSettings, updatePreferences, trackingEnabled, recordedSites, emptyStats, statsSnapshot, aggregate, score, validDailyTarget, dailyTarget, scoreBand, scoreColor, badgeText, localDate, validLocalDate, recentDates, siteForURL, classifyPage, activeMillis, splitInterval, csv };
 });

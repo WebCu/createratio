@@ -3,6 +3,17 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../core.js');
 
+test('duration converters preserve arithmetic without rounding or validation', () => {
+  for (const value of [0, 1, 1.25, -1, NaN, Infinity, -Infinity]) {
+    assert.equal(C.millisFromMinutes(value), value * 60000);
+    assert.equal(C.millisFromSeconds(value), value * 1000);
+    assert.equal(C.secondsFromMillis(value), value / 1000);
+    assert.equal(C.minutesFromMillis(value), value / 60000);
+    assert.equal(C.millisFromNumber(value), value);
+    assert.equal(C.secondsFromNumber(value), value);
+  }
+});
+
 test('classifies consuming routes, including profiles and SPA query strings', () => {
   for (const url of ['https://x.com/home', 'https://x.com/explore/', 'https://x.com/search?q=js', 'https://x.com/someone', 'https://x.com/someone/with_replies', 'https://x.com/someone/status/42', 'https://www.linkedin.com/feed/', 'https://www.linkedin.com/in/someone/', 'https://www.linkedin.com/company/acme/posts/']) assert.equal(C.classifyPage({ url }), 'consume', url);
 });

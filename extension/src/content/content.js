@@ -46,7 +46,7 @@
       if (segments.reduce((sum, segment) => sum + segment.sec, 0) + part.sec > MAX_SECONDS) queuePacket();
       if (recordingPaused) break;
       const tail = segments.at(-1);
-      if (tail && tail.mode === segmentMode && tail.date === part.date) tail.sec += part.sec;
+      if (tail && tail.mode === segmentMode && tail.date === part.date) tail.sec = Core.secondsFromNumber(tail.sec + part.sec);
       else segments.push({ ...part, mode: segmentMode });
       if (segments.length === MAX_ITEMS) queuePacket();
       if (recordingPaused) break;

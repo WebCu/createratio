@@ -34,12 +34,12 @@ function nextBlockedLine() {
 const blockedLine = nextBlockedLine();
 $('heading').textContent = blockedLine.replace('{wait}', 'a deliberate pause');
 function error(message = '') { $('error').textContent = message; $('error').hidden = !message; }
-function remaining(ms) { const seconds = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }
+function remaining(ms) { const seconds = Math.max(0, Math.ceil(Core.secondsFromMillis(ms))); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }
 function render() {
   if (!access) return;
   const now = Date.now(), active = access.goalAllowed || access.remainingMs > 0;
   const waiting = !active && access.readyAt > 0;
-  const waitSeconds = typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0 ? access.waitSeconds : Core.DEFAULT_SETTINGS.waitMinutes * 60;
+  const waitSeconds = typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0 ? access.waitSeconds : Core.secondsFromMillis(Core.millisFromMinutes(Core.DEFAULT_SETTINGS.waitMinutes));
   const waitMinutes = waitSeconds / 60;
   const waitDuration = `${waitMinutes} minute${waitMinutes === 1 ? '' : 's'}`;
   $('request').setAttribute('aria-label', 'Request access to ' + access.name);
@@ -65,7 +65,7 @@ function render() {
   $('end').hidden = !!access.goalAllowed;
   $('return').disabled = busy || !active;
   if (waiting) {
-    const seconds = Math.max(0, Math.ceil((access.readyAt - now) / 1000));
+    const seconds = Math.max(0, Math.ceil(Core.secondsFromMillis(access.readyAt - now)));
     $('clock').textContent = remaining(access.readyAt - now);
     const progress = /** @type {HTMLProgressElement} */ (document.getElementById('progress'));
     progress.max = waitSeconds;
