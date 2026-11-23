@@ -87,6 +87,14 @@ test('the wrapper returns the consumer status when the consumer exits without re
   assert.equal(await stream(['large.bin'], ['sh', '-c', 'exit 3'], { cwd: directory }), 3);
 });
 
+test('the wrapper keeps the consumer status when tar stops reading a long file list', { timeout: 20000 }, async t => {
+  const directory = scratch(t);
+  const files = Array.from({ length: 3000 }, (_, index) => `${'d'.repeat(200)}/${index}.bin`);
+  fs.mkdirSync(path.join(directory, 'd'.repeat(200)));
+  for (const file of files) fs.writeFileSync(path.join(directory, file), Buffer.alloc(1024, 1));
+  assert.equal(await stream(files, ['sh', '-c', 'exit 3'], { cwd: directory }), 3);
+});
+
 test('the wrapper streams the checkout to the consumer and returns its status', async t => {
   const directory = scratch(t);
   write(directory, 'a.txt', 'a');

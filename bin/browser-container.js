@@ -43,6 +43,9 @@ function stream(files, [program, ...args], { cwd = root } = {}) {
   });
   const consumer = spawn(program, args, { cwd, stdio: [archive.stdout, 'inherit', 'inherit'] });
   archive.stdout.destroy();
+  archive.stdin.on('error', error => {
+    if (error.code !== 'EPIPE') console.error(`Could not send the file list to tar: ${error.message}`);
+  });
   archive.stdin.end(files.join('\0'));
   const exited = child => new Promise(resolve => {
     child.on('error', error => {
