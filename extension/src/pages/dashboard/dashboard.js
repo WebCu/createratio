@@ -3,45 +3,82 @@ const extensionAPI = globalThis.browser || globalThis.chrome;
 const messages = RuntimeMessages.create(extensionAPI.runtime);
 /** @type {(id: string) => HTMLInputElement} */
 const $ = id => /** @type {HTMLInputElement} */ (document.getElementById(id));
-let intentions = [], intentionHistoryEnabled = false, activeView = 'ratio', refreshing = false, refreshPending = false, websiteTimeEnabled = false;
-let reportURL = null, reportTimer = null, reportVersion = 0;
+let intentions = [],
+  intentionHistoryEnabled = false,
+  activeView = 'ratio',
+  refreshing = false,
+  refreshPending = false,
+  websiteTimeEnabled = false;
+let reportURL = null,
+  reportTimer = null,
+  reportVersion = 0;
 let errorVersion = 0;
 function nextDay() {
   const now = new Date();
-  setTimeout(() => { nextDay(); void refresh(true); }, new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime() + 100);
+  setTimeout(
+    () => {
+      nextDay();
+      void refresh(true);
+    },
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime() + 100
+  );
 }
-function error(message = '') { errorVersion++; $('error').textContent = message; $('error').hidden = !message; }
-function minutes(sec) { return (sec / 60).toFixed(1) + 'm'; }
+function error(message = '') {
+  errorVersion++;
+  $('error').textContent = message;
+  $('error').hidden = !message;
+}
+function minutes(sec) {
+  return (sec / 60).toFixed(1) + 'm';
+}
 function svgElement(tag, attrs = {}, text) {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-  if (text !== undefined) node.textContent = text; return node;
+  if (text !== undefined) node.textContent = text;
+  return node;
 }
 function chart(days) {
-  const dates = C3.recentDates();
-  const totals = dates.map(date => C3.aggregate(days[date]));
+  const dates = Core.recentDates();
+  const totals = dates.map(date => Core.aggregate(days[date]));
   const max = Math.max(1, ...totals.flatMap(s => [s.consumeSec / 60, s.createSec / 60]));
   const top = Math.ceil(max / 5) * 5;
   const svg = $('chart');
   while (svg.children.length > 2) svg.lastChild.remove();
-  $('chart-desc').textContent = dates.map((date, i) => `${date}: ${minutes(totals[i].createSec)} creating, ${minutes(totals[i].consumeSec)} consuming`).join('; ');
+  $('chart-desc').textContent = dates
+    .map((date, i) => `${date}: ${minutes(totals[i].createSec)} creating, ${minutes(totals[i].consumeSec)} consuming`)
+    .join('; ');
   for (let i = 0; i <= 2; i++) {
     const y = 112 - i * 46;
     svg.append(svgElement('line', { x1: 28, x2: 350, y1: y, y2: y, stroke: 'var(--line)' }));
-    svg.append(svgElement('text', { x: 23, y: y + 3, 'text-anchor': 'end' }, String(Math.round(top * i / 2))));
+    svg.append(svgElement('text', { x: 23, y: y + 3, 'text-anchor': 'end' }, String(Math.round((top * i) / 2))));
   }
-  const tbody = $('chart-table').querySelector('tbody'); tbody.replaceChildren();
+  const tbody = $('chart-table').querySelector('tbody');
+  tbody.replaceChildren();
   dates.forEach((date, i) => {
     const x = 34 + i * 45;
-    for (const [j, key, color] of /** @type {const} */ ([[0, 'createSec', 'var(--green)'], [1, 'consumeSec', 'var(--consume)']])) {
-      const height = totals[i][key] / 60 / top * 92;
+    for (const [j, key, color] of /** @type {const} */ ([
+      [0, 'createSec', 'var(--green)'],
+      [1, 'consumeSec', 'var(--consume)']
+    ])) {
+      const height = (totals[i][key] / 60 / top) * 92;
       const bar = svgElement('rect', { x: x + j * 13, y: 112 - height, width: 10, height, rx: 2, fill: color });
-      bar.append(svgElement('title', {}, `${date}: ${minutes(totals[i][key])} ${j === 0 ? 'creating' : 'consuming'}`)); svg.append(bar);
+      bar.append(svgElement('title', {}, `${date}: ${minutes(totals[i][key])} ${j === 0 ? 'creating' : 'consuming'}`));
+      svg.append(bar);
     }
     const d = new Date(date + 'T12:00:00');
-    svg.append(svgElement('text', { x: x + 11, y: 132, 'text-anchor': 'middle', 'font-weight': i === 6 ? 700 : 400 }, i === 6 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' })));
+    svg.append(
+      svgElement(
+        'text',
+        { x: x + 11, y: 132, 'text-anchor': 'middle', 'font-weight': i === 6 ? 700 : 400 },
+        i === 6 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' })
+      )
+    );
     const row = document.createElement('tr');
-    for (const value of [date, (totals[i].createSec / 60).toFixed(2), (totals[i].consumeSec / 60).toFixed(2)]) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }
+    for (const value of [date, (totals[i].createSec / 60).toFixed(2), (totals[i].consumeSec / 60).toFixed(2)]) {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.append(cell);
+    }
     tbody.append(row);
   });
 }
@@ -50,55 +87,99 @@ function renderWebsites(days) {
   const total = rows.reduce((sum, [, sec]) => sum + sec, 0);
   $('website-total').textContent = WebTime.duration(total);
   $('website-count').textContent = `${rows.length} website${rows.length === 1 ? '' : 's'}`;
-  $('website-status').textContent = websiteTimeEnabled ? 'Website time is on. Updates as you browse.' : 'Website time is off. Previously recorded browsing time is kept.';
+  $('website-status').textContent = websiteTimeEnabled
+    ? 'Website time is on. Updates as you browse.'
+    : 'Website time is off. Previously recorded browsing time is kept.';
   $('website-empty').hidden = rows.length > 0;
-  $('website-empty').textContent = websiteTimeEnabled ? 'No time in this period yet. Use a website to start.' : 'Enable Website time in Settings to record browsing time across all sites.';
+  $('website-empty').textContent = websiteTimeEnabled
+    ? 'No time in this period yet. Use a website to start.'
+    : 'Enable Website time in Settings to record browsing time across all sites.';
   $('website-sites').replaceChildren();
   const shares = WebTime.shares(rows);
   rows.forEach(([domain, sec], index) => {
-    const row = document.createElement('tr'), name = document.createElement('td'), time = document.createElement('td'), share = document.createElement('td');
+    const row = document.createElement('tr'),
+      name = document.createElement('td'),
+      time = document.createElement('td'),
+      share = document.createElement('td');
     name.textContent = domain;
-    const bar = document.createElement('span'); bar.style.width = `${sec / total * 100}%`; bar.setAttribute('aria-hidden', 'true'); name.append(bar);
-    time.textContent = WebTime.duration(sec); share.textContent = `${shares[index]}%`;
-    row.append(name, time, share); $('website-sites').append(row);
+    const bar = document.createElement('span');
+    bar.style.width = `${(sec / total) * 100}%`;
+    bar.setAttribute('aria-hidden', 'true');
+    name.append(bar);
+    time.textContent = WebTime.duration(sec);
+    share.textContent = `${shares[index]}%`;
+    row.append(name, time, share);
+    $('website-sites').append(row);
   });
   $('website-export').disabled = false;
 }
 function renderIntentions() {
   const entries = intentions;
-  $('intention-status').textContent = intentionHistoryEnabled ? 'Saving is on. Intentions stay on this device.' : 'Saving is off. Existing intentions are kept.';
+  $('intention-status').textContent = intentionHistoryEnabled
+    ? 'Saving is on. Intentions stay on this device.'
+    : 'Saving is off. Existing intentions are kept.';
   $('intention-empty').hidden = entries.length > 0;
   $('intention-clear').disabled = entries.length === 0;
   $('intention-list').replaceChildren();
-  const names = new Map(C3.SITES.map(site => [site.id, site.name]));
+  const names = new Map(Core.SITES.map(site => [site.id, site.name]));
   for (const entry of [...entries].reverse()) {
-    const item = document.createElement('li'), meta = document.createElement('div'), reason = document.createElement('p');
+    const item = document.createElement('li'),
+      meta = document.createElement('div'),
+      reason = document.createElement('p');
     meta.textContent = `${names.get(entry.site) || entry.site} · ${new Date(entry.requestedAt).toLocaleString()}`;
     reason.textContent = entry.reason;
-    item.append(meta, reason); $('intention-list').append(item);
+    item.append(meta, reason);
+    $('intention-list').append(item);
   }
 }
 function renderRatio(days) {
-  const today = C3.localDate(), day = days[today] || {}, total = C3.aggregate(day), score = C3.score(total);
+  const today = Core.localDate(),
+    day = days[today] || {},
+    total = Core.aggregate(day),
+    score = Core.score(total);
   const hasActivity = ['createSec', 'consumeSec', 'posts', 'replies', 'comments'].some(key => total[key] > 0);
-  $('date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); /** @type {HTMLTimeElement} */ (document.getElementById('date')).dateTime = today;
-  $('score').textContent = score.toFixed(2); $('score').style.color = hasActivity ? C3.scoreColor(score) : '';
-  $('score-card').setAttribute('data-score', hasActivity ? C3.scoreBand(score) : 'none');
-  $('score-status').textContent = !hasActivity ? 'A fresh start. Make something today.' : score >= 1 ? 'You’re making more than you’re taking in.' : score >= 0.5 ? 'A little more creating gets you to 1.0.' : 'One thoughtful reply is a great start.';
-  $('create-min').textContent = minutes(total.createSec); $('consume-min').textContent = minutes(total.consumeSec);
-  for (const key of ['posts', 'replies', 'comments', 'likes', 'quotes', 'reposts', 'bookmarks']) $(key).textContent = String(total[key]);
+  $('date').textContent = new Date().toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric'
+  });
+  /** @type {HTMLTimeElement} */
+  (document.getElementById('date')).dateTime = today;
+  $('score').textContent = score.toFixed(2);
+  $('score').style.color = hasActivity ? Core.scoreColor(score) : '';
+  $('score-card').setAttribute('data-score', hasActivity ? Core.scoreBand(score) : 'none');
+  $('score-status').textContent = !hasActivity
+    ? 'A fresh start. Make something today.'
+    : score >= 1
+      ? 'You’re making more than you’re taking in.'
+      : score >= 0.5
+        ? 'A little more creating gets you to 1.0.'
+        : 'One thoughtful reply is a great start.';
+  $('create-min').textContent = minutes(total.createSec);
+  $('consume-min').textContent = minutes(total.consumeSec);
+  for (const key of ['posts', 'replies', 'comments', 'likes', 'quotes', 'reposts', 'bookmarks'])
+    $(key).textContent = String(total[key]);
   $('sites').replaceChildren();
-  const names = new Map(C3.SITES.map(site => [site.id, site.name]));
-  for (const site of new Set([...names.keys(), ...C3.recordedSites(day)])) {
+  const names = new Map(Core.SITES.map(site => [site.id, site.name]));
+  for (const site of new Set([...names.keys(), ...Core.recordedSites(day)])) {
     const name = names.get(site) || site + ' (unavailable)';
-    const s = { ...C3.emptyStats(), ...day[site] }, row = document.createElement('tr');
-    for (const value of [name, minutes(s.createSec), minutes(s.consumeSec), C3.score(s).toFixed(2)]) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }
+    const s = { ...Core.emptyStats(), ...day[site] },
+      row = document.createElement('tr');
+    for (const value of [name, minutes(s.createSec), minutes(s.consumeSec), Core.score(s).toFixed(2)]) {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.append(cell);
+    }
     $('sites').append(row);
   }
-  $('export').disabled = false; chart(days);
+  $('export').disabled = false;
+  chart(days);
 }
 async function refresh(requested = false) {
-  if (refreshing) { if (requested) refreshPending = true; return; } refreshing = true;
+  if (refreshing) {
+    if (requested) refreshPending = true;
+    return;
+  }
+  refreshing = true;
   const version = errorVersion;
   try {
     const snapshot = await messages.send({ type: 'snapshot' }, 'Unable to load your data.');
@@ -107,31 +188,61 @@ async function refresh(requested = false) {
     const view = activeView;
     if (view === 'intentions') {
       const result = await messages.send({ type: 'access-history-list' }, 'Unable to load history.');
-      if (view === activeView) { intentions = result.intentions; renderIntentions(); }
+      if (view === activeView) {
+        intentions = result.intentions;
+        renderIntentions();
+      }
     } else {
-      const result = await messages.send({ type: 'history', kind: view === 'ratio' ? 'ratio' : 'websites', range: view === 'ratio' ? 'week' : /** @type {HistoryRange} */ ($('website-range').value) }, 'Unable to load history.');
-      if (view === activeView) { intentions = []; if (view === 'ratio') renderRatio(result.days); else renderWebsites(result.days); }
+      const result = await messages.send(
+        {
+          type: 'history',
+          kind: view === 'ratio' ? 'ratio' : 'websites',
+          range: view === 'ratio' ? 'week' : /** @type {HistoryRange} */ ($('website-range').value)
+        },
+        'Unable to load history.'
+      );
+      if (view === activeView) {
+        intentions = [];
+        if (view === 'ratio') renderRatio(result.days);
+        else renderWebsites(result.days);
+      }
     }
     if (version === errorVersion) error();
-  } catch (e) { error(e.message); } finally { refreshing = false; if (refreshPending) { refreshPending = false; void refresh(); } }
-}
-for (const view of ['ratio', 'websites', 'intentions']) $(view + '-view').addEventListener('click', () => {
-  for (const panel of ['ratio', 'websites', 'intentions']) {
-    $(panel + '-panel').hidden = panel !== view;
-    $(panel + '-view').setAttribute('aria-pressed', String(panel === view));
+  } catch (e) {
+    error(e.message);
+  } finally {
+    refreshing = false;
+    if (refreshPending) {
+      refreshPending = false;
+      void refresh();
+    }
   }
-  $('export').hidden = view !== 'ratio'; activeView = view; void refresh(true);
-});
+}
+for (const view of ['ratio', 'websites', 'intentions'])
+  $(view + '-view').addEventListener('click', () => {
+    for (const panel of ['ratio', 'websites', 'intentions']) {
+      $(panel + '-panel').hidden = panel !== view;
+      $(panel + '-view').setAttribute('aria-pressed', String(panel === view));
+    }
+    $('export').hidden = view !== 'ratio';
+    activeView = view;
+    void refresh(true);
+  });
 $('intention-clear').addEventListener('click', async () => {
   if (!confirm('Delete all saved intentions? This cannot be undone.')) return;
   $('intention-clear').disabled = true;
   try {
     await messages.send({ type: 'access-history-clear' }, 'Unable to clear intention history.');
     await refresh(true);
-  } catch (e) { error(e.message); }
-  finally { $('intention-clear').disabled = !intentions.length; }
+  } catch (e) {
+    error(e.message);
+  } finally {
+    $('intention-clear').disabled = !intentions.length;
+  }
 });
-$('website-range').addEventListener('change', () => { void refresh(true); });
+$('website-range').addEventListener('change', () => {
+  void refresh(true);
+});
 /** @param {HistoryKind} kind */
 async function exportHistory(kind) {
   const version = reportVersion;
@@ -143,39 +254,70 @@ async function exportHistory(kind) {
     }
     const data = await messages.send({ type: 'history', kind, range: 'month' }, failure);
     if (version !== reportVersion) throw new Error('History changed while loading. Please try again.');
-    const csv = websites ? WebTime.csv(data.days) : C3.csv(data.days);
+    const csv = websites ? WebTime.csv(data.days) : Core.csv(data.days);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a'); link.href = url; link.download = `CreateRatio${websites ? '-websites' : ''}-${C3.localDate()}.csv`; document.body.append(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000); error();
-  } catch (e) { error(e.message); }
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `CreateRatio${websites ? '-websites' : ''}-${Core.localDate()}.csv`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    error();
+  } catch (e) {
+    error(e.message);
+  }
 }
-const sharing = SocialSharing.mount({ messages, range: () => /** @type {HistoryRange} */ ($('report-range').value), error });
+const sharing = SocialSharing.mount({
+  messages,
+  range: () => /** @type {HistoryRange} */ ($('report-range').value),
+  error
+});
 $('report-range').addEventListener('change', sharing.clear);
 $('report-export').addEventListener('click', async () => {
   const button = $('report-export');
   if (button.disabled) return;
-  const range = /** @type {HistoryRange} */ ($('report-range').value), version = reportVersion;
-  button.disabled = true; $('report-status').textContent = '';
+  const range = /** @type {HistoryRange} */ ($('report-range').value),
+    version = reportVersion;
+  button.disabled = true;
+  $('report-status').textContent = '';
   try {
-    const now = new Date(), date = C3.localDate(now);
+    const now = new Date(),
+      date = Core.localDate(now);
     const data = await messages.send({ type: 'history', kind: 'ratio', range }, 'Unable to export report.');
     if (version !== reportVersion) throw new Error('History changed while loading. Please try again.');
-    if (C3.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
+    if (Core.localDate() !== date) throw new Error('The local date changed while loading history. Please try again.');
     const report = CreationReport.create(data.days, range, now);
     clearTimeout(reportTimer);
     if (reportURL) URL.revokeObjectURL(reportURL);
     reportURL = URL.createObjectURL(new Blob([report.html], { type: 'text/html;charset=utf-8' }));
-    reportTimer = setTimeout(() => { URL.revokeObjectURL(reportURL); reportURL = null; reportTimer = null; }, 10000);
-    const link = document.createElement('a'); link.href = reportURL;
-    link.download = report.filename; document.body.append(link); link.click(); link.remove();
-    error(); $('report-status').textContent = 'Report download started. Open the HTML file to review, print, or save as PDF.';
-  } catch (e) { error(e.message); }
-  finally { button.disabled = false; }
+    reportTimer = setTimeout(() => {
+      URL.revokeObjectURL(reportURL);
+      reportURL = null;
+      reportTimer = null;
+    }, 10000);
+    const link = document.createElement('a');
+    link.href = reportURL;
+    link.download = report.filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    error();
+    $('report-status').textContent = 'Report download started. Open the HTML file to review, print, or save as PDF.';
+  } catch (e) {
+    error(e.message);
+  } finally {
+    button.disabled = false;
+  }
 });
 $('website-export').addEventListener('click', () => exportHistory('websites'));
 $('export').addEventListener('click', () => exportHistory('ratio'));
 extensionAPI.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) { reportVersion++; sharing.clear(); }
+  if (area === 'local' && Object.hasOwn(changes, '_historyReset')) {
+    reportVersion++;
+    sharing.clear();
+  }
   if (RuntimeMessages.shouldRefresh(changes, area, activeView === 'websites')) void refresh(true);
 });
-nextDay(); void refresh();
+nextDay();
+void refresh();

@@ -13,12 +13,16 @@ function check(t, failAt = '', command = scripts.check) {
   const dir = mkdtempSync(path.join(tmpdir(), 'createratio-check-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const log = path.join(dir, 'calls.jsonl');
-  writeFileSync(path.join(dir, 'pnpm'), `#!${process.execPath}
+  writeFileSync(
+    path.join(dir, 'pnpm'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const command = process.argv[2];
 fs.appendFileSync(process.env.CALL_LOG, JSON.stringify(command) + '\\n');
 if (command === process.env.FAIL_AT) process.exit(7);
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 }
+  );
   const result = spawnSync('sh', ['-c', command], {
     cwd: root,
     encoding: 'utf8',
@@ -27,9 +31,9 @@ if (command === process.env.FAIL_AT) process.exit(7);
   return { ...result, calls: readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse) };
 }
 
-const stages = ['check:syntax', 'check:types', 'test', 'build', 'build:site'];
+const stages = ['check:format', 'check:syntax', 'check:types', 'test', 'build', 'build:site'];
 
-test('check runs syntax, types, tests, browser builds, and website build in order', t => {
+test('check runs formatting, syntax, types, tests, browser builds, and website build in order', t => {
   const result = check(t);
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.calls, stages);

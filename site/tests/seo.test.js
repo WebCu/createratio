@@ -12,11 +12,14 @@ const origin = 'https://createratio.com';
 
 function attributes(html, tag) {
   return [...html.matchAll(new RegExp(`<${tag}\\b[^>]*>`, 'gi'))].map(([element]) =>
-    Object.fromEntries([...element.matchAll(/([\w:-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value])));
+    Object.fromEntries([...element.matchAll(/([\w:-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]))
+  );
 }
 
 function metadata(html, key, value) {
-  return attributes(html, 'meta').filter(meta => meta[key] === value).map(meta => meta.content);
+  return attributes(html, 'meta')
+    .filter(meta => meta[key] === value)
+    .map(meta => meta.content);
 }
 
 function canonical(html) {
@@ -85,8 +88,11 @@ test('homepage social metadata and site identity agree with its search metadata'
 
 test('source and built previews deliver crawl files covering exactly the published canonicals', async t => {
   const output = build(t);
-  const expected = fs.readdirSync(output).filter(name => name.endsWith('.html'))
-    .map(name => canonical(fs.readFileSync(path.join(output, name), 'utf8'))).sort();
+  const expected = fs
+    .readdirSync(output)
+    .filter(name => name.endsWith('.html'))
+    .map(name => canonical(fs.readFileSync(path.join(output, name), 'utf8')))
+    .sort();
   for (const directory of [path.resolve(__dirname, '..'), output]) {
     const server = createDevServer(directory);
     t.after(() => new Promise(resolve => server.close(resolve)));
@@ -101,7 +107,10 @@ test('source and built previews deliver crawl files covering exactly the publish
     assert.equal(sitemap.status, 200);
     assert.match(sitemap.headers.get('content-type'), /^application\/xml/);
     const xml = await sitemap.text();
-    assert.match(xml, /^<\?xml version="1\.0" encoding="UTF-8"\?>\s*<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">(?:\s*<url><loc>https:\/\/createratio\.com\/[^<]*<\/loc><\/url>)+\s*<\/urlset>\s*$/);
+    assert.match(
+      xml,
+      /^<\?xml version="1\.0" encoding="UTF-8"\?>\s*<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">(?:\s*<url><loc>https:\/\/createratio\.com\/[^<]*<\/loc><\/url>)+\s*<\/urlset>\s*$/
+    );
     const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, url]) => url).sort();
     assert.deepEqual(urls, expected, 'every canonical is listed once, without aliases or stale pages');
     for (const url of urls) {

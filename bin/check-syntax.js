@@ -16,13 +16,21 @@ function packageType(file) {
   }
 }
 
-const TYPE_TAG_NAMES = { type: /^$/, satisfies: /^$/, returns: /^$/, param: /^\[?[A-Za-z_$][\w$.]*\]?$/, typedef: /^[A-Za-z_$][\w$]*$/, template: /^[A-Za-z_$][\w$]*$/ };
+const TYPE_TAG_NAMES = {
+  type: /^$/,
+  satisfies: /^$/,
+  returns: /^$/,
+  param: /^\[?[A-Za-z_$][\w$.]*\]?$/,
+  typedef: /^[A-Za-z_$][\w$]*$/,
+  template: /^[A-Za-z_$][\w$]*$/
+};
 
 function typeTagLine(line) {
   const template = /^@template [A-Za-z_$][\w$]*$/.test(line);
   const tag = /^@(\w+) \{/.exec(line);
   if (template || !tag || !Object.hasOwn(TYPE_TAG_NAMES, tag[1])) return template;
-  let depth = 0, quote = '';
+  let depth = 0,
+    quote = '';
   for (let index = tag[0].length - 1; index < line.length; index++) {
     if (quote) {
       if (line[index] === '\\') index++;
@@ -36,7 +44,11 @@ function typeTagLine(line) {
 
 function typeAnnotation(comment) {
   if (comment.type !== 'Block' || !comment.value.startsWith('*')) return false;
-  const lines = comment.value.slice(1).split(/\r?\n/).map(line => line.replace(/^\s*\*?\s*/, '').trim()).filter(Boolean);
+  const lines = comment.value
+    .slice(1)
+    .split(/\r?\n/)
+    .map(line => line.replace(/^\s*\*?\s*/, '').trim())
+    .filter(Boolean);
   return lines.length > 0 && lines.every(typeTagLine);
 }
 
@@ -46,7 +58,11 @@ function codeComments(file, typed) {
   const type = extension === '.js' ? packageType(file) : undefined;
   let sourceType = extension === '.mjs' || type === 'module' ? 'module' : 'commonjs';
   if (extension === '.js' && !['module', 'commonjs'].includes(type)) {
-    const result = spawnSync(process.execPath, ['--check', '--input-type=commonjs'], { input: source, encoding: 'utf8', timeout: 10000 });
+    const result = spawnSync(process.execPath, ['--check', '--input-type=commonjs'], {
+      input: source,
+      encoding: 'utf8',
+      timeout: 10000
+    });
     if (result.error) throw result.error;
     if (![0, 1].includes(result.status)) throw new Error(`Module detection failed: ${file}\n${result.stderr}`);
     sourceType = result.status === 0 ? 'commonjs' : 'module';
@@ -57,7 +73,9 @@ function codeComments(file, typed) {
   } catch (error) {
     throw new Error(`Comment parse failed: ${file}\n${error.message}`);
   }
-  return comments.filter(comment => !(comment.start === 0 && source.startsWith('#!')) && !(typed && typeAnnotation(comment)));
+  return comments.filter(
+    comment => !(comment.start === 0 && source.startsWith('#!')) && !(typed && typeAnnotation(comment))
+  );
 }
 
 function checkSyntax(files, typedFiles = []) {
@@ -81,10 +99,15 @@ async function checkSyntaxParallel(files, typedFiles = []) {
   files.forEach((file, index) => groups[index % groups.length].push(file));
   const workers = groups.map(group => new Worker(__filename, { workerData: { files: group, typedFiles } }));
   try {
-    await Promise.all(workers.map(worker => new Promise((resolve, reject) => {
-      worker.once('error', reject);
-      worker.once('exit', code => code === 0 ? resolve() : reject(new Error(`Syntax worker exited ${code}`)));
-    })));
+    await Promise.all(
+      workers.map(
+        worker =>
+          new Promise((resolve, reject) => {
+            worker.once('error', reject);
+            worker.once('exit', code => (code === 0 ? resolve() : reject(new Error(`Syntax worker exited ${code}`))));
+          })
+      )
+    );
     return files.length;
   } finally {
     await Promise.all(workers.map(worker => worker.terminate()));
@@ -93,20 +116,32 @@ async function checkSyntaxParallel(files, typedFiles = []) {
 
 async function main() {
   const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
-  const inventory = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.js', '*.mjs', '*.cjs'], { cwd: root, encoding: 'utf8' });
-  const files = [...new Set(inventory.split('\0').filter(Boolean))].sort().map(file => path.join(root, file)).filter(file => existsSync(file));
+  const inventory = execFileSync(
+    'git',
+    ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.js', '*.mjs', '*.cjs'],
+    { cwd: root, encoding: 'utf8' }
+  );
+  const files = [...new Set(inventory.split('\0').filter(Boolean))]
+    .sort()
+    .map(file => path.join(root, file))
+    .filter(file => existsSync(file));
   const tsc = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
-  const typed = existsSync(path.join(root, 'tsconfig.json')) ? execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json', '--listFilesOnly'], { cwd: root, encoding: 'utf8' }) : '';
+  const typed = existsSync(path.join(root, 'tsconfig.json'))
+    ? execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json', '--listFilesOnly'], { cwd: root, encoding: 'utf8' })
+    : '';
   const typedFiles = typed.split(/\r?\n/).filter(file => file && existsSync(file));
-  console.log(`${await checkSyntaxParallel(files, typedFiles)} JavaScript syntax checks passed; no code comments outside JSDoc type annotations.`);
+  console.log(
+    `${await checkSyntaxParallel(files, typedFiles)} JavaScript syntax checks passed; no code comments outside JSDoc type annotations.`
+  );
 }
 
 if (require.main === module) {
   if (!isMainThread) checkSyntax(workerData.files, workerData.typedFiles);
-  else main().catch(error => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
+  else
+    main().catch(error => {
+      console.error(error.message);
+      process.exitCode = 1;
+    });
 }
 
 module.exports = { checkSyntax, checkSyntaxParallel };

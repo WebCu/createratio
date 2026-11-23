@@ -1,19 +1,39 @@
 (function (root, factory) {
   const plugin = factory();
   if (typeof module === 'object' && module.exports) module.exports = plugin;
-  else (root.C3_SITE_MODULES ||= {}).youtube = plugin;
+  else (root.SITE_MODULES ||= {}).youtube = plugin;
 })(globalThis, function () {
   'use strict';
   const hosts = ['youtube.com', 'www.youtube.com'];
-  const domains = ['youtube.com'], navigationId = 111, resourceId = 112;
+  const domains = ['youtube.com'],
+    navigationId = 111,
+    resourceId = 112;
   const access = {
-    domains, home: 'https://www.youtube.com/', redirectRuleId: 6, ruleIds: [navigationId, resourceId],
+    domains,
+    home: 'https://www.youtube.com/',
+    redirectRuleId: 6,
+    ruleIds: [navigationId, resourceId],
     unrestrictedRules: [
-      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
-      { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
+      {
+        id: navigationId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, resourceTypes: ['main_frame'] }
+      },
+      {
+        id: resourceId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] }
+      }
     ],
     sessionRules: [
-      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] } }
+      {
+        id: navigationId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] }
+      }
     ]
   };
   const selectors = {
@@ -23,13 +43,28 @@
   };
   function classifyPage({ url, youtubeCommentFocused = false }) {
     let parsed;
-    try { parsed = new URL(url); } catch (_) { return 'neutral'; }
-    if (parsed.protocol !== 'https:' || !hosts.includes(parsed.hostname) || parsed.port || parsed.username || parsed.password) return 'neutral';
+    try {
+      parsed = new URL(url);
+    } catch (_) {
+      return 'neutral';
+    }
+    if (
+      parsed.protocol !== 'https:' ||
+      !hosts.includes(parsed.hostname) ||
+      parsed.port ||
+      parsed.username ||
+      parsed.password
+    )
+      return 'neutral';
     const path = parsed.pathname.replace(/\/+$/, '') || '/';
-    const feed = /^\/(?:watch|results|playlist)$/.test(path)
-      || /^\/shorts(?:\/[A-Za-z0-9_-]+)?$/.test(path)
-      || /^\/feed\/(?:subscriptions|trending|explore|history|library|you|playlists)$/.test(path);
-    const channel = /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)(?:\/(?:featured|videos|shorts|streams|playlists|community|posts|releases|podcasts|courses))?$/.test(path);
+    const feed =
+      /^\/(?:watch|results|playlist)$/.test(path) ||
+      /^\/shorts(?:\/[A-Za-z0-9_-]+)?$/.test(path) ||
+      /^\/feed\/(?:subscriptions|trending|explore|history|library|you|playlists)$/.test(path);
+    const channel =
+      /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)(?:\/(?:featured|videos|shorts|streams|playlists|community|posts|releases|podcasts|courses))?$/.test(
+        path
+      );
     if (path !== '/' && !feed && !channel) return 'neutral';
     return youtubeCommentFocused ? 'create' : 'consume';
   }
@@ -37,12 +72,19 @@
     function available(node) {
       if (!dom.enabled(node)) return false;
       for (let ancestor = node; ancestor; ancestor = ancestor.parentElement) {
-        if (ancestor.getAttribute('disabled') !== null || ancestor.getAttribute('aria-disabled') === 'true' || ancestor.getAttribute('inert') !== null) return false;
+        if (
+          ancestor.getAttribute('disabled') !== null ||
+          ancestor.getAttribute('aria-disabled') === 'true' ||
+          ancestor.getAttribute('inert') !== null
+        )
+          return false;
       }
       return true;
     }
     function localElements(scope, candidates) {
-      return [...scope.querySelectorAll(candidates.join(','))].filter(node => dom.visible(node) && dom.closest(node, selectors.composer) === scope);
+      return [...scope.querySelectorAll(candidates.join(','))].filter(
+        node => dom.visible(node) && dom.closest(node, selectors.composer) === scope
+      );
     }
     function commentEditor(scope) {
       const editors = localElements(scope, selectors.editor);
@@ -69,5 +111,14 @@
       }
     };
   }
-  return { id: 'youtube', name: 'YouTube', hosts, defaultEnabled: true, access, actions: ['comments'], classifyPage, create };
+  return {
+    id: 'youtube',
+    name: 'YouTube',
+    hosts,
+    defaultEnabled: true,
+    access,
+    actions: ['comments'],
+    classifyPage,
+    create
+  };
 });

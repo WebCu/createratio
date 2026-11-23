@@ -15,8 +15,17 @@
   ],
   "socialPost": "CreateRatio supports X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit. A deliberate pause before you browse, active-time limits, and a local creation score. Choose your sites in Settings → Websites → Limit & track. Free and open source. https://createratio.com/",
   "screenshots": [
-    { "id": "01-websites", "caption": "Choose from seven supported sites: X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit. All seven start On for fresh installs; existing saved choices are preserved." },
-    { "id": "02-intention", "caption": "Make room for intention before opening Instagram. Write an intention, wait five minutes by default, then explicitly start a timed session." },
-    { "id": "03-creation-score", "caption": "See your creating-versus-consuming balance. Demonstration totals are synthetic; the creation score is approximate." }
+    {
+      "id": "01-websites",
+      "caption": "Choose from seven supported sites: X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit. All seven start On for fresh installs; existing saved choices are preserved."
+    },
+    {
+      "id": "02-intention",
+      "caption": "Make room for intention before opening Instagram. Write an intention, wait five minutes by default, then explicitly start a timed session."
+    },
+    {
+      "id": "03-creation-score",
+      "caption": "See your creating-versus-consuming balance. Demonstration totals are synthetic; the creation score is approximate."
+    }
   ]
 }

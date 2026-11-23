@@ -1,0 +1,9 @@
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!extension/package.json
+!site/package.json
+!bin/browser-pins.json
+!bin/setup-chromium.js
+!docker/browser-check.sh

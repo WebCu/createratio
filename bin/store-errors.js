@@ -1,16 +1,43 @@
 const diagnosticFields = new Set([
-  'error', 'errors', 'code', 'status', 'message', 'messages', 'detail', 'details',
-  'reason', 'description', 'fieldViolations', 'field', 'non_field_errors',
-  'source', 'upload', 'version', 'license', 'channel', 'validation', 'type',
-  'uploadState', 'lastAsyncUploadState', 'state', 'itemError', 'error_code', 'error_detail',
-  'warningInfo', 'warnings'
+  'error',
+  'errors',
+  'code',
+  'status',
+  'message',
+  'messages',
+  'detail',
+  'details',
+  'reason',
+  'description',
+  'fieldViolations',
+  'field',
+  'non_field_errors',
+  'source',
+  'upload',
+  'version',
+  'license',
+  'channel',
+  'validation',
+  'type',
+  'uploadState',
+  'lastAsyncUploadState',
+  'state',
+  'itemError',
+  'error_code',
+  'error_detail',
+  'warningInfo',
+  'warnings'
 ]);
 
 function sanitize(value, secrets = []) {
   let text = String(value);
-  const variants = secrets.filter(Boolean).flatMap(secret => [secret, encodeURIComponent(secret)]).sort((a, b) => b.length - a.length);
+  const variants = secrets
+    .filter(Boolean)
+    .flatMap(secret => [secret, encodeURIComponent(secret)])
+    .sort((a, b) => b.length - a.length);
   for (const secret of variants) text = text.split(secret).join('<REDACTED>');
-  return text.replace(/\b(Bearer|JWT)\s+[^\s<>"']+/gi, '$1 <REDACTED>')
+  return text
+    .replace(/\b(Bearer|JWT)\s+[^\s<>"']+/gi, '$1 <REDACTED>')
     .replace(/\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '<REDACTED>')
     .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ');
 }
@@ -62,7 +89,9 @@ async function responseDetails(response) {
 function storeError(store, operation, failure, details, secrets = []) {
   const guidance = store === 'Chrome Web Store' ? 'the Developer Dashboard' : 'AMO';
   const diagnostic = diagnosticDetails(details, secrets);
-  return new Error(`${store} ${operation} failed (${failure}); inspect ${guidance} before retrying. ${diagnostic || 'No safe structured store details available.'}`);
+  return new Error(
+    `${store} ${operation} failed (${failure}); inspect ${guidance} before retrying. ${diagnostic || 'No safe structured store details available.'}`
+  );
 }
 
 async function storeHttpError(store, operation, response, secrets) {

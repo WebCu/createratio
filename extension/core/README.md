@@ -1,6 +1,6 @@
 # Shared core
 
-`core.js` is dependency-free and has no DOM, browser-storage, or network access. It exports CommonJS in Node and exposes `globalThis.C3` in browser bundles.
+`core.js` is dependency-free and has no DOM, browser-storage, or network access. It exports CommonJS in Node and exposes `globalThis.Core` in browser bundles.
 
 ```js
 const core = require('./extension/core/core.js');
@@ -37,7 +37,7 @@ site's pure classifier; it returns `create`, `consume`, or `neutral`. The actual
 routes, selectors, and DOM/action interpretation live together in `extension/sites/<id>.js`.
 The core never chooses X-versus-LinkedIn behavior itself.
 
-`activeMillis` clips active intervals to the 30-second idle window and discards gaps over 15 seconds. `splitInterval` divides time at local midnight; `localDate` and `recentDates` use the local calendar.
+`activeMilliseconds` clips active intervals to the 30-second idle window and discards gaps over 15 seconds. `splitInterval` divides time at local midnight; `localDate` and `recentDates` use the local calendar.
 
 ## Data contract
 
