@@ -20,12 +20,21 @@ test('Chromium startup accepts complete debugger endpoints with valid ports', as
 test('Chromium startup keeps polling incomplete or malformed debugger endpoints', async () => {
   const { devToolsEndpoint } = await helper();
   const contents = [
-    '', '45179', '45179\n', `\n${debuggerPath}`,
-    `0\n${debuggerPath}`, `65536\n${debuggerPath}`, `not-a-port\n${debuggerPath}`,
-    `45179oops\n${debuggerPath}`, `45179.5\n${debuggerPath}`,
-    '45179\n/devtools/', '45179\n/devtools/browser/',
-    '45179\nnot-a-debugger-path', '45179\n/devtools/browser/invalid path',
-    `45179\n${debuggerPath}0`, `45179\n${debuggerPath.replace('35332af7', '35332ag7')}`
+    '',
+    '45179',
+    '45179\n',
+    `\n${debuggerPath}`,
+    `0\n${debuggerPath}`,
+    `65536\n${debuggerPath}`,
+    `not-a-port\n${debuggerPath}`,
+    `45179oops\n${debuggerPath}`,
+    `45179.5\n${debuggerPath}`,
+    '45179\n/devtools/',
+    '45179\n/devtools/browser/',
+    '45179\nnot-a-debugger-path',
+    '45179\n/devtools/browser/invalid path',
+    `45179\n${debuggerPath}0`,
+    `45179\n${debuggerPath.replace('35332af7', '35332ag7')}`
   ];
   for (const content of contents) {
     assert.equal(devToolsEndpoint(content), null, JSON.stringify(content));
@@ -43,8 +52,10 @@ test('Chromium startup waits for an empty then partially written debugger file t
   const file = join(directory, 'DevToolsActivePort');
   await writeFile(file, '');
   const writes = [
-    '45179\n', '45179\n/devtools/browser/35332af7-',
-    `45179\n${debuggerPath.slice(0, -1)}`, `45179\n${debuggerPath}`
+    '45179\n',
+    '45179\n/devtools/browser/35332af7-',
+    `45179\n${debuggerPath.slice(0, -1)}`,
+    `45179\n${debuggerPath}`
   ];
   let reads = 0;
   const endpoint = await eventually(async () => {

@@ -4,30 +4,89 @@ const assert = require('node:assert/strict');
 const ScrollFriction = require('./scroll-friction.js');
 
 class Element {
-  constructor(name, { scrollHeight = 0, clientHeight = 0, scrollWidth = 0, clientWidth = 0, overflowY = 'visible', overflowX = 'visible', contentEditable = false, dialog = false } = {}) {
-    Object.assign(this, { name, scrollHeight, clientHeight, scrollWidth, clientWidth, overflowY, overflowX, isContentEditable: contentEditable, dialog });
-    this.scrollTop = 0; this.scrollLeft = 0; this.moves = [];
+  constructor(
+    name,
+    {
+      scrollHeight = 0,
+      clientHeight = 0,
+      scrollWidth = 0,
+      clientWidth = 0,
+      overflowY = 'visible',
+      overflowX = 'visible',
+      contentEditable = false,
+      dialog = false
+    } = {}
+  ) {
+    Object.assign(this, {
+      name,
+      scrollHeight,
+      clientHeight,
+      scrollWidth,
+      clientWidth,
+      overflowY,
+      overflowX,
+      isContentEditable: contentEditable,
+      dialog
+    });
+    this.scrollTop = 0;
+    this.scrollLeft = 0;
+    this.moves = [];
   }
-  matches(selector) { return this.dialog && selector.split(',').includes('dialog'); }
-  scrollBy({ top = 0, left = 0 }) { this.moves.push({ top, left }); this.scrollTop += top; this.scrollLeft += left; }
+  matches(selector) {
+    return this.dialog && selector.split(',').includes('dialog');
+  }
+  scrollBy({ top = 0, left = 0 }) {
+    this.moves.push({ top, left });
+    this.scrollTop += top;
+    this.scrollLeft += left;
+  }
 }
 
 function setup({ root, body, chain = [], active = null, viewport = 800 }) {
-  const documentElement = root?.name === 'html' ? root : new Element('html', { scrollHeight: viewport, clientHeight: viewport });
+  const documentElement =
+    root?.name === 'html' ? root : new Element('html', { scrollHeight: viewport, clientHeight: viewport });
   const path = [...chain, body, documentElement];
   const document = {
-    scrollingElement: root, documentElement, body, activeElement: active, listener: null, passive: null,
-    addEventListener(type, listener, options) { if (type === 'wheel') { this.listener = listener; this.passive = options?.passive; } },
-    removeEventListener(type) { if (type === 'wheel') this.listener = null; }
+    scrollingElement: root,
+    documentElement,
+    body,
+    activeElement: active,
+    listener: null,
+    passive: null,
+    addEventListener(type, listener, options) {
+      if (type === 'wheel') {
+        this.listener = listener;
+        this.passive = options?.passive;
+      }
+    },
+    removeEventListener(type) {
+      if (type === 'wheel') this.listener = null;
+    }
   };
-  const getComputedStyle = node => ({ overflowY: node?.overflowY || 'visible', overflowX: node?.overflowX || 'visible' });
+  const getComputedStyle = node => ({
+    overflowY: node?.overflowY || 'visible',
+    overflowX: node?.overflowX || 'visible'
+  });
   const friction = ScrollFriction.create({ document, Element, getComputedStyle });
   function wheel({ deltaY, deltaX = 0, deltaMode = 0, ...overrides }) {
     const event = {
-      isTrusted: true, cancelable: true, defaultPrevented: false, deltaX, deltaY, deltaMode,
-      ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, prevented: 0,
-      preventDefault() { this.prevented++; this.defaultPrevented = true; },
-      composedPath: () => [...path], ...overrides
+      isTrusted: true,
+      cancelable: true,
+      defaultPrevented: false,
+      deltaX,
+      deltaY,
+      deltaMode,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+      prevented: 0,
+      preventDefault() {
+        this.prevented++;
+        this.defaultPrevented = true;
+      },
+      composedPath: () => [...path],
+      ...overrides
     };
     document.listener(event);
     return event;
@@ -41,11 +100,17 @@ function documentScroller({ scrollHeight = 5000, clientHeight = 800 } = {}) {
   return root;
 }
 function appShell(viewport = 540) {
-  return { root: new Element('html', { scrollHeight: viewport, clientHeight: viewport }), body: new Element('body', { overflowY: 'hidden' }), viewport };
+  return {
+    root: new Element('html', { scrollHeight: viewport, clientHeight: viewport }),
+    body: new Element('body', { overflowY: 'hidden' }),
+    viewport
+  };
 }
 
 test('a document-scrolled page slows by the configured resistance', () => {
-  const root = documentScroller(), body = new Element('body'), item = new Element('div');
+  const root = documentScroller(),
+    body = new Element('body'),
+    item = new Element('div');
   const h = setup({ root, body, chain: [item] });
   h.friction.setSpeed(0.5);
   assert.equal(h.document.passive, false, 'friction listens non-passively');
@@ -68,42 +133,57 @@ test('an app-shell page slows its own surface when the document cannot scroll', 
 });
 
 test('locked document roots with a scroll range use the inner page surface', () => {
-  for (const lock of ['root', 'body']) for (const overflowY of ['hidden', 'clip']) {
-    const root = documentScroller(), body = new Element('body');
-    if (lock === 'body') root.overflowY = 'visible';
-    (lock === 'root' ? root : body).overflowY = overflowY;
-    const workspace = new Element('main', { scrollHeight: 4200, clientHeight: 800, overflowY: 'auto' });
-    workspace.scrollTop = 1000;
-    const h = setup({ root, body, chain: [workspace] });
-    h.friction.setSpeed(0.5);
-    for (const deltaY of [240, -240]) assert.equal(h.wheel({ deltaY }).prevented, 1, `${lock} ${overflowY}`);
-    assert.deepEqual(workspace.moves.map(move => move.top), [120, -120]);
-    assert.deepEqual(root.moves, []);
-  }
+  for (const lock of ['root', 'body'])
+    for (const overflowY of ['hidden', 'clip']) {
+      const root = documentScroller(),
+        body = new Element('body');
+      if (lock === 'body') root.overflowY = 'visible';
+      (lock === 'root' ? root : body).overflowY = overflowY;
+      const workspace = new Element('main', { scrollHeight: 4200, clientHeight: 800, overflowY: 'auto' });
+      workspace.scrollTop = 1000;
+      const h = setup({ root, body, chain: [workspace] });
+      h.friction.setSpeed(0.5);
+      for (const deltaY of [240, -240]) assert.equal(h.wheel({ deltaY }).prevented, 1, `${lock} ${overflowY}`);
+      assert.deepEqual(
+        workspace.moves.map(move => move.top),
+        [120, -120]
+      );
+      assert.deepEqual(root.moves, []);
+    }
 });
 
 test('nested panels keep native scrolling regardless of height, position or document scroll range', () => {
   const scenarios = [
     ['document scrolls', () => ({ root: documentScroller(), body: new Element('body'), pane: null, viewport: 800 })],
-    ['app shell', () => ({ ...appShell(), pane: new Element('main', { scrollHeight: 4200, clientHeight: 520, overflowY: 'auto' }) })]
+    [
+      'app shell',
+      () => ({ ...appShell(), pane: new Element('main', { scrollHeight: 4200, clientHeight: 520, overflowY: 'auto' }) })
+    ]
   ];
-  for (const [label, build] of scenarios) for (const height of [200, 500]) for (const position of [0, 1000, 2000 - height]) for (const deltaY of [240, -240]) {
-    const { root, body, pane, viewport } = build();
-    const panel = new Element('aside', { scrollHeight: 2000, clientHeight: height, overflowY: 'auto' });
-    panel.scrollTop = position;
-    const h = setup({ root, body, chain: pane ? [panel, pane] : [panel], viewport });
-    h.friction.setSpeed(0.5);
-    const event = h.wheel({ deltaY });
-    assert.equal(event.prevented, 0, `${label}, height ${height}, position ${position}, delta ${deltaY}`);
-    assert.deepEqual(panel.moves, [], label);
-    assert.deepEqual(root.moves, [], label);
-    assert.deepEqual(pane?.moves || [], [], label);
-  }
+  for (const [label, build] of scenarios)
+    for (const height of [200, 500])
+      for (const position of [0, 1000, 2000 - height])
+        for (const deltaY of [240, -240]) {
+          const { root, body, pane, viewport } = build();
+          const panel = new Element('aside', { scrollHeight: 2000, clientHeight: height, overflowY: 'auto' });
+          panel.scrollTop = position;
+          const h = setup({ root, body, chain: pane ? [panel, pane] : [panel], viewport });
+          h.friction.setSpeed(0.5);
+          const event = h.wheel({ deltaY });
+          assert.equal(event.prevented, 0, `${label}, height ${height}, position ${position}, delta ${deltaY}`);
+          assert.deepEqual(panel.moves, [], label);
+          assert.deepEqual(root.moves, [], label);
+          assert.deepEqual(pane?.moves || [], [], label);
+        }
 });
 
 test('a surface that fills less than half the viewport is a panel, not the page', () => {
   const { root, body, viewport } = appShell();
-  const halfHeight = new Element('main', { scrollHeight: 4000, clientHeight: Math.floor(viewport / 2) - 1, overflowY: 'auto' });
+  const halfHeight = new Element('main', {
+    scrollHeight: 4000,
+    clientHeight: Math.floor(viewport / 2) - 1,
+    overflowY: 'auto'
+  });
   const h = setup({ root, body, chain: [halfHeight], viewport });
   h.friction.setSpeed(0.5);
   assert.equal(h.wheel({ deltaY: 120 }).prevented, 0);
@@ -146,7 +226,10 @@ test('fractional movement accumulates on the promoted surface', () => {
   h.friction.setSpeed(0.5);
   h.wheel({ deltaY: 3 });
   h.wheel({ deltaY: 3 });
-  assert.deepEqual(workspace.moves.map(move => move.top), [1, 2]);
+  assert.deepEqual(
+    workspace.moves.map(move => move.top),
+    [1, 2]
+  );
   assert.equal(workspace.scrollTop, 303);
 });
 
@@ -165,7 +248,8 @@ test('an independently scrolling body is the page surface, not its tall nested p
 });
 
 test('body overflow propagated to the viewport does not mask document scrolling', () => {
-  const root = documentScroller(); root.overflowY = 'visible';
+  const root = documentScroller();
+  root.overflowY = 'visible';
   const body = new Element('body', { scrollHeight: 5000, clientHeight: 800, overflowY: 'auto' });
   const h = setup({ root, body });
   h.friction.setSpeed(0.5);
@@ -176,7 +260,8 @@ test('body overflow propagated to the viewport does not mask document scrolling'
 
 test('non-propagated hidden and clipped body overflow does not lock document scrolling', () => {
   for (const overflowY of ['hidden', 'clip']) {
-    const root = documentScroller(), body = new Element('body', { overflowY });
+    const root = documentScroller(),
+      body = new Element('body', { overflowY });
     const h = setup({ root, body });
     h.friction.setSpeed(0.5);
     assert.equal(h.wheel({ deltaY: 240 }).prevented, 1, overflowY);
@@ -187,7 +272,8 @@ test('non-propagated hidden and clipped body overflow does not lock document scr
 
 test('a non-propagated body lock does not promote a tall panel inside a scrolling document', () => {
   for (const overflowY of ['hidden', 'clip']) {
-    const root = documentScroller(), body = new Element('body', { overflowY });
+    const root = documentScroller(),
+      body = new Element('body', { overflowY });
     const panel = new Element('aside', { scrollHeight: 3000, clientHeight: 500, overflowY: 'auto' });
     const h = setup({ root, body, chain: [panel] });
     h.friction.setSpeed(0.5);
@@ -214,12 +300,19 @@ test('fractional movement resets on target replacement and speed transitions', (
   assert.equal(h.document.listener, null);
   h.friction.setSpeed(0.5);
   h.wheel(gesture);
-  assert.deepEqual(workspace.moves.map(move => move.top), [1]);
-  assert.deepEqual(replacement.moves.map(move => move.top), [1, 0, 1]);
+  assert.deepEqual(
+    workspace.moves.map(move => move.top),
+    [1]
+  );
+  assert.deepEqual(
+    replacement.moves.map(move => move.top),
+    [1, 0, 1]
+  );
 });
 
 test('wheel input stays untouched while resistance is off', () => {
-  const root = documentScroller(), body = new Element('body');
+  const root = documentScroller(),
+    body = new Element('body');
   const h = setup({ root, body });
   assert.equal(h.document.listener, null);
   h.friction.setSpeed(1);

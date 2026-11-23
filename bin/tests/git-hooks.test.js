@@ -77,7 +77,10 @@ test('a real rebase cannot flatten merges on a tracked branch', t => {
   assert.match(result.stderr, /Refusing to flatten merge history/);
   assert.equal(git('rev-parse', 'HEAD'), before);
   assert.equal(fs.existsSync(path.join(directory, '.git', 'rebase-merge')), false);
-  for (const args of [['rebase', 'main', 'refs/heads/feature'], ['rebase', '--root']]) {
+  for (const args of [
+    ['rebase', 'main', 'refs/heads/feature'],
+    ['rebase', '--root']
+  ]) {
     const rejected = run(...args);
     assert.notEqual(rejected.status, 0);
     assert.match(rejected.stderr, /Refusing to flatten merge history/);
@@ -106,20 +109,43 @@ test('unpublished linear branches can still rebase', t => {
 test('explicit hook setup repairs hooks when an up-to-date frozen install skips prepare', t => {
   const { directory, env, git, run } = repository(t);
   git('config', '--unset', 'core.hooksPath');
-  for (const file of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.node-version', 'extension/package.json', 'site/package.json', 'bin/setup-git-hooks.js', '.githooks/pre-rebase', '.githooks/pre-commit']) {
+  for (const file of [
+    'package.json',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    '.node-version',
+    'extension/package.json',
+    'site/package.json',
+    'bin/setup-git-hooks.js',
+    '.githooks/pre-rebase',
+    '.githooks/pre-commit'
+  ]) {
     fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
     fs.copyFileSync(path.join(root, file), path.join(directory, file));
   }
-  const result = spawnSync('pnpm', ['install', '--frozen-lockfile'], { cwd: directory, env, encoding: 'utf8', timeout: 60000 });
+  const result = spawnSync('pnpm', ['install', '--frozen-lockfile'], {
+    cwd: directory,
+    env,
+    encoding: 'utf8',
+    timeout: 60000
+  });
   assert.equal(result.status, 0, result.stderr || result.error?.message);
   assert.equal(git('config', '--get', 'core.hooksPath'), '.githooks');
   assert.match(result.stdout, /Repository Git hooks enabled/);
   git('config', '--unset', 'core.hooksPath');
-  const repeated = spawnSync('pnpm', ['install', '--frozen-lockfile'], { cwd: directory, env, encoding: 'utf8', timeout: 60000 });
+  const repeated = spawnSync('pnpm', ['install', '--frozen-lockfile'], {
+    cwd: directory,
+    env,
+    encoding: 'utf8',
+    timeout: 60000
+  });
   assert.equal(repeated.status, 0, repeated.stderr || repeated.error?.message);
   assert.equal(run('config', '--get', 'core.hooksPath').status, 1);
   const setup = spawnSync('pnpm', ['setup:hooks'], {
-    cwd: directory, env, encoding: 'utf8', timeout: 60000,
+    cwd: directory,
+    env,
+    encoding: 'utf8',
+    timeout: 60000
   });
   assert.equal(setup.status, 0, setup.stdout + setup.stderr);
   assert.equal(git('config', '--get', 'core.hooksPath'), '.githooks');
@@ -134,7 +160,12 @@ test('automatic setup tolerates source archives and environments without Git', t
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-no-git-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   for (const PATH of [process.env.PATH, directory]) {
-    const invoke = (...args) => spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js'), ...args], { cwd: directory, env: { ...process.env, PATH }, encoding: 'utf8' });
+    const invoke = (...args) =>
+      spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js'), ...args], {
+        cwd: directory,
+        env: { ...process.env, PATH },
+        encoding: 'utf8'
+      });
     assert.equal(invoke('--if-unconfigured').status, 0);
     const explicit = invoke();
     assert.equal(explicit.status, 1);
@@ -149,7 +180,11 @@ test('hook setup preserves custom files in the default Git hooks directory', t =
   const source = '#!/bin/sh\nexit 0\n';
   fs.writeFileSync(hook, source, { mode: 0o755 });
   for (const args of [[], ['--if-unconfigured']]) {
-    const result = spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js'), ...args], { cwd: directory, env, encoding: 'utf8' });
+    const result = spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js'), ...args], {
+      cwd: directory,
+      env,
+      encoding: 'utf8'
+    });
     assert.equal(result.status, args.length ? 0 : 1);
     assert.match(result.stderr, /Existing Git hook files/);
     assert.equal(run('config', '--get', 'core.hooksPath').status, 1);
@@ -162,7 +197,8 @@ test('hook setup refuses missing or nonexecutable checked-in hooks before changi
   git('config', '--unset', 'core.hooksPath');
   const hook = path.join(directory, '.githooks/pre-commit');
   fs.rmSync(hook);
-  const invoke = () => spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js')], { cwd: directory, env, encoding: 'utf8' });
+  const invoke = () =>
+    spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js')], { cwd: directory, env, encoding: 'utf8' });
   const missing = invoke();
   assert.notEqual(missing.status, 0);
   assert.match(missing.stderr, /Missing or nonexecutable checked-in Git hook/);
@@ -177,7 +213,11 @@ test('hook setup refuses missing or nonexecutable checked-in hooks before changi
 test('hook setup preserves an explicitly disabled hook path', t => {
   const { directory, env, git } = repository(t);
   git('config', 'core.hooksPath', '');
-  const result = spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js')], { cwd: directory, env, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js')], {
+    cwd: directory,
+    env,
+    encoding: 'utf8'
+  });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Existing hooksPath/);
   assert.equal(git('config', '--get', 'core.hooksPath'), '');
@@ -185,9 +225,12 @@ test('hook setup preserves an explicitly disabled hook path', t => {
 
 test('hook setup is idempotent and preserves an existing hooks path', t => {
   const { directory, env, git } = repository(t);
-  const setup = (...args) => spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js'), ...args], {
-    cwd: directory, env, encoding: 'utf8',
-  });
+  const setup = (...args) =>
+    spawnSync(process.execPath, [path.join(root, 'bin/setup-git-hooks.js'), ...args], {
+      cwd: directory,
+      env,
+      encoding: 'utf8'
+    });
   git('config', '--unset', 'core.hooksPath');
   assert.equal(setup().status, 0);
   assert.equal(setup().status, 0);

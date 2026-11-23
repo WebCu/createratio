@@ -6,22 +6,41 @@
   'use strict';
   function matches(raw, patterns) {
     let url;
-    try { url = new URL(raw); } catch (_) { return false; }
+    try {
+      url = new URL(raw);
+    } catch (_) {
+      return false;
+    }
     return patterns.some(pattern => {
-      const [scheme, address] = pattern.split('://'), host = address.split('/')[0];
-      return url.protocol === scheme + ':' && (host.startsWith('*.') ? url.hostname === host.slice(2) || url.hostname.endsWith(host.slice(1)) : url.hostname === host);
+      const [scheme, address] = pattern.split('://'),
+        host = address.split('/')[0];
+      return (
+        url.protocol === scheme + ':' &&
+        (host.startsWith('*.')
+          ? url.hostname === host.slice(2) || url.hostname.endsWith(host.slice(1))
+          : url.hostname === host)
+      );
     });
   }
   function create(api, serialize, flush, environment = globalThis) {
-    let pending = null, applying = null, installedHere = false, recovery = false;
+    let pending = null,
+      applying = null,
+      installedHere = false,
+      recovery = false;
     const entries = () => api.runtime.getManifest().content_scripts || [];
     async function tabs() {
       const patterns = [...new Set(entries().flatMap(entry => entry.matches))];
-      return patterns.length ? (await api.tabs.query({ url: patterns })).filter(tab => Number.isInteger(tab.id) && !tab.discarded && matches(tab.url, patterns)) : [];
+      return patterns.length
+        ? (await api.tabs.query({ url: patterns })).filter(
+            tab => Number.isInteger(tab.id) && !tab.discarded && matches(tab.url, patterns)
+          )
+        : [];
     }
     async function openPages() {
-      if (api.runtime.getContexts) return (await api.runtime.getContexts({})).filter(context => context.contextType !== 'BACKGROUND');
-      if (api.extension?.getViews) return api.extension.getViews().filter(view => view.location.pathname !== '/_generated_background_page.html');
+      if (api.runtime.getContexts)
+        return (await api.runtime.getContexts({})).filter(context => context.contextType !== 'BACKGROUND');
+      if (api.extension?.getViews)
+        return api.extension.getViews().filter(view => view.location.pathname !== '/_generated_background_page.html');
       if (environment.clients) return environment.clients.matchAll({ includeUncontrolled: true, type: 'window' });
       throw new Error('Unable to check open extension pages');
     }
@@ -30,7 +49,9 @@
       try {
         return await Promise.race([
           api.tabs.sendMessage(tab.id, message, { frameId: 0 }),
-          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Update preparation timed out')), 5000); })
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Update preparation timed out')), 5000);
+          })
         ]);
       } catch (error) {
         if (/receiving end|establish connection|message port closed|context invalidated/i.test(error.message)) {
@@ -38,14 +59,21 @@
           try {
             await Promise.race([
               api.scripting.executeScript({ target: { tabId: tab.id }, func: () => location.href }),
-              new Promise((_, reject) => { probeTimer = setTimeout(() => reject(error), 5000); })
+              new Promise((_, reject) => {
+                probeTimer = setTimeout(() => reject(error), 5000);
+              })
             ]);
           } catch (probeError) {
-            if (/Frame with ID \d+ is showing error page/i.test(probeError.message)) return { ready: true, errorPage: true };
-          } finally { clearTimeout(probeTimer); }
+            if (/Frame with ID \d+ is showing error page/i.test(probeError.message))
+              return { ready: true, errorPage: true };
+          } finally {
+            clearTimeout(probeTimer);
+          }
         }
         throw error;
-      } finally { clearTimeout(timer); }
+      } finally {
+        clearTimeout(timer);
+      }
     }
     async function restore() {
       let restored = true;
@@ -55,17 +83,24 @@
           const reply = await send(tab, { type: 'prepare-update', force: false });
           if (reply?.errorPage) continue;
           if (reply?.ready === false) continue;
-          if (reply?.ready === true && (await send(tab, { type: 'commit-update' }))?.ready !== true) { restored = false; continue; }
+          if (reply?.ready === true && (await send(tab, { type: 'commit-update' }))?.ready !== true) {
+            restored = false;
+            continue;
+          }
         } catch (error) {
           if (!/receiving end|establish connection|message port closed|context invalidated/i.test(error.message)) {
             restored = false;
-            console.error('CreateRatio: unable to prepare a website tab for recovery.', error); continue;
+            console.error('CreateRatio: unable to prepare a website tab for recovery.', error);
+            continue;
           }
         }
         for (const entry of entries().filter(entry => matches(tab.url, entry.matches))) {
-          await api.scripting.executeScript({ target: { tabId: tab.id }, files: entry.js, world: entry.world || 'ISOLATED' }).catch(error => {
-            restored = false; console.error('CreateRatio: unable to restore an updated website tab.', error);
-          });
+          await api.scripting
+            .executeScript({ target: { tabId: tab.id }, files: entry.js, world: entry.world || 'ISOLATED' })
+            .catch(error => {
+              restored = false;
+              console.error('CreateRatio: unable to restore an updated website tab.', error);
+            });
         }
       }
       return restored;
@@ -74,19 +109,23 @@
       if (!recovery) return true;
       try {
         if (await restore()) {
-          await api.storage.local.remove('_updateRecovery'); recovery = false;
+          await api.storage.local.remove('_updateRecovery');
+          recovery = false;
           if (!pending) await api.alarms.clear('extension-update');
           return true;
         }
-      } catch (error) { console.error('CreateRatio: website recovery will retry.', error); }
+      } catch (error) {
+        console.error('CreateRatio: website recovery will retry.', error);
+      }
       await api.alarms.create('extension-update', { periodInMinutes: 1 });
       return false;
     }
     async function apply(force) {
-      if (!await recover()) return { applied: false };
-      if (!pending || !force && (await openPages()).length) return { applied: false };
+      if (!(await recover())) return { applied: false };
+      if (!pending || (!force && (await openPages()).length)) return { applied: false };
       const clients = await tabs();
-      let committed = false, reloaded = false;
+      let committed = false,
+        reloaded = false;
       try {
         if (clients.some(tab => tab.status === 'loading')) return { applied: false };
         const replies = await Promise.all(clients.map(tab => send(tab, { type: 'prepare-update', force })));
@@ -94,17 +133,24 @@
         if (!force && (await openPages()).length) return { applied: false };
         await serialize(flush);
         const current = await tabs();
-        if (JSON.stringify(current.map(tab => [tab.id, tab.url]).sort()) !== JSON.stringify(clients.map(tab => [tab.id, tab.url]).sort())) return { applied: false };
-        await api.storage.local.set({ _updateRecovery: true }); recovery = true;
+        if (
+          JSON.stringify(current.map(tab => [tab.id, tab.url]).sort()) !==
+          JSON.stringify(clients.map(tab => [tab.id, tab.url]).sort())
+        )
+          return { applied: false };
+        await api.storage.local.set({ _updateRecovery: true });
+        recovery = true;
         committed = true;
         const stopped = await Promise.all(clients.map(tab => send(tab, { type: 'commit-update' })));
         if (stopped.some(reply => reply?.ready !== true)) return { applied: false };
         if (!force && (await openPages()).length) return { applied: false };
         await serialize(flush);
-        api.runtime.reload(); reloaded = true;
+        api.runtime.reload();
+        reloaded = true;
         return { applied: true };
-      } catch (_) { return { applied: false }; }
-      finally {
+      } catch (_) {
+        return { applied: false };
+      } finally {
         if (!reloaded) {
           if (committed) await recover();
           await Promise.all(clients.map(tab => send(tab, { type: 'resume-update' }).catch(() => {})));
@@ -112,14 +158,21 @@
       }
     }
     function attempt(force = false) {
-      if (!applying) applying = apply(force).finally(() => { applying = null; });
+      if (!applying)
+        applying = apply(force).finally(() => {
+          applying = null;
+        });
       return applying;
     }
     async function start() {
       const stored = await api.storage.local.get(['_pendingUpdate', '_updateRecovery']);
       if (installedHere) return;
-      pending = stored._pendingUpdate; recovery = stored._updateRecovery === true;
-      if (pending || recovery) { await api.alarms.create('extension-update', { periodInMinutes: 1 }); await attempt(); }
+      pending = stored._pendingUpdate;
+      recovery = stored._updateRecovery === true;
+      if (pending || recovery) {
+        await api.alarms.create('extension-update', { periodInMinutes: 1 });
+        await attempt();
+      }
     }
     async function available(details) {
       if (typeof details?.version !== 'string' || !/^\d+(\.\d+){0,3}$/.test(details.version)) return;
@@ -130,14 +183,18 @@
     }
     async function installed(details, initialized = Promise.resolve()) {
       if (details?.reason !== 'update') return initialized;
-      installedHere = true; pending = null; recovery = true;
+      installedHere = true;
+      pending = null;
+      recovery = true;
       await api.storage.local.set({ _updateRecovery: true });
       await api.storage.local.remove('_pendingUpdate');
       await api.alarms.clear('extension-update');
       await initialized;
       await recover();
     }
-    api.runtime.onUpdateAvailable?.addListener(details => { available(details).catch(console.error); });
+    api.runtime.onUpdateAvailable?.addListener(details => {
+      available(details).catch(console.error);
+    });
     return { start, available, attempt, installed };
   }
   return { create };

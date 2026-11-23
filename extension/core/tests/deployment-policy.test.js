@@ -33,15 +33,22 @@ test('deployment gate rejects PRs, other branches, forks, and unsuccessful CI', 
         for (const repository of ['WebCu/createratio', 'other/createratio']) {
           const github = {
             repository: 'WebCu/createratio',
-            event: { workflow_run: {
-              conclusion, event, head_branch: branch,
-              head_repository: { full_name: repository }
-            } }
+            event: {
+              workflow_run: {
+                conclusion,
+                event,
+                head_branch: branch,
+                head_repository: { full_name: repository }
+              }
+            }
           };
-          const expected = conclusion === 'success' && event === 'push' &&
-            branch === 'main' && repository === github.repository;
-          assert.equal(vm.runInNewContext(condition, { github }), expected,
-            `${conclusion}, ${event}, ${branch}, ${repository}`);
+          const expected =
+            conclusion === 'success' && event === 'push' && branch === 'main' && repository === github.repository;
+          assert.equal(
+            vm.runInNewContext(condition, { github }),
+            expected,
+            `${conclusion}, ${event}, ${branch}, ${repository}`
+          );
         }
       }
     }
@@ -74,7 +81,11 @@ function deploymentRepository(t) {
   fs.mkdirSync(binaries);
   const guard = path.resolve(__dirname, '../../../bin/deployment-guard.js');
   if (fs.existsSync(guard)) fs.copyFileSync(guard, path.join(binaries, 'deployment-guard.js'));
-  fs.writeFileSync(path.join(binaries, 'aws'), '#!/bin/sh\nprintf "%s\\n" "$*" >> "$AWS_LOG"\nif [ "$1 $2" = "cloudfront create-invalidation" ]; then printf "test-invalidation\\n"; fi\n', { mode: 0o755 });
+  fs.writeFileSync(
+    path.join(binaries, 'aws'),
+    '#!/bin/sh\nprintf "%s\\n" "$*" >> "$AWS_LOG"\nif [ "$1 $2" = "cloudfront create-invalidation" ]; then printf "test-invalidation\\n"; fi\n',
+    { mode: 0o755 }
+  );
 
   function deploy(sha) {
     git('checkout', '--detach', sha);
@@ -85,10 +96,15 @@ function deploymentRepository(t) {
     fs.writeFileSync(log, '');
     const github = {
       repository: 'WebCu/createratio',
-      event: { workflow_run: {
-        conclusion: 'success', event: 'push', head_branch: 'main', head_sha: sha,
-        head_repository: { full_name: 'WebCu/createratio' }
-      } }
+      event: {
+        workflow_run: {
+          conclusion: 'success',
+          event: 'push',
+          head_branch: 'main',
+          head_sha: sha,
+          head_repository: { full_name: 'WebCu/createratio' }
+        }
+      }
     };
     const condition = workflow.match(/    if: >-\n([\s\S]*?)\n    runs-on:/)?.[1];
     assert.equal(vm.runInNewContext(condition, { github }), true);
@@ -108,14 +124,25 @@ function deploymentRepository(t) {
       }
       const run = step.match(/^        run: (.+)$/m)?.[1];
       assert.ok(run);
-      const command = run === '|' ? step.split('        run: |\n')[1].split('\n').map(line => line.slice(10)).join('\n') : run;
+      const command =
+        run === '|'
+          ? step
+              .split('        run: |\n')[1]
+              .split('\n')
+              .map(line => line.slice(10))
+              .join('\n')
+          : run;
       const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', command], {
         cwd: directory,
         env: {
-          ...env, PATH: `${binaries}${path.delimiter}${process.env.PATH}`,
-          TESTED_SHA: sha, GITHUB_OUTPUT: output, AWS_LOG: log,
+          ...env,
+          PATH: `${binaries}${path.delimiter}${process.env.PATH}`,
+          TESTED_SHA: sha,
+          GITHUB_OUTPUT: output,
+          AWS_LOG: log,
           GITHUB_TOKEN: freshness ? 'fake-read-only-job-token' : '',
-          RUNNER_TEMP: runDirectory, AWS_S3_BUCKET: 'test-bucket',
+          RUNNER_TEMP: runDirectory,
+          AWS_S3_BUCKET: 'test-bucket',
           AWS_CLOUDFRONT_DISTRIBUTION_ID: 'test-distribution'
         },
         encoding: 'utf8'
@@ -193,7 +220,10 @@ test('public legal policies ship through both website deployment and local previ
   assert.match(workflow, /cp dist\/site\/\*/);
   assert.ok(workflow.indexOf('run: node site/build.js') < workflow.indexOf('cp dist/site/*'));
   for (const name of ['privacy.html', 'terms.html', 'llms.txt', 'robots.txt', 'sitemap.xml']) {
-    assert.equal(readFileSync(path.join(output, name), 'utf8'), readFileSync(path.join(__dirname, '../../../site', name), 'utf8'));
+    assert.equal(
+      readFileSync(path.join(output, name), 'utf8'),
+      readFileSync(path.join(__dirname, '../../../site', name), 'utf8')
+    );
     assert.ok(compose.includes(`./site/${name}:/srv/www/${name}:ro`));
   }
   assert.match(compose, /\.\/site\/browser-install\.js:\/srv\/www\/browser-install\.js:ro/);

@@ -17,22 +17,48 @@ declare global {
     site?: string;
     reason?: string;
   };
-  type IngestMessage = { type: 'ingest'; id: string; generation: string | null; site: string; segments: TimeSegment[]; actions: SiteActionEntry[] };
-  type PreferenceRules = { [K in PreferenceMessage['type']]: (message: Extract<PreferenceMessage, { type: K }>) => void };
+  type IngestMessage = {
+    type: 'ingest';
+    id: string;
+    generation: string | null;
+    site: string;
+    segments: TimeSegment[];
+    actions: SiteActionEntry[];
+  };
+  type PreferenceRules = {
+    [K in PreferenceMessage['type']]: (message: Extract<PreferenceMessage, { type: K }>) => void;
+  };
   type HistoryStore = ReturnType<typeof ActivityHistory.create>;
-  type ReplySettings = { trackedSites?: string[]; scrollFrictionEnabled?: boolean; scrollFrictionStrength?: number; [key: string]: unknown };
-  type ReplyAccess = Omit<AccessStatus, 'site' | 'goalAllowed' | 'refilledAt' | 'waitSeconds'> & { goalAllowed?: boolean; refilledAt?: unknown; waitSeconds?: unknown };
-  type SnapshotReply = { ok: true; generation?: string | null; date: LocalDate; day: ReturnType<HistoryStore['creationDay']>; settings: ReplySettings; access: Record<string, ReplyAccess>; websiteTimeEnabled: boolean };
+  type ReplySettings = {
+    trackedSites?: string[];
+    scrollFrictionEnabled?: boolean;
+    scrollFrictionStrength?: number;
+    [key: string]: unknown;
+  };
+  type ReplyAccess = Omit<AccessStatus, 'site' | 'goalAllowed' | 'refilledAt' | 'waitSeconds'> & {
+    goalAllowed?: boolean;
+    refilledAt?: unknown;
+    waitSeconds?: unknown;
+  };
+  type SnapshotReply = {
+    ok: true;
+    generation?: string | null;
+    date: LocalDate;
+    day: ReturnType<HistoryStore['creationDay']>;
+    settings: ReplySettings;
+    access: Record<string, ReplyAccess>;
+    websiteTimeEnabled: boolean;
+  };
   type AccessReply = { ok: true; access: Record<string, ReplyAccess> };
   type SavedIntention = { site: string; reason: string; requestedAt: number };
   type ReplyTable<T extends Record<RuntimeMessage['type'], { ok: true }>> = T;
   type RuntimeReplies = {
-    'snapshot': SnapshotReply;
-    'ingest': SnapshotReply;
-    'tracking': SnapshotReply;
+    snapshot: SnapshotReply;
+    ingest: SnapshotReply;
+    tracking: SnapshotReply;
     'clear-history': SnapshotReply;
     'scroll-friction-setting': SnapshotReply;
-    'history': { ok: true; days: Awaited<ReturnType<HistoryStore['read']>> };
+    history: { ok: true; days: Awaited<ReturnType<HistoryStore['read']>> };
     'update-apply': { ok: true; applied: boolean };
     'website-time-setting': { ok: true; enabled: boolean };
     'access-status': AccessReply & { intentionHistoryEnabled?: unknown };
@@ -46,7 +72,9 @@ declare global {
     'access-history-list': { ok: true; intentions: SavedIntention[] };
     'access-history-clear': { ok: true };
   };
-  type RuntimeMessenger = { send<M extends RuntimeMessage>(message: M, fallbackMessage: string): Promise<RuntimeReplies[M['type']]> };
+  type RuntimeMessenger = {
+    send<M extends RuntimeMessage>(message: M, fallbackMessage: string): Promise<RuntimeReplies[M['type']]>;
+  };
   type RuntimeMessage =
     | PreferenceMessage
     | AccessSessionMessage

@@ -5,20 +5,46 @@
 })(globalThis, function () {
   'use strict';
   const hosts = ['reddit.com', 'www.reddit.com'];
-  const domains = ['reddit.com'], navigationId = 113, resourceId = 114;
+  const domains = ['reddit.com'],
+    navigationId = 113,
+    resourceId = 114;
   const access = {
-    domains, home: 'https://www.reddit.com/', redirectRuleId: 7, ruleIds: [navigationId, resourceId],
+    domains,
+    home: 'https://www.reddit.com/',
+    redirectRuleId: 7,
+    ruleIds: [navigationId, resourceId],
     unrestrictedRules: [
-      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
-      { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
+      {
+        id: navigationId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, resourceTypes: ['main_frame'] }
+      },
+      {
+        id: resourceId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] }
+      }
     ],
     sessionRules: [
-      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] } }
+      {
+        id: navigationId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] }
+      }
     ]
   };
   const selectors = {
     postScope: ['form[action="/api/submit"]', 'shreddit-post-composer'],
-    postEditor: ['textarea[name="title"]', 'input[name="title"]', 'textarea[name="text"]', 'input[name="url"]', '[contenteditable="true"][role="textbox"]'],
+    postEditor: [
+      'textarea[name="title"]',
+      'input[name="title"]',
+      'textarea[name="text"]',
+      'input[name="url"]',
+      '[contenteditable="true"][role="textbox"]'
+    ],
     commentScope: ['form[action="/api/comment"]', 'shreddit-composer'],
     commentEditor: ['textarea[name="text"]', 'textarea[name="body"]', '[contenteditable="true"][role="textbox"]'],
     messageScope: ['form[action="/api/compose"]'],
@@ -29,10 +55,20 @@
   function parseURL(url) {
     try {
       const parsed = new URL(url);
-      return parsed.protocol === 'https:' && hosts.includes(parsed.hostname) && !parsed.port && !parsed.username && !parsed.password ? parsed : null;
-    } catch (_) { return null; }
+      return parsed.protocol === 'https:' &&
+        hosts.includes(parsed.hostname) &&
+        !parsed.port &&
+        !parsed.username &&
+        !parsed.password
+        ? parsed
+        : null;
+    } catch (_) {
+      return null;
+    }
   }
-  function pathOf(url) { return url.pathname.replace(/\/+$/, '') || '/'; }
+  function pathOf(url) {
+    return url.pathname.replace(/\/+$/, '') || '/';
+  }
   function route(url) {
     const path = pathOf(url);
     if (/^\/(?:r\/[a-zA-Z0-9_]+\/)?submit$/.test(path)) return 'post';
@@ -43,8 +79,15 @@
     if (/^\/r\/[a-zA-Z0-9_]+(?:\/(?:hot|new|top|rising|controversial|search))?$/.test(path)) return 'feed';
     return null;
   }
-  function profileName(path) { return /^\/(?:user|u)\/([a-zA-Z0-9_-]+)(?:\/|$)/.exec(path)?.[1].toLowerCase() || null; }
-  function classifyPage({ url, redditEditorFocused = false, redditMessageEditorFocused = false, ownProfilePath = null }) {
+  function profileName(path) {
+    return /^\/(?:user|u)\/([a-zA-Z0-9_-]+)(?:\/|$)/.exec(path)?.[1].toLowerCase() || null;
+  }
+  function classifyPage({
+    url,
+    redditEditorFocused = false,
+    redditMessageEditorFocused = false,
+    ownProfilePath = null
+  }) {
     const parsed = parseURL(url);
     if (!parsed) return 'neutral';
     const kind = route(parsed);
@@ -53,20 +96,40 @@
     if (redditEditorFocused) return 'create';
     if (kind === 'post') return 'neutral';
     const profile = profileName(pathOf(parsed));
-    if (kind === 'profile' && (profile === 'me' || ownProfilePath && profile === profileName(ownProfilePath))) return 'neutral';
+    if (kind === 'profile' && (profile === 'me' || (ownProfilePath && profile === profileName(ownProfilePath))))
+      return 'neutral';
     return 'consume';
   }
   function create({ document, location, dom }) {
     function usable(node) {
       if (!dom.enabled(node)) return false;
       for (let current = node; current; current = current.parentElement) {
-        if (current.readOnly || current.disabled || current.inert || ['readonly', 'disabled', 'inert'].some(name => current.getAttribute(name) !== null) || ['aria-readonly', 'aria-disabled'].some(name => current.getAttribute(name) === 'true')) return false;
+        if (
+          current.readOnly ||
+          current.disabled ||
+          current.inert ||
+          ['readonly', 'disabled', 'inert'].some(name => current.getAttribute(name) !== null) ||
+          ['aria-readonly', 'aria-disabled'].some(name => current.getAttribute(name) === 'true')
+        )
+          return false;
       }
       return true;
     }
     function composer(kind) {
-      if (kind === 'post') return { scopes: selectors.postScope, editors: selectors.postEditor, labels: ['Post', 'Submit'], action: 'posts' };
-      if (['thread', 'profile', 'feed'].includes(kind)) return { scopes: selectors.commentScope, editors: selectors.commentEditor, labels: ['Comment', 'Reply'], action: 'comments' };
+      if (kind === 'post')
+        return {
+          scopes: selectors.postScope,
+          editors: selectors.postEditor,
+          labels: ['Post', 'Submit'],
+          action: 'posts'
+        };
+      if (['thread', 'profile', 'feed'].includes(kind))
+        return {
+          scopes: selectors.commentScope,
+          editors: selectors.commentEditor,
+          labels: ['Comment', 'Reply'],
+          action: 'comments'
+        };
       return null;
     }
     function focused(config) {
@@ -78,7 +141,13 @@
       mode() {
         const parsed = parseURL(location.href);
         const kind = parsed && route(parsed);
-        return classifyPage({ url: location.href, ownProfilePath: dom.ownProfilePath(selectors.ownProfileLink), redditEditorFocused: focused(composer(kind)), redditMessageEditorFocused: kind === 'message' && focused({ scopes: selectors.messageScope, editors: selectors.messageEditor }) });
+        return classifyPage({
+          url: location.href,
+          ownProfilePath: dom.ownProfilePath(selectors.ownProfileLink),
+          redditEditorFocused: focused(composer(kind)),
+          redditMessageEditorFocused:
+            kind === 'message' && focused({ scopes: selectors.messageScope, editors: selectors.messageEditor })
+        });
       },
       action(event) {
         if (event.type !== 'click') return null;
@@ -89,7 +158,9 @@
         if (!usable(button)) return null;
         const scope = dom.closest(button, [config.scopes.join(',')]);
         if (!scope) return null;
-        const editor = Array.from(scope.querySelectorAll(config.editors.join(','))).find(node => usable(node) && dom.closest(node, [config.scopes.join(',')]) === scope);
+        const editor = Array.from(scope.querySelectorAll(config.editors.join(','))).find(
+          node => usable(node) && dom.closest(node, [config.scopes.join(',')]) === scope
+        );
         if (!editor) return null;
         const label = dom.label(button) || button.getAttribute('value');
         if (!config.labels.includes(label)) return null;
@@ -97,5 +168,14 @@
       }
     };
   }
-  return { id: 'reddit', name: 'Reddit', hosts, defaultEnabled: true, access, actions: ['posts', 'comments'], classifyPage, create };
+  return {
+    id: 'reddit',
+    name: 'Reddit',
+    hosts,
+    defaultEnabled: true,
+    access,
+    actions: ['posts', 'comments'],
+    classifyPage,
+    create
+  };
 });

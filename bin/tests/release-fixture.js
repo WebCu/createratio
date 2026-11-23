@@ -17,7 +17,9 @@ function repository(t) {
   const log = path.join(directory, 'commands.jsonl');
   for (const folder of [checkout, bin]) fs.mkdirSync(folder, { recursive: true });
   const transport = path.join(directory, 'git-transport.cjs');
-  fs.writeFileSync(transport, `const cp = require('node:child_process');
+  fs.writeFileSync(
+    transport,
+    `const cp = require('node:child_process');
 const spawnSync = cp.spawnSync;
 cp.spawnSync = (program, args, options) => {
   const result = spawnSync(program, args, options);
@@ -25,12 +27,19 @@ cp.spawnSync = (program, args, options) => {
     result.stdout = result.stdout.split('\\n').map(url => url === ${JSON.stringify(`file://${remote}`)} ? 'https://github.com/WebCu/createratio.git' : url).join('\\n');
   }
   return result;
-};\n`);
+};\n`
+  );
   const env = {
-    ...process.env, NODE_OPTIONS: `--require=${transport}`, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
-    GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_ALLOW_PROTOCOL: 'file',
-    GIT_AUTHOR_NAME: 'Release fixture', GIT_AUTHOR_EMAIL: 'release@example.invalid',
-    GIT_COMMITTER_NAME: 'Release fixture', GIT_COMMITTER_EMAIL: 'release@example.invalid',
+    ...process.env,
+    NODE_OPTIONS: `--require=${transport}`,
+    PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_ALLOW_PROTOCOL: 'file',
+    GIT_AUTHOR_NAME: 'Release fixture',
+    GIT_AUTHOR_EMAIL: 'release@example.invalid',
+    GIT_COMMITTER_NAME: 'Release fixture',
+    GIT_COMMITTER_EMAIL: 'release@example.invalid',
     CLI_LOG: log
   };
   function git(...args) {
@@ -47,11 +56,15 @@ cp.spawnSync = (program, args, options) => {
   git('remote', 'add', 'origin', 'https://github.com/WebCu/createratio.git');
   assert.equal(git('remote', 'get-url', '--push', 'origin'), `file://${remote}`);
   fs.mkdirSync(path.join(checkout, 'extension/src'), { recursive: true });
-  for (const file of versionFiles) fs.writeFileSync(path.join(checkout, file), '{\n  "version": "0.0.1",\n  "description": "keep formatting"\n}\n');
+  for (const file of versionFiles)
+    fs.writeFileSync(path.join(checkout, file), '{\n  "version": "0.0.1",\n  "description": "keep formatting"\n}\n');
   git('add', '.');
   git('commit', '-m', 'Initial fixture');
   git('push', '--set-upstream', 'origin', 'main');
-  for (const tool of ['gh', 'pnpm']) fs.writeFileSync(path.join(bin, tool), `#!${process.execPath}
+  for (const tool of ['gh', 'pnpm'])
+    fs.writeFileSync(
+      path.join(bin, tool),
+      `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CLI_LOG, JSON.stringify({tool: ${JSON.stringify(tool)}, args}) + '\\n');
@@ -63,13 +76,22 @@ if (args[0] === 'release' && args[1] === 'create') {
   fs.writeFileSync(process.env.CLI_LOG + '.release', JSON.stringify(args));
   console.log('https://github.com/WebCu/createratio/releases/tag/' + args[2]);
 }
-`, { mode: 0o755 });
+`,
+      { mode: 0o755 }
+    );
   return {
-    checkout, remote, env, git,
-    calls: () => fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse) : [],
-    run: (args, overrides = {}) => spawnSync(process.execPath, [script, ...args], {
-      cwd: checkout, env: { ...env, ...overrides }, encoding: 'utf8', timeout: 20000
-    })
+    checkout,
+    remote,
+    env,
+    git,
+    calls: () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse) : []),
+    run: (args, overrides = {}) =>
+      spawnSync(process.execPath, [script, ...args], {
+        cwd: checkout,
+        env: { ...env, ...overrides },
+        encoding: 'utf8',
+        timeout: 20000
+      })
   };
 }
 

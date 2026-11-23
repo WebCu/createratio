@@ -50,9 +50,18 @@ test('value types reject raw dates, unguarded values and mixed duration units', 
     ].join('\n')
   });
   assert.notEqual(result.status, 0);
-  assert.match(result.stdout, /invalid\.js\(2,\d+\): error TS2322: Type 'string' is not assignable to type 'LocalDate'/);
-  assert.match(result.stdout, /invalid\.js\(4,\d+\): error TS2322: Type 'Seconds' is not assignable to type 'Milliseconds'/);
-  assert.match(result.stdout, /invalid\.js\(8,\d+\): error TS2322: Type 'string' is not assignable to type 'LocalDate'/);
+  assert.match(
+    result.stdout,
+    /invalid\.js\(2,\d+\): error TS2322: Type 'string' is not assignable to type 'LocalDate'/
+  );
+  assert.match(
+    result.stdout,
+    /invalid\.js\(4,\d+\): error TS2322: Type 'Seconds' is not assignable to type 'Milliseconds'/
+  );
+  assert.match(
+    result.stdout,
+    /invalid\.js\(8,\d+\): error TS2322: Type 'string' is not assignable to type 'LocalDate'/
+  );
   assert.match(result.stdout, /invalid\.js\(11,\d+\): error TS2322: Type 'number' is not assignable to type 'Seconds'/);
 });
 
@@ -92,5 +101,11 @@ test('duration converters reject mismatched source units and raw numbers', t => 
     [13, 'string', 'number'],
     [14, '{}', 'number'],
     [15, 'boolean', 'number']
-  ]) assert.match(result.stdout, new RegExp(`converters\\.js\\(${line},\\d+\\): error TS2345: Argument of type '${source}' is not assignable to parameter of type '${target}'`));
+  ])
+    assert.match(
+      result.stdout,
+      new RegExp(
+        `converters\\.js\\(${line},\\d+\\): error TS2345: Argument of type '${source}' is not assignable to parameter of type '${target}'`
+      )
+    );
 });

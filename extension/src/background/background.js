@@ -1,15 +1,30 @@
 'use strict';
 const extensionAPI = globalThis.browser || globalThis.chrome;
-if (typeof importScripts === 'function') importScripts('sites.js', 'core.js', 'messages.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'updates.js');
+if (typeof importScripts === 'function')
+  importScripts(
+    'sites.js',
+    'core.js',
+    'messages.js',
+    'message-contracts.js',
+    'blocker.js',
+    'history.js',
+    'web-time.js',
+    'updates.js'
+  );
 
 let queue = Promise.resolve();
 function serialized(task) {
-  const next = queue.then(task); queue = next.catch(() => {}); return next;
+  const next = queue.then(task);
+  queue = next.catch(() => {});
+  return next;
 }
 const contracts = MessageContracts.create(Core, extensionAPI.runtime, Sites);
 const history = ActivityHistory.create(extensionAPI.storage.local, Core);
 const websiteTime = WebTime.create(extensionAPI, serialized, Core, history);
-const updates = ExtensionUpdates.create(extensionAPI, serialized, async () => { await websiteTime.tick(); await SiteAccess.reconcile(); });
+const updates = ExtensionUpdates.create(extensionAPI, serialized, async () => {
+  await websiteTime.tick();
+  await SiteAccess.reconcile();
+});
 async function badge(day) {
   const value = Core.score(Core.aggregate(day));
   await Promise.all([
@@ -21,15 +36,27 @@ async function badge(day) {
 async function snapshot() {
   await history.prepare();
   const date = Core.localDate();
-  const stored = /** @type {StoredData} */ (await extensionAPI.storage.local.get([date, 'settings', '_historyGeneration']));
+  const stored = /** @type {StoredData} */ (
+    await extensionAPI.storage.local.get([date, 'settings', '_historyGeneration'])
+  );
   const day = history.creationDay(stored[date]);
   await badge(day);
-  return { ok: true, generation: stored._historyGeneration ?? null, date, day, settings: Core.settingsSnapshot(stored.settings), access: await SiteAccess.reconcile(), websiteTimeEnabled: websiteTime.enabled };
+  return {
+    ok: true,
+    generation: stored._historyGeneration ?? null,
+    date,
+    day,
+    settings: Core.settingsSnapshot(stored.settings),
+    access: await SiteAccess.reconcile(),
+    websiteTimeEnabled: websiteTime.enabled
+  };
 }
 async function ingest(message, sender) {
   if (!contracts.creationSender(message, sender)) return { ok: false, error: 'Unsupported sender' };
   await history.prepare();
-  const preferences = /** @type {StoredData} */ (await extensionAPI.storage.local.get(['settings', '_historyGeneration']));
+  const preferences = /** @type {StoredData} */ (
+    await extensionAPI.storage.local.get(['settings', '_historyGeneration'])
+  );
   if ((message.generation ?? null) !== (preferences._historyGeneration ?? null)) return snapshot();
   if (!Core.trackingEnabled(message.site, preferences.settings)) return snapshot();
   contracts.packet(message);
@@ -44,8 +71,9 @@ async function readHistory(message, sender) {
 }
 async function clearHistory(sender) {
   contracts.preferencesSender(sender);
-  try { await history.clear(crypto.randomUUID()); }
-  catch (error) {
+  try {
+    await history.clear(crypto.randomUUID());
+  } catch (error) {
     await websiteTime.start(true).catch(() => {});
     throw error;
   }
@@ -56,31 +84,45 @@ async function handle(message, sender) {
   contracts.read(message, sender);
   if (message.type.startsWith('access-')) return SiteAccess.handle(message, sender);
   switch (message.type) {
-    case 'ingest': return ingest(message, sender);
-    case 'snapshot': return snapshot();
-    case 'history': return readHistory(message, sender);
-    case 'clear-history': return clearHistory(sender);
+    case 'ingest':
+      return ingest(message, sender);
+    case 'snapshot':
+      return snapshot();
+    case 'history':
+      return readHistory(message, sender);
+    case 'clear-history':
+      return clearHistory(sender);
     case 'tracking':
       await SiteAccess.handle(message, sender);
       return snapshot();
     case 'scroll-friction-setting': {
       contracts.preferences(message, sender);
       const stored = /** @type {StoredData} */ (await extensionAPI.storage.local.get('settings'));
-      await extensionAPI.storage.local.set({ settings: { ...stored.settings, scrollFrictionEnabled: message.enabled,
-        scrollFrictionStrength: message.strength ?? Core.settingsSnapshot(stored.settings).scrollFrictionStrength } });
+      await extensionAPI.storage.local.set({
+        settings: {
+          ...stored.settings,
+          scrollFrictionEnabled: message.enabled,
+          scrollFrictionStrength: message.strength ?? Core.settingsSnapshot(stored.settings).scrollFrictionStrength
+        }
+      });
       return snapshot();
     }
     case 'website-time-setting':
       contracts.preferences(message, sender);
       return websiteTime.setEnabled(message.enabled);
-    default: throw MessageContracts.refuse('Unknown message');
+    default:
+      throw MessageContracts.refuse('Unknown message');
   }
 }
 extensionAPI.runtime.onMessage.addListener((message, sender, respond) => {
-  const task = message?.type === 'update-apply' ? Promise.resolve().then(async () => {
-    contracts.read(message, sender); contracts.updateSender(sender);
-    return { ok: true, ...await updates.attempt(true) };
-  }) : serialized(() => handle(message, sender));
+  const task =
+    message?.type === 'update-apply'
+      ? Promise.resolve().then(async () => {
+          contracts.read(message, sender);
+          contracts.updateSender(sender);
+          return { ok: true, ...(await updates.attempt(true)) };
+        })
+      : serialized(() => handle(message, sender));
   task.then(respond, error => {
     if (!error.expected) console.error('CreateRatio:', error);
     respond({ ok: false, error: error.message });
@@ -91,13 +133,18 @@ async function initialize() {
   if (extensionAPI.storage.local.setAccessLevel) {
     await extensionAPI.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   }
-  if (!await extensionAPI.alarms.get('daily-badge')) await extensionAPI.alarms.create('daily-badge', { periodInMinutes: 1 });
+  if (!(await extensionAPI.alarms.get('daily-badge')))
+    await extensionAPI.alarms.create('daily-badge', { periodInMinutes: 1 });
   await SiteAccess.reconcile(true);
   await websiteTime.start();
   await snapshot();
 }
-extensionAPI.runtime.onInstalled.addListener(details => { updates.installed(details, serialized(initialize)).catch(console.error); });
-extensionAPI.runtime.onStartup.addListener(() => { serialized(initialize).catch(console.error); });
+extensionAPI.runtime.onInstalled.addListener(details => {
+  updates.installed(details, serialized(initialize)).catch(console.error);
+});
+extensionAPI.runtime.onStartup.addListener(() => {
+  serialized(initialize).catch(console.error);
+});
 extensionAPI.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === 'extension-update') void updates.attempt().catch(console.error);
   if (alarm.name === 'daily-badge') serialized(snapshot).catch(console.error);
@@ -105,15 +152,32 @@ extensionAPI.alarms.onAlarm.addListener(alarm => {
   if (alarm.name.startsWith('access-')) serialized(() => SiteAccess.reconcile()).catch(console.error);
 });
 extensionAPI.storage.onChanged.addListener((changes, area) => {
-  const relevant = Object.fromEntries(Object.entries(changes).filter(([key]) => ['settings', '_access', '_historyGeneration'].includes(key)));
+  const relevant = Object.fromEntries(
+    Object.entries(changes).filter(([key]) => ['settings', '_access', '_historyGeneration'].includes(key))
+  );
   if (!RuntimeMessages.shouldRefresh(relevant, area)) return;
   const patterns = extensionAPI.runtime.getManifest().content_scripts.flatMap(entry => entry.matches);
   if (!patterns.length) return;
-  void extensionAPI.tabs.query({ url: [...new Set(patterns)] }).then(tabs => Promise.all(tabs.map(tab => extensionAPI.tabs.sendMessage(tab.id, { type: 'refresh' }).catch(() => {})))).catch(console.error);
+  void extensionAPI.tabs
+    .query({ url: [...new Set(patterns)] })
+    .then(tabs =>
+      Promise.all(tabs.map(tab => extensionAPI.tabs.sendMessage(tab.id, { type: 'refresh' }).catch(() => {})))
+    )
+    .catch(console.error);
 });
-const refreshAccess = () => { serialized(() => SiteAccess.reconcile()).catch(console.error); };
+const refreshAccess = () => {
+  serialized(() => SiteAccess.reconcile()).catch(console.error);
+};
 extensionAPI.tabs.onActivated?.addListener(refreshAccess);
 extensionAPI.tabs.onRemoved?.addListener(refreshAccess);
-extensionAPI.tabs.onUpdated?.addListener((_, change) => { if (change.url || change.status) refreshAccess(); });
+extensionAPI.tabs.onUpdated?.addListener((_, change) => {
+  if (change.url || change.status) refreshAccess();
+});
 extensionAPI.windows.onFocusChanged.addListener(refreshAccess);
-serialized(async () => { await history.prepare(); await SiteAccess.reconcile(true); await websiteTime.start(); }).then(() => updates.start()).catch(console.error);
+serialized(async () => {
+  await history.prepare();
+  await SiteAccess.reconcile(true);
+  await websiteTime.start();
+})
+  .then(() => updates.start())
+  .catch(console.error);

@@ -45,7 +45,10 @@ test('equivalence detects static blocking policy changes', async t => {
 
 test('generated fixture states never alias entries across integrations', () => {
   const access = { domains: ['example.invalid'], home: 'https://example.invalid/' };
-  const { states, urls } = matrix([{ id: 'first', access }, { id: 'second', access: { domains: ['second.invalid'], home: 'https://second.invalid/' } }]);
+  const { states, urls } = matrix([
+    { id: 'first', access },
+    { id: 'second', access: { domains: ['second.invalid'], home: 'https://second.invalid/' } }
+  ]);
   assert.notEqual(states.running._access.first, states.running._access.second);
   assert.deepEqual(states.defaults, {});
   assert.deepEqual(states.blocked.settings.trackedSites, ['first', 'second']);
