@@ -1,10 +1,9 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 
-test('daily and weekly exports reject history selected before midnight and recover on retry', async t => {
+test('daily and weekly share cards reject history selected before midnight and recover on retry', async t => {
   const { launch, evaluate, eventually, click, withFailureArtifacts } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   const { cdp } = browser;
@@ -21,8 +20,8 @@ test('daily and weekly exports reject history selected before midnight and recov
       '2026-12-31': { x: { createSec: 60, consumeSec: 120, posts: 1 } },
       '2027-01-01': { x: { createSec: 180, consumeSec: 120 } }
     };
-    for (const kind of ['share', 'report']) for (const range of ['today', 'week']) {
-      await t.test(`${kind} ${range}`, () => withFailureArtifacts(browser, `${kind} ${range} date rollover`, async () => {
+    for (const range of ['today', 'week']) {
+      await t.test(`share ${range}`, () => withFailureArtifacts(browser, `share ${range} date rollover`, async () => {
         await browser.setTime(new Date(2026, 11, 31, 23, 59).getTime());
         await evaluate(browser, browser.worker, `chrome.storage.local.set(${JSON.stringify(fixture)})`);
         await cdp.send('Page.navigate', { url: browser.origin + '/dashboard.html' }, page.session);
@@ -42,7 +41,7 @@ test('daily and weekly exports reject history selected before midnight and recov
             return reply;
           };
         })()`);
-        const selector = kind === 'share' ? '#share-create' : '#report-export';
+        const selector = '#share-create';
         const beforeDownloads = downloads.length;
         await click(browser, page, selector);
         await eventually(() => inspect(page, 'typeof releaseHistory === "function"'), 'history selected before midnight');
@@ -59,20 +58,13 @@ test('daily and weekly exports reject history selected before midnight and recov
         await click(browser, page, selector);
         const period = range === 'today' ? '2027-01-01' : '2026-12-26-to-2027-01-01';
         const minutes = range === 'today' ? '3m' : '4m';
-        if (kind === 'share') {
-          await eventually(() => inspect(page, '!document.querySelector("#share-result").hidden && !document.querySelector("#share-create").disabled && document.querySelector("#share-preview").width === 1200 && document.querySelector("#share-preview").height === 1200'), 'retry produces a PNG preview');
-          const caption = await inspect(page, 'document.querySelector("#share-caption").value');
-          assert.ok(caption.includes(`${minutes} creating`));
-          await click(browser, page, '#share-download');
-        }
+        await eventually(() => inspect(page, '!document.querySelector("#share-result").hidden && !document.querySelector("#share-create").disabled && document.querySelector("#share-preview").width === 1200 && document.querySelector("#share-preview").height === 1200'), 'retry produces a PNG preview');
+        const caption = await inspect(page, 'document.querySelector("#share-caption").value');
+        assert.ok(caption.includes(`${minutes} creating`));
+        await click(browser, page, '#share-download');
         await eventually(() => downloads.length === beforeDownloads + 1 && completed.has(downloads.at(-1).guid), 'retried artifact downloads');
         const download = downloads.at(-1);
-        assert.equal(download.suggestedFilename, `CreateRatio-${kind === 'share' ? 'share' : 'report'}-${period}.${kind === 'share' ? 'png' : 'html'}`);
-        if (kind === 'report') {
-          const html = await readFile(path.join(browser.directory, download.guid), 'utf8');
-          assert.ok(html.includes(`<dt>Creating</dt><dd>${range === 'today' ? '3.0m' : '4.0m'}</dd>`));
-          assert.ok(html.includes('2027-01-01'));
-        }
+        assert.equal(download.suggestedFilename, `CreateRatio-share-${period}.png`);
         assert.equal(await inspect(page, 'document.querySelector("#error").hidden'), true);
       }));
     }

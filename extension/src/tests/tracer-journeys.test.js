@@ -1,6 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const util = require('node:util');
 const { worker, gate, intent, rulesFor } = require('./background-harness.js');
 const { tracker } = require('./content-harness.js');
 const { Element } = require('../../sites/test-support.js');
@@ -355,4 +356,31 @@ for (const browser of ['chrome', 'browser']) {
     assert.deepEqual(w.errors, []);
     assert.deepEqual(t.warnings, []);
   });
+
+  for (const [name, button] of [['dashboard', 'export'], ['settings', 'export-ratio']]) {
+    test(`${browser}: the worker's Clear history writes make a pending ${name} CSV reject its pre-clear reply`, async () => {
+      const w = worker({ [date]: { x: { createSec: 180, consumeSec: 60 } } }, browser, start);
+      const settings = await ui(w, 'settings');
+      const exporter = name === 'settings' ? settings : await ui(w, name);
+      const preClear = await w.send({ type: 'history', kind: 'ratio', range: 'week' }, sender(name));
+      assert.equal(preClear.days[date].x.createSec, 180);
+      exporter.state.replies.set('history', preClear);
+      const release = exporter.holdMessage('history');
+      const exporting = exporter.nodes[button].fire('click');
+      await exporter.ready();
+      const beforeClear = structuredClone(w.data);
+      await settings.nodes['clear-history'].fire('click');
+      const written = Object.fromEntries(Object.keys({ ...beforeClear, ...w.data })
+        .filter(key => !util.isDeepStrictEqual(beforeClear[key], w.data[key]))
+        .map(key => [key, { oldValue: beforeClear[key], newValue: structuredClone(w.data[key]) }]));
+      exporter.change(written);
+      await exporter.ready(); release(); await exporting;
+      assert.equal(exporter.blobs.length, 0, 'a pre-clear reply never becomes a CSV');
+      assert.equal(exporter.nodes.error.textContent, 'History changed while loading. Please try again.');
+      exporter.state.replies.delete('history');
+      await exporter.nodes[button].fire('click');
+      assert.equal(csvRows(await exporter.blobs.at(-1).text()).length, 0);
+      assert.deepEqual(w.errors, []);
+    });
+  }
 }
