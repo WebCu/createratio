@@ -5,11 +5,49 @@ const { spawnSync } = require('node:child_process');
 const { mkdir, mkdtemp, readFile, writeFile, rm } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const stat = (start = '123', state = 'S') =>
   `42 (renderer (worker)) ${[state, '1', ...Array(17).fill('0'), start].join(' ')}`;
 const counters = 'Rss: 80 kB\nPss: 40 kB\nPrivate_Clean: 8 kB\nPrivate_Dirty: 12 kB\n';
 const missing = code => Object.assign(new Error(code), { code });
+
+test('blocked return synchronization waits for a new response and the refresh render to finish', async () => {
+  const { blockedReturnReady } = await import('../lifecycle-workloads.mjs');
+  const context = vm.createContext({ blockedProfile: { sends: 0, completed: 0 }, refreshing: false });
+  const browser = {
+    cdp: {
+      async send(method, { expression }, session) {
+        assert.equal(method, 'Runtime.evaluate');
+        assert.equal(session, 'gate');
+        return { result: { value: vm.runInContext(expression, context) } };
+      }
+    }
+  };
+  assert.equal(await blockedReturnReady(browser, 'gate', 0), false);
+  context.blockedProfile.sends++;
+  context.refreshing = true;
+  assert.equal(
+    await blockedReturnReady(browser, 'gate', 0),
+    false,
+    'sending with the old blocked DOM is not synchronization'
+  );
+  context.blockedProfile.completed++;
+  assert.equal(await blockedReturnReady(browser, 'gate', 0), false, 'a received reply must still render');
+  context.refreshing = false;
+  assert.equal(await blockedReturnReady(browser, 'gate', 0), true);
+  assert.equal(
+    await blockedReturnReady(browser, 'gate', 1),
+    false,
+    'an earlier completed refresh is not a new response'
+  );
+  context.blockedProfile.sends++;
+  assert.equal(
+    await blockedReturnReady(browser, 'gate', 1),
+    false,
+    'a failed request without a response does not synchronize'
+  );
+});
 
 test('worker process accounting distinguishes unavailable counters, exit and PID reuse', async () => {
   const { processMemory } = await import('../lifecycle-resources.mjs');

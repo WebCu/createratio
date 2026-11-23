@@ -5,7 +5,7 @@ import { tmpdir, release } from 'node:os';
 import { join, resolve } from 'node:path';
 import { launch, withFailureArtifacts } from '../extension/browser-tests/chromium.mjs';
 import { bundleFingerprint } from './scroll-profile-report.mjs';
-import { settingsWorkload, trackerWorkload } from './lifecycle-workloads.mjs';
+import { settingsWorkload, trackerWorkload, blockedWorkload } from './lifecycle-workloads.mjs';
 import { validateLifecycleProfile } from './lifecycle-profile-report.mjs';
 
 async function workloadFingerprint() {
@@ -25,7 +25,7 @@ async function workloadFingerprint() {
 }
 
 export async function profileLifecycle(baseline, candidate, output, { workload, baselineIdle = false }) {
-  assert.ok(['settings', 'trackers'].includes(workload));
+  assert.ok(['settings', 'trackers', 'blocked'].includes(workload));
   for (const bundle of [baseline, candidate]) await readFile(resolve(bundle, 'manifest.json'), 'utf8');
   const provenance = {
     baseline: await bundleFingerprint(baseline),
@@ -90,9 +90,11 @@ export async function profileLifecycle(baseline, candidate, output, { workload, 
           );
           browser = await launch(executionBundle);
           const result = await withFailureArtifacts(browser, `${workload} lifecycle ${variant} ${repetition}`, () =>
-            workload === 'settings'
-              ? settingsWorkload(browser)
-              : trackerWorkload(browser, { expectIdle: variant === 'candidate' || baselineIdle })
+            workload === 'blocked'
+              ? blockedWorkload(browser)
+              : workload === 'settings'
+                ? settingsWorkload(browser)
+                : trackerWorkload(browser, { expectIdle: variant === 'candidate' || baselineIdle })
           );
           await unchanged();
           report.runs.push({
