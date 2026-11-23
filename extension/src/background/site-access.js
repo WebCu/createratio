@@ -45,13 +45,13 @@
   function siteAccessFromStored(raw, now) {
     if (!record(raw) || !validSession(raw, now)) return null;
     const hasDate = Object.hasOwn(raw, 'date');
-    const session = () => {
-      const remaining = Number.isFinite(raw.remainingMs)
-        ? raw.remainingMs
-        : Number.isFinite(raw.expiresAt)
-          ? Math.max(0, raw.expiresAt - now)
-          : null;
-      return /** @type {AccessSession} */ ({
+    const remaining = Number.isFinite(raw.remainingMs)
+      ? raw.remainingMs
+      : Number.isFinite(raw.expiresAt)
+        ? Math.max(0, raw.expiresAt - now)
+        : null;
+    const session = () =>
+      /** @type {AccessSession} */ ({
         phase: 'session',
         remainingMs: remaining === null ? null : Core.asMilliseconds(remaining),
         expiresAt: numberOrNull(raw.expiresAt),
@@ -59,8 +59,7 @@
         date: hasDate ? raw.date : null,
         goalActive: raw.goalActive === true
       });
-    };
-    if (raw.remainingMs > 0 || raw.refilledAt > 0 || hasDate) return session();
+    if (remaining > 0 || raw.refilledAt > 0 || hasDate) return session();
     if (validWait(raw, now))
       return {
         phase: 'request',

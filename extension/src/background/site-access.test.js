@@ -138,3 +138,10 @@ test('a valid wait with leftover session fields stays a request', () => {
     expected
   );
 });
+
+test('a live legacy deadline is migrated before a wait is considered', () => {
+  assert.deepEqual(
+    M.siteAccessFromStored({ expiresAt: now + 60000, readyAt: now + 1000, waitMs: 300000 }, now),
+    session({ remainingMs: 60000, expiresAt: now + 60000 })
+  );
+});
