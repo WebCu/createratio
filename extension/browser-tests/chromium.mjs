@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import integrations from '../sites/index.js';
+import browserSetup from '../../bin/setup-chromium.js';
 
 const syntheticHosts = new Set([...integrations.sites.flatMap(site => site.hosts), 'twitter.com', 'www.twitter.com']);
 
@@ -158,16 +159,23 @@ export function devToolsEndpoint(contents) {
   return `ws://127.0.0.1:${port}${path}`;
 }
 
+let resolvedBrowser;
+
+function browserExecutable() {
+  if (!resolvedBrowser) {
+    resolvedBrowser = browserSetup.resolveBrowser();
+    if (resolvedBrowser.warning) console.warn(`Warning: ${resolvedBrowser.warning}`);
+  }
+  if (resolvedBrowser.problem) throw new Error(resolvedBrowser.problem);
+  return resolvedBrowser.executable;
+}
+
 export async function launch(extensionPath, options = {}) {
+  const executable = browserExecutable();
   extensionPath = resolve(extensionPath);
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
   const workerURL = extensionWorkerURL(extensionPath, manifest);
   const directory = await mkdtemp(join(tmpdir(), 'createratio-browser-'));
-  if (options.developerMode) {
-    await mkdir(join(directory, 'profile', 'Default'), { recursive: true });
-    await writeFile(join(directory, 'profile', 'Default', 'Preferences'), JSON.stringify({ extensions: { ui: { developer_mode: true } } }));
-  }
-  const executable = process.env.CHROMIUM_PATH || process.env.CHROMIUM || '/usr/bin/chromium';
   const args = [
     `--user-data-dir=${join(directory, 'profile')}`, '--remote-debugging-port=0',
     '--remote-debugging-address=127.0.0.1', '--headless=new',
@@ -279,6 +287,7 @@ export async function launch(extensionPath, options = {}) {
     await eventually(() => evaluate(browser, browser.worker, '!!globalThis.chrome?.storage?.local && !!globalThis.chrome?.runtime?.id'), 'extension worker API readiness');
     await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.session.get("_accessInitialized").then(value => value._accessInitialized === true)'), 'initial access reconciliation');
     await evaluate(browser, browser.worker, clockSource(0));
+    if (options.developerMode) await enableDeveloperMode(cdp, sessions);
     browser.page = async url => {
       const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
       const attached = await eventually(() => sessions.get(targetId), 'autoattached page');
@@ -317,6 +326,40 @@ export async function launch(extensionPath, options = {}) {
     catch (_) {}
     await cleanup();
     throw new Error(`${error.message}\n${diagnostics}`, { cause: error });
+  }
+}
+
+async function enableDeveloperMode(cdp, sessions) {
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'chrome://extensions' });
+  try {
+    const attached = await eventually(() => sessions.get(targetId), 'autoattached extensions page');
+    await attached.ready;
+    await eventually(async () => {
+      const { result } = await cdp.send('Runtime.evaluate', { awaitPromise: true, returnByValue: true, expression: `(async () => {
+        if (!globalThis.chrome?.developerPrivate) return false;
+        await chrome.developerPrivate.updateProfileConfiguration({ inDeveloperMode: true });
+        return (await chrome.developerPrivate.getProfileConfiguration()).inDeveloperMode;
+      })()` }, attached.sessionId);
+      return result.value === true;
+    }, 'extension developer mode enabled');
+  } finally {
+    await cdp.send('Target.closeTarget', { targetId });
+  }
+}
+
+const selectAllShortcut = process.platform === 'darwin' ? { modifiers: 4, commands: ['selectAll'] } : { modifiers: 2 };
+
+export async function selectAllText(browser, page) {
+  const details = { key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, ...selectAllShortcut };
+  await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...details }, page.session);
+  await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...details }, page.session);
+}
+
+export async function typeAhead(browser, page, text) {
+  for (const character of text) {
+    const details = { key: character, windowsVirtualKeyCode: character.toUpperCase().charCodeAt(0) };
+    await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', text: character, ...details }, page.session);
+    await browser.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...details }, page.session);
   }
 }
 

@@ -18,6 +18,21 @@ identity = base64.b64decode(manifest["key"]) if "key" in manifest else str(bundl
 extension_id = "".join(chr(ord("a") + int(value, 16)) for value in hashlib.sha256(identity).hexdigest()[:32])
 worker_url = "chrome-extension://" + extension_id + "/" + manifest["background"]["service_worker"]
 
+tools = pathlib.Path(__file__).resolve().parent
+resolved = subprocess.run(["node", str(tools / "setup-chromium.js"), "--resolve"], capture_output=True, text=True)
+sys.stderr.write(resolved.stderr)
+if resolved.returncode != 0:
+    raise SystemExit(resolved.returncode)
+chromium = resolved.stdout.strip()
+
+pinned_harness = json.loads((tools / "browser-pins.json").read_text())["browserHarness"]
+try:
+    harness_version = subprocess.run(["browser-harness", "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
+except FileNotFoundError:
+    raise SystemExit("browser-harness is not on PATH. Install the CI version: uv tool install browser-harness==" + pinned_harness)
+if harness_version != pinned_harness:
+    sys.stderr.write("Warning: browser-harness " + harness_version + " differs from the CI version " + pinned_harness + ".\n")
+
 env = dict(os.environ, BU_NAME="c3-smoke-" + uuid.uuid4().hex, BH_TAB_MARKER="0", BH_RECORD="0")
 env.pop("BU_CDP_WS", None)
 env.pop("BH_REQUIRE_EXISTING_DAEMON", None)
@@ -98,7 +113,7 @@ print(json.dumps({"browserSmoke": "passed", "states": len(result["snapshots"]), 
 with tempfile.TemporaryDirectory(prefix="createratio-chromium-") as directory:
     profile = pathlib.Path(directory)
     arguments = [
-        os.environ.get("CHROMIUM", "chromium"),
+        chromium,
         "--headless=new", "--remote-debugging-port=0", "--disable-dev-shm-usage",
         "--no-first-run", "--no-default-browser-check", "--disable-background-networking",
         "--disable-sync", "--disable-component-update",
