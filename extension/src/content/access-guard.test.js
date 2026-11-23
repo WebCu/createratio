@@ -146,6 +146,17 @@ test('guard sleeps until the authoritative expiry and blocks at exhaustion', asy
   await g.timer.fn();
   assert.deepEqual(g.redirects, ['chrome-extension://extension/blocked.html?site=x']);
 });
+test('guard defers gate navigation to the reachable worker after its drain', async () => {
+  const g = guard('x.com', 'chrome', {
+    reply: { ok: true, navigationHandled: true, access: { x: accessState('x', { remainingMs: 0 }) } }
+  });
+  await g.flush();
+  assert.deepEqual(g.redirects, []);
+  assert.equal(g.timer, undefined);
+  g.broken = true;
+  await g.event('focus');
+  assert.deepEqual(g.redirects, ['chrome-extension://extension/blocked.html?site=x']);
+});
 test('Off allows free access with no budget; switching On restores the gate', async () => {
   const g = guard();
   await g.flush();

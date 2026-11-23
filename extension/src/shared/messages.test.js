@@ -32,6 +32,16 @@ function client(reply) {
     }
   });
 }
+test('terminal refusals preserve their delivery disposition without marking transient failures', async () => {
+  await assert.rejects(
+    client({ ok: false, error: 'Invalid packet', retryable: false }).send({ type: 'ingest' }, 'Failed'),
+    { message: 'Invalid packet', retryable: false }
+  );
+  await assert.rejects(
+    client({ ok: false, error: 'Storage unavailable' }).send({ type: 'ingest' }, 'Failed'),
+    error => error.retryable === undefined
+  );
+});
 test('runtime replies require an object envelope with a literal success boolean', async () => {
   for (const reply of [
     undefined,

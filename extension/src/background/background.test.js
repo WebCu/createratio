@@ -18,6 +18,211 @@ test('initializes Chromium and Firefox backgrounds with their available storage 
 function packet(id, site = 'x') {
   return { type: 'ingest', id, site, segments: [{ date: C.localDate(), mode: 'consume', sec: 5 }], actions: [] };
 }
+test('delayed midnight reconciliation authorizes the continuously running refill', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const w = worker({ settings: { accessMinutes: 1, waitMinutes: 1 } }, 'chrome', midnight - 119000);
+  await unlock(w);
+  w.activate('https://x.com/home');
+  await w.send({ type: 'access-status' });
+  assert.equal(w.data._access.x.expiresAt, midnight + 1000);
+  w.advance(62000);
+  assert.equal(w.now, midnight + 3000);
+  const date = C.localDate(new Date(midnight));
+  const result = await w.send({
+    type: 'ingest',
+    id: 'midnight-refill',
+    site: 'x',
+    segments: [{ date, mode: 'consume', start: midnight, end: w.now, sec: 3 }],
+    actions: []
+  });
+  assert.equal(result.ok, true);
+  assert.equal(w.data[date].x.consumeSec, 3);
+});
+test('reconciliation after the midnight refill expires retains its full authorized minute', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const w = worker({ settings: { accessMinutes: 1, waitMinutes: 1 } }, 'chrome', midnight - 119000);
+  await unlock(w);
+  w.activate('https://x.com/home');
+  await w.send({ type: 'access-status' });
+  assert.equal(w.data._access.x.expiresAt, midnight + 1000);
+  w.advance(121000);
+  assert.equal(w.now, midnight + 62000);
+  const date = C.localDate(new Date(midnight));
+  const result = await w.send({
+    type: 'ingest',
+    id: 'exhausted-refill',
+    site: 'x',
+    segments: [{ date, mode: 'consume', start: midnight, end: w.now, sec: 62 }],
+    actions: [
+      { date, action: 'replies', at: midnight + 59000 },
+      { date, action: 'replies', at: midnight + 60000 }
+    ]
+  });
+  assert.equal(result.ok, true);
+  assert.equal(w.data[date].x.consumeSec, 60);
+  assert.equal(w.data[date].x.replies, 1);
+  assert.equal(result.access.x.remainingMs, 0);
+});
+test('goal-only access stops authorizing at midnight even when reconciliation is delayed', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const yesterday = C.localDate(new Date(midnight - 1)),
+    today = C.localDate(new Date(midnight));
+  const w = worker({ settings: { allowAboveGoal: true }, [yesterday]: { x: { posts: 1 } } }, 'chrome', midnight - 2000);
+  w.activate('https://x.com/home');
+  assert.equal((await w.send({ type: 'access-status' })).access.x.goalAllowed, true);
+  w.advance(5000);
+  const result = await w.send({
+    type: 'ingest',
+    id: 'goal-midnight',
+    site: 'x',
+    segments: [
+      { date: yesterday, mode: 'consume', start: midnight - 2000, end: midnight, sec: 2 },
+      { date: today, mode: 'consume', start: midnight, end: midnight + 3000, sec: 3 }
+    ],
+    actions: [
+      { date: yesterday, action: 'replies', at: midnight - 1 },
+      { date: today, action: 'replies', at: midnight + 1 }
+    ]
+  });
+  assert.equal(result.ok, true);
+  assert.equal(w.data[yesterday].x.consumeSec, 2);
+  assert.equal(w.data[yesterday].x.replies, 1);
+  assert.equal(w.data[today], undefined);
+  assert.equal(result.access.x.goalAllowed, false);
+});
+test('a timed budget paused above goal continues authorizing from its midnight refill', async () => {
+  const midnight = new Date(2026, 9, 12).getTime();
+  const yesterday = C.localDate(new Date(midnight - 1)),
+    today = C.localDate(new Date(midnight));
+  const w = worker(
+    {
+      settings: { allowAboveGoal: true, accessMinutes: 1 },
+      [yesterday]: { x: { posts: 1 } },
+      _access: { x: { date: yesterday, remainingMs: 30000, expiresAt: 0 } }
+    },
+    'chrome',
+    midnight - 2000
+  );
+  w.activate('https://x.com/home');
+  const before = (await w.send({ type: 'access-status' })).access.x;
+  assert.equal(before.goalAllowed, true);
+  assert.equal(before.expiresAt, 0);
+  w.advance(5000);
+  const result = await w.send({
+    type: 'ingest',
+    id: 'paused-goal-refill',
+    site: 'x',
+    segments: [{ date: today, mode: 'consume', start: midnight, end: midnight + 3000, sec: 3 }],
+    actions: [{ date: today, action: 'replies', at: midnight + 1000 }]
+  });
+  assert.equal(result.ok, true);
+  assert.equal(w.data[today]?.x.consumeSec, 3);
+  assert.equal(w.data[today].x.replies, 1);
+  assert.equal(w.data._access.x.refilledAt, midnight);
+});
+for (const active of [true, false])
+  test(`midnight above-goal refill charges only continuously active access: ${active}`, async () => {
+    const midnight = new Date(2026, 9, 12).getTime();
+    const yesterday = C.localDate(new Date(midnight - 1)),
+      today = C.localDate(new Date(midnight));
+    const w = worker(
+      {
+        settings: { allowAboveGoal: true, accessMinutes: 1 },
+        [yesterday]: { x: { posts: 1 } },
+        _access: { x: { date: yesterday, remainingMs: 30000, expiresAt: 0 } }
+      },
+      'chrome',
+      midnight - 2000
+    );
+    if (active) w.activate('https://x.com/home');
+    assert.equal((await w.send({ type: 'access-status' })).access.x.goalAllowed, true);
+    w.advance(122000);
+    const result = await w.send({
+      type: 'ingest',
+      id: 'delayed-goal-refill',
+      site: 'x',
+      segments: [{ date: today, mode: 'consume', start: midnight, end: w.now, sec: 120 }],
+      actions: [
+        { date: today, action: 'replies', at: midnight + 59000 },
+        { date: today, action: 'replies', at: midnight + 60000 }
+      ]
+    });
+    assert.equal(result.ok, true);
+    assert.equal(w.data[today]?.x.consumeSec, active ? 60 : 120);
+    assert.equal(w.data[today].x.replies, active ? 1 : 2);
+    assert.equal(result.access.x.remainingMs, active ? 0 : 60000);
+  });
+
+test('records the final interval of a minute session even after expiry', async () => {
+  const w = worker({ settings: { accessMinutes: 1 } });
+  await unlock(w);
+  w.activate('https://x.com/home');
+  await w.send({ type: 'access-status' });
+  const start = w.now,
+    date = C.localDate(new Date(start));
+  for (let index = 0; index < 12; index++) {
+    w.advance(5000);
+    const result = await w.send({
+      type: 'ingest',
+      id: `minute-${index}`,
+      site: 'x',
+      segments: [{ date, mode: 'consume', sec: 5, start: start + index * 5000, end: w.now }],
+      actions: []
+    });
+    assert.equal(result.ok, true);
+  }
+  assert.equal(w.data[date].x.consumeSec, 60);
+});
+test('late packets retain only authorized time and actions across expiry, manual end and restart', async () => {
+  for (const manual of [false, true]) {
+    const w = worker({ settings: { accessMinutes: 1 } });
+    await unlock(w);
+    w.activate('https://x.com/home');
+    await w.send({ type: 'access-status' });
+    const start = w.now,
+      end = start + (manual ? 30000 : 60000),
+      date = C.localDate(new Date(start));
+    w.advance(end - start);
+    if (manual) await w.send({ type: 'access-end', site: 'x' }, popupSender);
+    else await w.send({ type: 'access-status' });
+    w.advance(10000);
+    const late = {
+      type: 'ingest',
+      id: 'late',
+      site: 'x',
+      segments: [{ date, mode: 'consume', start: end - 5000, end: end + 5000, sec: 10 }],
+      actions: [
+        { date, action: 'replies', at: end - 1 },
+        { date, action: 'replies', at: end }
+      ]
+    };
+    w.failWrites = true;
+    assert.equal((await w.send(late)).ok, false);
+    w.failWrites = false;
+    const restarted = worker(w.data, 'chrome', w.now);
+    const retried = await restarted.send(late);
+    assert.equal(retried.ok, true, JSON.stringify(retried));
+    assert.equal((await restarted.send(late)).ok, true);
+    assert.equal(w.data[date].x.consumeSec, 5);
+    assert.equal(w.data[date].x.replies, 1);
+    assert.equal(
+      (
+        await restarted.send({
+          ...late,
+          id: 'outside',
+          segments: [{ date, mode: 'consume', start: end, end: end + 5000, sec: 5 }],
+          actions: []
+        })
+      ).ok,
+      true
+    );
+    assert.equal(w.data[date].x.consumeSec, 5);
+    assert.equal(
+      (await restarted.send({ ...late, id: 'invalid', segments: [{ ...late.segments[0], end: end - 6000 }] })).ok,
+      false
+    );
+  }
+});
 test('serialized writes from concurrent tabs preserve all time and quote counts', async () => {
   const w = activeWorker();
   const a = packet('a');
@@ -570,11 +775,12 @@ test('invalid intentions and unsupported senders return rejections without repor
         frameId: 0,
         url: 'https://example.com'
       }),
-      { ok: false, error: 'Unsupported sender' }
+      { ok: false, error: 'Unsupported sender', retryable: false }
     );
     assert.deepEqual(await w.send(packet('foreign'), { ...gate('x'), id: 'other-extension' }), {
       ok: false,
-      error: 'Unsupported sender'
+      error: 'Unsupported sender',
+      retryable: false
     });
     assert.equal(w.data._access, undefined);
     assert.equal(w.data[C.localDate()], undefined);

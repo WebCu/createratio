@@ -105,7 +105,11 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
       async query(query) {
         return query.active ? (activeTab ? [activeTab] : []) : tabs;
       },
+      async sendMessage(id, message, target) {
+        return options.sendTabMessage?.(id, message, target);
+      },
       async update(id, changes) {
+        await options.onTabUpdate?.(id, changes);
         Object.assign(
           tabs.find(tab => tab.id === id),
           changes
@@ -180,6 +184,8 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
     TextEncoder,
     crypto,
     Date: Clock,
+    setTimeout,
+    clearTimeout,
     setInterval() {
       return 1;
     },
