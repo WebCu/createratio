@@ -119,7 +119,7 @@ function resolveBrowser(env = process.env, pin = pinnedChromium({ cacheRoot: def
     return { problem: `${version} at ${executable} is branded Chrome, which ignores --load-extension. ${setupAdvice}` };
   }
   const pinnedVersion = pins.chromeForTesting.version;
-  const warning = version.includes(pinnedVersion) ? null : `${version} differs from the CI browser, Chrome for Testing ${pinnedVersion}. ${setupAdvice}`;
+  const warning = version.split(/\s+/).includes(pinnedVersion) ? null : `${version} differs from the CI browser, Chrome for Testing ${pinnedVersion}. ${setupAdvice}`;
   return { executable, version, warning };
 }
 
