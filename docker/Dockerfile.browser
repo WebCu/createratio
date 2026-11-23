@@ -11,20 +11,23 @@ RUN apt-get update \
     libxkbcommon0 libxrandr2 \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install --global --no-fund --no-audit "pnpm@${PNPM_VERSION}"
+RUN npm install --global --no-fund --no-audit "pnpm@${PNPM_VERSION}" \
+  && npm cache clean --force
 
 ENV CREATERATIO_CACHE_DIR=/opt/createratio/cache
 COPY bin/browser-pins.json bin/setup-chromium.js /opt/createratio/bin/
 RUN node /opt/createratio/bin/setup-chromium.js \
   && python3 -m venv /opt/browser-harness \
   && /opt/browser-harness/bin/pip install --disable-pip-version-check --no-cache-dir \
-    "browser-harness==$(node -p "require('/opt/createratio/bin/browser-pins.json').browserHarness")"
+    "browser-harness==$(node -p "require('/opt/createratio/bin/browser-pins.json').browserHarness")" \
+  && /opt/browser-harness/bin/pip uninstall --disable-pip-version-check -y pip setuptools
 
 WORKDIR /opt/createratio/deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY extension/package.json extension/
 COPY site/package.json site/
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts \
+  && rm -rf /root/.cache/pnpm
 
 COPY docker/browser-check.sh /usr/local/bin/browser-check
 ENV PATH=/opt/browser-harness/bin:$PATH \
