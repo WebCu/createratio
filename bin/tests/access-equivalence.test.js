@@ -95,8 +95,18 @@ test('matrix covers exhausted, legacy, stale-wait, above-goal session, and midni
   assert.deepEqual(restarts, ['running', 'midnight', 'runningAtMidnight']);
 });
 
-test('equivalence compares stored access by meaning and still detects a changed refill time', async t => {
+test('equivalence detects a changed refill time', async t => {
   const { baseline, candidate } = await bundles(t);
   await mutate(candidate, 'refilledAt = dayStart;', 'refilledAt = dayStart + 1;');
+  await assert.rejects(compare(baseline, candidate), /lifecycle/);
+});
+
+test('equivalence detects a stored budget dropped while a session runs', async t => {
+  const { baseline, candidate } = await bundles(t);
+  await mutate(
+    candidate,
+    'remainingMs: state.remainingMs,',
+    'remainingMs: state.expiresAt ? null : state.remainingMs,'
+  );
   await assert.rejects(compare(baseline, candidate), /lifecycle/);
 });

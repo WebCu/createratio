@@ -93,15 +93,19 @@ function engine(folder) {
       const { rules, data, alarms, tabs } = world;
       return JSON.parse(JSON.stringify({ status, rules, data, alarms, tabs }));
     },
-    parsedSnapshot(snapshot) {
+    normalizedBaseline(snapshot) {
       if (!model || !snapshot.data._access) return snapshot;
-      const parsed = Object.fromEntries(
+      const normalized = Object.fromEntries(
         Object.entries(snapshot.data._access).flatMap(([site, raw]) => {
           const state = model.siteAccessFromStored(raw, now);
-          return state === null ? [] : [[site, JSON.parse(JSON.stringify(state))]];
+          if (state === null) return [];
+          if (state.phase !== 'request') return [[site, raw]];
+          const { expiresAt, remainingMs, ...entry } = raw;
+          if (state.waitMs === null) delete entry.waitMs;
+          return [[site, entry]];
         })
       );
-      return { ...snapshot, data: { ...snapshot.data, _access: parsed } };
+      return { ...snapshot, data: { ...snapshot.data, _access: normalized } };
     }
   };
 }
@@ -194,8 +198,8 @@ async function compare(baseline, candidate) {
     for (const url of urls) {
       assert.equal(updated.siteForURL(url), original.siteForURL(url), `${label}: ${url}: lookup`);
       assert.deepEqual(
-        updated.parsedSnapshot(await updated.snapshot(initial, url, restart)),
-        updated.parsedSnapshot(await original.snapshot(initial, url, restart)),
+        await updated.snapshot(initial, url, restart),
+        updated.normalizedBaseline(await original.snapshot(initial, url, restart)),
         `${label}: ${url}: lifecycle`
       );
       count++;
