@@ -20,6 +20,7 @@ function page(options = {}) {
     redirects = [],
     pending = new Set();
   const document = {
+    addEventListener() {},
     body: {
       id: '',
       tagName: 'BODY',

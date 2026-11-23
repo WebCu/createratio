@@ -266,6 +266,10 @@ function page(name, data = { [Core.localDate()]: { x: { consumeSec: 60 } } }, en
   };
   const document = {
     activeElement: null,
+    hidden: false,
+    addEventListener(type, fn) {
+      events[type] = fn;
+    },
     getElementById: id => nodes[id],
     createElement: () => new Element(),
     createElementNS: () => new Element(),
@@ -356,6 +360,10 @@ function page(name, data = { [Core.localDate()]: { x: { consumeSec: 60 } } }, en
         })
       );
       return release;
+    },
+    visible(value) {
+      document.hidden = !value;
+      events.visibilitychange?.();
     },
     timeouts,
     revokedURLs,
