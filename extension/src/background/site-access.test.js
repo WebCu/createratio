@@ -310,3 +310,60 @@ test('reconcile never mutates its input', () => {
   M.reconcileSiteAccess(input, facts({ focused: true }));
   assert.deepEqual(input, paused);
 });
+
+test('invalid stored session dates make the entry unreadable', () => {
+  for (const date of ['not-a-date', '2026-02-30', '2026-13-01', '2026-10-1', 1, true, {}, [], null, ''])
+    assert.equal(M.siteAccessFromStored({ date, remainingMs: 120000, expiresAt: 0 }, now), null, JSON.stringify(date));
+});
+
+test('invalid stored session numbers make the entry unreadable', () => {
+  for (const field of ['remainingMs', 'expiresAt', 'refilledAt'])
+    for (const invalid of [-1, -Infinity, Infinity, NaN, '120000', true, null, undefined, {}, []]) {
+      const raw = {
+        date: today,
+        remainingMs: 120000,
+        expiresAt: now + 120000,
+        refilledAt: now - 600000,
+        [field]: invalid
+      };
+      assert.equal(M.siteAccessFromStored(raw, now), null, `${field}: ${String(invalid)}`);
+    }
+});
+
+test('malformed or too distant stored wait deadlines make the entry unreadable', () => {
+  const entries = [
+    ...[0, -1, -Infinity, Infinity, NaN, '1', null, undefined, true, {}, []].map(readyAt => ({ readyAt })),
+    {},
+    { readyAt: now + C.ACCESS_LIMITS.maxMinutes * 60000 + 1 }
+  ];
+  for (const raw of entries) assert.equal(M.siteAccessFromStored(raw, now), null, JSON.stringify(raw));
+});
+
+test('a stored wait keeps its deadline and falls back to one minute when its duration is invalid', () => {
+  for (const waitMs of [
+    undefined,
+    null,
+    0,
+    -60000,
+    60001,
+    '60000',
+    NaN,
+    Infinity,
+    (C.ACCESS_LIMITS.maxMinutes + 1) * 60000
+  ]) {
+    const state = M.siteAccessFromStored({ readyAt: now + 30000, ...(waitMs === undefined ? {} : { waitMs }) }, now);
+    assert.equal(state.readyAt, now + 30000, String(waitMs));
+    assert.equal(M.waitDuration(state), 60000, String(waitMs));
+  }
+});
+
+test('a stored wait is readable up to its own validated duration and no further', () => {
+  for (const waitMs of [60000, 300000, undefined, null, 0, -60000, 60001, '60000', NaN, Infinity, 241 * 60000]) {
+    const duration = C.validAccessMinutes(waitMs / 60000) && typeof waitMs === 'number' ? waitMs : 60000;
+    const stored = readyAt => ({ readyAt, ...(waitMs === undefined ? {} : { waitMs }) });
+    assert.equal(M.siteAccessFromStored(stored(now + duration + 1), now), null, String(waitMs));
+    const pending = M.siteAccessFromStored(stored(now + duration), now);
+    assert.equal(pending.readyAt, now + duration, String(waitMs));
+    assert.equal(M.waitDuration(pending), duration, String(waitMs));
+  }
+});
