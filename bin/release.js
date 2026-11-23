@@ -38,7 +38,9 @@ function compareVersions(left, right) {
 function run(program, args, stdio = 'pipe') {
   const result = spawnSync(program, args, { encoding: 'utf8', stdio, timeout: 300000, maxBuffer: 10 * 1024 * 1024 });
   if (result.error || result.status !== 0) {
-    throw new Error(`${program} ${args.slice(0, 2).join(' ')} failed. Your branch, files and tags are preserved; inspect the command before retrying.`);
+    throw new Error(
+      `${program} ${args.slice(0, 2).join(' ')} failed. Your branch, files and tags are preserved; inspect the command before retrying.`
+    );
   }
   return (result.stdout || '').trim();
 }
@@ -49,8 +51,14 @@ function git(...args) {
 
 function requireOfficialOrigin() {
   const origin = git('config', '--get', 'remote.origin.url');
-  const destinations = [origin, git('remote', 'get-url', 'origin'), ...git('remote', 'get-url', '--push', '--all', 'origin').split('\n')];
-  if (!destinations.every(url => /^(?:https:\/\/github\.com\/|git@github\.com:)WebCu\/createratio(?:\.git)?$/.test(url))) {
+  const destinations = [
+    origin,
+    git('remote', 'get-url', 'origin'),
+    ...git('remote', 'get-url', '--push', '--all', 'origin').split('\n')
+  ];
+  if (
+    !destinations.every(url => /^(?:https:\/\/github\.com\/|git@github\.com:)WebCu\/createratio(?:\.git)?$/.test(url))
+  ) {
     throw new Error('Origin must fetch and push only to the official WebCu/createratio repository.');
   }
 }
@@ -79,7 +87,8 @@ function prepare(increment) {
   if (git('branch', '--list', branch) || git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`)) {
     throw new Error('The release branch already exists; inspect its PR instead of overwriting it.');
   }
-  if (git('ls-remote', '--tags', 'origin', `refs/tags/v${version}`)) throw new Error('This release tag already exists.');
+  if (git('ls-remote', '--tags', 'origin', `refs/tags/v${version}`))
+    throw new Error('This release tag already exists.');
   const edits = versionFiles.map(file => {
     const text = readFileSync(file, 'utf8');
     const matches = [...text.matchAll(/("version"\s*:\s*")[^"]+("\s*[,}])/g)];
@@ -94,9 +103,32 @@ function prepare(increment) {
   git('commit', '-m', `Release ${version}`);
   git('pull', '--rebase', '--ff-only', 'origin', 'main');
   requireOfficialOrigin();
-  git('-c', 'remote.origin.mirror=false', 'push', '--no-follow-tags', '--set-upstream', 'origin', `refs/heads/${branch}:refs/heads/${branch}`);
-  const body = `## Summary\n\nPrepare version ${version} for Chrome and Firefox. All three version fields are updated together.\n\n## Evidence\n\n- pnpm check passed.\n- Store submission reruns CI and requires separate approval after the tag is pushed.\n\n## Merge Danger\n\n**Door:** two-way\n\nMerging updates source versions only; it does not push a release tag.\n\n**Blast Radius:** releases\n\nAfter merge, run pnpm release publish from clean, current main to trigger store submissions.\n`;
-  process.stdout.write(run('gh', ['pr', 'create', '--repo', 'WebCu/createratio', '--base', 'main', '--head', branch, '--title', `Release ${version}`, '--body', body]) + '\n');
+  git(
+    '-c',
+    'remote.origin.mirror=false',
+    'push',
+    '--no-follow-tags',
+    '--set-upstream',
+    'origin',
+    `refs/heads/${branch}:refs/heads/${branch}`
+  );
+  const body = `## Summary\n\nPrepare version ${version} for Chrome and Firefox. All three version fields are updated together.\n\n## Evidence\n\n- pnpm check passed.\n- Store submission reruns CI and requires separate approval after the GitHub release is published.\n\n## Merge Danger\n\n**Door:** two-way\n\nMerging updates source versions only; it does not push a release tag.\n\n**Blast Radius:** releases\n\nAfter merge, run pnpm release publish from clean, current main to publish a GitHub release with generated change notes and trigger store submissions.\n`;
+  process.stdout.write(
+    run('gh', [
+      'pr',
+      'create',
+      '--repo',
+      'WebCu/createratio',
+      '--base',
+      'main',
+      '--head',
+      branch,
+      '--title',
+      `Release ${version}`,
+      '--body',
+      body
+    ]) + '\n'
+  );
 }
 
 function publish() {
@@ -104,8 +136,12 @@ function publish() {
   git('pull', '--rebase', '--ff-only', 'origin', 'main');
   const version = sourceVersion();
   const tag = `v${version}`;
-  if (git('ls-remote', '--tags', 'origin', `refs/tags/${tag}`)) {
-    throw new Error('This tag already exists remotely. Retry a failed store job in Actions; never move a release tag.');
+  const remoteTag = git('ls-remote', '--tags', 'origin', `refs/tags/${tag}`, `refs/tags/${tag}^{}`)
+    .split('\n')
+    .filter(Boolean);
+  const remoteCommit = remoteTag.find(line => line.endsWith(`\trefs/tags/${tag}^{}`))?.split('\t')[0];
+  if (remoteTag.length && remoteCommit !== git('rev-parse', 'HEAD')) {
+    throw new Error('The remote tag must be annotated and point to current main; never move a release tag.');
   }
   if (git('tag', '--list', tag)) {
     const ref = `refs/tags/${tag}`;
@@ -115,12 +151,35 @@ function publish() {
     if (git('rev-parse', `${ref}^{commit}`) !== git('rev-parse', 'HEAD')) {
       throw new Error('The local tag points to another commit; refusing to move it.');
     }
-  } else {
-    git('tag', '--annotate', tag, '--message', `Release ${version}`);
   }
-  requireOfficialOrigin();
-  git('-c', 'remote.origin.mirror=false', 'push', '--no-follow-tags', 'origin', `refs/tags/${tag}:refs/tags/${tag}`);
-  process.stdout.write(`Triggered ${tag} for Chrome and Firefox. Review the packages and approve each store job in GitHub Actions.\n`);
+  run('gh', ['auth', 'status', '--hostname', 'github.com']);
+  if (!remoteTag.length) {
+    if (!git('tag', '--list', tag)) git('tag', '--annotate', tag, '--message', `Release ${version}`);
+    requireOfficialOrigin();
+    git('-c', 'remote.origin.mirror=false', 'push', '--no-follow-tags', 'origin', `refs/tags/${tag}:refs/tags/${tag}`);
+  }
+  try {
+    process.stdout.write(
+      run('gh', [
+        'release',
+        'create',
+        tag,
+        '--repo',
+        'WebCu/createratio',
+        '--verify-tag',
+        '--title',
+        `Release ${version}`,
+        '--generate-notes'
+      ]) + '\n'
+    );
+  } catch {
+    throw new Error(
+      'Release creation failed; the tag is preserved. Inspect the GitHub release before retrying: if published, use Actions to retry only failed store jobs; if absent, rerun this command.'
+    );
+  }
+  process.stdout.write(
+    `Published ${tag} with generated change notes. Review the packages and approve each store job in GitHub Actions; store availability is separate.\n`
+  );
 }
 
 function main() {
@@ -131,7 +190,9 @@ function main() {
 }
 
 if (require.main === module) {
-  try { main(); } catch (error) {
+  try {
+    main();
+  } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;
   }

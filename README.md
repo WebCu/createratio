@@ -3,18 +3,22 @@
 **Create > Consume.**
 
 A free, open-source browser extension that helps you spend more time creating
-and less time consuming. X and LinkedIn are blocked by default. Write an
-intention, wait 60 seconds, then confirm access for five active minutes by default.
+and less time consuming. X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit
+are blocked by default on a fresh install. Write an
+intention, wait five minutes, then confirm access for five active minutes by default.
 Switching away pauses the timer.
 
-- **Intentional access:** configurable session times and a **Limit & track**
-  switch for each supported site. Turning it off removes access restrictions
-  and stops new creation-score measurements without deleting history.
+- **Intentional access:** configurable intention waits and session times, with a **Limit & track**
+  switch for X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit. Turning it off removes
+  access restrictions and stops new creation-score measurements without deleting history.
 - **A daily creation score:** compares creating time and credit for posts,
   replies, and comments against consuming time. See the
   [measurement rules and limitations](extension/README.md#measurement-and-score).
 - **Scroll friction:** wheel/trackpad scrolling on consuming pages moves half
   as far by default. Tune the resistance or turn it off in Settings.
+- **All seven platforms start On:** each uses the same intention, wait and active-time
+  limits, alongside creation tracking and shared Slow scrolling. Turn **Limit & track**
+  Off for any site in Settings. Existing saved On/Off choices are kept.
 - **Optional extras:** track time across websites or save your access intentions.
   Both are off by default.
 - **Private by default:** no extension account, analytics, telemetry, or activity
@@ -63,7 +67,13 @@ pnpm build
 Load generated bundles, not source directories. After rebuilding, reload the
 extension in the browser's extensions manager. Individual builds are available
 through `pnpm build:chrome`, `pnpm build:edge`, and `pnpm build:firefox`.
-Source-built Edge and Firefox bundles have not yet been live-browser validated.
+On 2026-11-20, source-built bundles at `bb07674` were validated live on Microsoft
+Edge Stable 142.0.3595.94 and 158.0.4370.33 (both passed the same flows), alongside
+Firefox 160.0.1, against signed-out YouTube: blocking,
+intention entry and a real one-minute wait (premature click rejected), a 5-minute
+active budget pausing off-tab, score dashboard recording consumption, **End
+session** re-blocking, and **Limit & track** Off persisting. Store-published builds,
+signed-in/authenticated YouTube, and trackpad gestures were not covered.
 
 See the [extension guide](extension/README.md) for settings, permissions,
 measurement rules, and limitations.
@@ -108,7 +118,8 @@ add an access gate.
 
 Use [GitHub issues](https://github.com/WebCu/createratio/issues) for bug reports
 and feature proposals. Do not include private activity, intention text,
-credentials, or CSV exports.
+credentials, or CSV exports. Report security vulnerabilities privately as
+described in the [security policy](SECURITY.md).
 
 **Send feedback** in a store-installed Chrome build opens its public Chrome Web
 Store reviews page without attaching local activity data. Feedback links are
@@ -124,8 +135,9 @@ for Docker previews, analytics, and static builds.
 
 Use `pnpm release prepare patch` from clean, current `main` to synchronize the
 extension versions and open a version PR. After merging that PR, run
-`pnpm release publish` from updated `main` to push the matching tag.
-GitHub Actions tests and packages Chrome and Firefox, then requests separate
+`pnpm release publish` from updated `main` to create a GitHub Release with
+generated change notes and the matching tag. Publishing the release triggers
+GitHub Actions to test and package Chrome and Firefox, then request separate
 store approvals before submitting each package. Stores control their own review
 and publication timing. See the [release guide](docs/releases.md) for setup,
 manual checks, package inspection and recovery.

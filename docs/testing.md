@@ -14,11 +14,21 @@ pnpm check:browser
 pnpm smoke:browser
 ```
 
-`pnpm check` is the fast gate: JavaScript syntax, deterministic Node tests, all
+`pnpm check` is the fast gate: code formatting, JavaScript syntax, types, deterministic Node tests, all
 browser builds, and the website build. `pnpm check:browser` builds Chrome and runs
 the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;
 missing browsers and failed checks are errors, not successful skips.
+
+CI runs browser journeys across eight independent runners, with one browser at a
+time per shard. `bin/browser-shards.json` assigns every browser test file exactly
+once; missing, duplicate, or unassigned files fail before journeys start. After
+adding or moving a browser test, update that plan and keep shard durations balanced.
+Run one shard locally with `pnpm check:browser:shard 1` (through `8`); the normal
+`pnpm check:browser` still runs the complete suite. The broader smoke runs
+separately. The existing `browser-smoke` check requires both that smoke and every
+journey shard to succeed, including when a dependency fails, is skipped, or is
+cancelled. Failed shards retain separately named evidence for seven days.
 
 `pnpm verify` runs all three completion commands in order, stopping on the first
 failure and preserving its exit code. Each invocation creates a fresh private
@@ -126,6 +136,139 @@ There is no automated memory-budget gate: browser memory measurements and their
 acceptance remain a required contributor and maintainer review gate. A green CI
 run alone does not satisfy this section.
 
+### Update-lifecycle resource comparison
+
+Build the fixed baseline and candidate into separate directories, then run:
+
+```sh
+node bin/update-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/update-profile.json
+```
+
+The existing update runner alternates three runs per build with eight synthetic
+website tabs and Website time enabled. Disposable manifests promote optional
+`tabs`/`idle` permissions only. Every debugger is detached during each 42-second
+observation. Append `--baseline-idle` when both builds should shut down; otherwise
+the baseline must remain running and the candidate must shut down. Its summed
+browser-process RSS is not worker-specific or shared-memory-adjusted memory.
+
+### Tracker navigation and worker attribution
+
+The following companion workload adds attribution, repeated navigation and a
+natural idle/wake recovery journey without replacing the Website time comparison.
+Build the fixed baseline and candidate into separate directories. Both must
+support the current tracker and Slow scrolling contracts. Select an installed
+Chromium with `CHROMIUM_PATH`, then run:
+
+```sh
+node bin/tracker-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/tracker-profile.json --baseline-idle
+node bin/lifecycle-profile-report.mjs /tmp/tracker-profile.json > /tmp/tracker-profile.md
+```
+
+This alternates three fresh profiles per build with eight synthetic X tabs,
+three full navigation cycles, a seeded access session and saved 75% resistance.
+Each current document must apply its initial tracking preferences before sampling;
+DOM readiness or access-guard readiness alone is insufficient. Post-GC page-heap
+samples identify their V8 isolates, with an uninjected page as a separate control.
+Do not sum co-resident targets' isolate heaps or renderer DOM counts.
+
+All debugger sessions are detached during each 42-second idle observation.
+Browser-level target inventory observes natural worker absence; foregrounding the
+same website document must wake a replacement worker and restore the saved
+resistance, including its effect on actual wheel input. The fixture records and
+clears scheduled alarms immediately before observation, restoring them after wake
+with at least one minute remaining. This isolates idle behavior, not scheduled
+access enforcement. Website time stays off; manifests and permissions are unchanged.
+
+`--baseline-idle` requires both builds to shut down. Omit it only for a deliberately
+non-idle baseline; the candidate must still shut down. Unique user-timing trace
+marks attribute worker/page processes, with shared processes and isolates recorded.
+Linux `/proc` samples report worker-containing-process PSS/private memory separately
+from page heap and CDP-listed whole-browser RSS. PID identity is rechecked; exited
+processes, missing/inaccessible counters and unsupported platforms are distinct.
+Unavailable values are null, never false zero or a lifecycle failure. Process
+memory is not worker-isolate-only memory, and worker exit is not zero extension RAM.
+
+### Hidden-mutation classification comparison
+
+Build the fixed baseline and candidate separately, select Chromium with
+`CHROMIUM_PATH`, then run:
+
+```sh
+node bin/hidden-mutation-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/hidden-mutation-profile.json
+```
+
+This alternates three fresh profiles per build with tracking enabled on a synthetic
+X feed. A foreground blank tab makes the feed genuinely hidden; each hidden and
+visible phase drives 100 mutation batches 220 ms apart, followed by a 1.1-second
+drain. Returning to the feed must reclassify, visible mutations must classify,
+and the candidate must make zero hidden-phase classifier calls. A trusted key
+event starts visible tracking; the report includes saved consuming seconds.
+
+CDP precise coverage counts adapter `mode` calls without modifying the bundles.
+Background timer throttling can coalesce baseline refreshes. CPU sampling at
+100 microseconds attributes leaf samples in extension content/site/DOM/friction/
+messages scripts; tab-wide `ScriptDuration` is separate. Profiling perturbs timing
+and tiny CPU totals are noisy: report medians and ranges, not exact CPU savings.
+JSON includes bundle fingerprints, environment and per-phase measurements. Keep
+it outside Git. This complements, not replaces, tracker heap and worker checks.
+
+### Hidden blocked-gate worker comparison
+
+```sh
+CHROMIUM_PATH=/path/to/chrome CHROMIUM_NO_SANDBOX=1 node bin/blocked-lifecycle-profile.mjs /tmp/baseline/dist/chrome dist/chrome /path/outside/repo/blocked-profile.json
+```
+
+The shared runner alternates three fresh profiles per build. One blocked X gate
+has no pending wait or access session, Website time stays off, and a neutral tab
+is foregrounded. Every debugger session is detached for 60 seconds; browser-level
+target polling records worker presence every 250 ms. A page-local counter records
+outgoing access-status sends without worker probes. After observation, the same
+gate must refresh within 1.5 seconds of returning and display its current blocked
+state. Scheduled alarms stay enabled; their schedules and page-observed alarm
+events are reported separately, not attributed to periodic polling. JSON retains
+raw observations and bundle/workload fingerprints; the command prints per-run
+lifetime, alive-sample fraction, hidden/return sends and synchronization results.
+Use a new output path outside Git. This measures lifecycle behavior, not RAM or
+an exact cross-platform shutdown deadline; maintainer resource acceptance remains
+separate.
+
+### Settings-control resource comparison
+
+```sh
+node bin/settings-lifecycle-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/settings-profile.json
+node bin/lifecycle-profile-report.mjs /tmp/settings-profile.json > /tmp/settings-profile.md
+```
+
+This uses the same disposable Chromium runner, bundle fingerprints, attribution
+and reporting helpers: three alternating runs per build, four real built Settings
+pages and twelve cycles after warm-up. Each cycle refreshes preferences, changes a
+preset, opens/saves/cancels Custom, and restores Default inheritance. Every third
+cycle reloads each page and verifies the inherited choice. Synthetic select changes
+exercise the real page handlers; Save/Cancel use trusted browser clicks. No browser
+API or production polling is replaced. Extra pages close before a final retained
+page sample; this verifies target teardown, not immediate process reclamation.
+
+Post-GC checkpoints at cycles 0, 6 and 12 reject growth in connected DOM elements,
+retained detached Node wrappers, renderer documents and listener counts over
+warm-up, while retaining heap measurements without inventing a heap tolerance.
+`Runtime.queryObjects` inspects current-realm Node wrappers and releases its remote
+handles after each sample. Total wrapper counts vary with V8 wrapper caching;
+renderer-wide node counts also include browser/native state. Both totals remain
+informational; shared-isolate/renderer counts are not per-page totals. Built-browser
+regressions independently retain a detached control or a listener and require each
+fault to fail, in disposable fixtures only.
+
+Both commands require a new output path and preserve incremental, versioned JSON
+outside Git. Interrupted reports remain incomplete; failed reports cannot be
+formatted as successful evidence. Reports fingerprint all input bundle files and
+workload sources, reject mixed/incomplete repetitions and environments, and render
+median/range tables. Input bundles are copied before launch and must stay unchanged.
+Use `BROWSER_TIMEOUT_MS=180000` if the Settings workload exceeds the normal per-profile
+watchdog. Keep generated tables outside Git too. Identical-build comparisons validate
+instrumentation, not an optimization. Measurements do not establish or relax a
+resource budget; maintainer acceptance, store delivery, native Firefox/Edge and real
+sleep/wake remain separate gates.
+
 ### Scroll-friction resource comparison
 
 Build baseline and candidate Chrome bundles in separate directories, then run:
@@ -188,6 +331,16 @@ Fast integration journeys and seeded lifecycle properties live in
 `extension/src/tests/`; real built-extension journeys live in
 `extension/browser-tests/`. Run the focused loop with `pnpm test:tracers`.
 
+Coordinated-update interruption coverage in
+`extension/src/tests/update-interruptions.test.js` connects two live trackers to
+the real storage/message path, with a discarded-tab control. Cases name the browser
+adapter, client order and interruption point (before/after recovery persistence,
+partial commit, or before reload). Replay one case with Node's
+`--test-name-pattern` option. Lost acknowledgements, failed saving and failed
+reinjection must preserve queued packets without duplicate credit; restored inactive
+clients must return to quiet idle. These deterministic cases complement rather than
+replace the real Chromium same-document update journeys.
+
 ### Replaying properties
 
 The access model tracks focused budget spending independently. The delivery
@@ -206,7 +359,12 @@ CR_PROPERTY_SEED=42 CR_PROPERTY_CASE=0 CR_PROPERTY_ADAPTER=chrome \
 ```
 
 `CR_PROPERTY_CASES` and `CR_PROPERTY_STEPS` control bounded exploration; keep
-local/CI defaults deterministic. Record a discovered regression as a focused
+local/CI defaults deterministic. The daily `explore-properties.yml` workflow runs
+ten fresh random seeds at the maximum case and step bounds; it does not gate pull
+requests. Each run prints its seed, and failures print the exact replay command.
+GitHub emails scheduled-workflow failures only to the last person who edited the
+cron schedule.
+Record a discovered regression as a focused
 example before changing the generator. These are seeded model-based properties,
 not automatic shrinking: the failure prefix is replayable but not guaranteed
 minimal. Generated models stay within one local day and exclude above-goal
@@ -214,23 +372,48 @@ access; existing focused regression tests cover those policies.
 
 ## Browser setup
 
-Set `CHROMIUM_PATH` (or `CHROMIUM`, shared with the broader smoke runner) to an
-installed Chromium or Chrome for Testing executable, then run
-`pnpm check:browser`. CI downloads a version-pinned, SHA-256-verified
-Chrome for Testing archive; the workflow is the source of truth for the version
-and checksum. Update both together after verifying the official download and
-running the browser journeys. Regular branded Chrome may reject unpacked-extension
-launch flags; use Chromium or Chrome for Testing for this runner.
+Run `pnpm setup:chromium` once per machine. It downloads the Chrome for Testing
+build that CI uses for `linux64`, `mac-arm64` or `mac-x64`, and checks its SHA-256
+before it unpacks the archive. A failed checksum leaves nothing unpacked. The
+build goes to a per-user cache that all worktrees share
+(`~/Library/Caches/createratio` on macOS, `$XDG_CACHE_HOME/createratio` or
+`~/.cache/createratio` on Linux; `CREATERATIO_CACHE_DIR` overrides it). A second
+run does nothing.
 
-The runner defaults to `/usr/bin/chromium` and a 90-second watchdog;
-`BROWSER_TIMEOUT_MS` can override the bounded timeout. Sandbox disabling requires
+Both browser runners select the browser in this order: `CHROMIUM_PATH`,
+`CHROMIUM`, the cached pinned build, then `/usr/bin/chromium`. They stop before
+launch if the browser is missing or is branded Google Chrome, which ignores
+unpacked-extension launch flags. They warn if its version differs from the pinned
+version. The smoke also warns if `browser-harness` differs from its pinned version.
+
+`bin/browser-pins.json` holds the Chrome for Testing version, the per-platform
+checksums and the `browser-harness` version. CI installs the same versions, and
+`bin/tests/setup-chromium.test.js` fails if the workflow differs from the pins. To
+change the version, download each official archive, record its checksum in the
+pins, update the workflow, and run the browser journeys and the smoke.
+
+On macOS, both disposable browser runners use Chromium's mock keychain rather
+than requesting access to the login keychain. This does not change macOS or
+normal-browser settings.
+
+The runner has a 90-second watchdog; `BROWSER_TIMEOUT_MS` can override the
+bounded timeout. Sandbox disabling requires
 `CHROMIUM_NO_SANDBOX=1` and is only appropriate in an isolated Linux sandbox that
 cannot support Chromium's sandbox. External traffic is blocked
 by interception, an unusable proxy, and DNS isolation; supported-site navigations
 receive synthetic offline HTML. Trusted CDP input drives the actual extension UI,
 waiting for painted, stable geometry and a matching hit target before dispatch.
-The tests shift `Date` in pages and the worker to check the 60-second wait and
+The tests shift `Date` in pages and the worker to check the five-minute default wait and
 expiry without minute-long sleeps; native timers and monotonic time remain real.
+
+CI runs the journeys on Linux only. To choose an option in a native `<select>`,
+focus it and call `typeAhead(browser, page, text)` with the first letters of the
+option label; arrow, Home and End keys open a native menu on macOS instead of
+changing the value. After a click on the select, also press Enter: on Linux the click
+opens Chromium's own menu, and type-ahead only highlights the option until Enter. Use `selectAllText(browser, page)` instead of a Ctrl+A key
+event. `launch(path, { developerMode: true })` turns on developer mode through
+`chrome.developerPrivate` and fails if it stays off. Without developer mode,
+`chrome.runtime.reload()` disables the unpacked extension.
 
 Use `findByRole(browser, page, role, name)` and `clickByRole(...)` from
 `extension/browser-tests/chromium.mjs` for accessibility-driven journeys. Names
@@ -273,6 +456,43 @@ accounts, submit real posts, or establish Firefox/Edge compatibility. DOM
 fixtures, controlled clocks, and simulated worker replacement cannot prove
 operating-system sleep/wake behavior. Keep those release checks manual.
 
+### Isolated browser container
+
+The `browser-tests` Compose service runs the browser checks in a Linux container
+with the same Node.js, pnpm, Chrome for Testing and `browser-harness` versions as
+CI. Use it for agent runs and whenever a result must match CI. It needs Docker
+Compose v2 and runs as `linux/amd64`; Apple silicon uses Rosetta emulation.
+
+```sh
+docker compose build browser-tests
+pnpm browser:container pnpm smoke:browser
+pnpm browser:container pnpm check:browser
+pnpm browser:container pnpm check:browser:shard 3
+```
+
+The image build is the only step with network access. It installs the locked
+dependencies with lifecycle scripts disabled, the pinned browser through
+`bin/setup-chromium.js`, and `browser-harness`. At run time the container has no
+network, a read-only root file system, no Linux capabilities and a non-root user.
+The container does not mount the checkout. `bin/browser-container.js` sends the
+files that `git ls-files --cached --others --exclude-standard` lists as a tar
+stream on standard input. Ignored files, such as `.env`, `node_modules`, `dist`
+and local agent settings, never enter the container. The container unpacks the
+stream into a temporary folder and runs the command there.
+Chromium runs with `CHROMIUM_NO_SANDBOX=1`; the container is its sandbox. The
+only writable host folder is `dist/container`. The wrapper creates it and runs
+the container with your user and group IDs. The folder receives
+`browser-artifacts/` whenever a run creates that folder, for example after a
+failure. An export error never replaces the command's failure status.
+
+The run refuses to start when `pnpm-lock.yaml` or `bin/browser-pins.json`
+differs from the image; rebuild the image after a dependency or browser pin
+change. Because of the lockfile check, the image turns off
+pnpm's own dependency verification, which needs the network. Remove the image
+with `docker image rm createratio-dev-browser-tests`. CI builds the image and
+runs the smoke in it. The container does not protect against a kernel or
+virtual-machine escape, and Debian system packages in the image are not pinned.
+
 ### Live scroll geometry
 
 When a current site behaves differently from synthetic fixtures, review
@@ -293,11 +513,33 @@ live composing behavior, physical comfort or cross-browser compatibility.
 
 `pnpm check:syntax` uses Node's parser on tracked and nonignored untracked
 JavaScript (`.js`, `.mjs`, and `.cjs`) without executing it, then uses Acorn to
-reject code comments with file, line and column diagnostics. An initial hashbang
+reject code comments with file, line and column diagnostics. JSDoc blocks that
+contain only type tags with a type and name are allowed in the files
+`tsc -p tsconfig.json --listFilesOnly` reports, where `pnpm check:types`
+validates the types. Files are checked
+across at most four workers; any worker failure fails the command. An initial hashbang
 interpreter directive is allowed; comment-like text in strings, templates and
 regular expressions is not a comment. Ambiguous `.js` files use Node's CommonJS
 syntax check, including its wrapper bindings, to select Acorn's grammar. This
 guard covers JavaScript only, not CSS, HTML or other languages. `pnpm check` runs it before tests and builds.
+
+`pnpm check:types` runs `tsc --checkJs` without emitting files, so the shipped
+JavaScript is not compiled. `tsconfig.json` checks the packaged extension sources
+in `extension/core`, `extension/sites` and `extension/src`, excluding tests and
+test harnesses. Types come from inference and JSDoc annotations;
+`extension/types/globals.d.ts` declares the globals that classic scripts share in
+extension pages and the background worker. Extension API calls are checked
+against `@types/chrome`, and Firefox's `browser` global is declared with the same
+`chrome` API types.
+`extension/types/messages.d.ts` types the runtime messages: `messages.send`
+accepts only `RuntimeMessage` shapes, and `message-contracts.js` keeps its
+allowed values in `Record<…, true>` tables, so a value missing from either side
+fails `pnpm check:types`. `bin/tests/message-types.test.js` covers both failures.
+`globals.d.ts` also brands local dates and durations as `LocalDate`,
+`Milliseconds`, `Seconds` and `Minutes`. Raw values enter through
+`Core.validLocalDate`, `Core.validAccessMinutes`, `Core.asMilliseconds`,
+`Core.asSeconds` and `Core.asMinutes`. `bin/tests/value-types.test.js` checks
+that mixed units fail.
 The pre-commit hook checks staged whitespace, including newly added files.
 `pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
 paths, including skill-directory symlinks and files force-added while ignored.
@@ -316,7 +558,7 @@ exit "$status"
 ## Release automation
 
 `pnpm check` includes release-command, package-reproduction and store-submission
-tests. Workflow tests exercise the submission conditions for automatic tags and
+tests. Workflow tests exercise the submission conditions for published releases and
 manual Chrome-only, Firefox-only and both-store runs. They execute the real tag
 guard in disposable Git history, including branch, ancestry, version and browser
 refusals. They do not dispatch GitHub Actions or verify live Google federation.
@@ -328,7 +570,9 @@ all other Git operations are real and restricted to file transport. Tests reject
 alternate push URLs and URL rewrites before creating branches or tags. With
 automatic tag following and mirror settings enabled, they verify the complete
 remote ref set: preparation adds only its branch, publication only its version
-tag, and unrelated local refs remain local. They never push to the actual
+tag, and unrelated local refs remain local. GitHub Release creation is substituted;
+tests check generated-note/verified-tag options, authentication refusal, and
+recovery after release creation fails without moving its tag. They never push to the actual
 repository or publish a store version.
 
 The package test extracts the generated reviewer-source archive, rebuilds Firefox
@@ -416,14 +660,17 @@ changes require separate review, not a skipped comparison. This is not browser Q
 
 ## Disposable Chromium smoke
 
-With Chromium, Python 3, and `browser-harness` installed in your agent environment:
+With Python 3 and the pinned `browser-harness` installed in your agent
+environment (for example `uv tool install browser-harness==0.1.13`):
 
 ```sh
+pnpm setup:chromium
 pnpm smoke:browser
 ```
 
-`CHROMIUM` selects the browser executable. Only in an isolated Linux sandbox that
-cannot support Chromium's sandbox, set `CHROMIUM_NO_SANDBOX=1`.
+The smoke selects its browser as described in [Browser setup](#browser-setup).
+Only in an isolated Linux sandbox that cannot support Chromium's sandbox, set
+`CHROMIUM_NO_SANDBOX=1`.
 
 The command builds Chrome, runs worker-selection regressions, launches a unique
 temporary profile, and uses browser-harness to verify the real extension worker,
@@ -448,8 +695,13 @@ screenshots, credentials, or publisher-dashboard information.
 
 Before a release, verify:
 
-- X/Twitter aliases and LinkedIn block, while unrelated sites remain accessible.
-- Reloading preserves the 60-second wait; only explicit confirmation unlocks.
+- Enabled X/Twitter aliases, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit block,
+  including HTTP/S subdomains, while unrelated sites remain accessible. TikTok,
+  Instagram, Facebook, YouTube and Reddit all start On for fresh installs; saved On/Off
+  choices survive updates without adding sites to an existing selection. Verify browser
+  approval of expanded hosts.
+- Reloading preserves the configured wait (five minutes by default). Returning after
+  a long absence still offers confirmation; only explicit confirmation unlocks.
 - Access budgets are shared per site, pause on tab/window changes, survive
   restarts, refill at local midnight, and revoke access at expiry or manual end.
   A worker wake deducts elapsed active time; actual browser downtime does not.
@@ -482,6 +734,20 @@ Before a release, verify:
   physical trackpad feel or Firefox/Edge compatibility.
 - Focused editors, routes, click/keyboard submissions, and light actions behave
   correctly in current logged-in X and LinkedIn UIs. Submissions count once.
+- All seven popup rows show current access without session-time editors.
+  Settings opens Websites initially; Browsing, Privacy and Your data open through
+  native section summaries, closing the previous section. Verify keyboard access,
+  320px layouts, reduced motion and forced colors. Duration menus support presets,
+  inherited Default and on-demand Custom edits from 1–240 whole minutes. Verify
+  Save/Cancel, invalid input, failed saves, focused drafts across polling and
+  retained arbitrary durations after reload. Saving affects new sessions/refills,
+  not the current budget; Off disables editing without deleting saved times.
+- Available tracking-only integrations start Off and have no access gates or
+  session timers. Their compact Settings switches persist independently; enabling
+  applies the shared Slow scrolling preference on consuming pages, while editors,
+  messaging, unsupported routes and Off retain native scrolling. Verify documented
+  submit controls in each current logged-in UI. Disabling preserves history and
+  stops new measurements. Check exact HTTPS hosts and update-permission prompts.
 - Idle, focus, navigation, midnight, and sleep/wake boundaries do not backfill time.
 - All-website permission denial leaves tracking off; opt-in records only focused
   domain/time totals; disabling removes permissions and preserves totals.
@@ -518,7 +784,16 @@ Before a release, verify:
   and never appears in CSV exports.
 - Retention and size limits remove oldest history without altering preferences.
 - Store-installed Chrome feedback opens the correct public reviews page without
-  activity data. Unpacked builds show feedback as unavailable.
+  activity data. Unpacked and other-browser builds omit unavailable store feedback;
+  Privacy policy and Terms of use remain accessible.
+- A store-delivered update preserves synthetic measurements, preferences and
+  access budgets. With Website time enabled and its debugger detached, the worker
+  becomes inactive between alarms. **Update ready** appears in extension pages;
+  unsaved settings/intention drafts are never interrupted automatically. Active
+  tracking and failed delivery defer automatic installation. Explicit Update now
+  confirms intent, flushes pending measurements and restores tracking in existing
+  website documents without reloading them. Verify the actual store version
+  transition; a simulated available event and unpacked reload do not prove delivery.
 - Popup, Settings, dashboard, and blocked pages work with keyboard navigation,
   narrow windows, and reduced motion.
 

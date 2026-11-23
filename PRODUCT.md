@@ -14,8 +14,9 @@ web
 ## Users
 
 Anyone who wants to create more than they consume online. There is no narrower
-professional or demographic audience. Current site integrations support X and
-LinkedIn.
+professional or demographic audience. Site integrations support timed access and
+creation tracking on X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit.
+All seven start with Limit & track On for fresh installs; existing saved site choices persist.
 
 ## Product Purpose
 
@@ -39,10 +40,12 @@ quality.
 - The static website provides Chrome and Firefox store links, source-install
   instructions, and privacy and terms pages. Edge is available as a source build,
   not a published store release.
-- On gated sites, users write an intention, wait, and explicitly confirm access.
+- On gated sites, users write an intention, wait five minutes by default, and explicitly confirm access.
   Active-time budgets pause when users switch away. Users can change session
-  durations or turn a site's **Limit & track** off.
-- The popup shows today's score and access controls; Settings owns preferences;
+  durations and intention waits or turn a site's **Limit & track** off.
+- The popup shows today's score and access controls, without time editing.
+  Settings groups site switches, session times and optional preferences into
+  focused expandable sections;
   the dashboard provides history, charts, and exports.
 - Users must save drafts before installation or access expiry: open gated-site
   tabs redirect to the blocked page.

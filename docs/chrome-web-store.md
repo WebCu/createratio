@@ -4,10 +4,10 @@ CreateRatio is published on the
 [Chrome Web Store](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk).
 Use this guide to verify and release updates to that listing.
 
-## Tagged releases
+## GitHub releases
 
 Use the shared [Chrome and Firefox release workflow](releases.md) to prepare a
-version PR and push its tag after merge. The workflow retains its existing
+version PR and publish its GitHub Release with generated change notes after merge. The workflow retains its existing
 `.github/workflows/release-chrome.yml` filename for Google's federated trust,
 but builds both store packages and submits them in independent approval jobs.
 For a Chrome-only update, use the [manual release option](releases.md#release-to-one-store)
@@ -33,7 +33,7 @@ The release workflow requires:
 
 - A dedicated Google project, store service account, and federation restricted
   to this repository's immutable ID, version tags, release workflow, and
-  `chrome-web-store` environment. Allow only the `push` and `workflow_dispatch`
+  `chrome-web-store` environment. Allow only the `release` and `workflow_dispatch`
   events for automatic and manually targeted releases.
 - A `chrome-web-store` environment with owner approval, tag-only deployment
   policy, the pinned Google authentication action allowed, and four non-secret
@@ -45,8 +45,9 @@ The release workflow requires:
   placeholders fail before authentication or upload. There are no OAuth refresh
   tokens or service-account keys to store in GitHub.
 
-If the federation currently permits only `push`, its owner must explicitly add
-`workflow_dispatch` before a manually targeted Chrome release. Preserve all
+Before the next automatic Chrome release, the federation owner must replace its
+`push` event allowance with `release` and retain `workflow_dispatch` for manually
+targeted releases. A release event still uses the version tag ref. Preserve all
 repository, workflow, tag and environment restrictions. Repository changes do
 not update Google IAM, and existing GitHub variable names do not prove this
 permission is configured.
@@ -55,6 +56,9 @@ Google's [service-account setup](https://developer.chrome.com/docs/webstore/serv
 and [API guide](https://developer.chrome.com/docs/webstore/using-api) describe the
 provider-side requirements. Do not put credentials in this repository.
 
+Submission failures identify the operation and HTTP status in the Actions log
+and error annotation, with bounded, credential-redacted store validation details
+when available. Non-JSON responses and unrecognized fields are not dumped.
 If a run fails after upload or submission, inspect the dashboard before retrying.
 The script does not retry write requests, cancel reviews, or overwrite pending
 submissions. A rerun can require dashboard recovery or a new version; do not move
@@ -112,7 +116,7 @@ replacing an uploaded package; keep package and manifest versions aligned.
 
 - Describe the single purpose: intentional site access with private local
   feedback on creating versus consuming.
-- Explain default X/LinkedIn blocking, the intention and 60-second wait, shared
+- Explain default X/LinkedIn blocking, the intention and five-minute default wait, shared
   active-time budgets, midnight refills, and the optional above-goal exception.
 - Explain Limit & track: Off means unrestricted access and no new creation-score
   measurements; Website time remains an independent opt-in feature.
@@ -146,7 +150,7 @@ analytics are disclosed separately in the privacy policy.
 
 Install and pin the Chrome bundle. Visit X or LinkedIn, enter a synthetic
 20–280-character intention, start the wait, and reload to check persistence.
-Confirm only after 60 seconds; waiting alone must not unlock access. The default
+Confirm only after five minutes by default; waiting alone must not unlock access. The default
 budget is five active minutes shared by the site's tabs; switching away pauses
 it. Check expiry and manual end, then turn Limit & track Off and On in Settings.
 Save drafts before expiry redirects open tabs.
@@ -156,7 +160,7 @@ HTTP/HTTPS tabs. Verify that privacy links open the public HTTPS policy.
 Send feedback is unavailable in
 unpacked builds; verify its reviews link after store installation. Signed-in
 posting checks require the reviewer's own account, never supplied credentials.
-Tagged releases submit through the approved workflow above. Manual dashboard
+Published GitHub Releases submit through the approved workflow above. Manual dashboard
 submission remains available for recovery.
 
 ## Store requirements

@@ -25,7 +25,16 @@
   }
 
   function scrollThroughOpening(event) {
-    if (!enabled || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (
+      !enabled ||
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
     event.preventDefault();
     stopAutomaticScroll();
     const from = window.scrollY;
@@ -65,8 +74,6 @@
   }
 
   function measure() {
-    stopAutomaticScroll();
-    if (!enabled) return;
     start = arrival.getBoundingClientRect().top + window.scrollY;
     distance = Math.max(1, arrival.offsetHeight - stage.offsetHeight);
     radius = Math.hypot(window.innerWidth, stage.offsetHeight) * 0.55;
@@ -76,7 +83,10 @@
 
   function configure() {
     stopAutomaticScroll();
-    enabled = !reducedMotion.matches && supportsMask;
+    enabled =
+      !reducedMotion.matches &&
+      supportsMask &&
+      window.getComputedStyle(arrival).getPropertyValue('--arrival-layout').trim() !== 'compact';
     document.documentElement.classList.toggle('has-arrival', enabled);
     if (enabled) {
       measure();
@@ -92,7 +102,7 @@
   for (const name of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
     window.addEventListener(name, stopAutomaticScroll, { passive: true });
   }
-  window.addEventListener('resize', measure);
+  window.addEventListener('resize', configure);
   reducedMotion.addEventListener('change', configure);
   document.addEventListener('focusin', event => {
     stopAutomaticScroll();

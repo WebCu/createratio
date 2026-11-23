@@ -1,7 +1,7 @@
 # CreateRatio browser extension
 
-A dependency-free Manifest V3 extension for intentional access to X and LinkedIn
-and local creating-versus-consuming tracking.
+A dependency-free Manifest V3 extension for intentional access and local
+creating-versus-consuming tracking on X, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit.
 
 ## Layout and installation
 
@@ -26,8 +26,8 @@ harnesses stay in `src/tests/`. Test commands discover tests recursively, and th
 explicit build asset list excludes tests and harnesses.
 
 [Install the published Chrome extension from the Chrome Web Store](https://chromewebstore.google.com/detail/kopbjmlmjpnkekffalpbjfhmbhgbgamk).
-Save X and LinkedIn drafts before installing; existing tabs redirect to the
-access gate.
+Save drafts on enabled gated sites before installing; existing tabs redirect
+to the access gate.
 [Install the published Firefox add-on](https://addons.mozilla.org/en-US/firefox/addon/createratio/).
 For development builds or Edge, follow the
 [build and installation instructions](../README.md#build-and-install).
@@ -70,9 +70,34 @@ The reply adapter refuses malformed successes before queues acknowledge packets
 or access pages navigate. Access eligibility and browser permissions remain
 execution-time checks, not cached validation results.
 
-Pages poll for countdown and website-time updates. Storage notifications refresh
-access phase changes, preferences, creation activity, and history resets; countdown-only
-access writes and website-time accrual do not trigger cross-page refreshes.
+Settings and the dashboard refresh from storage changes instead of polling the
+worker. The dashboard also refreshes at local midnight. Popup and access-page
+polling remains limited to open extension UI. Website-time writes refresh only
+the dashboard's browsing view; countdown-only access writes do not trigger
+cross-page refreshes. Content guards check at session expiry and on focus or
+preference changes. Creation trackers deliver real measurements every five seconds,
+without empty periodic worker requests. Failed synchronization retries only while
+focused, using the existing interval with backoff from five seconds to at most one
+request per minute. A valid snapshot clears that retry state; hidden clients without
+pending measurements remain quiet.
+
+Downloaded updates wait while extension pages or fresh creation tracking are in
+use. The popup, Settings, dashboard and access page show **Update ready**. **Update
+now** requires confirmation to protect unsaved settings and intention drafts.
+Before reloading, the worker pauses content clients, drains acknowledged delivery
+and serialized writes, and checks that the website tabs have not changed. Failed
+preparation resumes tracking and leaves the update pending for a later attempt.
+Repeated preparation preserves the original activity state, and a ten-second lease
+resumes clients if preparation is abandoned. A persistent recovery marker is saved
+before client teardown. Replacement workers restore stopped clients before retrying
+an update; the marker is cleared only after successful restoration. Failed recovery
+reuses the pending-update alarm rather than adding another timer. Discarded tabs are
+excluded from live coordination and receive normal scripts when restored.
+Update installation reinjects the manifest's scripts into authorized website tabs
+without reloading their documents. Timers, listeners and observers have explicit
+cleanup; route-hook installation is idempotent. Closed, loading or inaccessible
+tabs rely on normal navigation injection. Chrome controls store availability and
+downloads; unpacked installations do not receive store updates.
 
 Owning data modules normalize restored records separately from new commands.
 History reads normalize copies without rewriting saved records; numeric strings
@@ -115,16 +140,24 @@ sequenceDiagram
 Closures, adapters, queues, and timers do not survive worker replacement.
 Preferences, access budgets, receipts, and histories are reconstructed from
 `storage.local`; the `storage.session` initialization marker distinguishes worker
-replacement from a browser restart. Website-time sampling starts fresh.
+replacement from a browser restart. Website-time checkpoints survive worker dormancy in `storage.session`, but not
+browser restarts or extension updates.
 
 ## Using the extension
 
-- **Popup:** today's score, active time, and request/end-access controls.
-- **Settings:** one Default session-time row and one row per vetted site with a
-  **Limit & track** switch. Times show **From Default** or **Custom**; **Use Default**
-  removes an override. Off disables time editing/reset without losing saved times.
-  Slow scrolling, above-goal access, Website time, intention saving, exports, and
-  history clearing remain separate. Preferences save automatically.
+- **Popup:** today's score and all four sites' request/end-access controls.
+  Off sites open directly. Session-time editing lives only in Settings.
+- **Settings:** four expandable sections, with **Websites** open initially.
+  Opening **Browsing**, **Privacy** or **Your data** closes the previous section.
+  **Websites** holds Limit & track switches, the Default session and per-site
+  duration menus. Choose a preset or **Custom…** for 1–240 whole minutes; custom
+  edits require **Save** or **Cancel**. Choosing **Default** or the reset button
+  removes a site override. Off disables editing without losing saved times.
+  **Browsing** holds Slow scrolling and Above-goal access; **Privacy** holds
+  intention saving and Website time; **Your data** holds exports and clearing.
+  Long explanations stay in disclosures. Preferences save automatically, except
+  an unconfirmed custom-time draft. New times affect new sessions and midnight
+  refills, not a running budget.
 - **Dashboard:** per-site totals, charts, all-website time, intention history,
   shareable daily/seven-day PNG cards, detailed reports, and CSV exports.
 
@@ -136,7 +169,7 @@ Open CreateRatio from the extensions menu; use **Open dashboard** or **Settings*
 for full pages rather than hard-coding an installation-specific extension ID.
 
 Site-access buttons have site-specific accessible names and describe the current
-state. Settings expose native switches and labeled session-time fields;
+state. Settings expose native section disclosures, switches and labeled duration menus;
 dashboard views expose pressed states and hide inactive panels. The access gate
 exposes its form, intention requirements, waiting/active regions, and disabled
 confirmation state. Use roles and names, not row positions. Check save status or
@@ -148,44 +181,54 @@ agent permission to change settings, export private data, or bypass access gates
 
 ### Site access
 
-X, Twitter aliases, and LinkedIn, including subdomains, are blocked on HTTP and
-HTTPS. Blocking covers the whole site, including posting and messages.
+Enabled X, Twitter aliases, LinkedIn, TikTok and Instagram, including subdomains,
+are blocked on HTTP and HTTPS. Blocking covers the whole site, including posting
+and messages.
 
 1. Visit a blocked site or choose **Request access**.
-2. Write an intention of 20–280 characters and start the **60-second wait**.
+2. Write an intention of 20–280 characters and start the **five-minute wait** by
+   default, configurable from 1–240 minutes in Settings.
 3. Explicitly confirm access when the wait finishes. Waiting alone never unlocks.
 4. Use the shared per-site active-time budget: **five minutes** by default,
    configurable from 1–240 minutes in Settings. Only the active tab in a focused
    browser window uses the budget; other sites remain blocked.
 
-Reloading does not reset the wait. Cancelling does; unconfirmed requests expire
-ten minutes after the wait finishes. The popup can end access early. Remaining
-budgets survive restarts and refill to the configured duration at local midnight,
-without accumulating. Never-opened sites stay blocked; manually ending a session
-cancels its daily refill.
+Reloading does not reset the wait. Once the wait finishes, the request stays
+ready until you confirm it, cancel it, or turn **Limit & track** off for that
+site. The popup can end access early. Remaining budgets survive restarts and
+refill to the configured duration at local midnight, without accumulating.
+Never-opened sites stay blocked; manually ending a session cancels its daily refill.
 
 **Save drafts before expiry:** open tabs redirect to the local blocked page.
 
-Optional **Allow sites while above the daily goal** skips gates and timers only
+Optional **Settings → Browsing → Above-goal access** skips gates and timers only
 while today's aggregate score is strictly above the current daily target
 (default 1.0). Existing timed budgets pause. At or below the target, on a new day,
 or when disabled, normal gates return unless a timed budget still has time.
 
 ### Tracking choices
 
-X and LinkedIn start with **Limit & track** On. Off removes the site's gate,
+All seven supported platforms start with **Limit & track** On for fresh installs.
+Existing saved On/Off choices are preserved. Off removes the site's gate,
 wait, timer, and new creation-score measurements together. Saved duration and
 history remain. Off discards the current budget and waiting request, including
 its midnight refill. Re-enabling requires a fresh intention and wait unless
 optional above-goal access applies. Fresh trusted input is required to measure.
 
-New vetted integrations start disabled; arbitrary domains or user scripts cannot
-be added from the UI. Integrations without explicit gate support remain
-tracking-only.
+All seven use the same intention, wait and active-time budgets. Manage each site's
+**Limit & track** in Settings. Enabled sites require access sessions. Save drafts
+before installing or enabling a site.
+
+Integrations declare their default activation; saved site selections never gain
+new sites automatically. Arbitrary domains or user scripts cannot be added from the UI. Integrations without explicit gate support appear under
+**Tracking only**. Enabling one measures supported creating/consuming time and
+submit interactions and applies the shared Slow scrolling preference. It never
+adds an access gate, intention, wait, or session timer. Off stops measurements and
+restores native scrolling while keeping history.
 
 ### Slow scrolling
 
-**Settings → Slow scrolling** is on by default at **50% resistance**. Saved Off
+**Settings → Browsing → Slow scrolling** is on by default at **50% resistance**. Saved Off
 choices are preserved. Its **Scroll resistance** slider ranges from **50% (Light)**
 to **95% (Heavy)** in five-point steps. Higher resistance means less vertical page
 movement for the same wheel or trackpad gesture, in either direction. The default
@@ -199,8 +242,9 @@ The percentage and distance preview update while dragging; the preference saves
 when you release the slider or use its keyboard controls. It applies to open tabs
 without a reload. Changes replace only a cached scroll multiplier, without a
 timer, popup, or queued animation. It applies only to consuming pages on enabled
-sites during timed or above-goal access, using the existing page classification
-below. Turning a site's Limit & track off also removes its scroll friction.
+integrations, using the page classification below. Gated sites additionally need
+timed or above-goal access; tracking-only integrations need their tracking switch
+On. Turning either kind of site Off also removes its scroll friction.
 
 Editors, messaging routes, nested scroll panels, horizontal gestures, and zoom
 stay native. When the document cannot scroll, including when its overflow is
@@ -229,9 +273,10 @@ intermediate slider value.
 
 ## Measurement and score
 
-Creation-score measurements require Limit & track On and timed or optional
-above-goal access. Both the content tracker and background reject measurements
-while blocked or Off. The budget counts all active-tab time, including creating,
+Creation-score measurements require the site's tracking switch On. Gated sites
+additionally require timed or optional above-goal access. Both the content tracker
+and background reject measurements while blocked or Off. Tracking-only sites have
+no access budget. A gated site's budget counts all active-tab time, including creating,
 consuming, and neutral pages—not only consuming time. Default changes affect
 inherited times, while explicit site overrides remain unchanged. Duration changes
 apply to new sessions and midnight refills, not the current budget.
@@ -243,13 +288,23 @@ Old Twitter URLs must redirect to X first.
 | --- | --- | --- |
 | X | Home, Explore, Search, other profiles and status pages | Post/reply/quote editors and a focused home composer |
 | LinkedIn | Feed and other personal/company/school profiles | Focused post, comment, or direct-message editors |
+| TikTok | For You, Following, Explore, Search, tags, music, profiles, videos and photos | Focused comment, upload-caption, or message editors |
+| Instagram | Feed, Explore, Search, Reels, tagged feeds, posts, stories and profiles | Focused comment, dialog-caption, or message editors |
+| Facebook | Home, Watch feed, reels, group feeds/posts, supported permalink and numeric-profile routes | Focused post-dialog, comment, or messaging-page editors |
+| YouTube | Home, watch, Shorts, search, playlists, supported feeds and channels | Focused comment editors |
+| Reddit | Home, community feeds, search, threads and profiles | Focused post, comment, or message-compose editors |
 
 Known own profiles and unsupported routes are neutral. If the own-profile link
 cannot be identified, profiles default to consuming. Editors take precedence;
 a blank, unfocused composer does not turn the feed into creating time.
-Writing direct messages counts as creating on messaging pages and in chat overlays.
-Reading messages on messaging pages stays neutral; unfocused overlays leave the
-underlying page's classification unchanged. Sending a direct message earns no
+LinkedIn's standalone post editor at `/sharing/compose` also counts as creating
+while focused. Generic rich-text fields on other routes do not count as post
+writing. This editor support measures writing time; it does not add submission
+bonuses for the redesigned composer.
+Writing direct messages counts as creating on messaging pages and in chat overlays,
+including LinkedIn overlays inside open shadow roots. Closed shadow roots are not
+inspected. Reading messages on messaging pages stays neutral; unfocused overlays
+leave the underlying page's classification unchanged. Sending a direct message earns no
 post or comment bonus. Message text is never read or saved.
 
 Only visible, focused documents with trusted input in the last **30 seconds**
@@ -287,6 +342,91 @@ Charts show active time without action credits.
 See the [core contract](core/README.md) and [integration interface](sites/README.md)
 for contributor-facing details.
 
+### Reddit tracking
+
+Reddit starts On for fresh installs under **Settings → Websites → Reddit → Limit & track**.
+It uses the shared intention, wait and active-time budget, plus creation tracking and
+Slow scrolling. Existing saved choices are preserved. Blocking covers HTTP/S `reddit.com` and its subdomains; creation
+tracking uses only HTTPS `reddit.com` and `www.reddit.com`. Off restores free
+access and native scrolling while retaining history and saved duration.
+
+Scoped Post/Submit clicks count posts and Comment/Reply clicks count comments.
+Only recognized forms and light-DOM composers are supported. Message-compose
+editors create without submit bonuses; inbox/chat/settings/moderation routes
+stay neutral. English labels are recognized. Old/new/mobile/chat subdomains,
+shadow-root-only editors, unverified editor shortcuts, votes and awards are
+unsupported. Synthetic fixtures do not prove current authenticated markup or
+publication.
+
+### TikTok tracking
+
+TikTok starts On for fresh installs under **Settings → Websites → TikTok → Limit & track**.
+It uses the shared intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Existing saved choices are preserved.
+Blocking covers HTTP/S `tiktok.com` and its subdomains; creation tracking uses only
+HTTPS `tiktok.com` and `www.tiktok.com`. Off restores free access and native
+scrolling while retaining history and saved duration.
+
+Scoped comment Post controls and plain Enter count comments; upload-caption Post
+controls count posts. Positive Like and Save controls count without score credit.
+Reading `/messages` is neutral; focused message editors create without submit
+bonuses. Upload pages create only while a recognized caption editor is focused.
+Mobile hosts, live streams, unsupported shortcuts and ambiguous controls are not
+supported. Recognition uses specific `data-e2e` controls and composer structure;
+synthetic fixtures do not prove current authenticated markup or publication.
+
+### Instagram tracking
+
+Instagram starts On for fresh installs under **Settings → Websites → Instagram → Limit & track**.
+It uses the shared intention, wait and active-time budget, plus creation tracking and Slow scrolling.
+Existing saved choices are preserved.
+Blocking covers HTTP/S `instagram.com` and its subdomains; creation tracking uses
+only HTTPS `instagram.com` and `www.instagram.com`. Off restores free access and
+native scrolling while retaining history and saved duration.
+
+Scoped comment Post controls and plain Enter count comments; caption-dialog Share
+counts posts, including Reels with rich-text captions. Positive Like and Save
+controls count without score credit. Reading Direct stays neutral; focused
+supported message editors create without submission
+bonuses. English labels are recognized; ambiguous controls, unsupported shortcuts,
+and upload steps without a recognized caption submit do not count. Mobile hosts
+are unsupported. Synthetic fixtures do not prove current authenticated markup or
+publication.
+
+### Facebook tracking
+
+Facebook starts On for fresh installs under **Settings → Websites**; existing saved choices
+are preserved. Its **Limit & track** switch controls the same intention, wait, session-time
+controls and active-time budget. Access gating covers HTTP/S `facebook.com` and its
+subdomains; creation tracking uses only the exact HTTPS hosts `facebook.com` and
+`www.facebook.com`. Enabling applies the shared Slow scrolling preference on
+consuming pages during access. Off restores unrestricted access and native
+scrolling and retains history and saved session times.
+
+A scoped create-post dialog's Post control counts posts; scoped comment/reply
+submits and plain Enter in comment editors count comments. Reactions, shares,
+editing, and opening a composer do not count as submissions. Reading messages is
+neutral; supported focused messaging-page editors create without submit bonuses.
+English labels are recognized. Vanity-profile routes, separate Messenger hosts,
+mobile hosts, and shadow-root-only editors are unsupported. Synthetic fixtures
+do not prove current authenticated markup or publication.
+
+### YouTube tracking
+
+YouTube starts On for fresh installs under **Settings → Websites**; existing saved choices
+are preserved. **Limit & track** controls the same intention, wait and active-time budget
+as the other sites, with creation tracking and shared Slow scrolling. Access gating covers HTTP/S `youtube.com`
+and its subdomains; creation tracking uses only the exact HTTPS hosts
+`youtube.com` and `www.youtube.com`. Off restores unrestricted access and native
+scrolling, stops new creation measurements, and preserves history and saved duration.
+
+A visible focused `ytd-commentbox` editor counts as creating. Scoped comment-submit
+clicks count comments, not proof of publication. Keyboard editor shortcuts, likes,
+video uploads, YouTube Studio, mobile hosts, and ambiguous/multiple editors are
+unsupported. Playback without recent trusted input is not continuous watch-time
+measurement. Settings/account/auth routes remain neutral. Synthetic fixtures do
+not prove current authenticated markup.
+
 ## Optional all-website time
 
 Enable **Website time** in Settings and approve optional `tabs` and `idle`
@@ -295,8 +435,11 @@ and preserves recorded totals.
 
 Only the active HTTP/HTTPS tab in a focused normal window counts. Tracking pauses
 when the computer is idle for 30 seconds or locked. Private tabs, background tabs,
-browser pages, and extension pages are excluded. Timing is approximate;
-sleep gaps, backward clock changes, and restarts are not backfilled.
+browser pages, and extension pages are excluded. Timing is approximate. Tab, focus and idle changes checkpoint elapsed time; a
+one-minute alarm checkpoints uninterrupted browsing without keeping the worker
+alive. Alarms over 15 seconds late, gaps over 75 seconds, backward clock changes
+and browser restarts are not backfilled. Sleep/wake detection remains best-effort;
+closing the browser can lose the last uncheckpointed interval.
 
 The dashboard offers today, seven-day, and 30-day domain totals. `www.` is grouped
 with the bare hostname; other subdomains stay separate. Tracking starts at opt-in
@@ -317,8 +460,10 @@ remove oldest whole non-today days sooner, including temporarily ahead-dated
 days. If today's records alone cannot fit, saving reports an error instead of
 deleting today's history. Settings and access boundaries are not pruned.
 
-**Dashboard → Creation score → Preview share card** creates a local 1200 × 1200
-PNG for **Today** or **Last 7 days (including today)**. Review the preview,
+**Popup → Share today** previews today's card directly beside the creation
+score. Close the preview to return to the compact summary. **Dashboard → Creation
+score → Preview share card** also offers **Today** or **Last 7 days (including
+today)**. Both create the same local 1200 × 1200 PNG. Review the preview,
 choose **Download PNG**, then attach it to a social post. **Copy caption** copies
 the matching summary with a clickable `https://createratio.com/` link; if clipboard
 access fails, the caption is selected for manual copying. The card includes
@@ -330,11 +475,11 @@ Headlines never infer a trend from a single period or treat action credits as
 creating time. Cards and
 captions exclude site names, website time, and saved intentions. No data is
 uploaded and nothing is posted automatically. Changing the period or clearing
-history discards the preview. Each dashboard reuses one 1200 × 1200 canvas for
+history discards the preview. Each popup or dashboard reuses one 1200 × 1200 canvas for
 previewing and PNG encoding, retaining one PNG URL only for downloading. The
 preview does not decode that URL into another image. Replacement, clearing, or
 encoding failure revokes the previous URL and resets the canvas dimensions;
-closing the dashboard releases both. If the local
+closing the preview or its page releases both. If the local
 date changes while history is loading, PNG and HTML exports stop with a retry
 message instead of mixing periods. Explicit Clear history has a separate reset
 marker, so ordinary receipt-window rollover preserves ready and pending export
@@ -355,7 +500,9 @@ per-site scores, including history from disabled or removed integrations.
 Website-time CSV separately includes dates, domains, and seconds; formula-like
 domain names are escaped as text to prevent spreadsheet formula evaluation.
 **Clear history** removes both histories after confirmation, invalidates pending
-pre-clear measurements in open tabs, and preserves preferences and access boundaries.
+pre-clear measurements in open tabs, and preserves preferences and timed access
+sessions. The creation score resets, so sites open only through Above-goal access
+are blocked again.
 Fresh trusted input is required to resume creation tracking after clearing.
 Export regularly for longer retention and
 before uninstalling, which removes extension data. Timezone changes affect future
@@ -384,8 +531,12 @@ optional intention history saves the text you explicitly submit. Nothing uses
 `storage.sync`.
 
 Required permissions are `storage`, `alarms`, and
-`declarativeNetRequestWithHostAccess`. Host access is limited to X, Twitter aliases,
-and LinkedIn. Optional `tabs` and `idle` permissions are requested only for
+`declarativeNetRequestWithHostAccess`, plus `scripting` to restore CreateRatio's
+own scripts in already-authorized tabs after updates. Host access is limited to HTTP/S X, Twitter
+aliases, LinkedIn, TikTok, Instagram, Facebook, YouTube and Reddit, including their subdomains,
+for access gating. Creation tracking still uses each site's exact HTTPS hosts.
+Expanded host scope can require browser approval when updating.
+Optional `tabs` and `idle` permissions are requested only for
 all-website time. No browser-history or all-sites host permission is requested.
 Chromium restricts aggregate storage to trusted extension contexts; Firefox's
 isolated content scripts can technically access extension storage, though this
@@ -393,8 +544,9 @@ tracker communicates through background messages. Website scripts cannot access 
 
 **Send feedback** in store-installed Chrome builds opens the extension's store
 reviews page. Reviews are public and handled by Google; no activity data is
-attached. Unpacked builds have no feedback link, and Edge/Firefox links are not
-configured. Do not include private data or CSV exports in reviews.
+attached. Unpacked builds, Edge/Firefox builds and failed store lookups omit the
+unavailable feedback control. Privacy policy and Terms of use remain accessible.
+Do not include private data or CSV exports in reviews.
 
 ## Limitations and verification
 
@@ -406,9 +558,15 @@ Request rules cannot terminate existing connections by themselves; normal expiry
 also redirects open tabs. Embedded frames remain blocked during sessions except
 LinkedIn frames initiated by LinkedIn itself.
 
-Chromium blocking has prior live-browser coverage; Firefox and Edge still need
-live validation before distribution. Automated DOM fixtures cannot confirm current
-logged-in website markup or real sleep/wake behavior.
+Chromium blocking has prior live-browser coverage. On 2026-11-20, source-built
+bundles at `bb07674` were validated live on Microsoft Edge Stable 142.0.3595.94
+and 158.0.4370.33 (both passed the same flows), alongside Firefox 160.0.1, against
+signed-out YouTube: blocking, intention entry and a
+real one-minute wait (premature click rejected), a 5-minute active budget pausing
+off-tab, score dashboard recording consumption, **End session** re-blocking, and
+**Limit & track** Off persisting. Store-published builds, signed-in/authenticated
+YouTube, and trackpad gestures were not covered. Automated DOM fixtures cannot
+confirm current logged-in website markup or real sleep/wake behavior.
 
 Run `pnpm check` and `pnpm check:browser` from the repository root. The browser
 journeys prove selected access and history flows in a disposable Chromium profile,

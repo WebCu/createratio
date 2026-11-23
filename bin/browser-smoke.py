@@ -18,6 +18,21 @@ identity = base64.b64decode(manifest["key"]) if "key" in manifest else str(bundl
 extension_id = "".join(chr(ord("a") + int(value, 16)) for value in hashlib.sha256(identity).hexdigest()[:32])
 worker_url = "chrome-extension://" + extension_id + "/" + manifest["background"]["service_worker"]
 
+tools = pathlib.Path(__file__).resolve().parent
+resolved = subprocess.run(["node", str(tools / "setup-chromium.js"), "--resolve"], capture_output=True, text=True)
+sys.stderr.write(resolved.stderr)
+if resolved.returncode != 0:
+    raise SystemExit(resolved.returncode)
+chromium = resolved.stdout.strip()
+
+pinned_harness = json.loads((tools / "browser-pins.json").read_text())["browserHarness"]
+try:
+    harness_version = subprocess.run(["browser-harness", "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
+except FileNotFoundError:
+    raise SystemExit("browser-harness is not on PATH. Install the CI version: uv tool install browser-harness==" + pinned_harness)
+if harness_version != pinned_harness:
+    sys.stderr.write("Warning: browser-harness " + harness_version + " differs from the CI version " + pinned_harness + ".\n")
+
 env = dict(os.environ, BU_NAME="c3-smoke-" + uuid.uuid4().hex, BH_TAB_MARKER="0", BH_RECORD="0")
 env.pop("BU_CDP_WS", None)
 env.pop("BH_REQUIRE_EXISTING_DAEMON", None)
@@ -46,12 +61,12 @@ wait_for_load()
 def evaluate(expression):
     result = cdp("Runtime.evaluate", expression=expression, awaitPromise=True, returnByValue=True)
     if "exceptionDetails" in result:
-        page = cdp("Runtime.evaluate", expression="JSON.stringify({url:location.href,ready:typeof document==='object'?document.readyState:null,scripts:typeof document==='object'?Array.from(document.scripts,script=>script.src):[],catalog:typeof C3Sites,core:typeof C3})", returnByValue=True)["result"].get("value")
+        page = cdp("Runtime.evaluate", expression="JSON.stringify({url:location.href,ready:typeof document==='object'?document.readyState:null,scripts:typeof document==='object'?Array.from(document.scripts,script=>script.src):[],catalog:typeof Sites,core:typeof Core})", returnByValue=True)["result"].get("value")
         raise RuntimeError({"exception": result["exceptionDetails"], "worker": workers[0]["url"], "page": page})
     return result["result"].get("value")
 
 result = evaluate("""(async () => {
-  const sites = C3Sites.sites.filter(site => site.gated);
+  const sites = Sites.sites.filter(site => site.gated);
   if (!sites.length) throw new Error('No gated integrations loaded');
   const history = { [sites[0].id]: { createSec: 10, consumeSec: 5 } };
   const historyDate = '2000-01-01';
@@ -60,17 +75,17 @@ result = evaluate("""(async () => {
   const fixtures = {
     blocked: { settings: { trackedSites: sites.map(site => site.id) }, _access: {} },
     off: { settings: { trackedSites: [] }, _access: {} },
-    session: { settings: { trackedSites: sites.map(site => site.id) }, _access: Object.fromEntries(sites.map(site => [site.id, { remainingMs: 60000, expiresAt: 0, date: C3.localDate(new Date()) }])) },
-    expired: { settings: { trackedSites: sites.map(site => site.id) }, _access: Object.fromEntries(sites.map(site => [site.id, { remainingMs: 1000, expiresAt: Date.now() - 1, date: C3.localDate(new Date()) }])) },
+    session: { settings: { trackedSites: sites.map(site => site.id) }, _access: Object.fromEntries(sites.map(site => [site.id, { remainingMs: 60000, expiresAt: 0, date: Core.localDate(new Date()) }])) },
+    expired: { settings: { trackedSites: sites.map(site => site.id) }, _access: Object.fromEntries(sites.map(site => [site.id, { remainingMs: 1000, expiresAt: Date.now() - 1, date: Core.localDate(new Date()) }])) },
   };
   for (const [name, fixture] of Object.entries(fixtures)) {
     await chrome.storage.local.set(fixture);
     const response = await chrome.runtime.sendMessage({ type: 'access-status' });
     if (!response?.ok) throw new Error(response?.error || 'Access status failed');
-    const expected = sites.flatMap(site => name === 'off' ? C3Sites.get(site.id).access.unrestrictedRules : name === 'session' ? C3Sites.get(site.id).access.sessionRules : []);
+    const expected = sites.flatMap(site => name === 'off' ? Sites.get(site.id).access.unrestrictedRules : name === 'session' ? Sites.get(site.id).access.sessionRules : []);
     snapshots.push({ name, expected, rules: await chrome.declarativeNetRequest.getSessionRules(), access: response.access, history: (await chrome.storage.local.get(historyDate))[historyDate] });
   }
-  return { sites: sites.map(site => site.id), homes: sites.map(site => ({ id: site.id, url: C3Sites.get(site.id).access.home })), history, snapshots, enabledRulesets: await chrome.declarativeNetRequest.getEnabledRulesets() };
+  return { sites: sites.map(site => site.id), homes: sites.map(site => ({ id: site.id, url: Sites.get(site.id).access.home })), history, snapshots, enabledRulesets: await chrome.declarativeNetRequest.getEnabledRulesets() };
 })()""")
 assert "site-blocking" in result["enabledRulesets"], result
 for snapshot in result["snapshots"]:
@@ -98,7 +113,7 @@ print(json.dumps({"browserSmoke": "passed", "states": len(result["snapshots"]), 
 with tempfile.TemporaryDirectory(prefix="createratio-chromium-") as directory:
     profile = pathlib.Path(directory)
     arguments = [
-        os.environ.get("CHROMIUM", "chromium"),
+        chromium,
         "--headless=new", "--remote-debugging-port=0", "--disable-dev-shm-usage",
         "--no-first-run", "--no-default-browser-check", "--disable-background-networking",
         "--disable-sync", "--disable-component-update",
@@ -107,6 +122,8 @@ with tempfile.TemporaryDirectory(prefix="createratio-chromium-") as directory:
         "--disable-extensions-except=" + str(bundle),
         "--load-extension=" + str(bundle), "about:blank",
     ]
+    if sys.platform == "darwin":
+        arguments.append("--use-mock-keychain")
     if os.environ.get("CHROMIUM_NO_SANDBOX") == "1":
         arguments.append("--no-sandbox")
     with (profile / "chromium.log").open("w+") as log:

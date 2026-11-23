@@ -34,6 +34,11 @@ the `listed` channel, waits for Mozilla validation, then creates a version with
 the reviewer-source archive and MIT license. Each HTTP request uses a new
 short-lived HMAC-SHA256 JWT. Write requests are never retried automatically.
 
+Failures identify the operation and HTTP status in the Actions log and error
+annotation, with bounded, credential-redacted store details when available.
+Failed upload validation also reports Mozilla's validator messages. Raw responses,
+source context and unrecognized fields are not dumped.
+
 The job reports submission, not signing or publication. Mozilla controls validation,
 review and availability. Inspect the Developer Hub before rerunning a failed job,
 especially after a timeout. Do not create another listing, move a release tag,

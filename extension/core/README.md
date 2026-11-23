@@ -1,6 +1,6 @@
 # Shared core
 
-`core.js` is dependency-free and has no DOM, browser-storage, or network access. It exports CommonJS in Node and exposes `globalThis.C3` in browser bundles.
+`core.js` is dependency-free and has no DOM, browser-storage, or network access. It exports CommonJS in Node and exposes `globalThis.Core` in browser bundles.
 
 ```js
 const core = require('./extension/core/core.js');
@@ -21,14 +21,15 @@ available-site switches and new collection validation, never permission to displ
 saved history. Contributions are reviewed through GitHub; see
 [Site integrations](../sites/README.md) and [Contributing](../../CONTRIBUTING.md).
 
-`DEFAULT_SETTINGS.trackedSites` enables X and LinkedIn by default.
+`DEFAULT_SETTINGS.trackedSites` enables all seven supported platforms by default,
+as declared by each module's `defaultEnabled` flag.
 `trackingEnabled(site, settings)` uses that default when the preference is absent
 and respects an empty list (all tracking disabled). Malformed non-array saved
 selections, including `null`, resolve to all sites Off; only a missing preference
 uses catalog defaults. Normalization does not overwrite saved preferences.
 Tracking preferences
-do not filter historical aggregates or CSV exports. New catalog entries start
-disabled; the extension user decides which integrations to activate.
+do not filter historical aggregates or CSV exports. Saved selections never gain
+new catalog entries automatically; users can independently enable or disable sites.
 
 `siteForURL` delegates supported HTTPS lookup to the catalog. `classifyPage` is a
 compatibility entry point delegating opaque route/editor state to the selected
@@ -36,7 +37,7 @@ site's pure classifier; it returns `create`, `consume`, or `neutral`. The actual
 routes, selectors, and DOM/action interpretation live together in `extension/sites/<id>.js`.
 The core never chooses X-versus-LinkedIn behavior itself.
 
-`activeMillis` clips active intervals to the 30-second idle window and discards gaps over 15 seconds. `splitInterval` divides time at local midnight; `localDate` and `recentDates` use the local calendar.
+`activeMilliseconds` clips active intervals to the 30-second idle window and discards gaps over 15 seconds. `splitInterval` divides time at local midnight; `localDate` and `recentDates` use the local calendar.
 
 ## Data contract
 

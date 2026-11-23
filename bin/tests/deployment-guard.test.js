@@ -9,11 +9,25 @@ const script = path.resolve(__dirname, '../deployment-guard.js');
 const latest = 'a'.repeat(40);
 const stale = 'b'.repeat(40);
 
-function guard(t, { tested = latest, response = `${latest}\trefs/heads/main\n`, status = 0, gitAvailable = true, outputAvailable = true, token = '', requireAuth = false, remoteStderr = '' } = {}) {
+function guard(
+  t,
+  {
+    tested = latest,
+    response = `${latest}\trefs/heads/main\n`,
+    status = 0,
+    gitAvailable = true,
+    outputAvailable = true,
+    token = '',
+    requireAuth = false,
+    remoteStderr = ''
+  } = {}
+) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-deployment-guard-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   if (gitAvailable) {
-    fs.writeFileSync(path.join(directory, 'git'), `#!/bin/sh
+    fs.writeFileSync(
+      path.join(directory, 'git'),
+      `#!/bin/sh
 [ "$*" = "ls-remote --exit-code origin refs/heads/main" ] || exit 90
 [ "$GIT_TERMINAL_PROMPT" = "0" ] || exit 91
 if [ "$REQUIRE_AUTH" = "true" ]; then
@@ -25,20 +39,28 @@ fi
 printf "%s" "$REMOTE_STDERR" >&2
 printf "%s" "$REMOTE_RESPONSE"
 exit "$REMOTE_STATUS"
-`, { mode: 0o755 });
+`,
+      { mode: 0o755 }
+    );
   }
   const output = path.join(directory, 'output');
   const result = spawnSync(process.execPath, [script], {
     cwd: directory,
     env: {
-      ...process.env, PATH: directory, TESTED_SHA: tested,
+      ...process.env,
+      PATH: directory,
+      TESTED_SHA: tested,
       GITHUB_OUTPUT: outputAvailable ? output : '',
-      GITHUB_TOKEN: token, GITHUB_SERVER_URL: 'https://github.com',
+      GITHUB_TOKEN: token,
+      GITHUB_SERVER_URL: 'https://github.com',
       REQUIRE_AUTH: String(requireAuth),
       EXPECTED_AUTH_HEADER: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
-      REMOTE_RESPONSE: response, REMOTE_STATUS: String(status), REMOTE_STDERR: remoteStderr
+      REMOTE_RESPONSE: response,
+      REMOTE_STATUS: String(status),
+      REMOTE_STDERR: remoteStderr
     },
-    encoding: 'utf8', timeout: 5000
+    encoding: 'utf8',
+    timeout: 5000
   });
   assert.ifError(result.error);
   return { ...result, output: fs.existsSync(output) ? fs.readFileSync(output, 'utf8') : '' };
@@ -78,7 +100,9 @@ test('guard fails closed when Git is unavailable or its remote lookup fails', t 
 
 test('guard fails closed for missing, malformed, ambiguous, or wrong-ref responses', t => {
   for (const response of [
-    '', 'not-a-sha\trefs/heads/main\n', `${latest}\trefs/heads/feature\n`,
+    '',
+    'not-a-sha\trefs/heads/main\n',
+    `${latest}\trefs/heads/feature\n`,
     `${latest}\trefs/heads/main\n${stale}\trefs/heads/main\n`
   ]) {
     const result = guard(t, { response });
@@ -89,7 +113,12 @@ test('guard fails closed for missing, malformed, ambiguous, or wrong-ref respons
 });
 
 test('guard requires the tested full SHA and a GitHub step output destination', t => {
-  for (const options of [{ tested: '' }, { tested: latest.slice(0, 7) }, { tested: 'main' }, { outputAvailable: false }]) {
+  for (const options of [
+    { tested: '' },
+    { tested: latest.slice(0, 7) },
+    { tested: 'main' },
+    { outputAvailable: false }
+  ]) {
     const result = guard(t, options);
     assert.notEqual(result.status, 0);
     assert.equal(result.output, '');

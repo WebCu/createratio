@@ -88,6 +88,18 @@ It is guidance, not an API or a guarantee that an AI service will use it.
 All three files ship in static builds and source/Docker previews; keep them current
 with product changes. The guide never exposes local extension data.
 
+Follow the [metadata and crawlability checklist](../docs/seo.md) when changing
+public pages. Run `node --test site/tests/seo.test.js` for metadata, canonical,
+and sitemap regression checks; deployed response checks remain separate.
+
+## Announcements and listing screenshots
+
+Edit `marketing/release.json` and run `pnpm marketing` from the repository root
+to update the static launch announcement and generate store copy, a social post,
+and real extension screenshots with synthetic data. Review outputs in
+`dist/marketing/`; nothing is published automatically. See the
+[listing kit guide](../docs/marketing.md) for capture requirements and publication.
+
 ## Analytics
 
 `analytics.js` loads the official `@plausible-analytics/tracker` only on
@@ -96,9 +108,12 @@ never load it or send events.
 
 The website sends pageviews and engagement to `https://plausible.io/api/event`.
 No cookies, custom events, outbound-link, download, or form tracking are enabled.
-To exclude your visits, set `localStorage.plausible_ignore = 'true'` in the browser
-console. Blocked analytics or disabled JavaScript do not affect the page.
+Blocked analytics or disabled JavaScript do not affect the page.
 This tracker is not included in extension builds.
+
+When testing the production landing page, set
+`localStorage.plausible_ignore = 'true'` in the browser console and reload the
+page to exclude future visits. This does not delete analytics already collected.
 
 ## Accessibility and verification
 

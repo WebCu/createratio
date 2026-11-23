@@ -12,14 +12,17 @@ and access code never branch on its site ID.
 ship, not which integrations a user activates. Users independently enable or
 disable available sites in Settings; their choices persist locally.
 
-X and LinkedIn declare `defaultEnabled: true` in their modules. New integrations
-omit this flag and start disabled until the user enables them. Adding a module
+All seven supported platforms declare `defaultEnabled: true` in their modules,
+so fresh installs start with Limit & track On. Saved selections are preserved
+without automatically adding sites. Omitting the flag defaults an integration to Off. Tracking-only
+integrations share the existing Slow scrolling preference on consuming pages
+without declaring access gates. Adding a module
 file without registering it does not ship or activate it.
 
 ## Plugin interface
 
 A module publishes the same object through `module.exports` in Node and
-`globalThis.C3_SITE_MODULES[id]` in the browser. Copy the small publication pattern
+`globalThis.SITE_MODULES[id]` in the browser. Copy the small publication pattern
 from `x.js` or `linkedin.js`; no browser objects are touched until `create(...)`.
 The exported object is:
 
@@ -152,10 +155,10 @@ its generated bundle code, rules, matches, and permissions. Recorded history
 remains in aggregate totals, charts, badges, per-site rows and CSV; a removed site
 uses its stable ID as a fallback display label and cannot record new activity.
 
-Tracking support does not automatically add an access gate. X and LinkedIn have
-explicit gate support: their **Limit & track** switch enables timed access and
-creation-score measurements together. Their domains, home URLs, rule IDs, and
-iframe-specific allow rules live in their site modules. Shared code enforces
+Tracking support does not automatically add an access gate. X, LinkedIn, TikTok,
+Instagram, Facebook, YouTube and Reddit have explicit gate support: their **Limit & track** switch
+enables timed access and creation-score measurements together. Their domains,
+home URLs, rule IDs, and iframe-specific allow rules live in their site modules. Shared code enforces
 access timing and applies their policies.
 
 ## Tests and leverage

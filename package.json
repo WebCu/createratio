@@ -1,6 +1,6 @@
 {
   "name": "createratio",
-  "version": "0.0.2",
+  "version": "0.0.7",
   "private": true,
   "license": "MIT",
   "description": "CreateRatio: track time spent creating versus consuming online",
@@ -10,16 +10,25 @@
   },
   "scripts": {
     "preview": "node site/dev-server.js",
+    "marketing": "pnpm marketing:copy && pnpm marketing:assets",
+    "marketing:copy": "node bin/marketing.js",
+    "marketing:assets": "pnpm build:chrome && node bin/marketing-assets.mjs",
     "release": "node bin/release.js",
     "prepare": "node bin/setup-git-hooks.js --if-unconfigured",
     "setup:hooks": "node bin/setup-git-hooks.js",
+    "setup:chromium": "node bin/setup-chromium.js",
+    "browser:container": "node bin/browser-container.js",
     "verify:access": "node bin/access-equivalence.js",
     "smoke:browser": "pnpm build:chrome && python3 -m unittest discover -s bin/tests -p test_browser_smoke.py && python3 bin/browser-smoke.py",
     "check:release": "node bin/release-smoke.js",
+    "format": "biome format --write",
+    "check:format": "biome format",
     "check:syntax": "node bin/check-syntax.js",
+    "check:types": "tsc -p tsconfig.json",
     "check:actions": "node bin/check-actions.js",
-    "check": "pnpm check:syntax && pnpm test && pnpm build && pnpm build:site",
+    "check": "pnpm check:format && pnpm check:syntax && pnpm check:types && pnpm test && pnpm build && pnpm build:site",
     "check:browser": "pnpm build:chrome && pnpm test:browser",
+    "check:browser:shard": "pnpm build:chrome && node bin/browser-shard.js",
     "verify": "node bin/verify.js",
     "test": "node --test --test-concurrency=4 extension/core/tests/*.test.js extension/sites/*.test.js \"extension/src/**/*.test.js\" site/tests/*.test.js bin/tests/*.test.js",
     "test:tracers": "node --test --test-concurrency=2 extension/src/tests/tracer-journeys.test.js extension/src/tests/lifecycle-properties.test.js",
@@ -31,6 +40,9 @@
     "build:firefox": "node extension/build.js firefox"
   },
   "devDependencies": {
-    "acorn": "8.19.0"
+    "@biomejs/biome": "2.6.8",
+    "@types/chrome": "0.3.7",
+    "acorn": "8.19.0",
+    "typescript": "6.0.3"
   }
 }

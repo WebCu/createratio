@@ -8,9 +8,15 @@ const helper = () => import('../../extension/browser-tests/chromium.mjs');
 test('browser tracer identifies the unpacked extension and declared worker path', async () => {
   const { extensionWorkerURL } = await helper();
   const manifest = { background: { service_worker: 'runtime/worker.js' } };
-  assert.equal(extensionWorkerURL('/tmp/createratio-fixture/chrome', manifest), 'chrome-extension://iphddjbhcelpecbdffdmjmpboapobdmh/runtime/worker.js');
+  assert.equal(
+    extensionWorkerURL('/tmp/createratio-fixture/chrome', manifest),
+    'chrome-extension://iphddjbhcelpecbdffdmjmpboapobdmh/runtime/worker.js'
+  );
   const keyed = { ...manifest, key: Buffer.from('fixture-public-key').toString('base64') };
-  assert.equal(extensionWorkerURL('/different/location', keyed), 'chrome-extension://bfmcheajhnbjgnhpjgbiefloegniiime/runtime/worker.js');
+  assert.equal(
+    extensionWorkerURL('/different/location', keyed),
+    'chrome-extension://bfmcheajhnbjgnhpjgbiefloegniiime/runtime/worker.js'
+  );
 });
 
 test('equivalent unpacked paths select the same worker while different paths do not', async t => {
@@ -38,7 +44,10 @@ test('equivalent unpacked paths select the same worker while different paths do 
   assert.equal(workerTarget([worker], different), undefined);
   const keyed = { ...manifest, key: Buffer.from('fixture-public-key').toString('base64') };
   for (const path of [...variants, `${canonical}-other`]) {
-    assert.equal(extensionWorkerURL(path, keyed), 'chrome-extension://bfmcheajhnbjgnhpjgbiefloegniiime/runtime/worker.js');
+    assert.equal(
+      extensionWorkerURL(path, keyed),
+      'chrome-extension://bfmcheajhnbjgnhpjgbiefloegniiime/runtime/worker.js'
+    );
   }
 });
 
@@ -59,5 +68,15 @@ test('ambiguous browser tracer worker identity fails closed', async () => {
   const { workerTarget } = await helper();
   const url = 'chrome-extension://createratio/background.js';
   const worker = { type: 'service_worker', url };
-  assert.throws(() => workerTarget([{ ...worker, targetId: 'one' }, { ...worker, targetId: 'two' }], url), error => error.fatal === true && /Multiple extension workers/.test(error.message));
+  assert.throws(
+    () =>
+      workerTarget(
+        [
+          { ...worker, targetId: 'one' },
+          { ...worker, targetId: 'two' }
+        ],
+        url
+      ),
+    error => error.fatal === true && /Multiple extension workers/.test(error.message)
+  );
 });

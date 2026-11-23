@@ -21,6 +21,12 @@ function expression(source, key, context) {
   return vm.runInNewContext(value, context, { timeout: 1000 });
 }
 
+test('automatic submissions start from published releases, never raw tag pushes', () => {
+  const triggers = workflow.split('\non:\n')[1].split('\npermissions:')[0];
+  assert.match(triggers, /  release:\n    types: \[published\]/);
+  assert.doesNotMatch(triggers, /^  push:/m);
+});
+
 test('manual releases offer an explicit browser choice and default to both', () => {
   const dispatch = workflow.split('  workflow_dispatch:\n')[1]?.split(/^\S/m)[0];
   assert.ok(dispatch);
@@ -33,7 +39,8 @@ test('manual releases offer an explicit browser choice and default to both', () 
 
 test('only selected store jobs reach their approval environments', () => {
   for (const [event, browser, expected] of [
-    ['push', undefined, [true, true]],
+    ['release', undefined, [true, true]],
+    ['push', undefined, [false, false]],
     ['workflow_dispatch', 'both', [true, true]],
     ['workflow_dispatch', 'chrome', [true, false]],
     ['workflow_dispatch', 'firefox', [false, true]],
@@ -43,7 +50,11 @@ test('only selected store jobs reach their approval environments', () => {
     ['pull_request', 'both', [false, false]]
   ]) {
     const context = { github: { event_name: event }, inputs: { browser } };
-    assert.deepEqual(['submit', 'submit-firefox'].map(name => expression(job(name), 'if', context)), expected, `${event}: ${browser}`);
+    assert.deepEqual(
+      ['submit', 'submit-firefox'].map(name => expression(job(name), 'if', context)),
+      expected,
+      `${event}: ${browser}`
+    );
   }
 });
 
@@ -51,9 +62,13 @@ test('manual and automatic release guards validate the selected tag before any s
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'createratio-release-workflow-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const env = {
-    ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'Release fixture', GIT_AUTHOR_EMAIL: 'release@example.invalid',
-    GIT_COMMITTER_NAME: 'Release fixture', GIT_COMMITTER_EMAIL: 'release@example.invalid'
+    ...process.env,
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 'Release fixture',
+    GIT_AUTHOR_EMAIL: 'release@example.invalid',
+    GIT_COMMITTER_NAME: 'Release fixture',
+    GIT_COMMITTER_EMAIL: 'release@example.invalid'
   };
   const git = (...args) => {
     const result = spawnSync('git', args, { cwd: directory, env, encoding: 'utf8', timeout: 5000 });
@@ -65,7 +80,8 @@ test('manual and automatic release guards validate the selected tag before any s
     fs.writeFileSync(path.join(directory, file), JSON.stringify({ version: '1.2.3' }));
   }
   fs.mkdirSync(path.join(directory, 'bin'));
-  for (const file of ['release.js', 'chrome-store-release.js']) fs.copyFileSync(path.join(root, 'bin', file), path.join(directory, 'bin', file));
+  for (const file of ['release.js', 'chrome-store-release.js', 'store-errors.js'])
+    fs.copyFileSync(path.join(root, 'bin', file), path.join(directory, 'bin', file));
   git('init', '--initial-branch=main');
   git('config', 'commit.gpgsign', 'false');
   git('add', '.');
@@ -76,7 +92,7 @@ test('manual and automatic release guards validate the selected tag before any s
   const run = guard.match(/        run: \|\n((?:          [^\n]*\n)+)/)?.[1];
   assert.ok(run);
   for (const [event, browser, refType, tag, succeeds] of [
-    ['push', undefined, 'tag', 'v1.2.3', true],
+    ['release', undefined, 'tag', 'v1.2.3', true],
     ['workflow_dispatch', 'both', 'tag', 'v1.2.3', true],
     ['workflow_dispatch', 'chrome', 'tag', 'v1.2.3', true],
     ['workflow_dispatch', 'firefox', 'tag', 'v1.2.3', true],
@@ -87,17 +103,24 @@ test('manual and automatic release guards validate the selected tag before any s
     ['workflow_dispatch', 'both', 'tag', 'v1.2.3;echo injected', false]
   ]) {
     const result = spawnSync('bash', ['-e', '-c', run.replace(/^ {10}/gm, '')], {
-      cwd: directory, env: {
-        ...env, GITHUB_REF_TYPE: refType, GITHUB_REF_NAME: tag,
+      cwd: directory,
+      env: {
+        ...env,
+        GITHUB_REF_TYPE: refType,
+        GITHUB_REF_NAME: tag,
         RELEASE_BROWSER: expression(guard, 'RELEASE_BROWSER', { github: { event_name: event }, inputs: { browser } })
-      }, encoding: 'utf8', timeout: 5000
+      },
+      encoding: 'utf8',
+      timeout: 5000
     });
     assert.equal(result.status === 0, succeeds, `${event}: ${browser}: ${refType}: ${tag}\n${result.stderr}`);
   }
   git('commit', '--allow-empty', '-m', 'Not merged into main');
   const unmerged = spawnSync('bash', ['-e', '-c', run.replace(/^ {10}/gm, '')], {
-    cwd: directory, env: { ...env, GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v1.2.3', RELEASE_BROWSER: 'chrome' },
-    encoding: 'utf8', timeout: 5000
+    cwd: directory,
+    env: { ...env, GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v1.2.3', RELEASE_BROWSER: 'chrome' },
+    encoding: 'utf8',
+    timeout: 5000
   });
   assert.notEqual(unmerged.status, 0);
 });

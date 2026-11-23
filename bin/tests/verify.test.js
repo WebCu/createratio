@@ -9,21 +9,42 @@ const path = require('node:path');
 const script = path.resolve(__dirname, '../verify.js');
 const stages = ['check', 'check:browser', 'smoke:browser'];
 
-function workspace(t, { available = true, repository = false } = {}) {
+function git(cwd, ...args) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
+function workspace(
+  t,
+  {
+    available = true,
+    repository = false,
+    parentRepository = false,
+    linkedWorktree = false,
+    gitAvailable = repository || parentRepository || linkedWorktree
+  } = {}
+) {
   const directory = mkdtempSync(path.join(tmpdir(), 'createratio-verify-test-'));
   const project = path.join(directory, 'project');
   mkdirSync(project);
   t.after(() => rmSync(directory, { recursive: true, force: true }));
-  if (repository) {
-    for (const args of [
-      ['init', '--initial-branch=main'], ['config', 'user.name', 'Verification fixture'],
-      ['config', 'user.email', 'verify@example.invalid'], ['config', 'commit.gpgsign', 'false']
-    ]) assert.equal(spawnSync('git', args, { cwd: project }).status, 0);
-    writeFileSync(path.join(project, 'source.txt'), 'original');
-    assert.equal(spawnSync('git', ['add', '.'], { cwd: project }).status, 0);
-    assert.equal(spawnSync('git', ['commit', '-m', 'Fixture'], { cwd: project }).status, 0);
+  if (repository || parentRepository || linkedWorktree) {
+    const root = repository ? project : directory;
+    git(root, 'init', '--initial-branch=main');
+    git(root, 'config', 'user.name', 'Verification fixture');
+    git(root, 'config', 'user.email', 'verify@example.invalid');
+    git(root, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(path.join(root, 'source.txt'), 'original');
+    git(root, 'add', 'source.txt');
+    git(root, 'commit', '-m', 'Fixture');
+    if (linkedWorktree) git(root, 'worktree', 'add', '--detach', project);
+    if (parentRepository) writeFileSync(path.join(project, 'source.txt'), 'source copy');
   }
-  if (available) writeFileSync(path.join(directory, 'pnpm'), `#!${process.execPath}
+  if (available)
+    writeFileSync(
+      path.join(directory, 'pnpm'),
+      `#!${process.execPath}
 const fs = require('node:fs');
 const stage = process.argv[2];
 if (stage === '--version') { console.log('12.11.2'); process.exit(0); }
@@ -32,17 +53,33 @@ console.log('fixture output: ' + stage);
 console.error('fixture stderr: ' + stage);
 if (process.env.FAIL_AT === 'signal:' + stage) process.kill(process.pid, 'SIGTERM');
 if (stage === process.env.FAIL_AT) process.exit(7);
-`, { mode: 0o755 });
+`,
+      { mode: 0o755 }
+    );
   return (failAt, overrides = {}) => {
     const callLog = path.join(directory, 'calls');
     writeFileSync(callLog, '');
     const result = spawnSync(process.execPath, [script], {
-      cwd: project, encoding: 'utf8',
-      env: { ...process.env, PATH: repository ? directory + path.delimiter + process.env.PATH : directory, TMPDIR: directory, CALL_LOG: callLog, FAIL_AT: failAt || '', ...overrides }
+      cwd: project,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: gitAvailable ? directory + path.delimiter + process.env.PATH : directory,
+        TMPDIR: directory,
+        CALL_LOG: callLog,
+        FAIL_AT: failAt || '',
+        ...overrides
+      }
     });
     assert.ok(result.stdout.includes('Verification logs: '), result.stderr);
     const output = result.stdout.match(/^Verification logs: (.+)$/m)[1];
-    return { ...result, cwd: project, output, calls: readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean), summary: JSON.parse(readFileSync(path.join(output, 'summary.json'), 'utf8')) };
+    return {
+      ...result,
+      cwd: project,
+      output,
+      calls: readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean),
+      summary: JSON.parse(readFileSync(path.join(output, 'summary.json'), 'utf8'))
+    };
   };
 }
 
@@ -75,11 +112,35 @@ test('unavailable provenance is explicit rather than inferred from another check
   assert.equal(result.summary.runtime.node, process.version);
 });
 
+test('verification does not record an enclosing repository for a source copy', t => {
+  const result = workspace(t, { parentRepository: true })();
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.summary.source, { head: null, dirty: null });
+});
+
+test('verification records the commit and working-tree state of a linked worktree', t => {
+  const run = workspace(t, { linkedWorktree: true });
+  const clean = run();
+  const head = git(clean.cwd, 'rev-parse', 'HEAD');
+  assert.deepEqual(clean.summary.source, { head, dirty: false });
+  writeFileSync(path.join(clean.cwd, 'source.txt'), 'modified');
+  assert.deepEqual(run().summary.source, { head, dirty: true });
+});
+
+test('verification reports unavailable provenance for a standalone source copy with Git installed', t => {
+  const result = workspace(t, { gitAvailable: true })();
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.summary.source, { head: null, dirty: null });
+});
+
 test('verification preserves a terminated stage as a signal-based failure', t => {
   const result = workspace(t)('signal:check');
   assert.equal(result.status, 143);
   assert.deepEqual(result.calls, ['check']);
-  assert.deepEqual(result.summary.stages.map(stage => stage.status), ['failed', 'not-run', 'not-run']);
+  assert.deepEqual(
+    result.summary.stages.map(stage => stage.status),
+    ['failed', 'not-run', 'not-run']
+  );
   assert.equal(result.summary.stages[0].exitCode, 143);
 });
 
@@ -87,7 +148,10 @@ test('verification reports an unavailable package manager as a failed stage, not
   const result = workspace(t, { available: false })();
   assert.equal(result.status, 1);
   assert.deepEqual(result.calls, []);
-  assert.deepEqual(result.summary.stages.map(stage => stage.status), ['failed', 'not-run', 'not-run']);
+  assert.deepEqual(
+    result.summary.stages.map(stage => stage.status),
+    ['failed', 'not-run', 'not-run']
+  );
   assert.match(result.stderr, /ENOENT/);
 });
 
@@ -98,7 +162,10 @@ test('verification keeps separate logs for every stage and never reuses an earli
   for (const result of [first, second]) {
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(result.calls, stages);
-    assert.deepEqual(result.summary.stages.map(stage => stage.status), ['passed', 'passed', 'passed']);
+    assert.deepEqual(
+      result.summary.stages.map(stage => stage.status),
+      ['passed', 'passed', 'passed']
+    );
     for (const stage of result.summary.stages) {
       const log = readFileSync(path.join(result.output, stage.log), 'utf8');
       assert.match(log, new RegExp('fixture output: ' + stage.name));
@@ -115,7 +182,10 @@ for (const [index, name] of stages.entries()) {
     const failed = run(name);
     assert.equal(failed.status, 7, failed.stderr);
     assert.deepEqual(failed.calls, stages.slice(0, index + 1));
-    assert.deepEqual(failed.summary.stages.map(stage => stage.status), stages.map((_, position) => position < index ? 'passed' : position === index ? 'failed' : 'not-run'));
+    assert.deepEqual(
+      failed.summary.stages.map(stage => stage.status),
+      stages.map((_, position) => (position < index ? 'passed' : position === index ? 'failed' : 'not-run'))
+    );
     assert.equal(failed.summary.stages[index].exitCode, 7);
     assert.match(failed.stderr, new RegExp('fixture stderr: ' + name));
     assert.notEqual(success.output, failed.output);
