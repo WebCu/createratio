@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const now = new Date(2026, 0, 15, 12).getTime();
 const date = '2026-01-15';
 
-function engine(folder, initial = {}, url = '') {
+function engine(folder, initial = {}, url = '', restart = false) {
   const data = structuredClone(initial),
     alarms = {},
     tabs = [{ id: 1, url }];
@@ -17,7 +17,7 @@ function engine(folder, initial = {}, url = '') {
     storage: {
       session: {
         async get() {
-          return { _accessInitialized: true };
+          return { _accessInitialized: !restart };
         },
         async set() {}
       },
@@ -117,6 +117,10 @@ function matrix(catalog) {
     )
   ];
   const enabled = { trackedSites: catalog.map(site => site.id) };
+  const aboveGoal = {
+    settings: { ...enabled, allowAboveGoal: true },
+    [date]: { [first.id]: { createSec: 121, consumeSec: 120 } }
+  };
   const states = {
     defaults: {},
     blocked: { settings: enabled },
@@ -125,10 +129,7 @@ function matrix(catalog) {
     paused: { settings: enabled, _access: entries({ remainingMs: 300000, date, expiresAt: 0 }) },
     running: { settings: enabled, _access: entries({ remainingMs: 300000, date, expiresAt: now + 299000 }) },
     expired: { settings: enabled, _access: entries({ remainingMs: 1000, date, expiresAt: now - 1 }) },
-    aboveGoal: {
-      settings: { ...enabled, allowAboveGoal: true },
-      [date]: { [first.id]: { createSec: 121, consumeSec: 120 } }
-    },
+    aboveGoal,
     atGoal: {
       settings: { ...enabled, allowAboveGoal: true },
       [date]: { [first.id]: { createSec: 120, consumeSec: 120 } }
@@ -137,9 +138,30 @@ function matrix(catalog) {
     midnight: {
       settings: { ...enabled, accessMinutes: 12, siteOverrides: { [first.id]: { accessMinutes: 2 } } },
       _access: entries({ remainingMs: 60000, date: '2026-01-14', expiresAt: 0 })
-    }
+    },
+    exhausted: { settings: enabled, _access: entries({ refilledAt: now - 3600000, date }) },
+    exhaustedYesterday: {
+      settings: enabled,
+      _access: entries({ refilledAt: now - 86400000, date: '2026-01-14' })
+    },
+    legacyDeadline: { settings: enabled, _access: entries({ expiresAt: now + 60000 }) },
+    runningAtMidnight: {
+      settings: enabled,
+      _access: entries({
+        remainingMs: 60000,
+        date: '2026-01-14',
+        expiresAt: new Date(2026, 0, 15, 0, 0, 30).getTime()
+      })
+    },
+    aboveGoalSession: {
+      ...aboveGoal,
+      _access: entries({ remainingMs: 300000, date, expiresAt: 0, refilledAt: now - 60000 })
+    },
+    exhaustedAboveGoal: { ...aboveGoal, _access: entries({ refilledAt: now - 3600000, date }) },
+    staleWait: { settings: enabled, _access: entries({ readyAt: now + 3600000, waitMs: 60000 }) }
   };
-  return { urls, states };
+  const restarts = ['running', 'midnight', 'runningAtMidnight'];
+  return { urls, states, restarts };
 }
 
 async function compare(baseline, candidate) {
@@ -147,14 +169,18 @@ async function compare(baseline, candidate) {
     const read = folder => JSON.parse(fs.readFileSync(path.join(folder, file), 'utf8'));
     assert.deepEqual(read(candidate), read(baseline), file);
   }
-  const { urls, states } = matrix(engine(candidate).catalog);
+  const { urls, states, restarts } = matrix(engine(candidate).catalog);
   let count = 0;
-  for (const [state, initial] of Object.entries(states)) {
+  const runs = Object.entries(states).flatMap(([state, initial]) => [
+    [state, initial, false],
+    ...(restarts.includes(state) ? [[`${state} (restart)`, initial, true]] : [])
+  ]);
+  for (const [label, initial, restart] of runs) {
     for (const url of urls) {
-      const original = engine(baseline, initial, url),
-        updated = engine(candidate, initial, url);
-      assert.equal(updated.siteForURL(url), original.siteForURL(url), `${state}: ${url}: lookup`);
-      assert.deepEqual(await updated.snapshot(), await original.snapshot(), `${state}: ${url}: lifecycle`);
+      const original = engine(baseline, initial, url, restart),
+        updated = engine(candidate, initial, url, restart);
+      assert.equal(updated.siteForURL(url), original.siteForURL(url), `${label}: ${url}: lookup`);
+      assert.deepEqual(await updated.snapshot(), await original.snapshot(), `${label}: ${url}: lifecycle`);
       count++;
     }
   }
@@ -162,6 +188,7 @@ async function compare(baseline, candidate) {
     cases: count,
     urls: urls.length,
     states: Object.keys(states).length,
+    restarts: restarts.length,
     verification: 'mocked browser-world VM, not live-browser QA'
   };
 }

@@ -18,9 +18,10 @@ async function bundles(t) {
 test('equivalence compares all lifecycle states and metadata-derived URLs', async t => {
   const { baseline, candidate } = await bundles(t);
   const result = await compare(baseline, candidate);
-  assert.equal(result.states, 11);
+  assert.equal(result.states, 18);
+  assert.equal(result.restarts, 3);
   assert.ok(result.urls > 20);
-  assert.equal(result.cases, result.states * result.urls);
+  assert.equal(result.cases, (result.states + result.restarts) * result.urls);
   assert.match(result.verification, /not live-browser QA/);
 });
 
@@ -32,6 +33,23 @@ test('equivalence detects changed lifecycle behavior', async t => {
   assert.notEqual(changed, source);
   await fs.writeFile(blocker, changed);
   await assert.rejects(compare(baseline, candidate), /lifecycle/);
+});
+
+async function mutate(candidate, from, to) {
+  for (const file of ['blocker.js', 'site-access.js']) {
+    const target = path.join(candidate, file);
+    const source = await fs.readFile(target, 'utf8').catch(() => '');
+    if (!source.includes(from)) continue;
+    await fs.writeFile(target, source.replace(from, to));
+    return;
+  }
+  assert.fail(`No candidate file contains ${from}`);
+}
+
+test('equivalence detects changed restart behavior', async t => {
+  const { baseline, candidate } = await bundles(t);
+  await mutate(candidate, 'const pausedAtMidnight = !restart &&', 'const pausedAtMidnight =');
+  await assert.rejects(compare(baseline, candidate), /restart/);
 });
 
 test('equivalence detects static blocking policy changes', async t => {
@@ -56,4 +74,22 @@ test('generated fixture states never alias entries across integrations', () => {
   assert.ok(urls.includes('http://mobile.second.invalid/'));
   assert.ok(urls.includes('https://second.invalid.evil.invalid/'));
   assert.throws(() => matrix([]), /no access integrations/);
+});
+
+test('matrix covers exhausted, legacy, stale-wait, above-goal session, and midnight-running states', () => {
+  const { states, restarts } = matrix([
+    { id: 'first', access: { domains: ['first.test'], home: 'https://first.test/' } },
+    { id: 'second', access: { domains: ['second.test'], home: 'https://second.test/' } }
+  ]);
+  for (const name of [
+    'exhausted',
+    'exhaustedYesterday',
+    'legacyDeadline',
+    'runningAtMidnight',
+    'aboveGoalSession',
+    'exhaustedAboveGoal',
+    'staleWait'
+  ])
+    assert.ok(states[name], name);
+  assert.deepEqual(restarts, ['running', 'midnight', 'runningAtMidnight']);
 });

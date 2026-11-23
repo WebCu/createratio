@@ -652,7 +652,7 @@ pnpm verify:access /tmp/baseline/chrome dist/chrome
 ```
 
 The comparison checks exact manifests and static rules, plus metadata-derived
-URL variants across eleven access states, including untouched defaults. It compares
+URL variants across eighteen access states, including untouched defaults; three of them run again after a simulated browser restart. It compares
 lookup, status, session rules, storage, alarms, and redirects in a fixed-clock
 browser-world VM. Its own tests
 prove that lifecycle and static-rule changes fail. Intentional manifest or policy
