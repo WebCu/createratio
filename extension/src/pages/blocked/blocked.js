@@ -10,6 +10,8 @@ $('reason').maxLength = Core.INTENTION_LIMITS.maxLength;
 let access;
 let busy = false,
   refreshing = false;
+let accessError = '',
+  intentionError = '';
 const blockedLines = [
   'The feed can wait. You’ve got this.',
   'Your next idea called. It wants {wait}.',
@@ -36,9 +38,20 @@ function nextBlockedLine() {
 }
 const blockedLine = nextBlockedLine();
 $('heading').textContent = blockedLine.replace('{wait}', 'a deliberate pause');
+function renderError() {
+  const message = (!$('request').hidden && intentionError) || accessError;
+  const notice = $('error');
+  if (notice.textContent !== message) notice.textContent = message;
+  notice.hidden = !message;
+}
 function error(message = '') {
-  $('error').textContent = message;
-  $('error').hidden = !message;
+  accessError = message;
+  renderError();
+}
+function clearIntentionError() {
+  if (!intentionError) return;
+  intentionError = '';
+  renderError();
 }
 /** @param {Milliseconds} milliseconds */
 function remaining(milliseconds) {
@@ -74,7 +87,10 @@ function render() {
       ? `Time counts only in the active tab of a focused browser window. When time runs out, all ${access.name} tabs return to this page.`
       : `${access.name} is paused. Set an intention, take a deliberate pause, then open a timed session.`;
   document.title = `${access.name} ${active ? 'session' : 'blocked'} - CreateRatio`;
-  $('request').hidden = active || waiting;
+  if ($('request').hidden !== (active || waiting)) {
+    $('request').hidden = active || waiting;
+    renderError();
+  }
   $('waiting').hidden = !waiting;
   $('active').hidden = !active;
   $('reason').disabled = busy;
@@ -154,7 +170,10 @@ async function action(type, extra = {}, navigate = false) {
         await RefillAnimation.waitForFill($('active-countdown'));
       location.replace(access.home);
     }
-    if (type === 'access-cancel' || type === 'access-end') $('reason').value = '';
+    if (type === 'access-cancel' || type === 'access-end') {
+      $('reason').value = '';
+      clearIntentionError();
+    }
   } catch (e) {
     error(e.message);
   } finally {
@@ -180,16 +199,17 @@ async function refresh() {
     refreshing = false;
   }
 }
+$('reason').addEventListener('input', clearIntentionError);
 $('request').addEventListener('submit', event => {
   event.preventDefault();
   const reason = $('reason').value.trim();
   if (!Core.validIntention(reason)) {
-    error(
-      `Write a specific intention of ${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters.`
-    );
+    intentionError = `Write a specific intention of ${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters.`;
+    renderError();
     return;
   }
   if (!$('request').reportValidity()) return;
+  clearIntentionError();
   void action('access-begin', { reason });
 });
 $('open').addEventListener('click', () => action('access-open', {}, true));
