@@ -44,6 +44,8 @@ test('built dashboard downloads local daily and weekly reports that render and p
       assert.doesNotMatch(daily, /2026-03-03|retired/);
       await click(browser, dashboard, '#report-range');
       await typeAhead(browser, dashboard, 'l');
+      await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }, dashboard.session);
+      await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, dashboard.session);
       await eventually(() => inspect(dashboard, 'document.querySelector("#report-range").value === "week"'), 'keyboard selects weekly period');
       const weekly = await download('CreateRatio-report-2026-03-03-to-2026-03-09.html');
       assert.match(weekly, /<dt>Creating<\/dt><dd>3\.0m<\/dd>/);
