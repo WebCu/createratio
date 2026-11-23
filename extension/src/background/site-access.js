@@ -7,6 +7,8 @@
   /** @typedef {{ phase: 'request', readyAt: number, waitMs: Milliseconds | null }} AccessRequest */
   /** @typedef {{ phase: 'session', remainingMs: Milliseconds | null, expiresAt: number | null, refilledAt: number | null, date: LocalDate | null, goalActive: boolean }} AccessSession */
   /** @typedef {AccessRequest | AccessSession | null} SiteAccessState */
+  /** @typedef {{ now: number, date: LocalDate, dayStart: number, midnight: number, restart: boolean, enabled: boolean, goalAllowed: boolean, focused: boolean, accessMinutes: Minutes, hasRules: boolean, hasWindows: boolean, closeAll: boolean }} AccessFacts */
+  /** @typedef {{ state: SiteAccessState, rules: 'unrestricted' | 'session' | 'none', alarmAt: number, expire: boolean, window: { start: number, end: number } | null, clearWindows: boolean }} AccessDecision */
   const MAXIMUM_BUDGET = Core.millisecondsFromMinutes(Core.ACCESS_LIMITS.maxMinutes);
   const SESSION_FIELDS = ['remainingMs', 'expiresAt', 'refilledAt'];
   /**
@@ -138,7 +140,77 @@
       }
     };
   }
+  /**
+   * @param {SiteAccessState} state
+   * @param {AccessFacts} facts
+   * @returns {AccessDecision}
+   */
+  function reconcileSiteAccess(state, facts) {
+    const { now, date, dayStart, midnight, restart, goalAllowed, focused } = facts;
+    if (!facts.enabled)
+      return { state: null, rules: 'unrestricted', alarmAt: 0, expire: false, window: null, clearWindows: true };
+    const budget = state?.phase === 'session' ? state : null;
+    let remaining = budget?.remainingMs ?? null;
+    let expiresAt = budget?.expiresAt ?? null;
+    let refilledAt = budget?.refilledAt ?? null;
+    let sessionDate = budget?.date ?? null;
+    let goalActive = budget?.goalActive ?? false;
+    let windowStart = now;
+    const hadSession = remaining !== null || expiresAt !== null;
+    if (sessionDate && sessionDate !== date) {
+      const runningAtMidnight =
+        !restart && ((expiresAt !== null && expiresAt >= dayStart) || (!goalAllowed && goalActive));
+      const pausedAtMidnight = !restart && remaining > 0 && !expiresAt;
+      if (runningAtMidnight || pausedAtMidnight) windowStart = dayStart;
+      remaining = Core.millisecondsFromMinutes(facts.accessMinutes);
+      refilledAt = dayStart;
+      expiresAt = runningAtMidnight ? dayStart + remaining : 0;
+    }
+    const authorizedUntil = expiresAt;
+    goalActive = goalAllowed && focused && remaining > 0;
+    if (remaining > 0) sessionDate = date;
+    if (!restart && expiresAt) remaining = Core.asMilliseconds(Math.min(remaining, Math.max(0, expiresAt - now)));
+    let rules = /** @type {AccessDecision['rules']} */ ('none'),
+      alarmAt = 0,
+      expire = false;
+    if (goalAllowed || remaining > 0) {
+      expiresAt = !goalAllowed && focused ? now + remaining : 0;
+      rules = 'session';
+      alarmAt = expiresAt;
+    } else {
+      expire = hadSession || facts.closeAll || facts.hasRules;
+      expiresAt = null;
+      remaining = null;
+    }
+    const window =
+      facts.hasWindows || refilledAt > 0 || expiresAt || goalAllowed
+        ? {
+            start: windowStart,
+            end: goalAllowed
+              ? midnight
+              : remaining > 0 && !expiresAt
+                ? Number.MAX_SAFE_INTEGER
+                : expiresAt || Math.min(now, authorizedUntil || now)
+          }
+        : null;
+    const next =
+      state?.phase === 'request'
+        ? state
+        : budget === null ||
+            (remaining === null && expiresAt === null && refilledAt === null && sessionDate === null && !goalActive)
+          ? null
+          : /** @type {AccessSession} */ ({
+              phase: 'session',
+              remainingMs: remaining,
+              expiresAt,
+              refilledAt,
+              date: sessionDate,
+              goalActive
+            });
+    return { state: next, rules, alarmAt, expire, window, clearWindows: false };
+  }
   return {
+    reconcileSiteAccess,
     siteAccessFromStored,
     storedFromSiteAccess,
     waitDuration,

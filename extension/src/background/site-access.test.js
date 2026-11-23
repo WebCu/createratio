@@ -145,3 +145,168 @@ test('a live legacy deadline is migrated before a wait is considered', () => {
     session({ remainingMs: 60000, expiresAt: now + 60000 })
   );
 });
+
+const dayStart = new Date(2026, 0, 15).getTime();
+const midnight = new Date(2026, 0, 16).getTime();
+const refilled = now - 60000;
+const facts = changes => ({
+  now,
+  date: today,
+  dayStart,
+  midnight,
+  restart: false,
+  enabled: true,
+  goalAllowed: false,
+  focused: false,
+  accessMinutes: 5,
+  hasRules: false,
+  hasWindows: false,
+  closeAll: false,
+  ...changes
+});
+const decision = changes => ({
+  rules: 'none',
+  alarmAt: 0,
+  expire: false,
+  window: null,
+  clearWindows: false,
+  ...changes
+});
+const paused = session({ remainingMs: 300000, expiresAt: 0, refilledAt: refilled, date: today });
+
+const cases = [
+  [
+    'Off site drops access and lifts blocking',
+    paused,
+    { enabled: false },
+    decision({ state: null, rules: 'unrestricted', clearWindows: true })
+  ],
+  [
+    'paused budget stays paused away from the site',
+    paused,
+    {},
+    decision({ state: paused, rules: 'session', window: { start: now, end: Number.MAX_SAFE_INTEGER } })
+  ],
+  [
+    'focused budget starts running with an expiry alarm',
+    paused,
+    { focused: true },
+    decision({
+      state: { ...paused, expiresAt: now + 300000 },
+      rules: 'session',
+      alarmAt: now + 300000,
+      window: { start: now, end: now + 300000 }
+    })
+  ],
+  [
+    'spent running budget expires and keeps refill eligibility',
+    session({ remainingMs: 1000, expiresAt: now - 1, refilledAt: refilled, date: today }),
+    {},
+    decision({
+      state: session({ refilledAt: refilled, date: today }),
+      expire: true,
+      window: { start: now, end: now - 1 }
+    })
+  ],
+  [
+    'midnight refill back-dates a paused budget window to midnight',
+    session({ remainingMs: 60000, expiresAt: 0, refilledAt: dayStart - 3600000, date: '2026-01-14' }),
+    {},
+    decision({
+      state: session({ remainingMs: 300000, expiresAt: 0, refilledAt: dayStart, date: today }),
+      rules: 'session',
+      window: { start: dayStart, end: Number.MAX_SAFE_INTEGER }
+    })
+  ],
+  [
+    'midnight refill after restart starts the window now',
+    session({ remainingMs: 60000, expiresAt: 0, refilledAt: dayStart - 3600000, date: '2026-01-14' }),
+    { restart: true },
+    decision({
+      state: session({ remainingMs: 300000, expiresAt: 0, refilledAt: dayStart, date: today }),
+      rules: 'session',
+      window: { start: now, end: Number.MAX_SAFE_INTEGER }
+    })
+  ],
+  [
+    'budget running at midnight is refilled and spent by noon',
+    session({ remainingMs: 60000, expiresAt: dayStart + 30000, refilledAt: dayStart - 3600000, date: '2026-01-14' }),
+    {},
+    decision({
+      state: session({ refilledAt: dayStart, date: today }),
+      expire: true,
+      window: { start: dayStart, end: dayStart + 300000 }
+    })
+  ],
+  [
+    'restart keeps a running budget and restarts its clock',
+    session({ remainingMs: 300000, expiresAt: now + 100000, refilledAt: refilled, date: today }),
+    { restart: true, focused: true },
+    decision({
+      state: session({ remainingMs: 300000, expiresAt: now + 300000, refilledAt: refilled, date: today }),
+      rules: 'session',
+      alarmAt: now + 300000,
+      window: { start: now, end: now + 300000 }
+    })
+  ],
+  [
+    'above goal without an entry grants access but stores nothing',
+    null,
+    { goalAllowed: true, focused: true },
+    decision({ state: null, rules: 'session', window: { start: now, end: midnight } })
+  ],
+  [
+    'above goal marks a focused budget as goal-active',
+    paused,
+    { goalAllowed: true, focused: true },
+    decision({ state: { ...paused, goalActive: true }, rules: 'session', window: { start: now, end: midnight } })
+  ],
+  [
+    'above goal stamps an exhausted session with a zero deadline',
+    session({ refilledAt: refilled, date: today }),
+    { goalAllowed: true },
+    decision({
+      state: session({ expiresAt: 0, refilledAt: refilled, date: today }),
+      rules: 'session',
+      window: { start: now, end: midnight }
+    })
+  ],
+  [
+    'legacy deadline becomes a paused budget',
+    session({ remainingMs: 60000, expiresAt: now + 60000 }),
+    {},
+    decision({ state: session({ remainingMs: 60000, expiresAt: 0, date: today }), rules: 'session' })
+  ],
+  [
+    'above goal keeps a pending request as a request',
+    request({ readyAt: now + 30000, waitMs: 300000 }),
+    { goalAllowed: true },
+    decision({
+      state: request({ readyAt: now + 30000, waitMs: 300000 }),
+      rules: 'session',
+      window: { start: now, end: midnight }
+    })
+  ],
+  [
+    'waiting request is left alone',
+    request({ readyAt: now + 30000, waitMs: 300000 }),
+    {},
+    decision({ state: request({ readyAt: now + 30000, waitMs: 300000 }) })
+  ],
+  [
+    'closing all expires a waiting request',
+    request({ readyAt: now + 30000, waitMs: 300000 }),
+    { closeAll: true },
+    decision({ state: request({ readyAt: now + 30000, waitMs: 300000 }), expire: true })
+  ],
+  ['leftover session rules without access expire', null, { hasRules: true }, decision({ state: null, expire: true })]
+];
+
+for (const [name, state, changes, expected] of cases)
+  test(`reconcile: ${name}`, () => assert.deepEqual(M.reconcileSiteAccess(state, facts(changes)), expected));
+
+test('reconcile never mutates its input', () => {
+  const input = structuredClone(paused);
+  M.reconcileSiteAccess(input, facts({ focused: true }));
+  assert.deepEqual(input, paused);
+});

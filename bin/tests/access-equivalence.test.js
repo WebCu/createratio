@@ -102,6 +102,6 @@ test('equivalence compares stored access by meaning and still detects a changed 
     path.join(candidate, 'site-access.js')
   );
   await compare(baseline, candidate);
-  await mutate(candidate, 'entry.refilledAt = dayStart;', 'entry.refilledAt = dayStart + 1;');
+  await mutate(candidate, 'refilledAt = dayStart;', 'refilledAt = dayStart + 1;');
   await assert.rejects(compare(baseline, candidate), /lifecycle/);
 });

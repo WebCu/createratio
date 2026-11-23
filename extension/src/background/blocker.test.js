@@ -7,7 +7,6 @@ const vm = require('node:vm');
 const C = require('../../core/core.js');
 const Sites = require('../../sites/index.js');
 const MessageContracts = require('./message-contracts.js');
-const SiteAccessModel = require('./site-access.js');
 const { worker, gate, intent, popupSender, rulesFor } = require('../tests/background-harness.js');
 const now = new Date(2026, 9, 11, 12).getTime();
 
@@ -107,10 +106,10 @@ function blocker(data = {}, browser = 'chrome', core = C) {
     Core: core,
     Sites,
     MessageContracts,
-    SiteAccessModel,
     URL,
     Date: Clock
   });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'site-access.js'), 'utf8'), context);
   vm.runInContext(
     fs.readFileSync(path.join(__dirname, 'blocker.js'), 'utf8') + '\n globalThis.access = SiteAccess;',
     context
@@ -628,7 +627,7 @@ test('restored waits cannot have more time remaining than their original validat
       const w = worker({ _access: { x: entry } }, browser, now);
       const rejected = (await w.send({ type: 'access-status' })).access.x;
       assert.equal(rejected.readyAt, 0);
-      assert.equal(w.data._access.x.waitMs, undefined);
+      assert.equal(w.data._access.x?.waitMs, undefined);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       const boundary = worker({ _access: { x: { ...entry, readyAt: now + duration } } }, browser, now);
       const pending = (await boundary.send({ type: 'access-status' })).access.x;
