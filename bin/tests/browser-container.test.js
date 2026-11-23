@@ -66,7 +66,7 @@ test('the wrapper runs as the host user and prepares a writable output folder', 
   assert.ok(fs.statSync(output).isDirectory());
 });
 
-test('as root, the wrapper gives a new output folder to the image user and refuses an existing one it cannot write', t => {
+test('as root, the wrapper gives a new output folder to the image user and leaves the write check of an existing one to the container', t => {
   assert.match(dockerfile, /^USER node$/m, 'the node image user has user ID 1000');
   const base = scratch(t);
   const calls = [];
@@ -74,13 +74,10 @@ test('as root, the wrapper gives a new output folder to the image user and refus
   const fresh = path.join(base, 'fresh/container');
   prepareOutput(fresh, { uid: 0, chown });
   assert.deepEqual(calls, [[fresh, 1000, 1000]]);
-  const locked = path.join(base, 'locked');
-  fs.mkdirSync(locked, { mode: 0o755 });
-  assert.throws(() => prepareOutput(locked, { uid: 0, chown }), /image user 1000[^\n]+chown 1000:1000/);
-  const open = path.join(base, 'open');
-  fs.mkdirSync(open);
-  fs.chmodSync(open, 0o777);
-  assert.equal(prepareOutput(open, { uid: 0, chown }), open);
+  const existing = path.join(base, 'existing');
+  fs.mkdirSync(existing);
+  fs.chmodSync(existing, 0o770);
+  assert.equal(prepareOutput(existing, { uid: 0, chown }), existing, 'group access can grant the image user write access');
   assert.equal(calls.length, 1, 'existing folders keep their owner');
 });
 
@@ -131,6 +128,7 @@ test('the container entry refuses an unwritable output folder before running any
   fs.mkdirSync(dirs.output, { mode: 0o500 });
   const result = run('sh', '-c', 'touch ran');
   assert.equal(result.status, 4);
+  assert.match(result.stderr, new RegExp(`not writable by user ID ${process.getuid()}`));
   assert.equal(fs.existsSync(path.join(dirs.work, 'ran')), false);
 });
 

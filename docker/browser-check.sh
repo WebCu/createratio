@@ -14,7 +14,8 @@ if [ "$#" -eq 0 ] || [ -t 0 ]; then
 fi
 
 if [ -d "$output_dir" ] && [ ! -w "$output_dir" ]; then
-  echo "$output_dir is not writable, so browser evidence cannot be exported." >&2
+  echo "$output_dir is not writable by user ID $(id -u), so browser evidence cannot be exported." >&2
+  echo "Make dist/container writable by that user, or remove it so the wrapper creates it." >&2
   exit 4
 fi
 

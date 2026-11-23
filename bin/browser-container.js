@@ -25,10 +25,6 @@ function prepareOutput(directory = path.join(root, 'dist/container'), { uid = pr
   fs.mkdirSync(directory, { recursive: true });
   if (uid === 0) {
     if (created) chown(directory, imageUser, imageUser);
-    const stat = fs.statSync(directory);
-    if (!created && stat.uid !== imageUser && (stat.mode & 0o002) === 0) {
-      throw new Error(`As root, the container runs as the image user ${imageUser}, which cannot write ${directory}. Run: chown ${imageUser}:${imageUser} ${directory}`);
-    }
     return directory;
   }
   try {
