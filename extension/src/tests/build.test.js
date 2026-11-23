@@ -269,7 +269,7 @@ test('new gated and tracking-only modules need only site files and catalog regis
   })(globalThis);`);
   const catalogPath = path.join(extension, 'sites/index.js');
   const catalog = await fs.readFile(catalogPath, 'utf8');
-  await fs.writeFile(catalogPath, catalog.replace(/const catalog = (\[[^\n]+\]);/, (_, entries) => "const catalog = " + entries.slice(0, -1) + ", { id: 'example' }, { id: 'reading' }];"));
+  await fs.writeFile(catalogPath, catalog.replace(/const catalog = (\[[^;]+\]);/, (_, entries) => "const catalog = " + entries.slice(0, -1) + ", { id: 'example' }, { id: 'reading' }];"));
   const { build: fixtureBuild } = require(path.join(extension, 'build.js'));
   for (const browser of BROWSERS) {
     const output = await fixtureBuild(browser, path.join(root, 'output'));

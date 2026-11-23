@@ -104,5 +104,5 @@ test('navigation is immediate without an animated fill and cancellation never pr
 
 test('reduced motion keeps the refill announcement but disables both animations', () => {
   const css = fs.readFileSync(path.join(__dirname, 'refill.css'), 'utf8');
-  assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.refill-notice,\.refill-fill\{animation:none\}\}/);
+  assert.match(css.replace(/\s+/g, ''), /@media\(prefers-reduced-motion:reduce\)\{\.refill-notice,\.refill-fill\{animation:none;?\}\}/);
 });
