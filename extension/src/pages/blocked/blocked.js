@@ -226,6 +226,6 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(render, 1000);
 setInterval(() => {
-  if (!document.hidden) void refresh();
+  if (!document.hidden) return refresh();
 }, 5000);
 void refresh();
