@@ -60,6 +60,27 @@ for (const browser of ['chrome', 'browser']) {
     });
   }
 
+  test(`${browser}: an access session counts down and expires in a focused popup window`, async () => {
+    const w = worker({}, browser, start);
+    await unlock(w);
+    const url = 'https://x.com/home';
+    w.tabs.push({ id: 1, url });
+    w.activate(url, 1, 'popup');
+    assert.equal((await status(w)).x.expiresAt, w.now + 300000);
+    assert.equal(w.alarms['access-x'].when, w.now + 300000);
+    w.advance(15000);
+    w.blur();
+    assert.equal((await status(w)).x.remainingMs, 285000);
+    w.advance(30000);
+    assert.equal((await status(w)).x.remainingMs, 285000);
+    w.activate(url, 1, 'popup');
+    await status(w);
+    w.advance(285000);
+    w.alarm('access-x');
+    assert.equal((await status(w)).x.remainingMs, 0);
+    assert.equal(w.tabs[0].url, gate('x').url);
+  });
+
   test(`${browser}: a completed wait stays ready after a long absence without unlocking the site`, async () => {
     const first = worker({}, browser, start);
     const { access } = await first.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));

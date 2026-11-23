@@ -189,7 +189,9 @@ const SiteAccess = (() => {
     const midnight = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate() + 1).getTime();
     const window = await api.windows.getLastFocused();
     const [tab] =
-      window.focused && window.type === 'normal' ? await api.tabs.query({ active: true, windowId: window.id }) : [];
+      window.focused && (window.type === 'normal' || window.type === 'popup')
+        ? await api.tabs.query({ active: true, windowId: window.id })
+        : [];
     const activeSite = siteForURL(tab?.url);
     const rules = [],
       expired = [];

@@ -22,6 +22,7 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
   let failWrites = false,
     failRemove = false;
   let focused = false,
+    windowType = 'normal',
     activeTab = null;
   const event = name => ({
     addListener(fn) {
@@ -90,7 +91,7 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
     },
     windows: {
       async getLastFocused() {
-        return { id: 1, focused, type: 'normal' };
+        return { id: 1, focused, type: windowType };
       },
       onFocusChanged: event('focus')
     },
@@ -233,8 +234,9 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
     set failRemove(value) {
       failRemove = value;
     },
-    activate(url, id = 1) {
+    activate(url, id = 1, type = 'normal') {
       focused = true;
+      windowType = type;
       activeTab = { id, url };
       for (const fn of events.activate || []) fn({ tabId: id, windowId: 1 });
     },
