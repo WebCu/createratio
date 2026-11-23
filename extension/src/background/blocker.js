@@ -1,32 +1,89 @@
 'use strict';
+/** @type {SiteAccessApi} */
 const SiteAccess = (() => {
-  const MAX_BUDGET_MS = C3.ACCESS_LIMITS.maxMinutes * 60000;
-  function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
-  function accessState(value) { return record(value) ? value : {}; }
+  const MAX_BUDGET_MS = Core.millisecondsFromMinutes(Core.ACCESS_LIMITS.maxMinutes);
+  function record(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+  function accessState(value) {
+    return record(value) ? value : {};
+  }
   function validSession(entry, now) {
-    return record(entry) && (!Object.hasOwn(entry, 'date') || C3.validLocalDate(entry.date))
-      && ['remainingMs', 'expiresAt', 'refilledAt'].every(field => !Object.hasOwn(entry, field) || Number.isFinite(entry[field]) && entry[field] >= 0)
-      && (!Object.hasOwn(entry, 'remainingMs') || entry.remainingMs <= MAX_BUDGET_MS)
-      && (Object.hasOwn(entry, 'remainingMs') || !Object.hasOwn(entry, 'expiresAt') || entry.expiresAt - now <= MAX_BUDGET_MS);
+    return (
+      record(entry) &&
+      (!Object.hasOwn(entry, 'date') || Core.validLocalDate(entry.date)) &&
+      ['remainingMs', 'expiresAt', 'refilledAt'].every(
+        field => !Object.hasOwn(entry, field) || (Number.isFinite(entry[field]) && entry[field] >= 0)
+      ) &&
+      (!Object.hasOwn(entry, 'remainingMs') || entry.remainingMs <= MAX_BUDGET_MS) &&
+      (Object.hasOwn(entry, 'remainingMs') ||
+        !Object.hasOwn(entry, 'expiresAt') ||
+        entry.expiresAt - now <= MAX_BUDGET_MS)
+    );
   }
   function savedIntentions(value) {
     if (!Array.isArray(value)) return [];
-    return value.filter(entry => record(entry) && typeof entry.site === 'string' && /^[a-z][a-z0-9_-]*$/.test(entry.site) && typeof entry.reason === 'string' && entry.reason.trim().length > 0 && entry.reason.length <= C3.INTENTION_LIMITS.maxLength && Number.isFinite(entry.requestedAt) && entry.requestedAt >= 0);
+    return value.filter(
+      entry =>
+        record(entry) &&
+        typeof entry.site === 'string' &&
+        /^[a-z][a-z0-9_-]*$/.test(entry.site) &&
+        typeof entry.reason === 'string' &&
+        entry.reason.trim().length > 0 &&
+        entry.reason.length <= Core.INTENTION_LIMITS.maxLength &&
+        Number.isFinite(entry.requestedAt) &&
+        entry.requestedAt >= 0
+    );
   }
-  const SITES = Object.fromEntries(C3Sites.sites.filter(site => site.gated).map(site => [site.id, { name: site.name, ...C3Sites.get(site.id).access }]));
+  const SITES = Object.fromEntries(
+    Sites.sites.filter(site => site.gated).map(site => [site.id, { name: site.name, ...Sites.get(site.id).access }])
+  );
   const api = globalThis.browser || globalThis.chrome;
-  const contracts = MessageContracts.create(C3, api.runtime, C3Sites);
-  function siteForURL(raw) { return C3Sites.forAccessURL(raw)?.id || null; }
-  function gateURL(site) { return api.runtime.getURL('blocked.html') + '?site=' + site; }
-  function ruleIds(site) { return SITES[site].ruleIds; }
-  function waitDurationMs(entry) { return Number.isFinite(entry.waitMs) && C3.validAccessMinutes(entry.waitMs / 60000) ? entry.waitMs : 60000; }
-  function status(site, entry = {}, now = Date.now(), minutes = C3.DEFAULT_SETTINGS.accessMinutes, enabled = true, goalAllowed = false, waitMinutes = C3.DEFAULT_SETTINGS.waitMinutes) {
+  const contracts = MessageContracts.create(Core, api.runtime, Sites);
+  function siteForURL(raw) {
+    return Sites.forAccessURL(raw)?.id || null;
+  }
+  function gateURL(site) {
+    return api.runtime.getURL('blocked.html') + '?site=' + site;
+  }
+  function ruleIds(site) {
+    return SITES[site].ruleIds;
+  }
+  function waitDurationMs(entry) {
+    const wait = Core.asMilliseconds(entry.waitMs);
+    return Number.isFinite(wait) && Core.validAccessMinutes(Core.minutesFromMilliseconds(wait))
+      ? wait
+      : Core.millisecondsFromMinutes(Core.ACCESS_LIMITS.minMinutes);
+  }
+  function status(
+    site,
+    entry = {},
+    now = Date.now(),
+    minutes = Core.DEFAULT_SETTINGS.accessMinutes,
+    enabled = true,
+    goalAllowed = false,
+    waitMinutes = Core.DEFAULT_SETTINGS.waitMinutes
+  ) {
     if (!Object.hasOwn(SITES, site)) throw new Error('Unsupported site');
-    const remainingMs = Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0;
+    const remainingMs = Core.asMilliseconds(Number.isFinite(entry.remainingMs) ? Math.max(0, entry.remainingMs) : 0);
     const expiresAt = remainingMs && entry.expiresAt > now ? entry.expiresAt : 0;
     const readyAt = !remainingMs && validWait(entry, now) ? entry.readyAt : 0;
-    const waitSeconds = readyAt ? waitDurationMs(entry) / 1000 : waitMinutes * 60;
-    return { site, enabled, goalAllowed: enabled && goalAllowed, name: SITES[site].name, home: SITES[site].home, remainingMs, expiresAt, readyAt, refilledAt: entry.refilledAt || 0, waitSeconds, sessionMinutes: minutes };
+    const waitSeconds = readyAt
+      ? Core.secondsFromMilliseconds(waitDurationMs(entry))
+      : Core.secondsFromMinutes(waitMinutes);
+    return {
+      site,
+      enabled,
+      goalAllowed: enabled && goalAllowed,
+      name: SITES[site].name,
+      home: SITES[site].home,
+      remainingMs,
+      expiresAt,
+      readyAt,
+      refilledAt: entry.refilledAt || 0,
+      waitSeconds,
+      sessionMinutes: minutes
+    };
   }
   function validWait(entry, now) {
     return Number.isFinite(entry.readyAt) && entry.readyAt > 0 && entry.readyAt <= now + waitDurationMs(entry);
@@ -34,39 +91,54 @@ const SiteAccess = (() => {
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
     const tabs = await api.tabs.query({ url: patterns });
-    await Promise.all(tabs.filter(tab => siteForURL(tab.url) === site).map(tab => api.tabs.update(tab.id, { url: gateURL(site) }).catch(() => {})));
+    await Promise.all(
+      tabs
+        .filter(tab => siteForURL(tab.url) === site)
+        .map(tab => api.tabs.update(tab.id, { url: gateURL(site) }).catch(() => {}))
+    );
   }
   async function reconcile(closeAll = false) {
     const restart = !(await api.storage.session.get('_accessInitialized'))._accessInitialized;
-    const now = Date.now(), clock = new Date(now), date = C3.localDate(clock);
-    const stored = await api.storage.local.get(['_access', 'settings', date]);
-    const goalAllowed = stored.settings?.allowAboveGoal === true && C3.score(C3.aggregate(stored[date])) > C3.dailyTarget(stored.settings);
+    const now = Date.now(),
+      clock = new Date(now),
+      date = Core.localDate(clock);
+    const stored = /** @type {StoredData} */ (await api.storage.local.get(['_access', 'settings', date]));
+    const goalAllowed =
+      stored.settings?.allowAboveGoal === true &&
+      Core.score(Core.aggregate(stored[date])) > Core.dailyTarget(stored.settings);
     const current = await api.declarativeNetRequest.getSessionRules();
-    const access = accessState(stored._access), original = JSON.stringify(stored._access === undefined ? {} : stored._access);
+    const access = accessState(stored._access),
+      original = JSON.stringify(stored._access === undefined ? {} : stored._access);
     const dayStart = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate()).getTime();
     const midnight = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate() + 1).getTime();
     const window = await api.windows.getLastFocused();
-    const [tab] = window.focused && window.type === 'normal' ? await api.tabs.query({ active: true, windowId: window.id }) : [];
+    const [tab] =
+      window.focused && window.type === 'normal' ? await api.tabs.query({ active: true, windowId: window.id }) : [];
     const activeSite = siteForURL(tab?.url);
-    const rules = [], expired = [];
+    const rules = [],
+      expired = [];
     for (const [site, definition] of Object.entries(SITES)) {
-      if (!C3.trackingEnabled(site, stored.settings)) {
+      if (!Core.trackingEnabled(site, stored.settings)) {
         rules.push(...definition.unrestrictedRules);
-        delete access[site]; await api.alarms.clear('access-' + site);
+        delete access[site];
+        await api.alarms.clear('access-' + site);
         continue;
       }
       if (Object.hasOwn(access, site) && !validSession(access[site], now)) delete access[site];
-      const entry = access[site] || {}, minutes = C3.siteSettings(site, stored.settings).accessMinutes;
+      const entry = access[site] || {},
+        minutes = Core.siteSettings(site, stored.settings).accessMinutes;
       const hadSession = Number.isFinite(entry.remainingMs) || Number.isFinite(entry.expiresAt);
-      if (!Number.isFinite(entry.remainingMs) && Number.isFinite(entry.expiresAt)) entry.remainingMs = Math.max(0, entry.expiresAt - now);
+      if (!Number.isFinite(entry.remainingMs) && Number.isFinite(entry.expiresAt))
+        entry.remainingMs = Math.max(0, entry.expiresAt - now);
       if (entry.date && entry.date !== date) {
         const runningAtMidnight = !restart && entry.expiresAt >= dayStart;
-        entry.remainingMs = minutes * 60000;
+        entry.remainingMs = Core.millisecondsFromMinutes(minutes);
         entry.refilledAt = dayStart;
         entry.expiresAt = runningAtMidnight ? dayStart + entry.remainingMs : 0;
       }
       if (entry.remainingMs > 0) entry.date = date;
-      if (!restart && entry.expiresAt) entry.remainingMs = Math.min(entry.remainingMs, Math.max(0, entry.expiresAt - now));
+      if (!restart && entry.expiresAt)
+        entry.remainingMs = Math.min(entry.remainingMs, Math.max(0, entry.expiresAt - now));
       if (goalAllowed || entry.remainingMs > 0) {
         entry.expiresAt = !goalAllowed && activeSite === site ? now + entry.remainingMs : 0;
         rules.push(...definition.sessionRules);
@@ -78,26 +150,60 @@ const SiteAccess = (() => {
         delete entry.remainingMs;
         await api.alarms.clear('access-' + site);
       }
-      if (!validWait(entry, now)) { delete entry.readyAt; delete entry.waitMs; }
+      if (!validWait(entry, now)) {
+        delete entry.readyAt;
+        delete entry.waitMs;
+      }
     }
-    const keys = list => list.map(rule => JSON.stringify([rule.id, rule.priority, rule.action.type, [...rule.condition.requestDomains].sort(), [...(rule.condition.initiatorDomains || [])].sort(), [...(rule.condition.resourceTypes || [])].sort(), [...(rule.condition.excludedResourceTypes || [])].sort()])).sort();
-    if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules))) await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: Object.keys(SITES).flatMap(ruleIds), addRules: rules });
+    const keys = list =>
+      list
+        .map(rule =>
+          JSON.stringify([
+            rule.id,
+            rule.priority,
+            rule.action.type,
+            [...rule.condition.requestDomains].sort(),
+            [...(rule.condition.initiatorDomains || [])].sort(),
+            [...(rule.condition.resourceTypes || [])].sort(),
+            [...(rule.condition.excludedResourceTypes || [])].sort()
+          ])
+        )
+        .sort();
+    if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules)))
+      await api.declarativeNetRequest.updateSessionRules({
+        removeRuleIds: Object.keys(SITES).flatMap(ruleIds),
+        addRules: rules
+      });
     if (JSON.stringify(access) !== original) await api.storage.local.set({ _access: access });
-    if (Object.keys(SITES).some(site => access[site]?.date)) await api.alarms.create('access-midnight', { when: midnight });
+    if (Object.keys(SITES).some(site => access[site]?.date))
+      await api.alarms.create('access-midnight', { when: midnight });
     else await api.alarms.clear('access-midnight');
     await Promise.all(expired.map(closeTabs));
     if (restart) await api.storage.session.set({ _accessInitialized: true });
-    return Object.fromEntries(Object.keys(SITES).map(site => [site, status(site, access[site], now, C3.siteSettings(site, stored.settings).accessMinutes, C3.trackingEnabled(site, stored.settings), goalAllowed, C3.siteSettings(site, stored.settings).waitMinutes)]));
+    return Object.fromEntries(
+      Object.keys(SITES).map(site => [
+        site,
+        status(
+          site,
+          access[site],
+          now,
+          Core.siteSettings(site, stored.settings).accessMinutes,
+          Core.trackingEnabled(site, stored.settings),
+          goalAllowed,
+          Core.siteSettings(site, stored.settings).waitMinutes
+        )
+      ])
+    );
   }
   async function setGoalAccess(message, sender) {
     contracts.preferences(message, sender);
-    const stored = await api.storage.local.get('settings');
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
     await api.storage.local.set({ settings: { ...stored.settings, allowAboveGoal: message.enabled } });
     return { ok: true, access: await reconcile() };
   }
   async function setIntentionHistory(message, sender) {
     contracts.preferences(message, sender);
-    const stored = await api.storage.local.get('settings');
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
     await api.storage.local.set({ settings: { ...stored.settings, intentionHistoryEnabled: message.enabled } });
     return { ok: true };
   }
@@ -112,22 +218,28 @@ const SiteAccess = (() => {
   }
   async function setDuration(message, sender) {
     contracts.preferences(message, sender);
-    const stored = await api.storage.local.get('settings');
-    const settings = C3.updatePreferences(stored.settings, { [message.preference || 'accessMinutes']: message.minutes }, message.site);
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
+    const settings = Core.updatePreferences(
+      stored.settings,
+      { [message.preference || 'accessMinutes']: message.minutes },
+      message.site
+    );
     await api.storage.local.set({ settings });
     return { ok: true, access: await reconcile() };
   }
   async function setTracking(message, sender) {
     contracts.preferences(message, sender);
-    const stored = await api.storage.local.get('settings');
-    const settings = { ...C3.DEFAULT_SETTINGS, ...stored.settings };
-    const enabled = new Set(C3.settingsSnapshot(stored.settings).trackedSites);
-    if (message.enabled) enabled.add(message.site); else enabled.delete(message.site);
-    settings.trackedSites = C3.SITES.filter(site => enabled.has(site.id)).map(site => site.id);
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
+    const settings = { ...Core.DEFAULT_SETTINGS, ...stored.settings };
+    const enabled = new Set(Core.settingsSnapshot(stored.settings).trackedSites);
+    if (message.enabled) enabled.add(message.site);
+    else enabled.delete(message.site);
+    settings.trackedSites = Core.SITES.filter(site => enabled.has(site.id)).map(site => site.id);
     await api.storage.local.set({ settings });
-    try { await reconcile(true); }
-    catch (error) {
-      await api.storage.local.set({ settings: stored.settings || C3.DEFAULT_SETTINGS });
+    try {
+      await reconcile(true);
+    } catch (error) {
+      await api.storage.local.set({ settings: stored.settings || Core.DEFAULT_SETTINGS });
       await reconcile().catch(() => {});
       throw error;
     }
@@ -135,23 +247,33 @@ const SiteAccess = (() => {
   }
   async function readAccessStatus() {
     const access = await reconcile();
-    const stored = await api.storage.local.get('settings');
+    const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
     return { ok: true, access, intentionHistoryEnabled: stored.settings?.intentionHistoryEnabled === true };
   }
   async function beginWait(message, state, stored, now) {
-    if (!C3.validIntention(message.reason)) return { ok: false, error: `Write a specific intention of ${C3.INTENTION_LIMITS.minLength}–${C3.INTENTION_LIMITS.maxLength} characters.` };
+    if (!Core.validIntention(message.reason))
+      return {
+        ok: false,
+        error: `Write a specific intention of ${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters.`
+      };
     if (state.remainingMs || state.readyAt) return;
-    const site = message.site, access = accessState(stored._access);
-    const waitMs = C3.siteSettings(site, stored.settings).waitMinutes * 60000;
+    const site = message.site,
+      access = accessState(stored._access);
+    const waitMs = Core.millisecondsFromMinutes(Core.siteSettings(site, stored.settings).waitMinutes);
     access[site] = { readyAt: now + waitMs, waitMs };
     const changes = { _access: access };
-    if (stored.settings?.intentionHistoryEnabled === true) changes._intentions = [...savedIntentions(stored._intentions), { site, reason: message.reason.trim(), requestedAt: now }].slice(-100);
+    if (stored.settings?.intentionHistoryEnabled === true)
+      changes._intentions = [
+        ...savedIntentions(stored._intentions),
+        { site, reason: message.reason.trim(), requestedAt: now }
+      ].slice(-100);
     await api.storage.local.set(changes);
   }
   async function confirmAccess(site, state, access, now) {
     const entry = access[site] || {};
-    if (!state.readyAt || now < entry.readyAt) throw MessageContracts.refuse('Finish the waiting period before opening the site.');
-    access[site] = { remainingMs: state.sessionMinutes * 60000, expiresAt: 0, refilledAt: now };
+    if (!state.readyAt || now < entry.readyAt)
+      throw MessageContracts.refuse('Finish the waiting period before opening the site.');
+    access[site] = { remainingMs: Core.millisecondsFromMinutes(state.sessionMinutes), expiresAt: 0, refilledAt: now };
     await api.storage.local.set({ _access: access });
   }
   async function cancelWait(site, state, access) {
@@ -169,13 +291,21 @@ const SiteAccess = (() => {
   async function handleSession(message, sender) {
     const statuses = await reconcile();
     contracts.session(message, sender);
-    const site = message.site, state = statuses[site];
-    if (state.enabled === false && ['access-begin', 'access-open', 'access-cancel', 'access-end'].includes(message.type)) return { ok: true, access: statuses };
+    const site = message.site,
+      state = statuses[site];
+    if (
+      state.enabled === false &&
+      ['access-begin', 'access-open', 'access-cancel', 'access-end'].includes(message.type)
+    )
+      return { ok: true, access: statuses };
     if (state.goalAllowed) {
-      if (message.type === 'access-end') throw MessageContracts.refuse('Turn off goal-based access in Settings to block sites above the goal.');
+      if (message.type === 'access-end')
+        throw MessageContracts.refuse('Turn off goal-based access in Settings to block sites above the goal.');
       if (['access-open', 'access-begin'].includes(message.type)) return { ok: true, access: statuses };
     }
-    const stored = await api.storage.local.get(['_access', 'settings', '_intentions']), access = accessState(stored._access), now = Date.now();
+    const stored = /** @type {StoredData} */ (await api.storage.local.get(['_access', 'settings', '_intentions'])),
+      access = accessState(stored._access),
+      now = Date.now();
     switch (message.type) {
       case 'access-begin': {
         const rejection = await beginWait(message, state, stored, now);
@@ -192,20 +322,28 @@ const SiteAccess = (() => {
       case 'access-end':
         await endAccess(site, access);
         break;
-      default: throw MessageContracts.refuse('Unknown access message');
+      default:
+        throw MessageContracts.refuse('Unknown access message');
     }
     return { ok: true, access: await reconcile() };
   }
   async function handle(message, sender) {
     switch (message.type) {
-      case 'tracking': return setTracking(message, sender);
-      case 'access-goal-setting': return setGoalAccess(message, sender);
-      case 'access-history-setting': return setIntentionHistory(message, sender);
+      case 'tracking':
+        return setTracking(message, sender);
+      case 'access-goal-setting':
+        return setGoalAccess(message, sender);
+      case 'access-history-setting':
+        return setIntentionHistory(message, sender);
       case 'access-history-clear':
-      case 'access-history-list': return manageIntentions(message, sender);
-      case 'access-duration': return setDuration(message, sender);
-      case 'access-status': return readAccessStatus();
-      default: return handleSession(message, sender);
+      case 'access-history-list':
+        return manageIntentions(message, sender);
+      case 'access-duration':
+        return setDuration(message, sender);
+      case 'access-status':
+        return readAccessStatus();
+      default:
+        return handleSession(message, sender);
     }
   }
   return { handle, reconcile, siteForURL, gateURL };

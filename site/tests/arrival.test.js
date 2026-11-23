@@ -144,7 +144,9 @@ function harness({ reduced = false, supportsMask = true, compact = false, hash =
   const hintEvents = {};
   const scrollHint = {
     hidden: false,
-    addEventListener(name, fn) { hintEvents[name] = fn; }
+    addEventListener(name, fn) {
+      hintEvents[name] = fn;
+    }
   };
   const windowEvents = {};
   const documentEvents = {};
@@ -155,19 +157,35 @@ function harness({ reduced = false, supportsMask = true, compact = false, hash =
   let nextFrame = 1;
   let motionChange;
   const classList = values => ({
-    toggle(name, enabled) { if (enabled) values.add(name); else values.delete(name); },
-    remove(name) { values.delete(name); }
+    toggle(name, enabled) {
+      if (enabled) values.add(name);
+      else values.delete(name);
+    },
+    remove(name) {
+      values.delete(name);
+    }
   });
   const window = {
-    scrollY, innerWidth: 1280, location: { hash },
+    scrollY,
+    innerWidth: 1280,
+    location: { hash },
     matchMedia: () => motion,
-    getComputedStyle: () => ({ getPropertyValue: name => name === '--arrival-layout' && compact ? 'compact' : '' }),
-    addEventListener(name, fn, options) { windowEvents[name] = { fn, options }; },
-    scrollTo(options) { scrolls.push(options); window.scrollY = options.top; windowEvents.scroll.fn(); }
+    getComputedStyle: () => ({ getPropertyValue: name => (name === '--arrival-layout' && compact ? 'compact' : '') }),
+    addEventListener(name, fn, options) {
+      windowEvents[name] = { fn, options };
+    },
+    scrollTo(options) {
+      scrolls.push(options);
+      window.scrollY = options.top;
+      windowEvents.scroll.fn();
+    }
   };
   const motion = {
     matches: reduced,
-    addEventListener(name, fn) { assert.equal(name, 'change'); motionChange = fn; }
+    addEventListener(name, fn) {
+      assert.equal(name, 'change');
+      motionChange = fn;
+    }
   };
   const arrival = {
     offsetHeight: 1188,
@@ -192,20 +210,41 @@ function harness({ reduced = false, supportsMask = true, compact = false, hash =
   const focusCalls = [];
   const main = {
     scrollIntoView: anchor.scrollIntoView,
-    focus(options) { focusCalls.push(options); documentEvents.focusin({ target: main }); }
+    focus(options) {
+      focusCalls.push(options);
+      documentEvents.focusin({ target: main });
+    }
   };
   const document = {
     documentElement: { classList: classList(classes) },
-    querySelector: selector => ({ '.arrival': arrival, '.arrival-stage': stage, '#your-space': space, '.scroll-hint': scrollHint })[selector],
-    getElementById: id => id === 'main' ? main : ['install', 'your-space'].includes(id) ? anchor : null,
-    addEventListener(name, fn) { documentEvents[name] = fn; }
+    querySelector: selector =>
+      ({ '.arrival': arrival, '.arrival-stage': stage, '#your-space': space, '.scroll-hint': scrollHint })[selector],
+    getElementById: id => (id === 'main' ? main : ['install', 'your-space'].includes(id) ? anchor : null),
+    addEventListener(name, fn) {
+      documentEvents[name] = fn;
+    }
   };
   vm.runInNewContext(source, {
-    window, document, CSS: { supports: () => supportsMask }, performance: { now: () => now },
-    requestAnimationFrame(fn) { const id = nextFrame++; frames.set(id, fn); return id; },
-    cancelAnimationFrame(id) { frames.delete(id); },
-    setTimeout(fn, delay) { const id = nextTimer++; timers.set(id, { fn, at: now + delay }); return id; },
-    clearTimeout(id) { timers.delete(id); }
+    window,
+    document,
+    CSS: { supports: () => supportsMask },
+    performance: { now: () => now },
+    requestAnimationFrame(fn) {
+      const id = nextFrame++;
+      frames.set(id, fn);
+      return id;
+    },
+    cancelAnimationFrame(id) {
+      frames.delete(id);
+    },
+    setTimeout(fn, delay) {
+      const id = nextTimer++;
+      timers.set(id, { fn, at: now + delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    }
   });
   function flush() {
     while (frames.size) {
@@ -214,12 +253,37 @@ function harness({ reduced = false, supportsMask = true, compact = false, hash =
       fn(now);
     }
   }
-  function scroll(top) { window.scrollY = top; windowEvents.scroll.fn(); }
+  function scroll(top) {
+    window.scrollY = top;
+    windowEvents.scroll.fn();
+  }
   return {
-    frames, windowEvents, documentEvents, classes, arrivalClasses, properties,
-    scrolls, window, arrival, stage, pageLink, anchorCalls, focusCalls, flush, scroll, scrollHint, timers,
+    frames,
+    windowEvents,
+    documentEvents,
+    classes,
+    arrivalClasses,
+    properties,
+    scrolls,
+    window,
+    arrival,
+    stage,
+    pageLink,
+    anchorCalls,
+    focusCalls,
+    flush,
+    scroll,
+    scrollHint,
+    timers,
     clickHint(options = {}) {
-      const event = { button: 0, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...options };
+      const event = {
+        button: 0,
+        defaultPrevented: false,
+        preventDefault() {
+          this.defaultPrevented = true;
+        },
+        ...options
+      };
       hintEvents.click(event);
       return event;
     },
@@ -232,11 +296,20 @@ function harness({ reduced = false, supportsMask = true, compact = false, hash =
     advance(milliseconds) {
       now += milliseconds;
       for (const [id, timer] of timers) {
-        if (timer.at <= now) { timers.delete(id); timer.fn(); }
+        if (timer.at <= now) {
+          timers.delete(id);
+          timer.fn();
+        }
       }
     },
-    changeMotion(value) { motion.matches = value; motionChange(); },
-    resizeCompact(value) { compact = value; windowEvents.resize.fn(); }
+    changeMotion(value) {
+      motion.matches = value;
+      motionChange();
+    },
+    resizeCompact(value) {
+      compact = value;
+      windowEvents.resize.fn();
+    }
   };
 }
 

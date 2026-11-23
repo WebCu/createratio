@@ -111,11 +111,24 @@ access code, Settings, and the build discover gate support through the catalog.
 
 ## Coding standards
 
+- **One code format, enforced by a tool.** Biome formats JavaScript, TypeScript
+  declarations, JSON, and CSS using `biome.json`. Run `pnpm format` before you
+  commit; `pnpm check:format` fails on unformatted files and runs first in
+  `pnpm check`. Do not adjust formatting by hand or argue style in reviews:
+  change `biome.json` in its own pull request instead. `.editorconfig` sets
+  indentation, line endings, and final newlines for every editor.
+  GitHub blame skips the reformat commit listed in `.git-blame-ignore-revs`;
+  run `git config blame.ignoreRevsFile .git-blame-ignore-revs` to skip it locally.
 - **Zero comments in code.** Do not add code comments, including inline,
   block, or documentation comments. Code must be self-explanatory through
   clear names, simple control flow, and small, focused functions. Refactor
   unclear code rather than explaining it with comments; put supporting
-  rationale in Markdown documentation.
+  rationale in Markdown documentation. The one exception is JSDoc type
+  annotations in files that `pnpm check:types` checks: `@type`, `@param`,
+  `@returns`, `@typedef`, `@template` and `@satisfies` tags with a type and
+  name only, no prose.
+  Prefer inferred types and add an annotation only where `pnpm check:types`
+  needs one.
 - **Keep documentation minimal, specific, and current.** Describe verified
   behavior and constraints, not past implementations or future plans. Keep
   internal review transcripts, account-specific infrastructure details, publisher

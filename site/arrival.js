@@ -25,7 +25,16 @@
   }
 
   function scrollThroughOpening(event) {
-    if (!enabled || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (
+      !enabled ||
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
     event.preventDefault();
     stopAutomaticScroll();
     const from = window.scrollY;
@@ -74,8 +83,10 @@
 
   function configure() {
     stopAutomaticScroll();
-    enabled = !reducedMotion.matches && supportsMask
-      && window.getComputedStyle(arrival).getPropertyValue('--arrival-layout').trim() !== 'compact';
+    enabled =
+      !reducedMotion.matches &&
+      supportsMask &&
+      window.getComputedStyle(arrival).getPropertyValue('--arrival-layout').trim() !== 'compact';
     document.documentElement.classList.toggle('has-arrival', enabled);
     if (enabled) {
       measure();

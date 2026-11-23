@@ -12,11 +12,16 @@ test('social cards use the selected period and offer an honest hook and a public
     _intentions: [{ reason: 'Private intention text' }],
     _websiteTime: { '2026-03-09': { 'private.example': 99999 } }
   };
-  const before = structuredClone(days), weekly = create(days, 'week', now), daily = create(days, 'today', now);
+  const before = structuredClone(days),
+    weekly = create(days, 'week', now),
+    daily = create(days, 'today', now);
   assert.equal(weekly.filename, 'CreateRatio-share-2026-03-03-to-2026-03-09.png');
-  assert.equal(weekly.creating, '3m'); assert.equal(weekly.consuming, '4m');
-  assert.equal(weekly.score, '1.75'); assert.equal(weekly.contributions, 2);
-  assert.equal(daily.creating, '1m'); assert.equal(daily.contributions, 1);
+  assert.equal(weekly.creating, '3m');
+  assert.equal(weekly.consuming, '4m');
+  assert.equal(weekly.score, '1.75');
+  assert.equal(weekly.contributions, 2);
+  assert.equal(daily.creating, '1m');
+  assert.equal(daily.contributions, 1);
   assert.deepEqual(weekly.headline, ['Made room', 'for creating.']);
   assert.match(weekly.caption, /last 7 days/i);
   assert.match(daily.caption, /today so far/i);
@@ -49,7 +54,8 @@ test('headlines encourage creating without claiming creative quality, less brows
   assert.deepEqual(card({ likes: 3 }).headline, ['Make room', 'for creating.']);
   assert.deepEqual(card({}).headline, ['A fresh start.', 'Room to create.']);
   assert.equal(card({}).score, '0.00');
-  assert.equal(card({}).creatingShare, 0); assert.equal(card({}).consumingShare, 0);
+  assert.equal(card({}).creatingShare, 0);
+  assert.equal(card({}).consumingShare, 0);
   assert.equal(card({ consumeSec: 300 }).consumingShare, 1);
   assert.equal(card({ createSec: 120, consumeSec: 60 }).consumingShare, 1 / 3);
   assert.equal(card({ createSec: 30 }).creating, '30s');

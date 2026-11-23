@@ -3,7 +3,10 @@ const assert = require('node:assert/strict');
 
 function integerEnvironment(name, fallback, minimum, maximum) {
   const value = process.env[name] === undefined ? fallback : Number(process.env[name]);
-  assert.ok(Number.isInteger(value) && value >= minimum && value <= maximum, `${name} must be an integer from ${minimum} to ${maximum}`);
+  assert.ok(
+    Number.isInteger(value) && value >= minimum && value <= maximum,
+    `${name} must be an integer from ${minimum} to ${maximum}`
+  );
   return value;
 }
 
@@ -13,12 +16,14 @@ function choiceEnvironment(name, choices) {
   return value;
 }
 
+const maximumBounds = { cases: 16, steps: 240 };
+
 function configuration() {
-  const cases = integerEnvironment('CR_PROPERTY_CASES', 6, 1, 16);
+  const cases = integerEnvironment('CR_PROPERTY_CASES', 6, 1, maximumBounds.cases);
   return {
     seed: integerEnvironment('CR_PROPERTY_SEED', 0xc3a710, 0, 0xffffffff),
     cases,
-    steps: integerEnvironment('CR_PROPERTY_STEPS', 160, 1, 240),
+    steps: integerEnvironment('CR_PROPERTY_STEPS', 160, 1, maximumBounds.steps),
     case: integerEnvironment('CR_PROPERTY_CASE', -1, -1, cases - 1),
     adapter: choiceEnvironment('CR_PROPERTY_ADAPTER', ['chrome', 'browser']),
     machine: choiceEnvironment('CR_PROPERTY_MACHINE', ['access', 'delivery'])
@@ -34,8 +39,13 @@ function random(seed) {
     return ((value ^ (value >>> 14)) >>> 0) / 0x100000000;
   };
   return {
-    integer(limit) { assert.ok(Number.isInteger(limit) && limit > 0); return Math.floor(next() * limit); },
-    pick(values) { return values[this.integer(values.length)]; }
+    integer(limit) {
+      assert.ok(Number.isInteger(limit) && limit > 0);
+      return Math.floor(next() * limit);
+    },
+    pick(values) {
+      return values[this.integer(values.length)];
+    }
   };
 }
 
@@ -51,7 +61,8 @@ async function runCases(config, adapter, machine, execute) {
   let transitions = 0;
   for (let index = 0; index < config.cases; index++) {
     if (config.case !== -1 && config.case !== index) continue;
-    const seed = caseSeed(config.seed, index), sequence = [];
+    const seed = caseSeed(config.seed, index),
+      sequence = [];
     const step = async (command, apply) => {
       sequence.push(structuredClone(command));
       await apply(command);
@@ -60,10 +71,13 @@ async function runCases(config, adapter, machine, execute) {
     try {
       await execute({ random: random(seed), step, steps: config.steps });
     } catch (error) {
-      throw new Error(`${error.message}\nProperty failure: seed=${config.seed}, caseSeed=${seed}, case=${index}, adapter=${adapter}, machine=${machine}, step=${sequence.length - 1}\nReplay: ${replayCommand(config, adapter, machine, index)}\nSequence: ${JSON.stringify(sequence)}`, { cause: error });
+      throw new Error(
+        `${error.message}\nProperty failure: seed=${config.seed}, caseSeed=${seed}, case=${index}, adapter=${adapter}, machine=${machine}, step=${sequence.length - 1}\nReplay: ${replayCommand(config, adapter, machine, index)}\nSequence: ${JSON.stringify(sequence)}`,
+        { cause: error }
+      );
     }
   }
   return transitions;
 }
 
-module.exports = { configuration, random, caseSeed, replayCommand, runCases };
+module.exports = { maximumBounds, configuration, random, caseSeed, replayCommand, runCases };
