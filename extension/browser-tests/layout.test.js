@@ -566,7 +566,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
           );
           const box = await inspect(
             page,
-            '(() => { const range = document.createRange(); range.selectNodeContents(document.querySelector("#score")); const rect = element => { const { left, right, top, bottom } = element.getBoundingClientRect(); return { left, right, top, bottom }; }; return { lines: range.getClientRects().length, score: rect(range), goal: rect(document.querySelector(".goal")), card: rect(document.querySelector("#score-card")), size: parseFloat(getComputedStyle(document.querySelector("#score")).fontSize) }; })()'
+            '(() => { const range = document.createRange(); range.selectNodeContents(document.querySelector("#score")); const rect = element => { const { left, right, top, bottom } = element.getBoundingClientRect(); return { left, right, top, bottom }; }; const label = document.createRange(); label.selectNodeContents(document.querySelector(".goal small")); return { lines: range.getClientRects().length, labelLines: label.getClientRects().length, score: rect(range), goal: rect(document.querySelector(".goal")), card: rect(document.querySelector("#score-card")), size: parseFloat(getComputedStyle(document.querySelector("#score")).fontSize) }; })()'
           );
           const detail = JSON.stringify({ text, width, ...box });
           const { score, goal, card } = box;
@@ -575,6 +575,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
           assert.equal(overlaps, false, detail);
           assert.ok(score.left >= card.left && score.right <= card.right, detail);
           assert.equal(box.lines, 1, detail);
+          assert.equal(box.labelLines, 1, detail);
           assert.ok(box.size >= 32, detail);
           await noOverflow(page);
           await browser.cdp.send('Target.closeTarget', { targetId: page.targetId });
