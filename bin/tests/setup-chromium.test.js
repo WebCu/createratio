@@ -95,6 +95,8 @@ test('browser resolution rejects branded Chrome and missing browsers, and warns 
   const chromium = fakeBrowser(directory, 'chromium', 'Chromium 150.0.1.2');
   const preferred = fakeBrowser(directory, 'preferred', `Chromium ${pins.chromeForTesting.version}`);
   assert.match(resolveBrowser({ ...emptyCache, CHROMIUM: chromium }).warning, /differs from the CI browser/);
+  const longerPatch = fakeBrowser(directory, 'longer-patch', `Chromium ${pins.chromeForTesting.version}0`);
+  assert.match(resolveBrowser({ ...emptyCache, CHROMIUM: longerPatch }).warning, /differs from the CI browser/);
   assert.deepEqual(resolveBrowser({ ...emptyCache, CHROMIUM_PATH: preferred, CHROMIUM: chromium }), {
     executable: preferred, version: `Chromium ${pins.chromeForTesting.version}`, warning: null
   });
