@@ -6,10 +6,9 @@ const path = require('node:path');
 const Sites = require('../../sites/index.js');
 
 const extension = path.resolve(__dirname, '../..');
-const domains = [...new Set(Sites.sites.flatMap(site => [
-  ...site.hosts,
-  ...(Sites.get(site.id).access?.domains || []),
-]))];
+const domains = [
+  ...new Set(Sites.sites.flatMap(site => [...site.hosts, ...(Sites.get(site.id).access?.domains || [])]))
+];
 
 function domainLeaks(source, ownedDomains) {
   return ownedDomains.filter(domain => source.includes(domain));

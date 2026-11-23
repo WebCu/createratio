@@ -1,6 +1,15 @@
 'use strict';
 const { spawnSync } = require('node:child_process');
-const { mkdtempSync, openSync, closeSync, writeFileSync, writeSync, fstatSync, readSync, realpathSync } = require('node:fs');
+const {
+  mkdtempSync,
+  openSync,
+  closeSync,
+  writeFileSync,
+  writeSync,
+  fstatSync,
+  readSync,
+  realpathSync
+} = require('node:fs');
 const { tmpdir, constants } = require('node:os');
 const path = require('node:path');
 
@@ -10,7 +19,9 @@ function commandValue(program, args, readOutput = output => output.trim()) {
 }
 
 function isProjectRepository() {
-  const topLevel = commandValue('git', ['--no-optional-locks', 'rev-parse', '--show-toplevel'], output => output.replace(/\n$/, ''));
+  const topLevel = commandValue('git', ['--no-optional-locks', 'rev-parse', '--show-toplevel'], output =>
+    output.replace(/\n$/, '')
+  );
   if (!topLevel) return false;
   try {
     return realpathSync(topLevel) === realpathSync(process.cwd());
@@ -22,15 +33,25 @@ function isProjectRepository() {
 function readSource() {
   if (!isProjectRepository()) return { head: null, dirty: null };
   const status = commandValue('git', ['--no-optional-locks', 'status', '--porcelain']);
-  return { head: commandValue('git', ['--no-optional-locks', 'rev-parse', '--verify', 'HEAD']), dirty: status === null ? null : Boolean(status) };
+  return {
+    head: commandValue('git', ['--no-optional-locks', 'rev-parse', '--verify', 'HEAD']),
+    dirty: status === null ? null : Boolean(status)
+  };
 }
 
 function runVerification() {
   const source = readSource();
   const runtime = { node: process.version, pnpm: commandValue('pnpm', ['--version']) };
   const directory = mkdtempSync(path.join(tmpdir(), 'createratio-verify-'));
-  const stages = ['check', 'check:browser', 'smoke:browser'].map(name => ({ name, status: 'not-run', log: name.replaceAll(':', '-') + '.log' }));
-  const save = () => writeFileSync(path.join(directory, 'summary.json'), JSON.stringify({ source, runtime, stages }, null, 2) + '\n', { mode: 0o600 });
+  const stages = ['check', 'check:browser', 'smoke:browser'].map(name => ({
+    name,
+    status: 'not-run',
+    log: name.replaceAll(':', '-') + '.log'
+  }));
+  const save = () =>
+    writeFileSync(path.join(directory, 'summary.json'), JSON.stringify({ source, runtime, stages }, null, 2) + '\n', {
+      mode: 0o600
+    });
   console.log(`Verification logs: ${directory}`);
   save();
   let exitCode = 0;
@@ -41,13 +62,15 @@ function runVerification() {
     }
     const descriptor = openSync(path.join(directory, stage.log), 'wx+', 0o600);
     try {
-      stage.status = 'running'; save();
+      stage.status = 'running';
+      save();
       console.log(`RUN ${stage.name}`);
       const result = spawnSync('pnpm', [stage.name], { stdio: ['ignore', descriptor, descriptor] });
       exitCode = result.status ?? (result.signal ? 128 + (constants.signals[result.signal] || 0) : 1);
       if (result.error) writeSync(descriptor, result.error.message + '\n');
       stage.exitCode = exitCode;
-      stage.status = exitCode ? 'failed' : 'passed'; save();
+      stage.status = exitCode ? 'failed' : 'passed';
+      save();
       console.log(`${exitCode ? 'FAIL' : 'PASS'} ${stage.name}`);
       if (exitCode) {
         const size = fstatSync(descriptor).size;
@@ -55,7 +78,9 @@ function runVerification() {
         readSync(descriptor, tail, 0, tail.length, size - tail.length);
         console.error(tail.toString('utf8').split('\n').slice(-40).join('\n'));
       }
-    } finally { closeSync(descriptor); }
+    } finally {
+      closeSync(descriptor);
+    }
   }
   return exitCode;
 }

@@ -17,11 +17,15 @@ if (result.error || (result.status !== 0 && result.status !== 1)) {
   throw result.error || new Error(result.stderr);
 }
 const existing = result.status === 0 ? result.stdout.trim() : null;
-let message = existing !== null && existing !== '.githooks' ? `Existing hooksPath ${existing || '(empty)'}; integrate .githooks/pre-commit and .githooks/pre-rebase without replacing it.` : '';
+let message =
+  existing !== null && existing !== '.githooks'
+    ? `Existing hooksPath ${existing || '(empty)'}; integrate .githooks/pre-commit and .githooks/pre-rebase without replacing it.`
+    : '';
 if (existing === null) {
   const directory = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-path', 'hooks'], options).trim();
   const custom = existsSync(directory) ? readdirSync(directory).filter(name => !name.endsWith('.sample')) : [];
-  if (custom.length) message = `Existing Git hook files in ${directory}; integrate .githooks/pre-commit and .githooks/pre-rebase without disabling them.`;
+  if (custom.length)
+    message = `Existing Git hook files in ${directory}; integrate .githooks/pre-commit and .githooks/pre-rebase without disabling them.`;
 }
 if (!message) {
   for (const name of ['pre-commit', 'pre-rebase']) {

@@ -28,7 +28,7 @@ test('equivalence detects changed lifecycle behavior', async t => {
   const { baseline, candidate } = await bundles(t);
   const blocker = path.join(candidate, 'blocker.js');
   const source = await fs.readFile(blocker, 'utf8');
-  const changed = source.replace('waitSeconds, sessionMinutes:', 'waitSeconds: waitSeconds + 1, sessionMinutes:');
+  const changed = source.replace(/waitSeconds,(\s*)sessionMinutes:/, 'waitSeconds: waitSeconds + 1,$1sessionMinutes:');
   assert.notEqual(changed, source);
   await fs.writeFile(blocker, changed);
   await assert.rejects(compare(baseline, candidate), /lifecycle/);
@@ -45,7 +45,10 @@ test('equivalence detects static blocking policy changes', async t => {
 
 test('generated fixture states never alias entries across integrations', () => {
   const access = { domains: ['example.invalid'], home: 'https://example.invalid/' };
-  const { states, urls } = matrix([{ id: 'first', access }, { id: 'second', access: { domains: ['second.invalid'], home: 'https://second.invalid/' } }]);
+  const { states, urls } = matrix([
+    { id: 'first', access },
+    { id: 'second', access: { domains: ['second.invalid'], home: 'https://second.invalid/' } }
+  ]);
   assert.notEqual(states.running._access.first, states.running._access.second);
   assert.deepEqual(states.defaults, {});
   assert.deepEqual(states.blocked.settings.trackedSites, ['first', 'second']);

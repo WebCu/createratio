@@ -33,11 +33,17 @@ async function submitRelease(configuration, fetchRequest = fetch, wait = setTime
       throw storeError('Chrome Web Store', operation, 'network error or timeout');
     }
     if (!response.ok) throw await storeHttpError('Chrome Web Store', operation, response, [token]);
-    try { return await response.json(); } catch { throw storeError('Chrome Web Store', operation, 'invalid JSON response'); }
+    try {
+      return await response.json();
+    } catch {
+      throw storeError('Chrome Web Store', operation, 'invalid JSON response');
+    }
   }
   const status = await request('status check', `${base}/v2/${item}:fetchStatus`);
-  if (!status || typeof status !== 'object' || Array.isArray(status)) throw storeError('Chrome Web Store', 'status check', 'invalid response');
-  if (status.takenDown || status.warned) throw new Error('Resolve the store policy warning or takedown before releasing.');
+  if (!status || typeof status !== 'object' || Array.isArray(status))
+    throw storeError('Chrome Web Store', 'status check', 'invalid response');
+  if (status.takenDown || status.warned)
+    throw new Error('Resolve the store policy warning or takedown before releasing.');
   if (['PENDING_REVIEW', 'STAGED'].includes(status.submittedItemRevisionStatus?.state)) {
     throw new Error('A submission is already pending or staged; inspect the Developer Dashboard.');
   }
@@ -47,8 +53,10 @@ async function submitRelease(configuration, fetchRequest = fetch, wait = setTime
     }
   }
   const upload = await request('upload', `${base}/upload/v2/${item}:upload`, 'POST', archive, 'application/zip');
-  if (!upload || typeof upload !== 'object' || Array.isArray(upload)) throw storeError('Chrome Web Store', 'upload', 'invalid response');
-  if (upload.crxVersion && upload.crxVersion !== version) throw new Error('Uploaded version does not match the release tag.');
+  if (!upload || typeof upload !== 'object' || Array.isArray(upload))
+    throw storeError('Chrome Web Store', 'upload', 'invalid response');
+  if (upload.crxVersion && upload.crxVersion !== version)
+    throw new Error('Uploaded version does not match the release tag.');
   let processing = upload;
   let state = upload.uploadState;
   for (let attempt = 0; state === 'IN_PROGRESS' && attempt < 30; attempt++) {
@@ -56,12 +64,24 @@ async function submitRelease(configuration, fetchRequest = fetch, wait = setTime
     processing = await request('upload processing status', `${base}/v2/${item}:fetchStatus`);
     state = processing?.lastAsyncUploadState;
   }
-  if (state === 'IN_PROGRESS') throw new Error('Store upload processing timed out; inspect the Developer Dashboard before retrying.');
-  if (state !== 'SUCCEEDED') throw storeError('Chrome Web Store', 'upload processing', 'unsuccessful upload; refusing submission', processing, [token]);
-  const published = await request('submission', `${base}/v2/${item}:publish`, 'POST', JSON.stringify({
-    publishType: 'DEFAULT_PUBLISH', skipReview: false, blockOnWarnings: true
-  }));
-  if (!['PENDING_REVIEW', 'PUBLISHED'].includes(published?.state)) throw storeError('Chrome Web Store', 'submission', 'unexpected state', published, [token]);
+  if (state === 'IN_PROGRESS')
+    throw new Error('Store upload processing timed out; inspect the Developer Dashboard before retrying.');
+  if (state !== 'SUCCEEDED')
+    throw storeError('Chrome Web Store', 'upload processing', 'unsuccessful upload; refusing submission', processing, [
+      token
+    ]);
+  const published = await request(
+    'submission',
+    `${base}/v2/${item}:publish`,
+    'POST',
+    JSON.stringify({
+      publishType: 'DEFAULT_PUBLISH',
+      skipReview: false,
+      blockOnWarnings: true
+    })
+  );
+  if (!['PENDING_REVIEW', 'PUBLISHED'].includes(published?.state))
+    throw storeError('Chrome Web Store', 'submission', 'unexpected state', published, [token]);
   return published.state;
 }
 
@@ -79,7 +99,11 @@ async function main() {
   };
   if (command === 'check-config') {
     validateConfiguration({ ...configuration, token: 'configuration-check' });
-    if (!/^projects\/\d+\/locations\/global\/workloadIdentityPools\/createratio-release\/providers\/github$/.test(process.env.CWS_WORKLOAD_IDENTITY_PROVIDER || '')) {
+    if (
+      !/^projects\/\d+\/locations\/global\/workloadIdentityPools\/createratio-release\/providers\/github$/.test(
+        process.env.CWS_WORKLOAD_IDENTITY_PROVIDER || ''
+      )
+    ) {
       throw new Error('Set CWS_WORKLOAD_IDENTITY_PROVIDER from the infra output before releasing.');
     }
     if (process.env.CWS_SERVICE_ACCOUNT !== 'createratio-prod-store@sunsetatomic-createratio.iam.gserviceaccount.com') {
@@ -90,12 +114,16 @@ async function main() {
   if (command !== 'submit') throw new Error('Use validate, check-config, or submit.');
   validateConfiguration(configuration);
   const file = 'dist/createratio-chrome.zip';
-  const manifest = JSON.parse(execFileSync('unzip', ['-p', file, 'manifest.json'], { encoding: 'utf8', timeout: 10000 }));
+  const manifest = JSON.parse(
+    execFileSync('unzip', ['-p', file, 'manifest.json'], { encoding: 'utf8', timeout: 10000 })
+  );
   const version = releaseVersion(tag, [manifest.version]);
   const state = await submitRelease({ ...configuration, version, archive: readFileSync(file) });
-  process.stdout.write(state === 'PUBLISHED'
-    ? `Chrome Web Store reports ${version} published.\n`
-    : `Version ${version} submitted for review; it will publish after Google approves.\n`);
+  process.stdout.write(
+    state === 'PUBLISHED'
+      ? `Chrome Web Store reports ${version} published.\n`
+      : `Version ${version} submitted for review; it will publish after Google approves.\n`
+  );
 }
 
 if (require.main === module) main().catch(error => reportStoreFailure(error, 'Chrome Web Store release failed'));
