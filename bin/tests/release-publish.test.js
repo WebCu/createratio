@@ -29,7 +29,9 @@ test('publication pushes only its matching tag despite automatic tag and mirror 
     const result = repo.run(['publish']);
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(repo.git('--git-dir', repo.remote, 'for-each-ref', '--format=%(refname)').split('\n').sort(), [
-      'refs/heads/main', 'refs/heads/retained-remote', 'refs/tags/v0.0.1'
+      'refs/heads/main',
+      'refs/heads/retained-remote',
+      'refs/tags/v0.0.1'
     ]);
     assert.equal(repo.git('tag', '--list'), 'v0.0.1\nv9.9.9');
     assert.equal(repo.git('config', '--get', 'remote.origin.mirror'), String(mirror));
@@ -48,7 +50,20 @@ test('publish creates a GitHub release with generated changes on the matching an
   assert.equal(repo.git('status', '--porcelain'), '');
   assert.deepEqual(repo.calls(), [
     { tool: 'gh', args: ['auth', 'status', '--hostname', 'github.com'] },
-    { tool: 'gh', args: ['release', 'create', 'v0.0.1', '--repo', 'WebCu/createratio', '--verify-tag', '--title', 'Release 0.0.1', '--generate-notes'] }
+    {
+      tool: 'gh',
+      args: [
+        'release',
+        'create',
+        'v0.0.1',
+        '--repo',
+        'WebCu/createratio',
+        '--verify-tag',
+        '--title',
+        'Release 0.0.1',
+        '--generate-notes'
+      ]
+    }
   ]);
   assert.match(result.stdout, /https:\/\/github.com\/WebCu\/createratio\/releases\/tag\/v0.0.1/);
 });
@@ -71,7 +86,9 @@ test('existing annotated-tag validation uses the tag namespace, not a same-named
     const repo = repository(t);
     const initial = repo.git('rev-parse', 'HEAD');
     fs.writeFileSync(path.join(repo.checkout, 'advance.txt'), 'New main');
-    repo.git('add', '.'); repo.git('commit', '-m', 'Advance main'); repo.git('push', 'origin', 'main');
+    repo.git('add', '.');
+    repo.git('commit', '-m', 'Advance main');
+    repo.git('push', 'origin', 'main');
     const head = repo.git('rev-parse', 'HEAD');
     repo.git('tag', '--annotate', 'v0.0.1', matchingTag ? head : initial, '--message', 'Existing annotated tag');
     repo.git('branch', 'v0.0.1', matchingTag ? initial : head);
@@ -107,7 +124,9 @@ test('publish reuses a matching local tag after a failed push but never moves or
   other.git('tag', '--annotate', 'v0.0.1', '--message', 'Original tag');
   const original = other.git('rev-parse', 'v0.0.1^{}');
   fs.writeFileSync(path.join(other.checkout, 'new.txt'), 'new work');
-  other.git('add', '.'); other.git('commit', '-m', 'New main'); other.git('push', 'origin', 'main');
+  other.git('add', '.');
+  other.git('commit', '-m', 'New main');
+  other.git('push', 'origin', 'main');
   const moved = other.run(['publish']);
   assert.notEqual(moved.status, 0);
   assert.match(moved.stderr, /another commit/);

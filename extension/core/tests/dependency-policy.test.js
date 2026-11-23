@@ -195,33 +195,75 @@ test('every workflow limits token scope, keeps checkout credentials out, and bou
 });
 
 test('workflow policy rejects broad permissions and misleading checkout text', () => {
-  const workflow = ({ top = '  contents: read', jobPermissions = '', checkoutWith }) => [
-    'on: push', 'permissions:', top, '', 'jobs:', '  build:', '    runs-on: ubuntu-24.04',
-    '    timeout-minutes: 5', jobPermissions, '    steps:', '      - name: Checkout (v1.0.0)',
-    '        uses: actions/checkout@0000000000000000000000000000000000000000', checkoutWith,
-    '      - run: echo done', '',
-  ].filter(line => line !== '').join('\n');
+  const workflow = ({ top = '  contents: read', jobPermissions = '', checkoutWith }) =>
+    [
+      'on: push',
+      'permissions:',
+      top,
+      '',
+      'jobs:',
+      '  build:',
+      '    runs-on: ubuntu-24.04',
+      '    timeout-minutes: 5',
+      jobPermissions,
+      '    steps:',
+      '      - name: Checkout (v1.0.0)',
+      '        uses: actions/checkout@0000000000000000000000000000000000000000',
+      checkoutWith,
+      '      - run: echo done',
+      ''
+    ]
+      .filter(line => line !== '')
+      .join('\n');
   const safeWith = '        with:\n          persist-credentials: false';
   assert.deepEqual(workflowPolicyViolations('x.yml', workflow({ checkoutWith: safeWith })), []);
-  assert.deepEqual(workflowPolicyViolations('x.yml', workflow({
-    top: '  contents: write\n  issues: write', checkoutWith: safeWith,
-  })), ['x.yml top-level permissions must be contents: read']);
-  assert.deepEqual(workflowPolicyViolations('x.yml', workflow({ checkoutWith: safeWith })
-    .replace('permissions:\n  contents: read', 'permissions: write-all')),
-  ['x.yml top-level permissions must be contents: read']);
-  assert.deepEqual(workflowPolicyViolations('x.yml', workflow({
-    jobPermissions: '    permissions:\n      contents: write', checkoutWith: safeWith,
-  })), ['x.yml build job permissions exceed the allowed scope']);
-  assert.deepEqual(workflowPolicyViolations('x.yml', workflow({
-    jobPermissions: '    permissions:\n      contents: read\n      id-token: write', checkoutWith: safeWith,
-  })), ['x.yml build job permissions exceed the allowed scope']);
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      workflow({
+        top: '  contents: write\n  issues: write',
+        checkoutWith: safeWith
+      })
+    ),
+    ['x.yml top-level permissions must be contents: read']
+  );
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      workflow({ checkoutWith: safeWith }).replace('permissions:\n  contents: read', 'permissions: write-all')
+    ),
+    ['x.yml top-level permissions must be contents: read']
+  );
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      workflow({
+        jobPermissions: '    permissions:\n      contents: write',
+        checkoutWith: safeWith
+      })
+    ),
+    ['x.yml build job permissions exceed the allowed scope']
+  );
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      workflow({
+        jobPermissions: '    permissions:\n      contents: read\n      id-token: write',
+        checkoutWith: safeWith
+      })
+    ),
+    ['x.yml build job permissions exceed the allowed scope']
+  );
   for (const checkoutWith of [
     '        with:\n          persist-credentials: true\n        env:\n          NOTE: |\n            persist-credentials: false',
     '        env:\n          NOTE: persist-credentials: false',
-    '        with:\n          ref: main\n          extra:\n            persist-credentials: false',
+    '        with:\n          ref: main\n          extra:\n            persist-credentials: false'
   ]) {
-    assert.deepEqual(workflowPolicyViolations('x.yml', workflow({ checkoutWith })),
-      ['x.yml build checkout must not persist credentials'], checkoutWith);
+    assert.deepEqual(
+      workflowPolicyViolations('x.yml', workflow({ checkoutWith })),
+      ['x.yml build checkout must not persist credentials'],
+      checkoutWith
+    );
   }
 });
 
@@ -230,29 +272,55 @@ test('workflow policy reads quoted keys, comments, and every job header form', (
   const checkout = [
     '      - name: Checkout (v1.0.0)',
     '        uses: actions/checkout@0000000000000000000000000000000000000000',
-    '        with:', '          persist-credentials: true',
+    '        with:',
+    '          persist-credentials: true'
   ].join('\n');
   const stepJob = jobHeader => `${jobHeader}\n    runs-on: ubuntu-24.04\n    steps:\n${checkout}\n`;
   const writeAfter = ['  "issues": write', '# note\n  issues: write'];
   for (const extra of writeAfter) {
-    assert.deepEqual(workflowPolicyViolations('x.yml',
-      `on: push\npermissions:\n  contents: read\n${extra}\njobs:\n  a:\n    uses: ./b.yml\n`),
-    ['x.yml top-level permissions must be contents: read'], extra);
-    assert.deepEqual(workflowPolicyViolations('x.yml', `${header}  a:\n    runs-on: ubuntu-24.04\n` +
-      `    timeout-minutes: 5\n    permissions:\n      contents: read\n${extra.replace(/^ {2}/m, '      ')}\n` +
-      '    steps:\n      - run: echo done\n'),
-    ['x.yml a job permissions exceed the allowed scope'], extra);
+    assert.deepEqual(
+      workflowPolicyViolations(
+        'x.yml',
+        `on: push\npermissions:\n  contents: read\n${extra}\njobs:\n  a:\n    uses: ./b.yml\n`
+      ),
+      ['x.yml top-level permissions must be contents: read'],
+      extra
+    );
+    assert.deepEqual(
+      workflowPolicyViolations(
+        'x.yml',
+        `${header}  a:\n    runs-on: ubuntu-24.04\n` +
+          `    timeout-minutes: 5\n    permissions:\n      contents: read\n${extra.replace(/^ {2}/m, '      ')}\n` +
+          '    steps:\n      - run: echo done\n'
+      ),
+      ['x.yml a job permissions exceed the allowed scope'],
+      extra
+    );
   }
-  assert.deepEqual(workflowPolicyViolations('x.yml', `${header}  a:\n    runs-on: ubuntu-24.04\n` +
-    '    timeout-minutes: 5\n    "permissions":\n      contents: write\n    steps:\n      - run: echo done\n'),
-  ['x.yml a job permissions exceed the allowed scope']);
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      `${header}  a:\n    runs-on: ubuntu-24.04\n` +
+        '    timeout-minutes: 5\n    "permissions":\n      contents: write\n    steps:\n      - run: echo done\n'
+    ),
+    ['x.yml a job permissions exceed the allowed scope']
+  );
   for (const jobHeader of ['  package: ', '  package: # packaging', '  "package":']) {
-    assert.deepEqual(workflowPolicyViolations('x.yml', `${header}  checks:\n    uses: ./b.yml\n${stepJob(jobHeader)}`),
-      ['x.yml package needs timeout-minutes', 'x.yml package checkout must not persist credentials'], jobHeader);
+    assert.deepEqual(
+      workflowPolicyViolations('x.yml', `${header}  checks:\n    uses: ./b.yml\n${stepJob(jobHeader)}`),
+      ['x.yml package needs timeout-minutes', 'x.yml package checkout must not persist credentials'],
+      jobHeader
+    );
   }
-  assert.deepEqual(workflowPolicyViolations('deploy-site.yml', `${header}  "deploy":\n` +
-    '    runs-on: ubuntu-24.04\n    timeout-minutes: 5\n    permissions:\n      contents: read\n' +
-    '      id-token: write\n    steps:\n      - run: echo done\n'), []);
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'deploy-site.yml',
+      `${header}  "deploy":\n` +
+        '    runs-on: ubuntu-24.04\n    timeout-minutes: 5\n    permissions:\n      contents: read\n' +
+        '      id-token: write\n    steps:\n      - run: echo done\n'
+    ),
+    []
+  );
 });
 
 test('CI uses a frozen install, audits security, and runs the shared fail-fast check', () => {
@@ -269,7 +337,10 @@ test('CI uses a frozen install, audits security, and runs the shared fail-fast c
 
 test('weekly dependency automation proposes Action majors but excludes library and image majors', () => {
   const updates = read('.github/dependabot.yml').split('  - package-ecosystem: ').slice(1);
-  assert.deepEqual(updates.map(update => update.split('\n')[0]), ['npm', 'github-actions', 'docker-compose']);
+  assert.deepEqual(
+    updates.map(update => update.split('\n')[0]),
+    ['npm', 'github-actions', 'docker-compose']
+  );
   for (const update of updates) {
     assert.match(update, /interval: weekly/);
     if (update.startsWith('github-actions\n')) {

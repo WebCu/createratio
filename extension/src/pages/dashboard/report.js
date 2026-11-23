@@ -4,19 +4,33 @@
   else root.CreationReport = api;
 })(globalThis, function (Core) {
   'use strict';
-  function escape(value) { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
-  function minutes(seconds) { return (seconds / 60).toFixed(1) + 'm'; }
-  function row(label, stats) { return `<tr><th scope="row">${escape(label)}</th><td>${minutes(stats.createSec)}</td><td>${minutes(stats.consumeSec)}</td><td>${Core.score(stats).toFixed(2)}</td></tr>`; }
-  function table(caption, heading, rows) { return `<table><caption>${caption}</caption><thead><tr><th scope="col">${heading}</th><th scope="col">Creating</th><th scope="col">Consuming</th><th scope="col">Score</th></tr></thead><tbody>${rows}</tbody></table>`; }
+  function escape(value) {
+    return String(value).replace(
+      /[&<>"']/g,
+      char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]
+    );
+  }
+  function minutes(seconds) {
+    return (seconds / 60).toFixed(1) + 'm';
+  }
+  function row(label, stats) {
+    return `<tr><th scope="row">${escape(label)}</th><td>${minutes(stats.createSec)}</td><td>${minutes(stats.consumeSec)}</td><td>${Core.score(stats).toFixed(2)}</td></tr>`;
+  }
+  function table(caption, heading, rows) {
+    return `<table><caption>${caption}</caption><thead><tr><th scope="col">${heading}</th><th scope="col">Creating</th><th scope="col">Consuming</th><th scope="col">Score</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
   function summarize(days, range, now = new Date()) {
     if (!['today', 'week'].includes(range)) throw new Error('Choose Today or Last 7 days.');
-    const dates = Core.recentDates(range === 'today' ? 1 : 7, now), first = dates[0], last = dates.at(-1);
+    const dates = Core.recentDates(range === 'today' ? 1 : 7, now),
+      first = dates[0],
+      last = dates.at(-1);
     const bySite = Object.create(null);
-    for (const date of dates) for (const site of Core.recordedSites(days[date])) {
-      const stats = Core.statsSnapshot(days[date][site]);
-      bySite[site] ||= Core.emptyStats();
-      for (const key of Core.FIELDS) bySite[site][key] += stats[key];
-    }
+    for (const date of dates)
+      for (const site of Core.recordedSites(days[date])) {
+        const stats = Core.statsSnapshot(days[date][site]);
+        bySite[site] ||= Core.emptyStats();
+        for (const key of Core.FIELDS) bySite[site][key] += stats[key];
+      }
     return { dates, first, last, bySite, total: Core.aggregate(bySite) };
   }
   function create(days, range, now = new Date()) {
@@ -25,7 +39,15 @@
     const hasActivity = Core.FIELDS.some(key => total[key] > 0);
     const title = range === 'today' ? 'Today' : 'Last 7 days';
     const period = first === last ? last : `${first} to ${last}`;
-    const actions = [['Posts', 'posts'], ['Replies', 'replies'], ['Comments', 'comments'], ['Likes', 'likes'], ['Reposts', 'reposts'], ['Bookmarks', 'bookmarks'], ['Quotes (included in posts)', 'quotes']];
+    const actions = [
+      ['Posts', 'posts'],
+      ['Replies', 'replies'],
+      ['Comments', 'comments'],
+      ['Likes', 'likes'],
+      ['Reposts', 'reposts'],
+      ['Bookmarks', 'bookmarks'],
+      ['Quotes (included in posts)', 'quotes']
+    ];
     const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
@@ -37,7 +59,14 @@
 <main><dl class="summary"><div><dt>Creating</dt><dd>${minutes(total.createSec)}</dd></div><div><dt>Consuming</dt><dd>${minutes(total.consumeSec)}</dd></div><div><dt>Period creation score</dt><dd>${Core.score(total).toFixed(2)}</dd></div></dl>
 ${hasActivity ? '' : '<p>No creation tracking recorded in this period.</p>'}
 <h2>Actions</h2><dl class="actions">${actions.map(([label, key]) => `<div><dt>${label}</dt><dd>${total[key]}</dd></div>`).join('')}</dl>
-${table('By site', 'Site', Object.keys(bySite).sort().map(site => row(names.get(site) || `${site} (unavailable)`, bySite[site])).join(''))}
+${table(
+  'By site',
+  'Site',
+  Object.keys(bySite)
+    .sort()
+    .map(site => row(names.get(site) || `${site} (unavailable)`, bySite[site]))
+    .join('')
+)}
 ${table('Daily breakdown', 'Local date', dates.map(date => row(date, Core.aggregate(days[date]))).join(''))}
 </main><footer class="notes"><p>Score = (creating seconds + 120 seconds per post, reply or comment) ÷ consuming seconds (minimum 1 second). The period score uses combined totals, not an average of daily scores. Quotes are included in posts; other light actions add no score credit.</p><p>Dates use your device’s local calendar. Today is partial. Missing days show zero; cleared or expired history cannot be recovered. Times are rounded to one decimal minute; scores use unrounded seconds.</p><p>Creation tracking covers enabled vetted sites only. Website time is separate and is not included. Saved intentions are never included.</p><p>Generated locally on ${escape(now.toLocaleString())}. No data was uploaded.</p></footer>
 </body></html>`;

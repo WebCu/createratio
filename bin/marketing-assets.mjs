@@ -4,7 +4,13 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'no
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { launch, evaluate, eventually, clickByRole, withFailureArtifacts } from '../extension/browser-tests/chromium.mjs';
+import {
+  launch,
+  evaluate,
+  eventually,
+  clickByRole,
+  withFailureArtifacts
+} from '../extension/browser-tests/chromium.mjs';
 import marketing from './marketing.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +42,10 @@ try {
   await cp(bundle, join(profileBundle, 'chrome'), { recursive: true });
   browser = await launch(join(profileBundle, 'chrome'));
   await browser.setTime(new Date(2026, 2, 9, 12).getTime());
-  await evaluate(browser, browser.worker, `(async () => {
+  await evaluate(
+    browser,
+    browser.worker,
+    `(async () => {
     const { settings } = await chrome.storage.local.get('settings');
     await chrome.storage.local.set({ settings: { ...settings, trackedSites: Core.SITES.map(site => site.id), allowAboveGoal: false, intentionHistoryEnabled: false }, _websiteTimeEnabled: false,
       [Core.localDate()]: {
@@ -47,50 +56,101 @@ try {
       }
     });
     await SiteAccess.reconcile();
-  })()`);
+  })()`
+  );
   const page = await browser.page('about:blank');
-  await browser.cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, page.session);
-  await browser.cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }, page.session);
+  await browser.cdp.send(
+    'Emulation.setDeviceMetricsOverride',
+    { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false },
+    page.session
+  );
+  await browser.cdp.send(
+    'Emulation.setEmulatedMedia',
+    { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] },
+    page.session
+  );
   await browser.cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: 'Math.random = () => 0;' }, page.session);
   const inspect = source => evaluate(browser, page.session, source);
   const open = async (url, ready) => {
     await browser.cdp.send('Page.navigate', { url: browser.origin + url }, page.session);
-    await eventually(() => inspect(`document.readyState === 'complete' && document.querySelector('#error')?.hidden && (${ready})`), url + ' ready for capture');
-    await inspect('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');
+    await eventually(
+      () => inspect(`document.readyState === 'complete' && document.querySelector('#error')?.hidden && (${ready})`),
+      url + ' ready for capture'
+    );
+    await inspect(
+      'document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))'
+    );
   };
   const captures = [];
   const capture = async index => {
-    assert.equal(await inspect('document.documentElement.scrollWidth <= innerWidth'), true, 'Screenshot must not overflow horizontally.');
-    const { data } = await browser.cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, page.session);
+    assert.equal(
+      await inspect('document.documentElement.scrollWidth <= innerWidth'),
+      true,
+      'Screenshot must not overflow horizontally.'
+    );
+    const { data } = await browser.cdp.send(
+      'Page.captureScreenshot',
+      { format: 'png', captureBeyondViewport: false },
+      page.session
+    );
     const bytes = Buffer.from(data, 'base64');
     assert.equal(bytes.readUInt32BE(16), 1280);
     assert.equal(bytes.readUInt32BE(20), 800);
     const filename = release.screenshots[index].id + '.png';
     await writeFile(join(temporary, filename), bytes);
-    captures.push({ filename, caption: release.screenshots[index].caption, sha256: digest(bytes), width: 1280, height: 800 });
+    captures.push({
+      filename,
+      caption: release.screenshots[index].caption,
+      sha256: digest(bytes),
+      width: 1280,
+      height: 800
+    });
   };
   await open('/settings.html', 'document.querySelectorAll("#site-settings input:checked").length === 7');
   await capture(0);
-  await open('/blocked.html?site=instagram', '!document.querySelector("#begin").disabled && !document.querySelector("#request").hidden && document.title === "Instagram blocked - CreateRatio"');
+  await open(
+    '/blocked.html?site=instagram',
+    '!document.querySelector("#begin").disabled && !document.querySelector("#request").hidden && document.title === "Instagram blocked - CreateRatio"'
+  );
   await clickByRole(browser, page, 'textbox', 'What do you need to do?');
   await browser.cdp.send('Input.insertText', { text: 'Share the photos from my latest project.' }, page.session);
   await capture(1);
-  await open('/dashboard.html', 'document.querySelectorAll("#sites tr").length === 7 && document.querySelector("#create-min").textContent === "48.0m"');
+  await open(
+    '/dashboard.html',
+    'document.querySelectorAll("#sites tr").length === 7 && document.querySelector("#create-min").textContent === "48.0m"'
+  );
   await capture(2);
   assert.deepEqual(browser.errors, []);
   assert.deepEqual(await inventory(bundle), bundleHashes, 'Bundle changed during capture.');
-  assert.equal(marketing.releaseFingerprint(marketing.readRelease()), marketing.releaseFingerprint(release), 'Release copy changed during capture.');
-  await writeFile(join(temporary, 'manifest.json'), JSON.stringify({
-    version: manifest.version, browser: await browser.cdp.send('Browser.getVersion'),
-    releaseSHA256: marketing.releaseFingerprint(release), synthetic: true,
-    note: 'Actual Chrome build in a disposable offline profile. All seven sites enabled as on a fresh install; existing saved choices are preserved. Not Firefox validation.',
-    bundleSHA256: bundleHashes, screenshots: captures
-  }, null, 2) + '\n');
+  assert.equal(
+    marketing.releaseFingerprint(marketing.readRelease()),
+    marketing.releaseFingerprint(release),
+    'Release copy changed during capture.'
+  );
+  await writeFile(
+    join(temporary, 'manifest.json'),
+    JSON.stringify(
+      {
+        version: manifest.version,
+        browser: await browser.cdp.send('Browser.getVersion'),
+        releaseSHA256: marketing.releaseFingerprint(release),
+        synthetic: true,
+        note: 'Actual Chrome build in a disposable offline profile. All seven sites enabled as on a fresh install; existing saved choices are preserved. Not Firefox validation.',
+        bundleSHA256: bundleHashes,
+        screenshots: captures
+      },
+      null,
+      2
+    ) + '\n'
+  );
   await rm(join(output, 'screenshots'), { recursive: true, force: true });
   await rename(temporary, join(output, 'screenshots'));
   console.log(`Store screenshots: ${join(output, 'screenshots')} (1280 × 800 PNG, synthetic data, no uploads)`);
 } catch (error) {
-  if (browser) await withFailureArtifacts(browser, 'marketing screenshot generation', async () => { throw error; });
+  if (browser)
+    await withFailureArtifacts(browser, 'marketing screenshot generation', async () => {
+      throw error;
+    });
   throw error;
 } finally {
   await browser?.cleanup();

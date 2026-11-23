@@ -29,45 +29,83 @@ export async function eventually(check, description, timeout = 10000) {
 const artifactRoot = () => process.env.BROWSER_ARTIFACT_DIR || join(process.cwd(), 'dist/browser-artifacts');
 
 export async function withFailureArtifacts(browser, name, run, root = artifactRoot()) {
-  try { return await run(); }
-  catch (error) {
+  try {
+    return await run();
+  } catch (error) {
     try {
       await mkdir(root, { recursive: true });
       const directory = await mkdtemp(join(root, 'failure-'));
       const report = {
-        name, error: { name: error.name, message: error.message, stack: error.stack },
-        environment: { node: process.version, platform: process.platform, architecture: process.arch, executable: browser.executable },
-        stderr: browser.stderr, events: browser.events || [], errors: (browser.errors || []).map(value => value.stack || String(value)),
-        diagnosticErrors: [], pages: []
+        name,
+        error: { name: error.name, message: error.message, stack: error.stack },
+        environment: {
+          node: process.version,
+          platform: process.platform,
+          architecture: process.arch,
+          executable: browser.executable
+        },
+        stderr: browser.stderr,
+        events: browser.events || [],
+        errors: (browser.errors || []).map(value => value.stack || String(value)),
+        diagnosticErrors: [],
+        pages: []
       };
       const collect = async (label, operation) => {
         let timer;
         try {
-          return await Promise.race([operation(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('diagnostic deadline exceeded')), 1500); })]);
-        } catch (failure) { report.diagnosticErrors.push(`${label}: ${failure.message}`); }
-        finally { clearTimeout(timer); }
+          return await Promise.race([
+            operation(),
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(new Error('diagnostic deadline exceeded')), 1500);
+            })
+          ]);
+        } catch (failure) {
+          report.diagnosticErrors.push(`${label}: ${failure.message}`);
+        } finally {
+          clearTimeout(timer);
+        }
       };
       if (browser.cdp) {
         report.version = await collect('browser version', () => browser.cdp.send('Browser.getVersion'));
         report.targets = await collect('targets', () => browser.cdp.send('Target.getTargets'));
-        if (browser.worker) report.state = await collect('extension state', () => evaluate(browser, browser.worker, '(async () => ({ now: Date.now(), offset: globalThis.__browserSmokeOffset, storage: await chrome.storage.local.get(null), session: await chrome.storage.session.get(null), sessionRules: await chrome.declarativeNetRequest.getSessionRules(), alarms: await chrome.alarms.getAll(), tabs: await chrome.tabs.query({}) }))()'));
+        if (browser.worker)
+          report.state = await collect('extension state', () =>
+            evaluate(
+              browser,
+              browser.worker,
+              '(async () => ({ now: Date.now(), offset: globalThis.__browserSmokeOffset, storage: await chrome.storage.local.get(null), session: await chrome.storage.session.get(null), sessionRules: await chrome.declarativeNetRequest.getSessionRules(), alarms: await chrome.alarms.getAll(), tabs: await chrome.tabs.query({}) }))()'
+            )
+          );
         for (const [index, page] of (browser.pages || []).entries()) {
           const prefix = `page-${index + 1}`;
-          const document = await collect(`${prefix} document`, () => evaluate(browser, page.session, `({
+          const document = await collect(`${prefix} document`, () =>
+            evaluate(
+              browser,
+              page.session,
+              `({
             url: location.href, title: document.title, now: Date.now(), offset: globalThis.__browserSmokeOffset, readyState: document.readyState, visibility: document.visibilityState, focused: document.hasFocus(),
             html: document.documentElement.outerHTML, text: document.body?.innerText,
             controls: [...document.querySelectorAll('button, input, textarea')].map(element => ({ id: element.id, text: element.textContent, disabled: element.disabled, rect: element.getBoundingClientRect().toJSON() }))
-          })`));
+          })`
+            )
+          );
           const { html, ...details } = document || {};
           report.pages.push({ targetId: page.targetId, ...details });
           if (html) await collect(`${prefix} HTML`, () => writeFile(join(directory, `${prefix}.html`), html));
-          const screenshot = await collect(`${prefix} screenshot`, () => browser.cdp.send('Page.captureScreenshot', { format: 'png' }, page.session));
-          if (screenshot) await collect(`${prefix} PNG`, () => writeFile(join(directory, `${prefix}.png`), Buffer.from(screenshot.data, 'base64')));
+          const screenshot = await collect(`${prefix} screenshot`, () =>
+            browser.cdp.send('Page.captureScreenshot', { format: 'png' }, page.session)
+          );
+          if (screenshot)
+            await collect(`${prefix} PNG`, () =>
+              writeFile(join(directory, `${prefix}.png`), Buffer.from(screenshot.data, 'base64'))
+            );
         }
       }
       await writeFile(join(directory, 'report.json'), JSON.stringify(report, null, 2));
       console.error(`Browser failure evidence: ${directory}`);
-    } catch (failure) { console.error(`Browser failure evidence could not be saved: ${failure.message}`); }
+    } catch (failure) {
+      console.error(`Browser failure evidence could not be saved: ${failure.message}`);
+    }
     throw error;
   }
 }
@@ -142,13 +180,18 @@ const inputTraceSource = `document.addEventListener('click', event => {
 
 export function extensionWorkerURL(extensionPath, manifest) {
   const identity = manifest.key ? Buffer.from(manifest.key, 'base64') : Buffer.from(resolve(extensionPath));
-  const id = createHash('sha256').update(identity).digest('hex').slice(0, 32).replace(/[0-9a-f]/g, value => String.fromCharCode(97 + parseInt(value, 16)));
+  const id = createHash('sha256')
+    .update(identity)
+    .digest('hex')
+    .slice(0, 32)
+    .replace(/[0-9a-f]/g, value => String.fromCharCode(97 + parseInt(value, 16)));
   return `chrome-extension://${id}/${manifest.background.service_worker}`;
 }
 
 export function workerTarget(targets, url) {
   const matches = targets.filter(target => target.type === 'service_worker' && target.url === url);
-  if (matches.length > 1) throw Object.assign(new Error('Multiple extension workers match the generated manifest'), { fatal: true });
+  if (matches.length > 1)
+    throw Object.assign(new Error('Multiple extension workers match the generated manifest'), { fatal: true });
   return matches[0];
 }
 
@@ -177,25 +220,51 @@ export async function launch(extensionPath, options = {}) {
   const workerURL = extensionWorkerURL(extensionPath, manifest);
   const directory = await mkdtemp(join(tmpdir(), 'createratio-browser-'));
   const args = [
-    `--user-data-dir=${join(directory, 'profile')}`, '--remote-debugging-port=0',
-    '--remote-debugging-address=127.0.0.1', '--headless=new',
-    '--disable-dev-shm-usage', '--no-first-run', '--no-default-browser-check',
-    '--disable-background-networking', '--disable-component-update', '--disable-sync',
-    '--disable-default-apps', '--disable-breakpad', '--metrics-recording-only',
+    `--user-data-dir=${join(directory, 'profile')}`,
+    '--remote-debugging-port=0',
+    '--remote-debugging-address=127.0.0.1',
+    '--headless=new',
+    '--disable-dev-shm-usage',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-sync',
+    '--disable-default-apps',
+    '--disable-breakpad',
+    '--metrics-recording-only',
     '--disable-features=MediaRouter,OptimizationHints,AutofillServerCommunication',
-    '--proxy-server=http://127.0.0.1:9', '--proxy-bypass-list=<-loopback>',
-    '--host-resolver-rules=MAP * ~NOTFOUND', '--window-size=1280,900',
-    `--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, 'about:blank'
+    '--proxy-server=http://127.0.0.1:9',
+    '--proxy-bypass-list=<-loopback>',
+    '--host-resolver-rules=MAP * ~NOTFOUND',
+    '--window-size=1280,900',
+    `--disable-extensions-except=${extensionPath}`,
+    `--load-extension=${extensionPath}`,
+    'about:blank'
   ];
   if (process.platform === 'darwin') args.push('--use-mock-keychain');
   if (process.env.CHROMIUM_NO_SANDBOX === '1') args.push('--no-sandbox');
   const child = spawn(executable, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
-  let diagnostics = '', spawnError, closed = false, cdp, socket, watchdog, browser;
-  child.stderr.on('data', data => { diagnostics = (diagnostics + data).slice(-5000); });
-  child.on('error', error => { spawnError = error; });
+  let diagnostics = '',
+    spawnError,
+    closed = false,
+    cdp,
+    socket,
+    watchdog,
+    browser;
+  child.stderr.on('data', data => {
+    diagnostics = (diagnostics + data).slice(-5000);
+  });
+  child.on('error', error => {
+    spawnError = error;
+  });
   const kill = signal => {
     if (child.pid) {
-      try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+      try {
+        process.kill(-child.pid, signal);
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error;
+      }
     }
   };
   const cleanup = async () => {
@@ -215,8 +284,24 @@ export async function launch(extensionPath, options = {}) {
     console.error(message);
     try {
       mkdirSync(artifactRoot(), { recursive: true });
-      writeFileSync(join(artifactRoot(), 'termination.json'), JSON.stringify({ message, executable, architecture: process.arch, node: process.version, stderr: diagnostics, events: browser?.events }, null, 2));
-    } catch (error) { console.error(`Browser termination evidence could not be saved: ${error.message}`); }
+      writeFileSync(
+        join(artifactRoot(), 'termination.json'),
+        JSON.stringify(
+          {
+            message,
+            executable,
+            architecture: process.arch,
+            node: process.version,
+            stderr: diagnostics,
+            events: browser?.events
+          },
+          null,
+          2
+        )
+      );
+    } catch (error) {
+      console.error(`Browser termination evidence could not be saved: ${error.message}`);
+    }
     kill('SIGKILL');
     rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     process.exit(code);
@@ -234,39 +319,88 @@ export async function launch(extensionPath, options = {}) {
   try {
     const endpoint = await eventually(async () => {
       if (spawnError) throw Object.assign(spawnError, { fatal: true });
-      if (child.exitCode !== null) throw Object.assign(new Error(`Chromium exited ${child.exitCode}: ${diagnostics}`), { fatal: true });
+      if (child.exitCode !== null)
+        throw Object.assign(new Error(`Chromium exited ${child.exitCode}: ${diagnostics}`), { fatal: true });
       return devToolsEndpoint(await readFile(join(directory, 'profile', 'DevToolsActivePort'), 'utf8'));
     }, `Chromium startup (${executable})`);
     socket = new WebSocket(endpoint);
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Chromium WebSocket handshake timed out')), 10000);
-      socket.addEventListener('open', () => { clearTimeout(timer); resolve(); }, { once: true });
-      socket.addEventListener('error', () => { clearTimeout(timer); reject(new Error('Chromium WebSocket handshake failed')); }, { once: true });
+      socket.addEventListener(
+        'open',
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        { once: true }
+      );
+      socket.addEventListener(
+        'error',
+        () => {
+          clearTimeout(timer);
+          reject(new Error('Chromium WebSocket handshake failed'));
+        },
+        { once: true }
+      );
     });
     cdp = new CDP(socket);
-    browser = { cdp, directory, cleanup, executable, get stderr() { return diagnostics; }, offset: 0, pages: [], documents: [], errors: [], events: [] };
+    browser = {
+      cdp,
+      directory,
+      cleanup,
+      executable,
+      get stderr() {
+        return diagnostics;
+      },
+      offset: 0,
+      pages: [],
+      documents: [],
+      errors: [],
+      events: []
+    };
     const record = (type, details, session) => {
       browser.events.push({ type, details, session, at: Date.now() });
       if (browser.events.length > 200) browser.events.shift();
     };
-    cdp.on('Runtime.consoleAPICalled', (event, session) => record('console', { type: event.type, arguments: event.args.map(value => value.value ?? value.description) }, session));
+    cdp.on('Runtime.consoleAPICalled', (event, session) =>
+      record(
+        'console',
+        { type: event.type, arguments: event.args.map(value => value.value ?? value.description) },
+        session
+      )
+    );
     cdp.on('Runtime.exceptionThrown', (event, session) => record('exception', event.exceptionDetails, session));
     cdp.on('Page.frameNavigated', (event, session) => record('navigation', { url: event.frame.url }, session));
     cdp.on('Fetch.requestPaused', (event, session) => {
       const url = new URL(event.request.url);
       const synthetic = event.resourceType === 'Document' && syntheticHosts.has(url.hostname);
       const operation = synthetic
-        ? cdp.send('Fetch.fulfillRequest', { requestId: event.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from('<!doctype html><html><head><title>Synthetic offline site</title></head><body><h1 id="synthetic-site">Offline synthetic site</h1><p>No login, posting, or remote requests.</p></body></html>').toString('base64') }, session)
+        ? cdp.send(
+            'Fetch.fulfillRequest',
+            {
+              requestId: event.requestId,
+              responseCode: 200,
+              responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }],
+              body: Buffer.from(
+                '<!doctype html><html><head><title>Synthetic offline site</title></head><body><h1 id="synthetic-site">Offline synthetic site</h1><p>No login, posting, or remote requests.</p></body></html>'
+              ).toString('base64')
+            },
+            session
+          )
         : cdp.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' }, session);
       if (synthetic) browser.documents.push(event.request.url);
       operation.catch(error => browser.errors.push(error));
     });
     const sessions = new Map();
-    cdp.on('Target.attachedToTarget', (event) => {
+    cdp.on('Target.attachedToTarget', event => {
       const { sessionId, targetInfo } = event;
       const initialize = async () => {
         if (targetInfo.type === 'page' || targetInfo.type === 'service_worker') {
-          await cdp.send('Fetch.enable', { patterns: [{ urlPattern: 'http://*' }, { urlPattern: 'https://*' }] }, sessionId);
+          await cdp.send(
+            'Fetch.enable',
+            { patterns: [{ urlPattern: 'http://*' }, { urlPattern: 'https://*' }] },
+            sessionId
+          );
         }
         await cdp.send('Runtime.runIfWaitingForDebugger', {}, sessionId);
       };
@@ -284,8 +418,20 @@ export async function launch(extensionPath, options = {}) {
     await workerSession.ready;
     browser.worker = workerSession.sessionId;
     await cdp.send('Runtime.enable', {}, browser.worker);
-    await eventually(() => evaluate(browser, browser.worker, '!!globalThis.chrome?.storage?.local && !!globalThis.chrome?.runtime?.id'), 'extension worker API readiness');
-    await eventually(() => evaluate(browser, browser.worker, 'chrome.storage.session.get("_accessInitialized").then(value => value._accessInitialized === true)'), 'initial access reconciliation');
+    await eventually(
+      () =>
+        evaluate(browser, browser.worker, '!!globalThis.chrome?.storage?.local && !!globalThis.chrome?.runtime?.id'),
+      'extension worker API readiness'
+    );
+    await eventually(
+      () =>
+        evaluate(
+          browser,
+          browser.worker,
+          'chrome.storage.session.get("_accessInitialized").then(value => value._accessInitialized === true)'
+        ),
+      'initial access reconciliation'
+    );
     await evaluate(browser, browser.worker, clockSource(0));
     if (options.developerMode) await enableDeveloperMode(cdp, sessions);
     browser.page = async url => {
@@ -298,7 +444,11 @@ export async function launch(extensionPath, options = {}) {
       await cdp.send('Page.enable', {}, session);
       await cdp.send('Runtime.enable', {}, session);
       await cdp.send('Fetch.enable', { patterns: [{ urlPattern: 'http://*' }, { urlPattern: 'https://*' }] }, session);
-      await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: clockSource(browser.offset) + ';' + inputTraceSource }, session);
+      await cdp.send(
+        'Page.addScriptToEvaluateOnNewDocument',
+        { source: clockSource(browser.offset) + ';' + inputTraceSource },
+        session
+      );
       await cdp.send('Target.activateTarget', { targetId });
       await cdp.send('Page.navigate', { url }, session);
       return page;
@@ -313,7 +463,12 @@ export async function launch(extensionPath, options = {}) {
             await evaluate(browser, page.session, clockSource(browser.offset));
             return true;
           } catch (error) {
-            if (/Execution context was destroyed|Cannot find (?:default execution context|context with specified id)|Inspected target navigated/.test(error.message)) return false;
+            if (
+              /Execution context was destroyed|Cannot find (?:default execution context|context with specified id)|Inspected target navigated/.test(
+                error.message
+              )
+            )
+              return false;
             throw Object.assign(error, { fatal: true });
           }
         }, 'apply test clock across page navigation');
@@ -322,8 +477,11 @@ export async function launch(extensionPath, options = {}) {
     console.log(`Chromium: ${(await cdp.send('Browser.getVersion')).product}`);
     return browser;
   } catch (error) {
-    try { await withFailureArtifacts(browser || { cdp, executable, stderr: diagnostics }, 'Chromium startup', async () => { throw error; }); }
-    catch (_) {}
+    try {
+      await withFailureArtifacts(browser || { cdp, executable, stderr: diagnostics }, 'Chromium startup', async () => {
+        throw error;
+      });
+    } catch (_) {}
     await cleanup();
     throw new Error(`${error.message}\n${diagnostics}`, { cause: error });
   }
@@ -335,11 +493,19 @@ async function enableDeveloperMode(cdp, sessions) {
     const attached = await eventually(() => sessions.get(targetId), 'autoattached extensions page');
     await attached.ready;
     await eventually(async () => {
-      const { result } = await cdp.send('Runtime.evaluate', { awaitPromise: true, returnByValue: true, expression: `(async () => {
+      const { result } = await cdp.send(
+        'Runtime.evaluate',
+        {
+          awaitPromise: true,
+          returnByValue: true,
+          expression: `(async () => {
         if (!globalThis.chrome?.developerPrivate) return false;
         await chrome.developerPrivate.updateProfileConfiguration({ inDeveloperMode: true });
         return (await chrome.developerPrivate.getProfileConfiguration()).inDeveloperMode;
-      })()` }, attached.sessionId);
+      })()`
+        },
+        attached.sessionId
+      );
       return result.value === true;
     }, 'extension developer mode enabled');
   } finally {
@@ -364,13 +530,21 @@ export async function typeAhead(browser, page, text) {
 }
 
 export async function evaluate(browser, session, expression) {
-  const result = await browser.cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, session);
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
+  const result = await browser.cdp.send(
+    'Runtime.evaluate',
+    { expression, awaitPromise: true, returnByValue: true },
+    session
+  );
+  if (result.exceptionDetails)
+    throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
   return result.result.value;
 }
 
 export async function seedAccess(browser, sites, settings) {
-  await evaluate(browser, browser.worker, `(async () => {
+  await evaluate(
+    browser,
+    browser.worker,
+    `(async () => {
     const seed = { _access: Object.fromEntries(${JSON.stringify(sites)}.map(site => [site, { remainingMs: 300000, date: Core.localDate() }])) };
     const preferences = ${JSON.stringify(settings ?? null)};
     if (preferences) {
@@ -379,21 +553,43 @@ export async function seedAccess(browser, sites, settings) {
     }
     await chrome.storage.local.set(seed);
     await SiteAccess.reconcile();
-  })()`);
+  })()`
+  );
 }
 
 export async function openSettingsSection(browser, page, name) {
   const selector = '#' + name + '-settings';
-  await eventually(() => evaluate(browser, page.session, `!!document.querySelector(${JSON.stringify(selector)}) && !!document.querySelector('#accessMinutes-default')`), name + ' settings section ready');
-  if (!await evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`)) await click(browser, page, selector + ' > summary');
-  await eventually(() => evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`), name + ' settings section open');
+  await eventually(
+    () =>
+      evaluate(
+        browser,
+        page.session,
+        `!!document.querySelector(${JSON.stringify(selector)}) && !!document.querySelector('#accessMinutes-default')`
+      ),
+    name + ' settings section ready'
+  );
+  if (!(await evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`)))
+    await click(browser, page, selector + ' > summary');
+  await eventually(
+    () => evaluate(browser, page.session, `document.querySelector(${JSON.stringify(selector)}).open`),
+    name + ' settings section open'
+  );
 }
 
 export async function waitForEnabledControl(browser, page, selector, timeout) {
-  return eventually(() => evaluate(browser, page.session, `(() => {
+  return eventually(
+    () =>
+      evaluate(
+        browser,
+        page.session,
+        `(() => {
     const control = document.querySelector(${JSON.stringify(selector)});
     return control?.disabled === false && control.getAttribute('aria-disabled') !== 'true';
-  })()`), `enabled control ${selector}`, timeout);
+  })()`
+      ),
+    `enabled control ${selector}`,
+    timeout
+  );
 }
 
 export async function accessibilityNodes(browser, page) {
@@ -403,24 +599,47 @@ export async function accessibilityNodes(browser, page) {
 
 export async function findByRole(browser, page, role, name) {
   const normalize = value => (value || '').trim().replace(/\s+/g, ' ');
-  const matches = (await accessibilityNodes(browser, page)).filter(node => node.role?.value === role && normalize(node.name?.value) === normalize(name));
-  if (matches.length !== 1) throw Object.assign(new Error(`Expected one ${role} named ${name}; found ${matches.length}`), { fatal: matches.length > 1 });
+  const matches = (await accessibilityNodes(browser, page)).filter(
+    node => node.role?.value === role && normalize(node.name?.value) === normalize(name)
+  );
+  if (matches.length !== 1)
+    throw Object.assign(new Error(`Expected one ${role} named ${name}; found ${matches.length}`), {
+      fatal: matches.length > 1
+    });
   return matches[0];
 }
 
 export async function click(browser, page, selector) {
-  return clickElement(browser, page, async () => {
-    const { result } = await browser.cdp.send('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(selector)})` }, page.session);
-    return result;
-  }, selector);
+  return clickElement(
+    browser,
+    page,
+    async () => {
+      const { result } = await browser.cdp.send(
+        'Runtime.evaluate',
+        { expression: `document.querySelector(${JSON.stringify(selector)})` },
+        page.session
+      );
+      return result;
+    },
+    selector
+  );
 }
 
 export async function clickByRole(browser, page, role, name) {
-  return clickElement(browser, page, async () => {
-    const node = await findByRole(browser, page, role, name);
-    const { object } = await browser.cdp.send('DOM.resolveNode', { backendNodeId: node.backendDOMNodeId }, page.session);
-    return object;
-  }, `${role} named ${name}`);
+  return clickElement(
+    browser,
+    page,
+    async () => {
+      const node = await findByRole(browser, page, role, name);
+      const { object } = await browser.cdp.send(
+        'DOM.resolveNode',
+        { backendNodeId: node.backendDOMNodeId },
+        page.session
+      );
+      return object;
+    },
+    `${role} named ${name}`
+  );
 }
 
 async function clickElement(browser, page, locate, description) {
@@ -429,7 +648,13 @@ async function clickElement(browser, page, locate, description) {
     const { objectId } = await locate();
     if (!objectId) return false;
     try {
-      const result = await browser.cdp.send('Runtime.callFunctionOn', { objectId, awaitPromise: true, returnByValue: true, functionDeclaration: `async function() {
+      const result = await browser.cdp.send(
+        'Runtime.callFunctionOn',
+        {
+          objectId,
+          awaitPromise: true,
+          returnByValue: true,
+          functionDeclaration: `async function() {
         const element = this;
         if (element.disabled || element.getAttribute('aria-disabled') === 'true' || !element.getClientRects().length) return false;
         element.scrollIntoView({ block: 'center', behavior: 'instant' });
@@ -442,13 +667,32 @@ async function clickElement(browser, page, locate, description) {
         const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
         const hit = element.getRootNode().elementFromPoint(point.x, point.y);
         return hit === element || element.contains(hit) ? point : false;
-      }` }, page.session);
-      if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
+      }`
+        },
+        page.session
+      );
+      if (result.exceptionDetails)
+        throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
       return result.result.value;
-    } finally { await browser.cdp.send('Runtime.releaseObject', { objectId }, page.session).catch(() => {}); }
+    } finally {
+      await browser.cdp.send('Runtime.releaseObject', { objectId }, page.session).catch(() => {});
+    }
   }, `stable clickable ${description}`);
-  browser.events?.push({ type: 'input-request', details: { selector: description, point }, session: page.session, at: Date.now() });
+  browser.events?.push({
+    type: 'input-request',
+    details: { selector: description, point },
+    session: page.session,
+    at: Date.now()
+  });
   await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point }, page.session);
-  await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point }, page.session);
-  await browser.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point }, page.session);
+  await browser.cdp.send(
+    'Input.dispatchMouseEvent',
+    { type: 'mousePressed', button: 'left', clickCount: 1, ...point },
+    page.session
+  );
+  await browser.cdp.send(
+    'Input.dispatchMouseEvent',
+    { type: 'mouseReleased', button: 'left', clickCount: 1, ...point },
+    page.session
+  );
 }

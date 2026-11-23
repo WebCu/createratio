@@ -20,8 +20,19 @@ async function until(predicate, description) {
 }
 
 async function ui(w, name) {
-  const p = page(name, {}, false, { now: () => w.now, forward: message => w.send(message, name === 'blocked' ? gate('x') : sender(name)) });
-  await until(() => name === 'blocked' ? !p.nodes.begin.disabled : name === 'settings' ? !!p.nodes['track-x'] : !!p.nodes.date.dateTime, `${name} loads through the worker`);
+  const p = page(name, {}, false, {
+    now: () => w.now,
+    forward: message => w.send(message, name === 'blocked' ? gate('x') : sender(name))
+  });
+  await until(
+    () =>
+      name === 'blocked'
+        ? !p.nodes.begin.disabled
+        : name === 'settings'
+          ? !!p.nodes['track-x']
+          : !!p.nodes.date.dateTime,
+    `${name} loads through the worker`
+  );
   assert.equal(p.nodes.error.textContent, '');
   return p;
 }
@@ -34,7 +45,10 @@ async function preferences(w, minutes) {
   const p = await ui(w, 'settings');
   p.nodes['accessMinutes-default'].value = String(minutes);
   p.nodes['accessMinutes-default'].fire('change');
-  await until(() => p.nodes['save-status'].textContent.includes('session time saved'), 'duration saved through Settings');
+  await until(
+    () => p.nodes['save-status'].textContent.includes('session time saved'),
+    'duration saved through Settings'
+  );
   p.nodes['intention-history-enabled'].checked = true;
   await p.nodes['intention-history-enabled'].fire('change');
   assert.match(p.nodes['save-status'].textContent, /intentions will be saved/);
@@ -81,15 +95,22 @@ for (const browser of ['chrome', 'browser']) {
     const source = { id: 'test-extension', tab: { id: 1 }, frameId: 0, url };
     const w = worker({ _access: { linkedin: { remainingMs: 300000, date } } }, browser, start);
     w.activate(url);
-    let ready = false, pending = 0;
-    const t = await tracker(browser, { url, standalonePost: true, forward: async message => {
-      pending++;
-      try {
-        const response = await w.send(message, source);
-        ready = true;
-        return response;
-      } finally { pending--; }
-    } });
+    let ready = false,
+      pending = 0;
+    const t = await tracker(browser, {
+      url,
+      standalonePost: true,
+      forward: async message => {
+        pending++;
+        try {
+          const response = await w.send(message, source);
+          ready = true;
+          return response;
+        } finally {
+          pending--;
+        }
+      }
+    });
     await until(() => ready, 'modern post tracker loads worker preferences');
     t.route(url, true);
     async function sample(ms) {
@@ -119,7 +140,8 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(await sample(5000), 22, 'hidden writing adds no time');
     t.visible(true);
     t.input();
-    for (const expected of [27, 32, 37, 42, 47, 52, 52]) assert.equal(await sample(5000), expected, 'idle writing stops at thirty seconds');
+    for (const expected of [27, 32, 37, 42, 47, 52, 52])
+      assert.equal(await sample(5000), expected, 'idle writing stops at thirty seconds');
     t.input();
     assert.equal(await sample(20000), 52, 'a sleep gap is not backfilled');
     t.input();
@@ -131,15 +153,18 @@ for (const browser of ['chrome', 'browser']) {
     t.document.activeElement = t.editor;
     t.event('focusin', {});
     assert.equal((await w.send({ type: 'access-end', site: 'linkedin' }, sender('popup'))).ok, true);
-    t.notify(); await sample(0);
+    t.notify();
+    await sample(0);
     t.input();
     assert.equal(await sample(5000), 57, 'ending access stops creation tracking');
     assert.equal((await w.send({ type: 'access-goal-setting', enabled: true }, sender('settings'))).ok, true);
-    t.notify(); await sample(0);
+    t.notify();
+    await sample(0);
     t.input();
     assert.equal(await sample(5000), 62, 'above-goal access permits fresh writing without a session');
     assert.equal((await w.send({ type: 'tracking', site: 'linkedin', enabled: false }, sender('settings'))).ok, true);
-    t.notify(); await sample(0);
+    t.notify();
+    await sample(0);
     t.input();
     assert.equal(await sample(5000), 62, 'Limit & track Off cannot record writing even above the goal');
     assert.deepEqual(w.errors, []);
@@ -173,7 +198,10 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(reloaded.nodes.clock.textContent, '0:00');
     assert.equal(reloaded.nodes.open.disabled, false);
     assert.deepEqual(reloaded.state.redirects, []);
-    assert.equal(reloaded.messages.some(message => message.type === 'access-open'), false);
+    assert.equal(
+      reloaded.messages.some(message => message.type === 'access-open'),
+      false
+    );
     assert.equal((await w.send({ type: 'access-status' })).access.x.remainingMs, 0);
     assert.deepEqual(rulesFor(w), []);
 
@@ -192,13 +220,19 @@ for (const browser of ['chrome', 'browser']) {
     assert.ok(w.rules.length > 0);
     w.advance(20000);
     popup.refresh();
-    await until(() => accessRow(popup).children[0].children[1].textContent === '1:40 left', 'popup displays elapsed active time');
+    await until(
+      () => accessRow(popup).children[0].children[1].textContent === '1:40 left',
+      'popup displays elapsed active time'
+    );
     w.blur();
     snapshot = await w.send({ type: 'snapshot' });
     assert.equal(snapshot.access.x.remainingMs, 100000);
     assert.equal(snapshot.access.x.expiresAt, 0);
     popup.refresh();
-    await until(() => accessRow(popup).children[0].children[1].textContent === '1:40 left · paused', 'popup displays paused time');
+    await until(
+      () => accessRow(popup).children[0].children[1].textContent === '1:40 left · paused',
+      'popup displays paused time'
+    );
     w.advance(600000);
     const paused = await ui(w, 'popup');
     assert.equal(accessRow(paused).children[0].children[1].textContent, '1:40 left · paused');
@@ -215,12 +249,18 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(accessRow(resumed).children[0].children[1].textContent, 'Blocked');
     assert.equal((await w.send({ type: 'snapshot' })).access.x.remainingMs, 0);
     assert.deepEqual(rulesFor(w), []);
-    assert.deepEqual(w.tabs.map(tab => tab.url), [gate('x').url, gate('x').url]);
+    assert.deepEqual(
+      w.tabs.map(tab => tab.url),
+      [gate('x').url, gate('x').url]
+    );
     assert.deepEqual(w.data.settings, savedPreferences);
     assert.deepEqual(w.data._intentions, intentions);
     const dashboard = await ui(w, 'dashboard');
     dashboard.nodes['intentions-view'].fire('click');
-    await until(() => dashboard.nodes['intention-list'].children.length === 1, 'saved intention remains reviewable after ending access');
+    await until(
+      () => dashboard.nodes['intention-list'].children.length === 1,
+      'saved intention remains reviewable after ending access'
+    );
     assert.equal(dashboard.nodes['intention-list'].children[0].children[1].textContent, intent);
     assert.deepEqual(w.errors, []);
   });
@@ -244,18 +284,24 @@ for (const browser of ['chrome', 'browser']) {
     await w.send({ type: 'snapshot' });
 
     const deliveries = [];
-    let delayNext = false, pending, release;
-    const t = await tracker(browser, { forward: async message => {
-      const packet = structuredClone(message);
-      if (packet.type === 'ingest' && delayNext) {
-        delayNext = false;
-        pending = packet;
-        await new Promise(resolve => { release = resolve; });
+    let delayNext = false,
+      pending,
+      release;
+    const t = await tracker(browser, {
+      forward: async message => {
+        const packet = structuredClone(message);
+        if (packet.type === 'ingest' && delayNext) {
+          delayNext = false;
+          pending = packet;
+          await new Promise(resolve => {
+            release = resolve;
+          });
+        }
+        const response = await w.send(packet);
+        deliveries.push({ packet, response });
+        return response;
       }
-      const response = await w.send(packet);
-      deliveries.push({ packet, response });
-      return response;
-    } });
+    });
     await until(() => deliveries.length > 0, 'tracker loads the real worker snapshot');
     t.setNow(w.now - start);
     t.input();
@@ -293,7 +339,10 @@ for (const browser of ['chrome', 'browser']) {
     const beforeCancel = structuredClone(w.data);
     await settings.nodes['clear-history'].fire('click');
     assert.deepEqual(w.data, beforeCancel);
-    assert.equal(settings.messages.some(message => message.type === 'clear-history'), false);
+    assert.equal(
+      settings.messages.some(message => message.type === 'clear-history'),
+      false
+    );
     assert.match(settings.state.confirmations[0], /cannot be undone/);
 
     w.advance(5000);
@@ -311,12 +360,16 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(settings.nodes['clear-history'].disabled, false);
     assert.equal(w.data[date], undefined);
     assert.equal(w.data['_websiteTime:' + date], undefined);
-    for (const key of ['settings', '_intentions', '_access', '_websiteTimeEnabled']) assert.deepEqual(w.data[key], beforeClear[key]);
+    for (const key of ['settings', '_intentions', '_access', '_websiteTimeEnabled'])
+      assert.deepEqual(w.data[key], beforeClear[key]);
     assert.notEqual(w.data._historyGeneration, pending.generation);
     await score(w, '0.00', 0);
 
     release();
-    await until(() => deliveries.some(delivery => delivery.packet.id === pending.id), 'delayed packet receives the reset generation');
+    await until(
+      () => deliveries.some(delivery => delivery.packet.id === pending.id),
+      'delayed packet receives the reset generation'
+    );
     const stale = deliveries.find(delivery => delivery.packet.id === pending.id);
     assert.equal(stale.response.ok, true);
     assert.equal(stale.response.generation, w.data._historyGeneration);
@@ -348,7 +401,9 @@ for (const browser of ['chrome', 'browser']) {
     await until(() => w.data[date]?.x.posts === 1, 'a fresh trusted submission resumes');
     assert.equal(w.data[date].x.consumeSec, 5);
     assert.equal(w.data[date].x.createSec, 0);
-    const fresh = deliveries.filter(delivery => delivery.packet.type === 'ingest' && delivery.packet.id !== pending.id).at(-1);
+    const fresh = deliveries
+      .filter(delivery => delivery.packet.type === 'ingest' && delivery.packet.id !== pending.id)
+      .at(-1);
     assert.equal(fresh.packet.generation, w.data._historyGeneration);
     await score(w, '24.00', 1);
     assert.deepEqual(w.data.settings, beforeClear.settings);
@@ -357,7 +412,10 @@ for (const browser of ['chrome', 'browser']) {
     assert.deepEqual(t.warnings, []);
   });
 
-  for (const [name, button] of [['dashboard', 'export'], ['settings', 'export-ratio']]) {
+  for (const [name, button] of [
+    ['dashboard', 'export'],
+    ['settings', 'export-ratio']
+  ]) {
     test(`${browser}: the worker's Clear history writes make a pending ${name} CSV reject its pre-clear reply`, async () => {
       const w = worker({ [date]: { x: { createSec: 180, consumeSec: 60 } } }, browser, start);
       const settings = await ui(w, 'settings');
@@ -370,11 +428,15 @@ for (const browser of ['chrome', 'browser']) {
       await exporter.ready();
       const beforeClear = structuredClone(w.data);
       await settings.nodes['clear-history'].fire('click');
-      const written = Object.fromEntries(Object.keys({ ...beforeClear, ...w.data })
-        .filter(key => !util.isDeepStrictEqual(beforeClear[key], w.data[key]))
-        .map(key => [key, { oldValue: beforeClear[key], newValue: structuredClone(w.data[key]) }]));
+      const written = Object.fromEntries(
+        Object.keys({ ...beforeClear, ...w.data })
+          .filter(key => !util.isDeepStrictEqual(beforeClear[key], w.data[key]))
+          .map(key => [key, { oldValue: beforeClear[key], newValue: structuredClone(w.data[key]) }])
+      );
       exporter.change(written);
-      await exporter.ready(); release(); await exporting;
+      await exporter.ready();
+      release();
+      await exporting;
       assert.equal(exporter.blobs.length, 0, 'a pre-clear reply never becomes a CSV');
       assert.equal(exporter.nodes.error.textContent, 'History changed while loading. Please try again.');
       exporter.state.replies.delete('history');

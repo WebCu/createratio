@@ -62,7 +62,9 @@ test('setup installs a verified archive once and reuses it from the cache', asyn
   assert.deepEqual(await installChromium(pin), { executable: pin.executable, downloaded: false });
   assert.deepEqual(requests, [`/${pins.chromeForTesting.version}/linux64/chrome-linux64.zip`]);
   assert.deepEqual(resolveBrowser({}, pin), {
-    executable: pin.executable, version: `Google Chrome for Testing ${pins.chromeForTesting.version}`, warning: null
+    executable: pin.executable,
+    version: `Google Chrome for Testing ${pins.chromeForTesting.version}`,
+    warning: null
   });
 });
 
@@ -90,21 +92,33 @@ test('browser resolution rejects branded Chrome and missing browsers, and warns 
   const directory = temporaryDirectory(t);
   const emptyCache = { CREATERATIO_CACHE_DIR: directory };
   const branded = fakeBrowser(directory, 'branded', 'Google Chrome 157.0.8103.80');
-  assert.match(resolveBrowser({ ...emptyCache, CHROMIUM_PATH: branded }).problem, /branded Chrome.*pnpm setup:chromium/);
-  assert.match(resolveBrowser({ ...emptyCache, CHROMIUM: path.join(directory, 'missing') }).problem, /not found.*pnpm setup:chromium/);
+  assert.match(
+    resolveBrowser({ ...emptyCache, CHROMIUM_PATH: branded }).problem,
+    /branded Chrome.*pnpm setup:chromium/
+  );
+  assert.match(
+    resolveBrowser({ ...emptyCache, CHROMIUM: path.join(directory, 'missing') }).problem,
+    /not found.*pnpm setup:chromium/
+  );
   const chromium = fakeBrowser(directory, 'chromium', 'Chromium 150.0.1.2');
   const preferred = fakeBrowser(directory, 'preferred', `Chromium ${pins.chromeForTesting.version}`);
   assert.match(resolveBrowser({ ...emptyCache, CHROMIUM: chromium }).warning, /differs from the CI browser/);
   const longerPatch = fakeBrowser(directory, 'longer-patch', `Chromium ${pins.chromeForTesting.version}0`);
   assert.match(resolveBrowser({ ...emptyCache, CHROMIUM: longerPatch }).warning, /differs from the CI browser/);
   assert.deepEqual(resolveBrowser({ ...emptyCache, CHROMIUM_PATH: preferred, CHROMIUM: chromium }), {
-    executable: preferred, version: `Chromium ${pins.chromeForTesting.version}`, warning: null
+    executable: preferred,
+    version: `Chromium ${pins.chromeForTesting.version}`,
+    warning: null
   });
 });
 
 test('the resolve command fails with setup advice instead of launching branded Chrome', t => {
   const directory = temporaryDirectory(t);
-  const env = { ...process.env, CREATERATIO_CACHE_DIR: directory, CHROMIUM_PATH: fakeBrowser(directory, 'branded', 'Google Chrome 157.0.8103.80') };
+  const env = {
+    ...process.env,
+    CREATERATIO_CACHE_DIR: directory,
+    CHROMIUM_PATH: fakeBrowser(directory, 'branded', 'Google Chrome 157.0.8103.80')
+  };
   const rejected = spawnSync(process.execPath, [script, '--resolve'], { encoding: 'utf8', env });
   assert.equal(rejected.status, 1);
   assert.match(rejected.stderr, /branded Chrome/);
@@ -117,11 +131,18 @@ test('the resolve command fails with setup advice instead of launching branded C
 
 test('CI installs the browser versions that local setup pins', () => {
   const { version, archives } = pins.chromeForTesting;
-  const downloads = [...workflow.matchAll(/chrome-for-testing-public\/([^/\s]+)\/linux64\/chrome-linux64\.zip/g)].map(match => match[1]);
+  const downloads = [...workflow.matchAll(/chrome-for-testing-public\/([^/\s]+)\/linux64\/chrome-linux64\.zip/g)].map(
+    match => match[1]
+  );
   assert.ok(downloads.length >= 2);
   assert.deepEqual(new Set(downloads), new Set([version]));
-  const checksums = [...workflow.matchAll(/echo '([a-f0-9]{64}) {2}'"\$RUNNER_TEMP\/chrome\.zip"/g)].map(match => match[1]);
+  const checksums = [...workflow.matchAll(/echo '([a-f0-9]{64}) {2}'"\$RUNNER_TEMP\/chrome\.zip"/g)].map(
+    match => match[1]
+  );
   assert.equal(checksums.length, downloads.length);
   assert.deepEqual(new Set(checksums), new Set([archives.linux64.sha256]));
-  assert.deepEqual([...workflow.matchAll(/browser-harness==(\S+)/g)].map(match => match[1]), [pins.browserHarness]);
+  assert.deepEqual(
+    [...workflow.matchAll(/browser-harness==(\S+)/g)].map(match => match[1]),
+    [pins.browserHarness]
+  );
 });

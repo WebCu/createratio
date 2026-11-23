@@ -20,7 +20,10 @@ export async function bundleFingerprint(root) {
     }
   }
   await visit('');
-  assert.ok(files.some(file => file.path === 'manifest.json'), 'Bundle manifest is missing');
+  assert.ok(
+    files.some(file => file.path === 'manifest.json'),
+    'Bundle manifest is missing'
+  );
   return { sha256: createHash('sha256').update(JSON.stringify(files)).digest('hex'), files };
 }
 
@@ -45,35 +48,81 @@ export function validateProfile(report) {
   assert.equal(report.schemaVersion, 1, 'Unsupported profile schema');
   assert.equal(report.status, 'complete', 'Profile is incomplete or failed');
   assert.ok(['document', 'app-shell', 'body'].includes(report.layout), 'Unknown layout');
-  for (const [key, value] of Object.entries({ tabCount: 8, cycles: 30, lifecycleWheelEvents: 61, wheelEvents: 100, idleMs: 6000 })) {
+  for (const [key, value] of Object.entries({
+    tabCount: 8,
+    cycles: 30,
+    lifecycleWheelEvents: 61,
+    wheelEvents: 100,
+    idleMs: 6000
+  })) {
     assert.equal(report[key], value, `Unexpected workload ${key}`);
   }
-  assert.ok(Number.isFinite(Date.parse(report.startedAt)) && Date.parse(report.completedAt) >= Date.parse(report.startedAt), 'Invalid observation timestamps');
+  assert.ok(
+    Number.isFinite(Date.parse(report.startedAt)) && Date.parse(report.completedAt) >= Date.parse(report.startedAt),
+    'Invalid observation timestamps'
+  );
   assert.ok(hash(report.provenance.workloadSha256), 'Missing workload fingerprint');
   for (const variant of ['baseline', 'candidate']) {
     const bundle = report.provenance[variant];
     assert.ok(hash(bundle.sha256) && Array.isArray(bundle.files) && bundle.files.length, 'Missing bundle fingerprint');
-    assert.equal(createHash('sha256').update(JSON.stringify(bundle.files)).digest('hex'), bundle.sha256, 'Bundle inventory does not match its fingerprint');
+    assert.equal(
+      createHash('sha256').update(JSON.stringify(bundle.files)).digest('hex'),
+      bundle.sha256,
+      'Bundle inventory does not match its fingerprint'
+    );
     assert.equal(new Set(bundle.files.map(file => file.path)).size, bundle.files.length, 'Duplicate bundle paths');
-    assert.ok(bundle.files.some(file => file.path === 'manifest.json'), 'Missing manifest in bundle inventory');
-    for (const file of bundle.files) assert.ok(typeof file.path === 'string' && Number.isSafeInteger(file.bytes) && file.bytes >= 0 && hash(file.sha256), 'Invalid bundle inventory');
+    assert.ok(
+      bundle.files.some(file => file.path === 'manifest.json'),
+      'Missing manifest in bundle inventory'
+    );
+    for (const file of bundle.files)
+      assert.ok(
+        typeof file.path === 'string' && Number.isSafeInteger(file.bytes) && file.bytes >= 0 && hash(file.sha256),
+        'Invalid bundle inventory'
+      );
   }
-  assert.deepEqual(report.runs.map(run => `${run.variant}:${run.repetition}`), ['baseline:1', 'candidate:1', 'candidate:2', 'baseline:2', 'baseline:3', 'candidate:3'], 'Expected three alternating runs per build');
+  assert.deepEqual(
+    report.runs.map(run => `${run.variant}:${run.repetition}`),
+    ['baseline:1', 'candidate:1', 'candidate:2', 'baseline:2', 'baseline:3', 'candidate:3'],
+    'Expected three alternating runs per build'
+  );
   for (const run of report.runs) {
     assert.equal(run.layout, report.layout, 'Mixed layouts within a profile');
     assert.equal(run.bundleSha256, report.provenance[run.variant].sha256, 'Run uses a different bundle');
-    assert.ok(typeof run.browser === 'string' && /^[A-Za-z ]+\/\d+(?:\.\d+){1,3}$/.test(run.browser), 'Missing browser version');
+    assert.ok(
+      typeof run.browser === 'string' && /^[A-Za-z ]+\/\d+(?:\.\d+){1,3}$/.test(run.browser),
+      'Missing browser version'
+    );
     assert.ok([40, 80].includes(run.wheelDistance), 'Unexpected wheel distance');
-    assert.deepEqual(run.checkpoints.map(point => point.cycle), [0, 10, 30], 'Missing lifecycle checkpoint');
+    assert.deepEqual(
+      run.checkpoints.map(point => point.cycle),
+      [0, 10, 30],
+      'Missing lifecycle checkpoint'
+    );
     assert.ok(finite(run.injectedBytes) && finite(run.controlHeap.heapBytes), 'Invalid byte measurements');
     for (const point of run.checkpoints) {
-      assert.ok(finite(point.heapBytes) && Number.isSafeInteger(point.nodes) && point.nodes >= 0 && Array.isArray(point.wheelListeners), 'Invalid checkpoint');
+      assert.ok(
+        finite(point.heapBytes) &&
+          Number.isSafeInteger(point.nodes) &&
+          point.nodes >= 0 &&
+          Array.isArray(point.wheelListeners),
+        'Invalid checkpoint'
+      );
       assert.equal(point.nodes, run.checkpoints[0].nodes, 'DOM nodes accumulated');
-      assert.equal(point.wheelListeners.length, run.checkpoints[0].wheelListeners.length, 'Wheel listeners accumulated');
+      assert.equal(
+        point.wheelListeners.length,
+        run.checkpoints[0].wheelListeners.length,
+        'Wheel listeners accumulated'
+      );
     }
-    for (const key of ['elapsedMs', 'scriptMs', 'taskMs', 'layoutMs']) assert.ok(finite(run.workload[key]), `Invalid ${key}`);
+    for (const key of ['elapsedMs', 'scriptMs', 'taskMs', 'layoutMs'])
+      assert.ok(finite(run.workload[key]), `Invalid ${key}`);
     assert.equal(run.idleRequests, 0, 'Hidden snapshot requests observed');
-    assert.equal(run.inactiveListeners.filter(listener => !listener.passive).length, 0, 'Hidden non-passive listeners observed');
+    assert.equal(
+      run.inactiveListeners.filter(listener => !listener.passive).length,
+      0,
+      'Hidden non-passive listeners observed'
+    );
   }
   for (const bundleSha256 of new Set(report.runs.map(run => run.bundleSha256))) {
     const distances = report.runs.filter(run => run.bundleSha256 === bundleSha256).map(run => run.wheelDistance);
@@ -95,26 +144,48 @@ export function renderProfiles(reports) {
     assert.equal(report.runs[0].browser, first.runs[0].browser, 'Mixed browser versions');
   }
   const lines = [
-    '# Scroll resource comparison', '',
+    '# Scroll resource comparison',
+    '',
     `Baseline bundle SHA-256: \`${first.provenance.baseline.sha256}\``,
     `Candidate bundle SHA-256: \`${first.provenance.candidate.sha256}\``,
-    `Workload SHA-256: \`${first.provenance.workloadSha256}\``, '',
+    `Workload SHA-256: \`${first.provenance.workloadSha256}\``,
+    '',
     `Environment: ${first.environment.node}, ${first.environment.platform}/${first.environment.architecture}, ${first.runs[0].browser}.`,
     'Each layout: three alternating runs per build, eight tabs, 30 lifecycle cycles, 61 lifecycle wheel inputs, 100 timed inputs, six seconds hidden.',
-    'Values are median [minimum–maximum].', ''
+    'Values are median [minimum–maximum].',
+    ''
   ];
   for (const report of reports) {
-    lines.push(`## ${report.layout}`, '', `Observed: ${new Date(report.startedAt).toISOString()} to ${new Date(report.completedAt).toISOString()}.`, '', '| Measurement | Baseline | Candidate |', '| --- | ---: | ---: |');
+    lines.push(
+      `## ${report.layout}`,
+      '',
+      `Observed: ${new Date(report.startedAt).toISOString()} to ${new Date(report.completedAt).toISOString()}.`,
+      '',
+      '| Measurement | Baseline | Candidate |',
+      '| --- | ---: | ---: |'
+    );
     for (const [name, measure] of metrics) {
       const values = variant => {
-        const samples = report.runs.filter(run => run.variant === variant).map(measure).sort((a, b) => a - b);
+        const samples = report.runs
+          .filter(run => run.variant === variant)
+          .map(measure)
+          .sort((a, b) => a - b);
         return `${samples[1].toFixed(3)} [${samples[0].toFixed(3)}–${samples[2].toFixed(3)}]`;
       };
       lines.push(`| ${name} | ${values('baseline')} | ${values('candidate')} |`);
     }
-    lines.push('', 'All runs: stable DOM-node/wheel-listener counts; zero hidden snapshot requests and non-passive wheel listeners.', '');
+    lines.push(
+      '',
+      'All runs: stable DOM-node/wheel-listener counts; zero hidden snapshot requests and non-passive wheel listeners.',
+      ''
+    );
   }
-  lines.push('Synthetic Chromium evidence only. Isolate heap is not whole-browser RAM; CDP elapsed time is not physical input latency; hidden-message checks do not prove worker termination.', '', 'Resource acceptance requires maintainer review. This report does not grant acceptance or establish live-site/device/browser compatibility.', '');
+  lines.push(
+    'Synthetic Chromium evidence only. Isolate heap is not whole-browser RAM; CDP elapsed time is not physical input latency; hidden-message checks do not prove worker termination.',
+    '',
+    'Resource acceptance requires maintainer review. This report does not grant acceptance or establish live-site/device/browser compatibility.',
+    ''
+  );
   return lines.join('\n');
 }
 

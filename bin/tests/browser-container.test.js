@@ -26,7 +26,9 @@ function write(directory, file, content) {
 
 function container(t) {
   const base = scratch(t);
-  const dirs = Object.fromEntries(['source', 'work', 'deps', 'output', 'home'].map(name => [name, path.join(base, name)]));
+  const dirs = Object.fromEntries(
+    ['source', 'work', 'deps', 'output', 'home'].map(name => [name, path.join(base, name)])
+  );
   for (const name of ['source', 'deps']) fs.mkdirSync(dirs[name]);
   write(dirs.source, 'pnpm-lock.yaml', 'lock: 1\n');
   write(dirs.source, 'bin/browser-pins.json', '{"pin":1}\n');
@@ -36,11 +38,21 @@ function container(t) {
   const pins = path.join(base, 'image-pins.json');
   fs.writeFileSync(pins, '{"pin":1}\n');
   const run = (...command) => {
-    const archive = spawnSync('tar', ['-cf', '-', '.'], { cwd: dirs.source, env: { ...process.env, COPYFILE_DISABLE: '1' } });
+    const archive = spawnSync('tar', ['-cf', '-', '.'], {
+      cwd: dirs.source,
+      env: { ...process.env, COPYFILE_DISABLE: '1' }
+    });
     return spawnSync('sh', [entry, ...command], {
       encoding: 'utf8',
       input: archive.stdout,
-      env: { PATH: process.env.PATH, HOME: dirs.home, BROWSER_CHECK_WORK: dirs.work, BROWSER_CHECK_DEPS: dirs.deps, BROWSER_CHECK_PINS: pins, BROWSER_CHECK_OUTPUT: dirs.output }
+      env: {
+        PATH: process.env.PATH,
+        HOME: dirs.home,
+        BROWSER_CHECK_WORK: dirs.work,
+        BROWSER_CHECK_DEPS: dirs.deps,
+        BROWSER_CHECK_PINS: pins,
+        BROWSER_CHECK_OUTPUT: dirs.output
+      }
     });
   };
   return { dirs, run };
@@ -50,7 +62,16 @@ test('the wrapper sends only files git tracks or would track', t => {
   const repo = scratch(t);
   const git = (...args) => assert.equal(spawnSync('git', args, { cwd: repo }).status, 0, args.join(' '));
   git('init', '-q');
-  for (const [file, content] of [['.gitignore', '.env\nnode_modules/\ndist/\n.codex/\n'], ['tracked.txt', 'a'], ['gone.txt', 'b'], ['sub/new.txt', 'c'], ['.env', 'SECRET'], ['node_modules/x.js', 'x'], ['dist/old.txt', 'o'], ['.codex/auth.json', 'token']]) {
+  for (const [file, content] of [
+    ['.gitignore', '.env\nnode_modules/\ndist/\n.codex/\n'],
+    ['tracked.txt', 'a'],
+    ['gone.txt', 'b'],
+    ['sub/new.txt', 'c'],
+    ['.env', 'SECRET'],
+    ['node_modules/x.js', 'x'],
+    ['dist/old.txt', 'o'],
+    ['.codex/auth.json', 'token']
+  ]) {
     write(repo, file, content);
   }
   git('add', '.gitignore', 'tracked.txt', 'gone.txt');
@@ -77,11 +98,17 @@ test('as root, the wrapper gives a new output folder to the image user and leave
   const existing = path.join(base, 'existing');
   fs.mkdirSync(existing);
   fs.chmodSync(existing, 0o770);
-  assert.equal(prepareOutput(existing, { uid: 0, chown }), existing, 'group access can grant the image user write access');
+  assert.equal(
+    prepareOutput(existing, { uid: 0, chown }),
+    existing,
+    'group access can grant the image user write access'
+  );
   assert.equal(calls.length, 1, 'existing folders keep their owner');
 });
 
-test('the wrapper returns the consumer status when the consumer exits without reading the checkout', { timeout: 20000 }, async t => {
+test('the wrapper returns the consumer status when the consumer exits without reading the checkout', {
+  timeout: 20000
+}, async t => {
   const directory = scratch(t);
   fs.writeFileSync(path.join(directory, 'large.bin'), Buffer.alloc(4 * 1024 * 1024, 1));
   assert.equal(await stream(['large.bin'], ['sh', '-c', 'exit 3'], { cwd: directory }), 3);
@@ -105,7 +132,14 @@ test('the wrapper streams the checkout to the consumer and returns its status', 
 
 test('the container entry unpacks the stream with image dependencies, then forwards the command', t => {
   const { dirs, run } = container(t);
-  const result = run('sh', '-c', 'printf "%s|" "$@"; ls -A; cat node_modules/image.txt', 'probe', 'two words', '--flag');
+  const result = run(
+    'sh',
+    '-c',
+    'printf "%s|" "$@"; ls -A; cat node_modules/image.txt',
+    'probe',
+    'two words',
+    '--flag'
+  );
   assert.equal(result.status, 0, result.stderr);
   const [forwarded, ...listing] = result.stdout.split('\n');
   assert.equal(forwarded, 'two words|--flag|' + 'bin');
@@ -115,9 +149,16 @@ test('the container entry unpacks the stream with image dependencies, then forwa
 
 test('the container entry keeps the command exit status and exports failure evidence', t => {
   const { dirs, run } = container(t);
-  const result = run('sh', '-c', 'mkdir -p dist/browser-artifacts/failure-1 && echo evidence > dist/browser-artifacts/failure-1/report.json && exit 7');
+  const result = run(
+    'sh',
+    '-c',
+    'mkdir -p dist/browser-artifacts/failure-1 && echo evidence > dist/browser-artifacts/failure-1/report.json && exit 7'
+  );
   assert.equal(result.status, 7);
-  assert.equal(fs.readFileSync(path.join(dirs.output, 'browser-artifacts/failure-1/report.json'), 'utf8'), 'evidence\n');
+  assert.equal(
+    fs.readFileSync(path.join(dirs.output, 'browser-artifacts/failure-1/report.json'), 'utf8'),
+    'evidence\n'
+  );
 });
 
 test('the container entry keeps the command status when the export fails', t => {
@@ -146,7 +187,10 @@ for (const file of ['pnpm-lock.yaml', 'bin/browser-pins.json']) {
     write(dirs.source, file, 'changed\n');
     const result = run('sh', '-c', 'touch ran');
     assert.equal(result.status, 3);
-    assert.match(result.stderr, new RegExp(`${file.replace('.', '\\.')} differs[^\\n]+docker compose build browser-tests`));
+    assert.match(
+      result.stderr,
+      new RegExp(`${file.replace('.', '\\.')} differs[^\\n]+docker compose build browser-tests`)
+    );
     assert.equal(fs.existsSync(path.join(dirs.work, 'ran')), false);
   });
 }
@@ -159,19 +203,40 @@ test('the container entry needs a command and a piped checkout', t => {
 test('the browser container runs isolated and installs the versions CI uses', () => {
   const service = compose.split('\n  browser-tests:\n')[1];
   assert.ok(service, 'Missing browser-tests service');
-  for (const setting of [/network_mode: none/, /read_only: true/, /cap_drop:\n\s+- ALL/, /no-new-privileges:true/, /platform: linux\/amd64/]) {
+  for (const setting of [
+    /network_mode: none/,
+    /read_only: true/,
+    /cap_drop:\n\s+- ALL/,
+    /no-new-privileges:true/,
+    /platform: linux\/amd64/
+  ]) {
     assert.match(service, setting);
   }
-  const volumes = service.split('volumes:\n')[1].match(/^\s+- (\S+)$/gm).map(line => line.trim().slice(2));
-  assert.deepEqual(volumes, ['./dist/container:/out'], 'the checkout is streamed, and only failure evidence is writable on the host');
+  const volumes = service
+    .split('volumes:\n')[1]
+    .match(/^\s+- (\S+)$/gm)
+    .map(line => line.trim().slice(2));
+  assert.deepEqual(
+    volumes,
+    ['./dist/container:/out'],
+    'the checkout is streamed, and only failure evidence is writable on the host'
+  );
   assert.match(workflow, /run: node bin\/browser-container\.js pnpm smoke:browser/);
   assert.match(dockerfile, /^FROM node:([\d.]+)-bookworm-slim@sha256:[a-f0-9]{64}$/m);
   const ciNode = workflow.match(/node-version: (\S+)/)[1];
   const ciPnpm = workflow.match(/pnpm\/action-setup@[^\n]+\n\s+with:\n\s+version: (\S+)/)[1];
   assert.equal(dockerfile.match(/^FROM node:([\d.]+)-/m)[1], ciNode);
   assert.equal(dockerfile.match(/^ARG PNPM_VERSION=(\S+)$/m)[1], ciPnpm);
-  assert.match(dockerfile, /COPY bin\/browser-pins\.json bin\/setup-chromium\.js \/opt\/createratio\/bin\//, 'the entry compares the checkout pins with this copy');
+  assert.match(
+    dockerfile,
+    /COPY bin\/browser-pins\.json bin\/setup-chromium\.js \/opt\/createratio\/bin\//,
+    'the entry compares the checkout pins with this copy'
+  );
   assert.match(dockerfile, /RUN node \/opt\/createratio\/bin\/setup-chromium\.js/);
   assert.match(dockerfile, /pnpm install --frozen-lockfile --ignore-scripts/);
-  assert.match(dockerfile, /pnpm_config_verify_deps_before_run=false/, 'the entry lockfile check replaces pnpm network verification');
+  assert.match(
+    dockerfile,
+    /pnpm_config_verify_deps_before_run=false/,
+    'the entry lockfile check replaces pnpm network verification'
+  );
 });

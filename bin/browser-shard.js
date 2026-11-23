@@ -17,7 +17,8 @@ try {
   const inventory = new Set(readdirSync(directory).filter(file => file.endsWith('.test.js')));
   const assigned = new Set();
   for (const file of shards.flat()) {
-    if (typeof file !== 'string' || path.basename(file) !== file || !file.endsWith('.test.js')) throw new Error(`Invalid browser test: ${file}`);
+    if (typeof file !== 'string' || path.basename(file) !== file || !file.endsWith('.test.js'))
+      throw new Error(`Invalid browser test: ${file}`);
     if (assigned.has(file)) throw new Error(`Duplicate browser test: ${file}`);
     if (!inventory.has(file)) throw new Error(`Missing browser test: ${file}`);
     assigned.add(file);

@@ -14,7 +14,7 @@ pnpm check:browser
 pnpm smoke:browser
 ```
 
-`pnpm check` is the fast gate: JavaScript syntax, types, deterministic Node tests, all
+`pnpm check` is the fast gate: code formatting, JavaScript syntax, types, deterministic Node tests, all
 browser builds, and the website build. `pnpm check:browser` builds Chrome and runs
 the built extension in a disposable real Chromium profile. `pnpm smoke:browser`
 preserves the broader rule, page, and worker checks. CI requires all three;

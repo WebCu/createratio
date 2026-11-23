@@ -41,8 +41,10 @@ function pinnedChromium({ key = platformKey(), cacheRoot = defaultCacheRoot(), d
 
 function isInstalled(pin) {
   try {
-    return fs.readFileSync(path.join(pin.directory, verifiedMarker), 'utf8') === pin.sha256
-      && fs.statSync(pin.executable).isFile();
+    return (
+      fs.readFileSync(path.join(pin.directory, verifiedMarker), 'utf8') === pin.sha256 &&
+      fs.statSync(pin.executable).isFile()
+    );
   } catch (error) {
     if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false;
     throw error;
@@ -53,19 +55,24 @@ async function downloadWithDigest(url, file) {
   const response = await fetch(url, { signal: AbortSignal.timeout(300000) });
   if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} downloading ${url}`);
   const digest = createHash('sha256');
-  await pipeline(Readable.fromWeb(response.body), async function* (chunks) {
-    for await (const chunk of chunks) {
-      digest.update(chunk);
-      yield chunk;
-    }
-  }, fs.createWriteStream(file));
+  await pipeline(
+    Readable.fromWeb(response.body),
+    async function* (chunks) {
+      for await (const chunk of chunks) {
+        digest.update(chunk);
+        yield chunk;
+      }
+    },
+    fs.createWriteStream(file)
+  );
   return digest.digest('hex');
 }
 
 function unpack(archive, destination, platform = process.platform) {
-  const [command, args] = platform === 'darwin'
-    ? ['ditto', ['-x', '-k', archive, destination]]
-    : ['unzip', ['-q', archive, '-d', destination]];
+  const [command, args] =
+    platform === 'darwin'
+      ? ['ditto', ['-x', '-k', archive, destination]]
+      : ['unzip', ['-q', archive, '-d', destination]];
   const result = spawnSync(command, args, { encoding: 'utf8' });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} failed with exit code ${result.status}: ${result.stderr}`);
@@ -91,7 +98,9 @@ async function installChromium(pin = pinnedChromium()) {
     const archive = path.join(staging, 'archive.zip');
     const actual = await downloadWithDigest(pin.url, archive);
     if (actual !== pin.sha256) {
-      throw new Error(`Checksum mismatch for ${pin.url}: expected ${pin.sha256}, received ${actual}. The archive was not unpacked.`);
+      throw new Error(
+        `Checksum mismatch for ${pin.url}: expected ${pin.sha256}, received ${actual}. The archive was not unpacked.`
+      );
     }
     const unpacked = path.join(staging, 'unpacked');
     unpack(archive, unpacked);
@@ -112,14 +121,17 @@ function reportedVersion(executable) {
 }
 
 function resolveBrowser(env = process.env, pin = pinnedChromium({ cacheRoot: defaultCacheRoot(env) })) {
-  const executable = env.CHROMIUM_PATH || env.CHROMIUM || (pin && isInstalled(pin) ? pin.executable : '/usr/bin/chromium');
+  const executable =
+    env.CHROMIUM_PATH || env.CHROMIUM || (pin && isInstalled(pin) ? pin.executable : '/usr/bin/chromium');
   const { version, problem } = reportedVersion(executable);
   if (problem) return { problem: `Browser ${executable}: ${problem}. ${setupAdvice}` };
   if (/^Google Chrome (?!for Testing)/.test(version)) {
     return { problem: `${version} at ${executable} is branded Chrome, which ignores --load-extension. ${setupAdvice}` };
   }
   const pinnedVersion = pins.chromeForTesting.version;
-  const warning = version.split(/\s+/).includes(pinnedVersion) ? null : `${version} differs from the CI browser, Chrome for Testing ${pinnedVersion}. ${setupAdvice}`;
+  const warning = version.split(/\s+/).includes(pinnedVersion)
+    ? null
+    : `${version} differs from the CI browser, Chrome for Testing ${pinnedVersion}. ${setupAdvice}`;
   return { executable, version, warning };
 }
 
@@ -140,17 +152,24 @@ async function main(argv) {
   }
   const pin = pinnedChromium();
   const { executable, downloaded } = await installChromium(pin);
-  console.log(`${downloaded ? 'Installed' : 'Already installed:'} Chrome for Testing ${pins.chromeForTesting.version} (${pin.key})`);
+  console.log(
+    `${downloaded ? 'Installed' : 'Already installed:'} Chrome for Testing ${pins.chromeForTesting.version} (${pin.key})`
+  );
   console.log('pnpm check:browser and pnpm smoke:browser use it when CHROMIUM_PATH and CHROMIUM are unset.');
   console.log(`CHROMIUM_PATH=${JSON.stringify(executable)}`);
   return 0;
 }
 
 if (require.main === module) {
-  main(process.argv.slice(2)).then(code => { process.exitCode = code; }, error => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
+  main(process.argv.slice(2)).then(
+    code => {
+      process.exitCode = code;
+    },
+    error => {
+      console.error(error.message);
+      process.exitCode = 1;
+    }
+  );
 }
 
 module.exports = { platformKey, defaultCacheRoot, pinnedChromium, installChromium, isInstalled, resolveBrowser };
