@@ -5,6 +5,7 @@ const { spawn, spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const usage = 'Usage: pnpm browser:container <command> [arguments...]';
+const imageUser = 1000;
 
 function sourceFiles(directory = root) {
   const listed = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: directory, encoding: 'utf8' });
@@ -19,8 +20,17 @@ function containerUser(uid = process.getuid(), gid = process.getgid()) {
   return uid === 0 ? [] : ['--user', `${uid}:${gid}`];
 }
 
-function prepareOutput(directory = path.join(root, 'dist/container')) {
+function prepareOutput(directory = path.join(root, 'dist/container'), { uid = process.getuid(), chown = fs.chownSync } = {}) {
+  const created = !fs.existsSync(directory);
   fs.mkdirSync(directory, { recursive: true });
+  if (uid === 0) {
+    if (created) chown(directory, imageUser, imageUser);
+    const stat = fs.statSync(directory);
+    if (!created && stat.uid !== imageUser && (stat.mode & 0o002) === 0) {
+      throw new Error(`As root, the container runs as the image user ${imageUser}, which cannot write ${directory}. Run: chown ${imageUser}:${imageUser} ${directory}`);
+    }
+    return directory;
+  }
   try {
     fs.accessSync(directory, fs.constants.W_OK);
   } catch {
@@ -29,22 +39,15 @@ function prepareOutput(directory = path.join(root, 'dist/container')) {
   return directory;
 }
 
-function run(command) {
-  if (!command.length) {
-    console.error(usage);
-    return Promise.resolve(2);
-  }
-  prepareOutput();
+function stream(files, [program, ...args], { cwd = root } = {}) {
   const archive = spawn('tar', ['--null', '-T', '-', '--no-xattrs', '--no-acls', '-cf', '-'], {
-    cwd: root,
+    cwd,
     env: { ...process.env, COPYFILE_DISABLE: '1' },
     stdio: ['pipe', 'pipe', 'inherit']
   });
-  const container = spawn('docker', ['compose', 'run', '--rm', '-T', ...containerUser(), 'browser-tests', ...command], {
-    cwd: root,
-    stdio: [archive.stdout, 'inherit', 'inherit']
-  });
-  archive.stdin.end(sourceFiles().join('\0'));
+  const consumer = spawn(program, args, { cwd, stdio: [archive.stdout, 'inherit', 'inherit'] });
+  archive.stdout.destroy();
+  archive.stdin.end(files.join('\0'));
   const exited = child => new Promise(resolve => {
     child.on('error', error => {
       console.error(error.message);
@@ -52,13 +55,23 @@ function run(command) {
     });
     child.on('exit', code => resolve(code ?? 1));
   });
-  return Promise.all([exited(archive), exited(container)]).then(([archiveCode, containerCode]) => {
+  return Promise.all([exited(archive), exited(consumer)]).then(([archiveCode, consumerCode]) => {
+    if (consumerCode !== 0) return consumerCode;
     if (archiveCode !== 0) {
       console.error(`tar exited with status ${archiveCode}; the container did not receive the full checkout.`);
-      return containerCode || archiveCode;
+      return archiveCode;
     }
-    return containerCode;
+    return 0;
   });
+}
+
+function run(command) {
+  if (!command.length) {
+    console.error(usage);
+    return Promise.resolve(2);
+  }
+  prepareOutput();
+  return stream(sourceFiles(), ['docker', 'compose', 'run', '--rm', '-T', ...containerUser(), 'browser-tests', ...command]);
 }
 
 if (require.main === module) {
@@ -68,4 +81,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { sourceFiles, containerUser, prepareOutput };
+module.exports = { sourceFiles, containerUser, prepareOutput, stream };

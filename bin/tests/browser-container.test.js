@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { sourceFiles, containerUser, prepareOutput } = require('../browser-container.js');
+const { sourceFiles, containerUser, prepareOutput, stream } = require('../browser-container.js');
 
 const root = path.resolve(__dirname, '../..');
 const entry = path.join(root, 'docker/browser-check.sh');
@@ -64,6 +64,38 @@ test('the wrapper runs as the host user and prepares a writable output folder', 
   const output = path.join(scratch(t), 'dist/container');
   assert.equal(prepareOutput(output), output);
   assert.ok(fs.statSync(output).isDirectory());
+});
+
+test('as root, the wrapper gives a new output folder to the image user and refuses an existing one it cannot write', t => {
+  assert.match(dockerfile, /^USER node$/m, 'the node image user has user ID 1000');
+  const base = scratch(t);
+  const calls = [];
+  const chown = (...args) => calls.push(args);
+  const fresh = path.join(base, 'fresh/container');
+  prepareOutput(fresh, { uid: 0, chown });
+  assert.deepEqual(calls, [[fresh, 1000, 1000]]);
+  const locked = path.join(base, 'locked');
+  fs.mkdirSync(locked, { mode: 0o755 });
+  assert.throws(() => prepareOutput(locked, { uid: 0, chown }), /image user 1000[^\n]+chown 1000:1000/);
+  const open = path.join(base, 'open');
+  fs.mkdirSync(open);
+  fs.chmodSync(open, 0o777);
+  assert.equal(prepareOutput(open, { uid: 0, chown }), open);
+  assert.equal(calls.length, 1, 'existing folders keep their owner');
+});
+
+test('the wrapper returns the consumer status when the consumer exits without reading the checkout', { timeout: 20000 }, async t => {
+  const directory = scratch(t);
+  fs.writeFileSync(path.join(directory, 'large.bin'), Buffer.alloc(4 * 1024 * 1024, 1));
+  assert.equal(await stream(['large.bin'], ['sh', '-c', 'exit 3'], { cwd: directory }), 3);
+});
+
+test('the wrapper streams the checkout to the consumer and returns its status', async t => {
+  const directory = scratch(t);
+  write(directory, 'a.txt', 'a');
+  const listing = path.join(directory, 'listing');
+  assert.equal(await stream(['a.txt'], ['sh', '-c', `tar -tf - > "${listing}"`], { cwd: directory }), 0);
+  assert.equal(fs.readFileSync(listing, 'utf8').trim(), 'a.txt');
 });
 
 test('the container entry unpacks the stream with image dependencies, then forwards the command', t => {
