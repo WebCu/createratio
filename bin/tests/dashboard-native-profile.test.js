@@ -4,7 +4,9 @@ const assert = require('node:assert/strict');
 const { mkdtemp, mkdir, writeFile, readFile, readdir, rm } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
+const { once } = require('node:events');
+const { pinnedChromium } = require('../setup-chromium.js');
 
 async function procFixture(t) {
   const root = await mkdtemp(path.join(tmpdir(), 'native-proc-test-'));
@@ -217,4 +219,83 @@ test('native profile CLI fails closed on missing arguments without launching Chr
   const result = spawnSync(process.execPath, [command], { encoding: 'utf8' });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Usage: node bin\/dashboard-native-profile/);
+});
+
+async function profileFixture(t) {
+  const { root } = await procFixture(t);
+  const bundle = path.join(root, 'bundle');
+  const cacheRoot = path.join(root, 'browser-cache');
+  const pin = pinnedChromium({ cacheRoot });
+  const argsFile = path.join(root, 'browser-args');
+  await mkdir(bundle);
+  await writeFile(path.join(bundle, 'manifest.json'), JSON.stringify({ background: { service_worker: 'worker.js' } }));
+  await mkdir(path.dirname(pin.executable), { recursive: true });
+  await writeFile(path.join(pin.directory, '.verified-sha256'), pin.sha256);
+  await writeFile(
+    pin.executable,
+    `#!${process.execPath}
+const fs = require('node:fs');
+if (process.argv[2] === '--version') {
+  console.log(${JSON.stringify(`Google Chrome for Testing ${pin.version}`)});
+} else {
+  fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(process.argv));
+  setInterval(() => {}, 1000);
+}
+`,
+    { mode: 0o755 }
+  );
+  const env = {
+    ...process.env,
+    TMPDIR: root,
+    CHROMIUM_PATH: '',
+    CHROMIUM: '',
+    CREATERATIO_CACHE_DIR: cacheRoot,
+    BROWSER_ARTIFACT_DIR: path.join(root, 'browser-artifacts')
+  };
+  const output = path.join(root, 'report.json');
+  const cli = [path.resolve(__dirname, '../dashboard-native-profile.mjs'), bundle, bundle, output];
+  return { root, pin, argsFile, env, output, cli };
+}
+
+test('comparison rejects falsey pilot JSON before creating output or starting Chromium', {
+  skip: process.platform !== 'linux' || !pinnedChromium()
+}, async t => {
+  const { root, argsFile, env, output, cli } = await profileFixture(t);
+  const pilot = path.join(root, 'pilot.json');
+  for (const value of [null, false, 0, '']) {
+    await writeFile(pilot, JSON.stringify(value));
+    const result = spawnSync(process.execPath, [...cli, pilot], { env, encoding: 'utf8', timeout: 2500 });
+    assert.equal(result.status, 1, result.error?.message ?? result.stderr);
+    assert.match(result.stderr, /Unknown pilot schema/);
+    await assert.rejects(readFile(output), { code: 'ENOENT' });
+    await assert.rejects(readFile(argsFile), { code: 'ENOENT' });
+  }
+});
+
+test('the profiler records its cached Chromium executable and removes the bundle when interrupted', {
+  skip: process.platform !== 'linux' || !pinnedChromium()
+}, async t => {
+  const { eventually } = await import('../../extension/browser-tests/chromium.mjs');
+  const { pin, argsFile, env, output, cli } = await profileFixture(t);
+  const child = spawn(process.execPath, cli, { env, stdio: 'ignore' });
+  const exited = once(child, 'exit');
+  t.after(async () => {
+    child.kill('SIGINT');
+    await exited;
+  });
+  const args = await eventually(
+    async () => JSON.parse(await readFile(argsFile, 'utf8')),
+    'cached Chromium launched',
+    5000
+  );
+  const bundleCopy = args.find(arg => arg.startsWith('--load-extension=')).slice('--load-extension='.length);
+  const profileDirectory = args.find(arg => arg.startsWith('--user-data-dir=')).slice('--user-data-dir='.length);
+  assert.ok((await readdir(bundleCopy)).includes('manifest.json'));
+  assert.equal(args[1], pin.executable);
+  const report = JSON.parse(await readFile(output, 'utf8'));
+  child.kill('SIGINT');
+  assert.deepEqual(await exited, [130, null]);
+  assert.equal(report.environment.executable, pin.executable);
+  await assert.rejects(readdir(bundleCopy), { code: 'ENOENT' });
+  await assert.rejects(readdir(path.dirname(profileDirectory)), { code: 'ENOENT' });
 });

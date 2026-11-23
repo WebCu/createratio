@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { basename, dirname, join, relative, resolve } from 'node:path';
-import { cpus, release, tmpdir, totalmem } from 'node:os';
+import { cpus, release, totalmem } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { bundleFingerprint } from './scroll-profile-report.mjs';
-import { launch, withFailureArtifacts } from '../extension/browser-tests/chromium.mjs';
+import { browserExecutable, launch, withFailureArtifacts } from '../extension/browser-tests/chromium.mjs';
 import { ownedBrowserRoot } from './native-process-memory.mjs';
 import { exerciseDashboard, workload, checkpointPlan } from './dashboard-native-workload.mjs';
 
@@ -20,7 +20,7 @@ export function runPlan(mode) {
 }
 
 export function requirePilot(pilot, provenance, environment) {
-  assert.equal(pilot.schemaVersion, 1, 'Unknown pilot schema');
+  assert.equal(pilot?.schemaVersion, 1, 'Unknown pilot schema');
   assert.equal(pilot.mode, 'pilot', 'Comparison requires a pilot');
   assert.equal(pilot.status, 'complete', 'Pilot is incomplete or failed');
   assert.deepEqual(pilot.provenance, provenance, 'Pilot inputs differ');
@@ -146,15 +146,15 @@ export async function profile(baseline, candidate, output, pilotFile) {
     logicalCpus: cpus().length,
     cpuModel: cpus()[0]?.model,
     totalMemoryBytes: totalmem(),
-    executable: process.env.CHROMIUM_PATH || process.env.CHROMIUM || '/usr/bin/chromium',
+    executable: browserExecutable(),
     noSandbox: process.env.CHROMIUM_NO_SANDBOX === '1',
     watchdogMs: Number(process.env.BROWSER_TIMEOUT_MS || 90000),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   };
-  const mode = pilotFile ? 'comparison' : 'pilot';
-  const pilotBytes = pilotFile ? await readFile(pilotFile) : undefined;
-  const pilot = pilotBytes ? JSON.parse(pilotBytes.toString('utf8')) : undefined;
-  if (pilot) requirePilot(pilot, provenance, environment);
+  const mode = pilotFile === undefined ? 'pilot' : 'comparison';
+  const pilotBytes = mode === 'comparison' ? await readFile(pilotFile) : undefined;
+  const pilot = mode === 'comparison' ? JSON.parse(pilotBytes.toString('utf8')) : undefined;
+  if (mode === 'comparison') requirePilot(pilot, provenance, environment);
   const report = {
     schemaVersion: 1,
     mode,
@@ -187,17 +187,18 @@ export async function profile(baseline, candidate, output, pilotFile) {
     await mkdir(artifactRoot, { mode: 0o700 });
     for (const entry of runPlan(mode)) {
       await unchanged();
-      const executionBundle = await mkdtemp(join(tmpdir(), 'dashboard-native-bundle-'));
-      let browser;
       const startedAt = new Date().toISOString();
+      const browser = await launch(bundles[entry.variant], {
+        async prepareExtension(source, destination) {
+          await cp(source, destination, { recursive: true });
+          assert.deepEqual(
+            await bundleFingerprint(destination),
+            provenance[entry.variant],
+            'Disposable bundle differs'
+          );
+        }
+      });
       try {
-        await cp(bundles[entry.variant], executionBundle, { recursive: true });
-        assert.deepEqual(
-          await bundleFingerprint(executionBundle),
-          provenance[entry.variant],
-          'Disposable bundle differs'
-        );
-        browser = await launch(executionBundle);
         const version = await browser.cdp.send('Browser.getVersion');
         const browserVersion = { product: version.product, revision: version.revision, jsVersion: version.jsVersion };
         const previous = pilot?.runs[0] || report.runs[0];
@@ -219,11 +220,7 @@ export async function profile(baseline, candidate, output, pilotFile) {
           ...result
         });
       } finally {
-        try {
-          await browser?.cleanup();
-        } finally {
-          await rm(executionBundle, { recursive: true, force: true });
-        }
+        await browser.cleanup();
       }
       await save();
     }

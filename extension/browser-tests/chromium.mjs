@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -204,7 +204,7 @@ export function devToolsEndpoint(contents) {
 
 let resolvedBrowser;
 
-function browserExecutable() {
+export function browserExecutable() {
   if (!resolvedBrowser) {
     resolvedBrowser = browserSetup.resolveBrowser();
     if (resolvedBrowser.warning) console.warn(`Warning: ${resolvedBrowser.warning}`);
@@ -215,10 +215,12 @@ function browserExecutable() {
 
 export async function launch(extensionPath, options = {}) {
   const executable = browserExecutable();
+  const timeout = Number(process.env.BROWSER_TIMEOUT_MS || 90000);
+  if (!Number.isSafeInteger(timeout) || timeout < 1000) {
+    throw new Error('BROWSER_TIMEOUT_MS must be an integer of at least 1000');
+  }
   extensionPath = resolve(extensionPath);
-  const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
-  const workerURL = extensionWorkerURL(extensionPath, manifest);
-  const directory = await mkdtemp(join(tmpdir(), 'createratio-browser-'));
+  const directory = mkdtempSync(join(tmpdir(), 'createratio-browser-'));
   const args = [
     `--user-data-dir=${join(directory, 'profile')}`,
     '--remote-debugging-port=0',
@@ -237,29 +239,20 @@ export async function launch(extensionPath, options = {}) {
     '--proxy-server=http://127.0.0.1:9',
     '--proxy-bypass-list=<-loopback>',
     '--host-resolver-rules=MAP * ~NOTFOUND',
-    '--window-size=1280,900',
-    `--disable-extensions-except=${extensionPath}`,
-    `--load-extension=${extensionPath}`,
-    'about:blank'
+    '--window-size=1280,900'
   ];
   if (process.platform === 'darwin') args.push('--use-mock-keychain');
   if (process.env.CHROMIUM_NO_SANDBOX === '1') args.push('--no-sandbox');
-  const child = spawn(executable, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
-  let diagnostics = '',
+  let child,
+    diagnostics = '',
     spawnError,
     closed = false,
     cdp,
     socket,
     watchdog,
     browser;
-  child.stderr.on('data', data => {
-    diagnostics = (diagnostics + data).slice(-5000);
-  });
-  child.on('error', error => {
-    spawnError = error;
-  });
   const kill = signal => {
-    if (child.pid) {
+    if (child?.pid) {
       try {
         process.kill(-child.pid, signal);
       } catch (error) {
@@ -272,9 +265,11 @@ export async function launch(extensionPath, options = {}) {
     closed = true;
     if (cdp) cdp.close();
     else socket?.close();
-    kill('SIGTERM');
-    await delay(200);
-    kill('SIGKILL');
+    if (child) {
+      kill('SIGTERM');
+      await delay(200);
+      kill('SIGKILL');
+    }
     await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     clearTimeout(watchdog);
     process.off('SIGINT', interrupt);
@@ -308,15 +303,25 @@ export async function launch(extensionPath, options = {}) {
   };
   const interrupt = () => void stop('Browser smoke interrupted', 130);
   const terminate = () => void stop('Browser smoke terminated', 143);
-  const timeout = Number(process.env.BROWSER_TIMEOUT_MS || 90000);
-  if (!Number.isSafeInteger(timeout) || timeout < 1000) {
-    await cleanup();
-    throw new Error('BROWSER_TIMEOUT_MS must be an integer of at least 1000');
-  }
   watchdog = setTimeout(() => void stop(`Browser smoke exceeded ${timeout}ms`, 1), timeout);
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', terminate);
   try {
+    if (options.prepareExtension) {
+      const prepared = join(directory, 'extension');
+      await options.prepareExtension(extensionPath, prepared);
+      extensionPath = prepared;
+    }
+    const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8'));
+    const workerURL = extensionWorkerURL(extensionPath, manifest);
+    args.push(`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, 'about:blank');
+    child = spawn(executable, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
+    child.stderr.on('data', data => {
+      diagnostics = (diagnostics + data).slice(-5000);
+    });
+    child.on('error', error => {
+      spawnError = error;
+    });
     const endpoint = await eventually(async () => {
       if (spawnError) throw Object.assign(spawnError, { fatal: true });
       if (child.exitCode !== null)
