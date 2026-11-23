@@ -51,7 +51,6 @@ services:
     pids_limit: 4096
     tmpfs:
       - /tmp:size=2g,mode=1777
-      - /work:size=1g,uid=1000,gid=1000
+      - /work:size=1g,mode=1777
     volumes:
-      - .:/src:ro
       - ./dist/container:/out

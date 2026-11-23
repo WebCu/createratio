@@ -421,24 +421,29 @@ Compose v2 and runs as `linux/amd64`; Apple silicon uses Rosetta emulation.
 
 ```sh
 docker compose build browser-tests
-docker compose run --rm browser-tests pnpm smoke:browser
-docker compose run --rm browser-tests pnpm check:browser
-docker compose run --rm browser-tests pnpm check:browser:shard 3
+pnpm browser:container pnpm smoke:browser
+pnpm browser:container pnpm check:browser
+pnpm browser:container pnpm check:browser:shard 3
 ```
 
 The image build is the only step with network access. It installs the locked
 dependencies with lifecycle scripts disabled, the pinned browser through
 `bin/setup-chromium.js`, and `browser-harness`. At run time the container has no
 network, a read-only root file system, no Linux capabilities and a non-root user.
-It mounts the checkout read-only, copies it without `.git`, `node_modules`,
-`dist` or `.env` files into a temporary folder, and runs the command there.
+The container does not mount the checkout. `bin/browser-container.js` sends the
+files that `git ls-files --cached --others --exclude-standard` lists as a tar
+stream on standard input. Ignored files, such as `.env`, `node_modules`, `dist`
+and local agent settings, never enter the container. The container unpacks the
+stream into a temporary folder and runs the command there.
 Chromium runs with `CHROMIUM_NO_SANDBOX=1`; the container is its sandbox. The
-only writable host folder is `dist/container`. It receives `browser-artifacts/`
-whenever a run creates that folder, for example after a failure. On Linux, user ID 1000 must be able to
-write that folder.
+only writable host folder is `dist/container`. The wrapper creates it and runs
+the container with your user and group IDs. The folder receives
+`browser-artifacts/` whenever a run creates that folder, for example after a
+failure. An export error never replaces the command's failure status.
 
-The run refuses to start when `pnpm-lock.yaml` differs from the image; rebuild
-the image after a dependency change. Because of that check, the image turns off
+The run refuses to start when `pnpm-lock.yaml` or `bin/browser-pins.json`
+differs from the image; rebuild the image after a dependency or browser pin
+change. Because of the lockfile check, the image turns off
 pnpm's own dependency verification, which needs the network. Remove the image
 with `docker image rm createratio-dev-browser-tests`. CI builds the image and
 runs the smoke in it. The container does not protect against a kernel or

@@ -149,9 +149,7 @@ jobs:
       - name: Build the isolated browser-check image
         run: docker compose build browser-tests
       - name: Run the smoke in the isolated container
-        run: |
-          mkdir -m 777 -p dist/container
-          docker compose run --rm browser-tests pnpm smoke:browser
+        run: node bin/browser-container.js pnpm smoke:browser
 
   browser-smoke:
     if: ${{ always() }}
