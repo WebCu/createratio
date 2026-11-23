@@ -97,13 +97,31 @@ test('resize or a reduced-motion change stops an automatic scroll', () => {
 });
 
 test('static and reduced-motion continuation keep native anchor navigation', () => {
-  for (const options of [{ reduced: true }, { supportsMask: false }]) {
+  for (const options of [{ reduced: true }, { supportsMask: false }, { compact: true }]) {
     const h = harness(options);
     assert.equal(h.clickHint().defaultPrevented, false);
     assert.equal(h.scrolls.length, 0);
     assert.equal(h.frames.size, 0);
     assert.equal(h.focusCalls.length, 0);
   }
+});
+
+test('switching to a compact viewport cancels the reveal until there is room again', () => {
+  const h = harness();
+  h.flush();
+  assert.equal(h.clickHint().defaultPrevented, true);
+  h.step(700);
+  const position = h.window.scrollY;
+  h.resizeCompact(true);
+  h.step(2800);
+  assert.equal(h.window.scrollY, position);
+  assert.equal(h.classes.has('has-arrival'), false);
+  assert.equal(h.clickHint().defaultPrevented, false);
+  assert.equal(h.frames.size, 0);
+  h.resizeCompact(false);
+  h.flush();
+  assert.equal(h.classes.has('has-arrival'), true);
+  assert.equal(h.clickHint().defaultPrevented, true);
 });
 
 test('modified and non-primary clicks keep native link behavior without starting a reveal', () => {
@@ -118,7 +136,7 @@ test('modified and non-primary clicks keep native link behavior without starting
   }
 });
 
-function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 } = {}) {
+function harness({ reduced = false, supportsMask = true, compact = false, hash = '', scrollY = 0 } = {}) {
   const frames = new Map();
   const timers = new Map();
   let now = 0;
@@ -152,6 +170,7 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
     innerWidth: 1280,
     location: { hash },
     matchMedia: () => motion,
+    getComputedStyle: () => ({ getPropertyValue: name => (name === '--arrival-layout' && compact ? 'compact' : '') }),
     addEventListener(name, fn, options) {
       windowEvents[name] = { fn, options };
     },
@@ -286,6 +305,10 @@ function harness({ reduced = false, supportsMask = true, hash = '', scrollY = 0 
     changeMotion(value) {
       motion.matches = value;
       motionChange();
+    },
+    resizeCompact(value) {
+      compact = value;
+      windowEvents.resize.fn();
     }
   };
 }
