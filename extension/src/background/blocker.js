@@ -366,11 +366,13 @@ const SiteAccess = (() => {
         ok: false,
         error: `Write a specific intention of ${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters.`
       };
-    if (state.remainingMs || state.readyAt) return;
     const site = message.site,
       access = accessState(stored._access);
+    const current = SiteAccessModel.siteAccessFromStored(access[site], now);
     const waitMs = Core.millisecondsFromMinutes(Core.siteSettings(site, stored.settings).waitMinutes);
-    access[site] = { readyAt: now + waitMs, waitMs };
+    const next = SiteAccessModel.requestAccess(current, waitMs, now);
+    if (next === current) return;
+    access[site] = SiteAccessModel.storedFromSiteAccess(next);
     const changes = { _access: access };
     if (stored.settings?.intentionHistoryEnabled === true)
       changes._intentions = [
@@ -380,14 +382,18 @@ const SiteAccess = (() => {
     await api.storage.local.set(changes);
   }
   async function confirmAccess(site, state, access, now) {
-    const entry = access[site] || {};
-    if (!state.readyAt || now < entry.readyAt)
-      throw MessageContracts.refuse('Finish the waiting period before opening the site.');
-    access[site] = { remainingMs: Core.millisecondsFromMinutes(state.sessionMinutes), expiresAt: 0, refilledAt: now };
+    const confirmed = SiteAccessModel.confirmRequest(
+      SiteAccessModel.siteAccessFromStored(access[site], now),
+      state.sessionMinutes,
+      now
+    );
+    if (!confirmed.ready) throw MessageContracts.refuse('Finish the waiting period before opening the site.');
+    access[site] = SiteAccessModel.storedFromSiteAccess(confirmed.state);
     await api.storage.local.set({ _access: access });
   }
-  async function cancelWait(site, state, access) {
-    if (!state.readyAt) return;
+  async function cancelWait(site, access, now) {
+    const current = SiteAccessModel.siteAccessFromStored(access[site], now);
+    if (SiteAccessModel.cancelRequest(current) === current) return;
     delete access[site];
     await api.storage.local.set({ _access: access });
   }
@@ -430,7 +436,7 @@ const SiteAccess = (() => {
         await confirmAccess(site, state, access, now);
         break;
       case 'access-cancel':
-        await cancelWait(site, state, access);
+        await cancelWait(site, access, now);
         break;
       case 'access-end':
         await endAccess(site, access);

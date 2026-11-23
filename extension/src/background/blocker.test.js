@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const C = require('../../core/core.js');
 const Sites = require('../../sites/index.js');
 const MessageContracts = require('./message-contracts.js');
+const SiteAccessModel = require('./site-access.js');
 const { worker, gate, intent, popupSender, rulesFor } = require('../tests/background-harness.js');
 const now = new Date(2026, 9, 11, 12).getTime();
 
@@ -101,7 +102,15 @@ function blocker(data = {}, browser = 'chrome', core = C) {
       }
     }
   };
-  const context = vm.createContext({ [browser]: api, Core: core, Sites, MessageContracts, URL, Date: Clock });
+  const context = vm.createContext({
+    [browser]: api,
+    Core: core,
+    Sites,
+    MessageContracts,
+    SiteAccessModel,
+    URL,
+    Date: Clock
+  });
   vm.runInContext(
     fs.readFileSync(path.join(__dirname, 'blocker.js'), 'utf8') + '\n globalThis.access = SiteAccess;',
     context

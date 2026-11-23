@@ -96,3 +96,45 @@ test('stored entries compare by content, not key order', () => {
   assert.equal(M.sameStoredEntry({ expiresAt: 0 }, {}), false);
   assert.equal(M.sameStoredEntry({ refilledAt: 0 }, { refilledAt: 1 }), false);
 });
+
+test('a request starts only when no request or budget is open', () => {
+  const open = session({ remainingMs: 300000, expiresAt: 0, refilledAt: now });
+  const waiting = request({ readyAt: now + 1000, waitMs: 300000 });
+  assert.deepEqual(M.requestAccess(null, 300000, now), request({ readyAt: now + 300000, waitMs: 300000 }));
+  assert.equal(M.requestAccess(open, 300000, now), open);
+  assert.equal(M.requestAccess(waiting, 300000, now), waiting);
+  assert.deepEqual(
+    M.requestAccess(session({ refilledAt: now - 1, date: today }), 300000, now),
+    request({ readyAt: now + 300000, waitMs: 300000 })
+  );
+});
+
+test('cancelling removes only a request', () => {
+  const open = session({ remainingMs: 1000 });
+  assert.equal(M.cancelRequest(request({ readyAt: now })), null);
+  assert.equal(M.cancelRequest(open), open);
+  assert.equal(M.cancelRequest(null), null);
+});
+
+test('confirming after the wait starts a full session; anything else is not ready', () => {
+  assert.deepEqual(M.confirmRequest(request({ readyAt: now }), 5, now), {
+    ready: true,
+    state: session({ remainingMs: 300000, expiresAt: 0, refilledAt: now })
+  });
+  assert.deepEqual(M.storedFromSiteAccess(M.confirmRequest(request({ readyAt: now }), 5, now).state), {
+    remainingMs: 300000,
+    expiresAt: 0,
+    refilledAt: now
+  });
+  for (const state of [request({ readyAt: now + 1 }), null, session({ refilledAt: now, date: today })])
+    assert.deepEqual(M.confirmRequest(state, 5, now), { ready: false });
+});
+
+test('a valid wait with leftover session fields stays a request', () => {
+  const expected = request({ readyAt: now + 30000, waitMs: 300000 });
+  assert.deepEqual(M.siteAccessFromStored({ readyAt: now + 30000, waitMs: 300000, expiresAt: 0 }, now), expected);
+  assert.deepEqual(
+    M.siteAccessFromStored({ readyAt: now + 30000, waitMs: 300000, expiresAt: 0, remainingMs: 0 }, now),
+    expected
+  );
+});

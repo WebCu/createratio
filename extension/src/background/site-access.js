@@ -45,27 +45,29 @@
   function siteAccessFromStored(raw, now) {
     if (!record(raw) || !validSession(raw, now)) return null;
     const hasDate = Object.hasOwn(raw, 'date');
-    if (Number.isFinite(raw.remainingMs) || Number.isFinite(raw.expiresAt) || raw.refilledAt > 0 || hasDate) {
+    const session = () => {
       const remaining = Number.isFinite(raw.remainingMs)
         ? raw.remainingMs
         : Number.isFinite(raw.expiresAt)
           ? Math.max(0, raw.expiresAt - now)
           : null;
-      return {
+      return /** @type {AccessSession} */ ({
         phase: 'session',
         remainingMs: remaining === null ? null : Core.asMilliseconds(remaining),
         expiresAt: numberOrNull(raw.expiresAt),
         refilledAt: numberOrNull(raw.refilledAt),
         date: hasDate ? raw.date : null,
         goalActive: raw.goalActive === true
-      };
-    }
-    if (!validWait(raw, now)) return null;
-    return {
-      phase: 'request',
-      readyAt: raw.readyAt,
-      waitMs: validWaitDuration(raw.waitMs) ? Core.asMilliseconds(raw.waitMs) : null
+      });
     };
+    if (raw.remainingMs > 0 || raw.refilledAt > 0 || hasDate) return session();
+    if (validWait(raw, now))
+      return {
+        phase: 'request',
+        readyAt: raw.readyAt,
+        waitMs: validWaitDuration(raw.waitMs) ? Core.asMilliseconds(raw.waitMs) : null
+      };
+    return Number.isFinite(raw.remainingMs) || Number.isFinite(raw.expiresAt) ? session() : null;
   }
   /**
    * @param {SiteAccessState} state
@@ -100,5 +102,50 @@
       keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && Object.is(a[key], b[key]))
     );
   }
-  return { siteAccessFromStored, storedFromSiteAccess, waitDuration, sameStoredEntry };
+  /**
+   * @param {SiteAccessState} state
+   * @param {Milliseconds} waitMilliseconds
+   * @param {number} now
+   * @returns {SiteAccessState}
+   */
+  function requestAccess(state, waitMilliseconds, now) {
+    if (state?.phase === 'request' || (state?.phase === 'session' && state.remainingMs)) return state;
+    return { phase: 'request', readyAt: now + waitMilliseconds, waitMs: waitMilliseconds };
+  }
+  /**
+   * @param {SiteAccessState} state
+   * @returns {SiteAccessState}
+   */
+  function cancelRequest(state) {
+    return state?.phase === 'request' ? null : state;
+  }
+  /**
+   * @param {SiteAccessState} state
+   * @param {Minutes} sessionMinutes
+   * @param {number} now
+   * @returns {{ ready: true, state: AccessSession } | { ready: false }}
+   */
+  function confirmRequest(state, sessionMinutes, now) {
+    if (state?.phase !== 'request' || now < state.readyAt) return { ready: false };
+    return {
+      ready: true,
+      state: {
+        phase: 'session',
+        remainingMs: Core.millisecondsFromMinutes(sessionMinutes),
+        expiresAt: 0,
+        refilledAt: now,
+        date: null,
+        goalActive: false
+      }
+    };
+  }
+  return {
+    siteAccessFromStored,
+    storedFromSiteAccess,
+    waitDuration,
+    sameStoredEntry,
+    requestAccess,
+    cancelRequest,
+    confirmRequest
+  };
 });

@@ -170,6 +170,7 @@ function matrix(catalog) {
       _access: entries({ remainingMs: 300000, date, expiresAt: 0, refilledAt: now - 60000 })
     },
     exhaustedAboveGoal: { ...aboveGoal, _access: entries({ refilledAt: now - 3600000, date }) },
+    waitAboveGoal: { ...aboveGoal, _access: entries({ readyAt: now + 30000, waitMs: 300000 }) },
     staleWait: { settings: enabled, _access: entries({ readyAt: now + 3600000, waitMs: 60000 }) }
   };
   const restarts = ['running', 'midnight', 'runningAtMidnight'];

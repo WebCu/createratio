@@ -18,7 +18,7 @@ async function bundles(t) {
 test('equivalence compares all lifecycle states and metadata-derived URLs', async t => {
   const { baseline, candidate } = await bundles(t);
   const result = await compare(baseline, candidate);
-  assert.equal(result.states, 18);
+  assert.equal(result.states, 19);
   assert.equal(result.restarts, 3);
   assert.ok(result.urls > 20);
   assert.equal(result.cases, (result.states + result.restarts) * result.urls);
@@ -88,7 +88,8 @@ test('matrix covers exhausted, legacy, stale-wait, above-goal session, and midni
     'runningAtMidnight',
     'aboveGoalSession',
     'exhaustedAboveGoal',
-    'staleWait'
+    'staleWait',
+    'waitAboveGoal'
   ])
     assert.ok(states[name], name);
   assert.deepEqual(restarts, ['running', 'midnight', 'runningAtMidnight']);
