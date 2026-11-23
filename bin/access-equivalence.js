@@ -78,6 +78,7 @@ function engine(folder, initial = {}, url = '', restart = false) {
   const context = vm.createContext({ URL, Date: Clock, chrome: api });
   const scripts = ['sites.js', 'core.js'];
   if (fs.existsSync(path.join(folder, 'message-contracts.js'))) scripts.push('message-contracts.js');
+  if (fs.existsSync(path.join(folder, 'site-access.js'))) scripts.push('site-access.js');
   scripts.push('blocker.js');
   for (const file of scripts) vm.runInContext(fs.readFileSync(path.join(folder, file), 'utf8'), context);
   const access = vm.runInContext('SiteAccess', context);
@@ -85,11 +86,22 @@ function engine(folder, initial = {}, url = '', restart = false) {
     'Sites.sites.filter(site => site.gated).map(site => ({ ...site, access: Sites.get(site.id).access }))',
     context
   );
+  const model = fs.existsSync(path.join(folder, 'site-access.js')) ? vm.runInContext('SiteAccessModel', context) : null;
   return {
     catalog: JSON.parse(JSON.stringify(catalog)),
     siteForURL: raw => access.siteForURL(raw),
     async snapshot() {
       return JSON.parse(JSON.stringify({ status: await access.reconcile(), rules, data, alarms, tabs }));
+    },
+    parsedSnapshot(snapshot) {
+      if (!model || !snapshot.data._access) return snapshot;
+      const parsed = Object.fromEntries(
+        Object.entries(snapshot.data._access).flatMap(([site, raw]) => {
+          const state = model.siteAccessFromStored(raw, now);
+          return state === null ? [] : [[site, JSON.parse(JSON.stringify(state))]];
+        })
+      );
+      return { ...snapshot, data: { ...snapshot.data, _access: parsed } };
     }
   };
 }
@@ -180,7 +192,11 @@ async function compare(baseline, candidate) {
       const original = engine(baseline, initial, url, restart),
         updated = engine(candidate, initial, url, restart);
       assert.equal(updated.siteForURL(url), original.siteForURL(url), `${label}: ${url}: lookup`);
-      assert.deepEqual(await updated.snapshot(), await original.snapshot(), `${label}: ${url}: lifecycle`);
+      assert.deepEqual(
+        updated.parsedSnapshot(await updated.snapshot()),
+        updated.parsedSnapshot(await original.snapshot()),
+        `${label}: ${url}: lifecycle`
+      );
       count++;
     }
   }

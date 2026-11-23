@@ -6,6 +6,7 @@ if (typeof importScripts === 'function')
     'core.js',
     'messages.js',
     'message-contracts.js',
+    'site-access.js',
     'blocker.js',
     'history.js',
     'web-time.js',

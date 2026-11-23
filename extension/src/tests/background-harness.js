@@ -214,6 +214,7 @@ function worker(data = {}, browser = 'chrome', now = new Date().setHours(12, 0, 
     load('core.js');
     load('messages.js');
     load('message-contracts.js');
+    load('site-access.js');
     load('blocker.js');
     load('history.js');
     load('web-time.js');

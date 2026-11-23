@@ -93,3 +93,14 @@ test('matrix covers exhausted, legacy, stale-wait, above-goal session, and midni
     assert.ok(states[name], name);
   assert.deepEqual(restarts, ['running', 'midnight', 'runningAtMidnight']);
 });
+
+test('equivalence compares stored access by meaning and still detects a changed refill time', async t => {
+  const { baseline, candidate } = await bundles(t);
+  await fs.copyFile(
+    path.join(__dirname, '../../extension/src/background/site-access.js'),
+    path.join(candidate, 'site-access.js')
+  );
+  await compare(baseline, candidate);
+  await mutate(candidate, 'entry.refilledAt = dayStart;', 'entry.refilledAt = dayStart + 1;');
+  await assert.rejects(compare(baseline, candidate), /lifecycle/);
+});

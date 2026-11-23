@@ -656,7 +656,7 @@ URL variants across eighteen access states, including untouched defaults; three 
 lookup, status, session rules, storage, alarms, and redirects in a fixed-clock
 browser-world VM. Its own tests
 prove that lifecycle and static-rule changes fail. Intentional manifest or policy
-changes require separate review, not a skipped comparison. This is not browser QA.
+changes require separate review, not a skipped comparison. When the candidate ships `site-access.js`, stored access entries are compared by their parsed meaning; everything else is compared exactly. This is not browser QA.
 
 ## Disposable Chromium smoke
 
