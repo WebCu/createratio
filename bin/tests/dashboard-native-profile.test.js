@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtemp, mkdir, writeFile, readFile, readdir, rm } = require('node:fs/promises');
+const { chmod, mkdtemp, mkdir, writeFile, readFile, readdir, rm, stat } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
@@ -254,7 +254,7 @@ if (process.argv[2] === '--version') {
   };
   const output = path.join(root, 'report.json');
   const cli = [path.resolve(__dirname, '../dashboard-native-profile.mjs'), bundle, bundle, output];
-  return { root, pin, argsFile, env, output, cli };
+  return { root, bundle, pin, argsFile, env, output, cli };
 }
 
 test('comparison rejects falsey pilot JSON before creating output or starting Chromium', {
@@ -272,30 +272,34 @@ test('comparison rejects falsey pilot JSON before creating output or starting Ch
   }
 });
 
-test('the profiler records its cached Chromium executable and removes the bundle when interrupted', {
+test('the profiler records its cached Chromium and removes the copy of a read-only bundle when interrupted', {
   skip: process.platform !== 'linux' || !pinnedChromium()
 }, async t => {
   const { eventually } = await import('../../extension/browser-tests/chromium.mjs');
-  const { pin, argsFile, env, output, cli } = await profileFixture(t);
+  const { bundle, pin, argsFile, env, output, cli } = await profileFixture(t);
+  await chmod(bundle, 0o555);
   const child = spawn(process.execPath, cli, { env, stdio: 'ignore' });
   const exited = once(child, 'exit');
-  t.after(async () => {
+  try {
+    const args = await eventually(
+      async () => JSON.parse(await readFile(argsFile, 'utf8')),
+      'cached Chromium launched',
+      5000
+    );
+    const bundleCopy = args.find(arg => arg.startsWith('--load-extension=')).slice('--load-extension='.length);
+    const profileDirectory = args.find(arg => arg.startsWith('--user-data-dir=')).slice('--user-data-dir='.length);
+    assert.ok((await readdir(bundleCopy)).includes('manifest.json'));
+    assert.equal(args[1], pin.executable);
+    const report = JSON.parse(await readFile(output, 'utf8'));
+    child.kill('SIGINT');
+    assert.deepEqual(await exited, [130, null]);
+    assert.equal(report.environment.executable, pin.executable);
+    await assert.rejects(readdir(bundleCopy), { code: 'ENOENT' });
+    await assert.rejects(readdir(path.dirname(profileDirectory)), { code: 'ENOENT' });
+    assert.equal((await stat(bundle)).mode & 0o777, 0o555);
+  } finally {
     child.kill('SIGINT');
     await exited;
-  });
-  const args = await eventually(
-    async () => JSON.parse(await readFile(argsFile, 'utf8')),
-    'cached Chromium launched',
-    5000
-  );
-  const bundleCopy = args.find(arg => arg.startsWith('--load-extension=')).slice('--load-extension='.length);
-  const profileDirectory = args.find(arg => arg.startsWith('--user-data-dir=')).slice('--user-data-dir='.length);
-  assert.ok((await readdir(bundleCopy)).includes('manifest.json'));
-  assert.equal(args[1], pin.executable);
-  const report = JSON.parse(await readFile(output, 'utf8'));
-  child.kill('SIGINT');
-  assert.deepEqual(await exited, [130, null]);
-  assert.equal(report.environment.executable, pin.executable);
-  await assert.rejects(readdir(bundleCopy), { code: 'ENOENT' });
-  await assert.rejects(readdir(path.dirname(profileDirectory)), { code: 'ENOENT' });
+    await chmod(bundle, 0o755);
+  }
 });

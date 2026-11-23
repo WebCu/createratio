@@ -190,6 +190,7 @@ export async function profile(baseline, candidate, output, pilotFile) {
       const startedAt = new Date().toISOString();
       const browser = await launch(bundles[entry.variant], {
         async prepareExtension(source, destination) {
+          await mkdir(destination, { mode: 0o700 });
           await cp(source, destination, { recursive: true });
           assert.deepEqual(
             await bundleFingerprint(destination),
