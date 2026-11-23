@@ -6,10 +6,21 @@ import { evaluate, eventually, click, waitForEnabledControl } from '../extension
 import { sampleOwnedMemory } from './native-process-memory.mjs';
 
 export const workload = {
-  version: 1, localDate: [2026, 2, 9, 12], settleMs: 250, maximumSnapshotAttempts: 3,
-  pilot: { tabs: 2, cycles: 2 }, comparison: { tabs: 8, cycles: 12 },
-  operations: ['changing synthetic storage totals', 'PNG previews in every dashboard', 'HTML download in active dashboard', 'alternating today/week selection', 'history clear and navigation every two cycles'],
-  sampling: 'Active dashboard isolate after forced GC, then owned process tree after fixed settlement; no retained Blob, image or canvas handles'
+  version: 1,
+  localDate: [2026, 2, 9, 12],
+  settleMs: 250,
+  maximumSnapshotAttempts: 3,
+  pilot: { tabs: 2, cycles: 2 },
+  comparison: { tabs: 8, cycles: 12 },
+  operations: [
+    'changing synthetic storage totals',
+    'PNG previews in every dashboard',
+    'HTML download in active dashboard',
+    'alternating today/week selection',
+    'history clear and navigation every two cycles'
+  ],
+  sampling:
+    'Active dashboard isolate after forced GC, then owned process tree after fixed settlement; no retained Blob, image or canvas handles'
 };
 
 export function checkpointPlan(mode) {
@@ -38,7 +49,10 @@ export async function exerciseDashboard(browser, root, mode) {
   await waitForEnabledControl(browser, settings, '#clear-history');
   const pages = [];
   const ready = async page => {
-    await eventually(() => inspect(page, 'document.readyState === "complete" && !!document.querySelector("#score")?.textContent'), 'generated dashboard loaded');
+    await eventually(
+      () => inspect(page, 'document.readyState === "complete" && !!document.querySelector("#score")?.textContent'),
+      'generated dashboard loaded'
+    );
     await waitForEnabledControl(browser, page, '#share-create');
     await waitForEnabledControl(browser, page, '#report-export');
   };
@@ -60,18 +74,31 @@ export async function exerciseDashboard(browser, root, mode) {
         checkpoints.push({ phase, cycle, activeIsolateHeapBytes: heap.usedSize, processMemory, discardedSnapshots });
         return;
       } catch (error) {
-        const transient = ['ENOENT', 'ESRCH'].includes(error.code) || /Process identity changed during sampling|Owned process tree changed during sampling/.test(error.message);
+        const transient =
+          ['ENOENT', 'ESRCH'].includes(error.code) ||
+          /Process identity changed during sampling|Owned process tree changed during sampling/.test(error.message);
         if (!transient || attempt === workload.maximumSnapshotAttempts) throw error;
         discardedSnapshots.push({ attempt, reason: error.message });
       }
     }
   };
-  await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: browser.directory, eventsEnabled: true });
+  await browser.cdp.send('Browser.setDownloadBehavior', {
+    behavior: 'allowAndName',
+    downloadPath: browser.directory,
+    eventsEnabled: true
+  });
   const downloadReport = async () => {
-    let guid, completed = false, canceled = false;
-    const begin = browser.cdp.on('Browser.downloadWillBegin', event => { guid = event.guid; });
+    let guid,
+      completed = false,
+      canceled = false;
+    const begin = browser.cdp.on('Browser.downloadWillBegin', event => {
+      guid = event.guid;
+    });
     const progress = browser.cdp.on('Browser.downloadProgress', event => {
-      if (event.guid === guid) { completed = event.state === 'completed'; canceled = event.state === 'canceled'; }
+      if (event.guid === guid) {
+        completed = event.state === 'completed';
+        canceled = event.state === 'canceled';
+      }
     });
     try {
       await waitForEnabledControl(browser, active, '#report-export');
@@ -81,18 +108,36 @@ export async function exerciseDashboard(browser, root, mode) {
         return completed;
       }, 'HTML export download');
       await unlink(join(browser.directory, guid));
-    } finally { begin(); progress(); }
+    } finally {
+      begin();
+      progress();
+    }
   };
   const period = async (page, value) => {
     await waitForEnabledControl(browser, page, '#report-range');
-    await inspect(page, `(() => { const control = document.querySelector('#report-range'); control.value = ${JSON.stringify(value)}; control.dispatchEvent(new Event('change')); })()`);
+    await inspect(
+      page,
+      `(() => { const control = document.querySelector('#report-range'); control.value = ${JSON.stringify(value)}; control.dispatchEvent(new Event('change')); })()`
+    );
     await eventually(() => inspect(page, 'document.querySelector("#share-result").hidden'), 'period discards preview');
   };
   const clear = async () => {
     const result = await inspect(settings, 'chrome.runtime.sendMessage({ type: "clear-history" })');
     assert.equal(result.ok, true, 'Real history clear failed');
-    await eventually(async () => (await evaluate(browser, browser.worker, 'chrome.storage.local.get("_historyGeneration")'))._historyGeneration, 'history generation persisted');
-    for (const page of pages) await eventually(() => inspect(page, 'document.querySelector("#share-result").hidden && document.querySelector("#score").textContent === "0.00"'), 'history clear visible');
+    await eventually(
+      async () =>
+        (await evaluate(browser, browser.worker, 'chrome.storage.local.get("_historyGeneration")'))._historyGeneration,
+      'history generation persisted'
+    );
+    for (const page of pages)
+      await eventually(
+        () =>
+          inspect(
+            page,
+            'document.querySelector("#share-result").hidden && document.querySelector("#score").textContent === "0.00"'
+          ),
+        'history clear visible'
+      );
   };
   const navigate = async () => {
     for (const page of pages) {
@@ -107,7 +152,14 @@ export async function exerciseDashboard(browser, root, mode) {
       await period(page, value);
       await waitForEnabledControl(browser, page, '#share-create');
       await click(browser, page, '#share-create');
-      await eventually(() => inspect(page, `!document.querySelector('#share-result').hidden && !document.querySelector('#share-create').disabled && document.querySelector('#share-preview').getAttribute('aria-label').includes('${cycle * (value === 'today' ? 1 : 3)}m creating')`), 'changed synthetic PNG preview ready');
+      await eventually(
+        () =>
+          inspect(
+            page,
+            `!document.querySelector('#share-result').hidden && !document.querySelector('#share-create').disabled && document.querySelector('#share-preview').getAttribute('aria-label').includes('${cycle * (value === 'today' ? 1 : 3)}m creating')`
+          ),
+        'changed synthetic PNG preview ready'
+      );
     }
   };
   await sample('ready', 0);

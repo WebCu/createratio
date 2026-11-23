@@ -14,7 +14,10 @@ async function procFixture(t) {
     await mkdir(directory, { recursive: true });
     const fields = ['S', String(parent), ...Array(17).fill('0'), startTicks];
     await writeFile(path.join(directory, 'stat'), `${pid} (process with ) spaces) ${fields.join(' ')}`);
-    await writeFile(path.join(directory, 'smaps_rollup'), `Rss: ${memory * 2} kB\nPss: ${memory} kB\nPrivate_Clean: 2 kB\nPrivate_Dirty: 3 kB\n`);
+    await writeFile(
+      path.join(directory, 'smaps_rollup'),
+      `Rss: ${memory * 2} kB\nPss: ${memory} kB\nPrivate_Clean: 2 kB\nPrivate_Dirty: 3 kB\n`
+    );
     return { pid, parent, startTicks, live: true };
   };
   return { root, entry };
@@ -33,7 +36,10 @@ test('native memory samples only the owned browser tree, including grandchildren
   await writeFile(zombie, (await readFile(zombie, 'utf8')).replace(') S ', ') Z '));
   await rm(path.join(root, '102', 'smaps_rollup'));
   const result = await sampleOwnedMemory(owner, root);
-  assert.deepEqual(result.processes.map(process => process.pid), [90, 100, 101]);
+  assert.deepEqual(
+    result.processes.map(process => process.pid),
+    [90, 100, 101]
+  );
   assert.equal(result.pssBytes, 60 * 1024);
   assert.equal(result.rssBytes, 120 * 1024);
   assert.equal(result.privateBytes, 15 * 1024);
@@ -47,7 +53,17 @@ test('browser ownership requires the fresh profile and ancestry to this profiler
   await entry(75, 50);
   const browser = {
     directory: '/synthetic/unique',
-    cdp: { send: async method => { assert.equal(method, 'SystemInfo.getProcessInfo'); return { processInfo: [{ type: 'browser', id: 100 }, { type: 'renderer', id: 101 }] }; } }
+    cdp: {
+      send: async method => {
+        assert.equal(method, 'SystemInfo.getProcessInfo');
+        return {
+          processInfo: [
+            { type: 'browser', id: 100 },
+            { type: 'renderer', id: 101 }
+          ]
+        };
+      }
+    }
   };
   const cmdline = path.join(root, '100', 'cmdline');
   await writeFile(cmdline, 'chromium\0--user-data-dir=/synthetic/unique/profile\0');
@@ -82,50 +98,102 @@ test('native sampler refuses exit, PID reuse, unreadable PSS and process-tree ch
   await assert.rejects(sampleOwnedMemory(owner, root, files), /identity changed during sampling/);
   await entry(101, 100);
   let scans = 0;
-  await assert.rejects(sampleOwnedMemory(owner, root, {
-    readFile, readdir: async directory => {
-      if (++scans === 2) await entry(102, 100);
-      return readdir(directory);
-    }
-  }), /tree changed/);
+  await assert.rejects(
+    sampleOwnedMemory(owner, root, {
+      readFile,
+      readdir: async directory => {
+        if (++scans === 2) await entry(102, 100);
+        return readdir(directory);
+      }
+    }),
+    /tree changed/
+  );
 });
 
 test('comparison runs alternate builds, require the matching completed pilot and keep medians distinct from ranges', async () => {
   const { runPlan, requirePilot, medianRange, summarize } = await import('../dashboard-native-profile.mjs');
   const { workload, syntheticHistory, checkpointPlan } = await import('../dashboard-native-workload.mjs');
-  assert.deepEqual(runPlan('comparison').map(run => `${run.variant}:${run.repetition}`), ['baseline:1', 'candidate:1', 'candidate:2', 'baseline:2', 'baseline:3', 'candidate:3']);
-  const provenance = { baseline: { sha256: 'synthetic baseline' }, candidate: { sha256: 'synthetic candidate' }, workloadSha256: 'synthetic workload' };
+  assert.deepEqual(
+    runPlan('comparison').map(run => `${run.variant}:${run.repetition}`),
+    ['baseline:1', 'candidate:1', 'candidate:2', 'baseline:2', 'baseline:3', 'candidate:3']
+  );
+  const provenance = {
+    baseline: { sha256: 'synthetic baseline' },
+    candidate: { sha256: 'synthetic candidate' },
+    workloadSha256: 'synthetic workload'
+  };
   const environment = { node: 'synthetic runtime' };
   const pilotRuns = runPlan('pilot').map(run => ({
-    ...run, bundleSha256: provenance[run.variant].sha256, browserVersion: { product: 'synthetic browser', revision: 'synthetic revision' },
-    checkpoints: checkpointPlan('pilot').map(point => ({ ...point, activeIsolateHeapBytes: 100, processMemory: { pssBytes: 1000 } })),
+    ...run,
+    bundleSha256: provenance[run.variant].sha256,
+    browserVersion: { product: 'synthetic browser', revision: 'synthetic revision' },
+    checkpoints: checkpointPlan('pilot').map(point => ({
+      ...point,
+      activeIsolateHeapBytes: 100,
+      processMemory: { pssBytes: 1000 }
+    })),
     generations: [{ cycle: 2, changed: true }]
   }));
-  const pilot = { schemaVersion: 1, mode: 'pilot', status: 'complete', provenance, environment, workload, runs: pilotRuns };
+  const pilot = {
+    schemaVersion: 1,
+    mode: 'pilot',
+    status: 'complete',
+    provenance,
+    environment,
+    workload,
+    runs: pilotRuns
+  };
   assert.doesNotThrow(() => requirePilot(pilot, provenance, environment));
   for (const mutate of [
-    value => { value.status = 'failed'; },
-    value => { value.provenance.baseline = 'changed'; },
-    value => { value.environment.node = 'changed'; },
-    value => { value.workload.pilot.tabs++; },
-    value => { value.runs.pop(); },
-    value => { value.runs[0].checkpoints.pop(); },
-    value => { value.runs[0].checkpoints[0].processMemory.pssBytes = null; },
-    value => { value.runs[0].generations = []; },
-    value => { value.runs[0].browserVersion.product = 'different'; }
+    value => {
+      value.status = 'failed';
+    },
+    value => {
+      value.provenance.baseline = 'changed';
+    },
+    value => {
+      value.environment.node = 'changed';
+    },
+    value => {
+      value.workload.pilot.tabs++;
+    },
+    value => {
+      value.runs.pop();
+    },
+    value => {
+      value.runs[0].checkpoints.pop();
+    },
+    value => {
+      value.runs[0].checkpoints[0].processMemory.pssBytes = null;
+    },
+    value => {
+      value.runs[0].generations = [];
+    },
+    value => {
+      value.runs[0].browserVersion.product = 'different';
+    }
   ]) {
-    const changed = structuredClone(pilot); mutate(changed);
+    const changed = structuredClone(pilot);
+    mutate(changed);
     assert.throws(() => requirePilot(changed, provenance, environment));
   }
   assert.deepEqual(medianRange([99, 1, 4]), { median: 4, minimum: 1, maximum: 99 });
   assert.throws(() => medianRange([1, NaN, 3]));
   assert.throws(() => medianRange([1, 3]));
-  const runs = runPlan('comparison').map(run => ({ ...run, checkpoints: checkpointPlan('comparison').map(point => ({ ...point, activeIsolateHeapBytes: run.repetition * 10, processMemory: { pssBytes: run.repetition * 1000, privateBytes: run.repetition * 100 } })) }));
+  const runs = runPlan('comparison').map(run => ({
+    ...run,
+    checkpoints: checkpointPlan('comparison').map(point => ({
+      ...point,
+      activeIsolateHeapBytes: run.repetition * 10,
+      processMemory: { pssBytes: run.repetition * 1000, privateBytes: run.repetition * 100 }
+    }))
+  }));
   const summary = summarize(runs);
   assert.deepEqual(summary[0].baseline.processPssBytes, { median: 2000, minimum: 1000, maximum: 3000 });
   assert.deepEqual(summary[0].candidate.activeIsolateHeapBytes, { median: 20, minimum: 10, maximum: 30 });
   assert.throws(() => summarize(runs.slice(1)), /three alternating/);
-  const mixed = structuredClone(runs); mixed[1].checkpoints[0].phase = 'navigated';
+  const mixed = structuredClone(runs);
+  mixed[1].checkpoints[0].phase = 'navigated';
   assert.throws(() => summarize(mixed), /Mixed checkpoints/);
   assert.notDeepEqual(syntheticHistory(1), syntheticHistory(2));
   assert.throws(() => syntheticHistory(0));

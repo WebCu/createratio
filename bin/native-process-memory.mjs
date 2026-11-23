@@ -4,7 +4,10 @@ import { join } from 'node:path';
 
 async function identity(root, pid, read = readFile) {
   const value = await read(join(root, String(pid), 'stat'), 'utf8');
-  const fields = value.slice(value.lastIndexOf(')') + 2).trim().split(/\s+/);
+  const fields = value
+    .slice(value.lastIndexOf(')') + 2)
+    .trim()
+    .split(/\s+/);
   assert.ok(fields.length >= 20 && /^\d+$/.test(fields[19]), 'Invalid process identity');
   return { pid, parent: Number(fields[1]), startTicks: fields[19], live: !['Z', 'X', 'x'].includes(fields[0]) };
 }
@@ -17,7 +20,10 @@ export async function ownedBrowserRoot(browser, procRoot = '/proc', ownerPid = p
   const root = await identity(procRoot, pid);
   assert.ok(root.live, 'Owned browser is not live');
   const args = (await readFile(join(procRoot, String(pid), 'cmdline'), 'utf8')).split('\0');
-  assert.ok(args.includes(`--user-data-dir=${join(browser.directory, 'profile')}`), 'Browser profile ownership mismatch');
+  assert.ok(
+    args.includes(`--user-data-dir=${join(browser.directory, 'profile')}`),
+    'Browser profile ownership mismatch'
+  );
   let parent = root.parent;
   const visited = new Set([pid]);
   while (parent !== ownerPid) {
@@ -51,10 +57,13 @@ async function descendants(root, procRoot, files) {
     size = owned.size;
     for (const entry of table.values()) if (owned.has(entry.parent)) owned.add(entry.pid);
   } while (size !== owned.size);
-  return [...owned].sort((a, b) => a - b).map(pid => {
-    assert.ok(table.has(pid), 'Owned process disappeared before sampling');
-    return table.get(pid);
-  }).filter(entry => entry.live);
+  return [...owned]
+    .sort((a, b) => a - b)
+    .map(pid => {
+      assert.ok(table.has(pid), 'Owned process disappeared before sampling');
+      return table.get(pid);
+    })
+    .filter(entry => entry.live);
 }
 
 export async function sampleOwnedMemory(root, procRoot = '/proc', files = { readFile, readdir }) {
@@ -65,15 +74,26 @@ export async function sampleOwnedMemory(root, procRoot = '/proc', files = { read
   for (const expected of entries) {
     const { pid } = expected;
     const source = await files.readFile(join(procRoot, String(pid), 'smaps_rollup'), 'utf8');
-    assert.deepEqual(await identity(procRoot, pid, files.readFile), expected, 'Process identity changed during sampling');
-    processes.push({ ...expected, pssBytes: kilobytes(source, 'Pss'), rssBytes: kilobytes(source, 'Rss'), privateBytes: kilobytes(source, 'Private_Clean') + kilobytes(source, 'Private_Dirty') });
+    assert.deepEqual(
+      await identity(procRoot, pid, files.readFile),
+      expected,
+      'Process identity changed during sampling'
+    );
+    processes.push({
+      ...expected,
+      pssBytes: kilobytes(source, 'Pss'),
+      rssBytes: kilobytes(source, 'Rss'),
+      privateBytes: kilobytes(source, 'Private_Clean') + kilobytes(source, 'Private_Dirty')
+    });
   }
   assert.deepEqual(await identity(procRoot, root.pid, files.readFile), root, 'Owned browser exited during sampling');
   assert.deepEqual(await descendants(root, procRoot, files), entries, 'Owned process tree changed during sampling');
   return {
-    sampledAt: new Date().toISOString(), elapsedMs: performance.now() - started,
+    sampledAt: new Date().toISOString(),
+    elapsedMs: performance.now() - started,
     pssBytes: processes.reduce((sum, entry) => sum + entry.pssBytes, 0),
     rssBytes: processes.reduce((sum, entry) => sum + entry.rssBytes, 0),
-    privateBytes: processes.reduce((sum, entry) => sum + entry.privateBytes, 0), processes
+    privateBytes: processes.reduce((sum, entry) => sum + entry.privateBytes, 0),
+    processes
   };
 }
