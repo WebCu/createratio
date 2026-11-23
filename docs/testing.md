@@ -188,6 +188,30 @@ processes, missing/inaccessible counters and unsupported platforms are distinct.
 Unavailable values are null, never false zero or a lifecycle failure. Process
 memory is not worker-isolate-only memory, and worker exit is not zero extension RAM.
 
+### Hidden-mutation classification comparison
+
+Build the fixed baseline and candidate separately, select Chromium with
+`CHROMIUM_PATH`, then run:
+
+```sh
+node bin/hidden-mutation-profile.mjs /tmp/baseline/chrome dist/chrome /tmp/hidden-mutation-profile.json
+```
+
+This alternates three fresh profiles per build with tracking enabled on a synthetic
+X feed. A foreground blank tab makes the feed genuinely hidden; each hidden and
+visible phase drives 100 mutation batches 220 ms apart, followed by a 1.1-second
+drain. Returning to the feed must reclassify, visible mutations must classify,
+and the candidate must make zero hidden-phase classifier calls. A trusted key
+event starts visible tracking; the report includes saved consuming seconds.
+
+CDP precise coverage counts adapter `mode` calls without modifying the bundles.
+Background timer throttling can coalesce baseline refreshes. CPU sampling at
+100 microseconds attributes leaf samples in extension content/site/DOM/friction/
+messages scripts; tab-wide `ScriptDuration` is separate. Profiling perturbs timing
+and tiny CPU totals are noisy: report medians and ranges, not exact CPU savings.
+JSON includes bundle fingerprints, environment and per-phase measurements. Keep
+it outside Git. This complements, not replaces, tracker heap and worker checks.
+
 ### Hidden blocked-gate worker comparison
 
 ```sh

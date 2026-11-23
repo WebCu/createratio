@@ -90,6 +90,9 @@ async function tracker(browser = 'chrome', options = {}) {
       }
     },
     MutationObserver: class {
+      constructor(fn) {
+        options.observeMutations?.(fn);
+      }
       observe() {}
       disconnect() {}
     },
@@ -98,7 +101,8 @@ async function tracker(browser = 'chrome', options = {}) {
       return 1;
     },
     clearInterval() {},
-    setTimeout() {
+    setTimeout(fn) {
+      options.scheduleTimeout?.(fn);
       return 1;
     },
     clearTimeout() {},
