@@ -80,11 +80,23 @@
         )
           throw refuse('Invalid time segment');
         totalSec += segment.sec;
+        if (segment.start !== undefined || segment.end !== undefined) {
+          if (
+            !Number.isFinite(segment.start) ||
+            !Number.isFinite(segment.end) ||
+            segment.start < 0 ||
+            segment.end <= segment.start ||
+            Math.abs((segment.end - segment.start) / 1000 - segment.sec) > 0.001
+          )
+            throw refuse('Invalid time interval');
+        }
       }
       if (totalSec > limits.maxSeconds) throw refuse('Time packet too large');
       for (const action of message.actions) {
         if (!record(action) || !core.validLocalDate(action.date) || !site.actions.includes(action.action))
           throw refuse('Action not supported on this site');
+        if (action.at !== undefined && (!Number.isFinite(action.at) || action.at < 0))
+          throw refuse('Invalid action time');
       }
     }
     /** @param {chrome.runtime.MessageSender} sender */

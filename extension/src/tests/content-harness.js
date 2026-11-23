@@ -75,8 +75,14 @@ async function tracker(browser = 'chrome', options = {}) {
     location,
     window: { addEventListener: listen, removeEventListener: unlisten },
     crypto: { randomUUID: () => crypto.randomUUID() },
-    performance: { now: () => now },
-    Date: { now: () => base + now },
+    performance: {
+      now() {
+        const sample = now;
+        now += options.sampleStep || 0;
+        return sample;
+      }
+    },
+    Date: { now: () => base + now + (options.wallOffset || 0) },
     console: {
       ...console,
       warn(...args) {

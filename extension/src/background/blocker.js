@@ -39,12 +39,71 @@ const SiteAccess = (() => {
     Sites.sites.filter(site => site.gated).map(site => [site.id, { name: site.name, ...Sites.get(site.id).access }])
   );
   const api = globalThis.browser || globalThis.chrome;
+  /** @type {(tab: chrome.tabs.Tab) => Promise<void>} */
+  let beforeNavigate = async () => {};
+  function setBeforeNavigate(handler) {
+    beforeNavigate = handler;
+  }
   const contracts = MessageContracts.create(Core, api.runtime, Sites);
   function siteForURL(raw) {
     return Sites.forAccessURL(raw)?.id || null;
   }
   function gateURL(site) {
     return api.runtime.getURL('blocked.html') + '?site=' + site;
+  }
+  function updateWindows(windows, site, now, end) {
+    const entries = Array.isArray(windows[site])
+      ? windows[site].filter(
+          item =>
+            record(item) &&
+            Number.isFinite(item.start) &&
+            Number.isFinite(item.end) &&
+            item.start >= 0 &&
+            item.end > item.start
+        )
+      : [];
+    const last = entries.at(-1);
+    if (last && last.start <= now && last.end >= now) {
+      for (const entry of entries) if (entry.start <= now && entry.end >= now) entry.end = Math.min(entry.end, end);
+      last.end = end;
+    } else if (end > now) entries.push({ start: now, end });
+    const retained = entries.filter(entry => entry.end > entry.start);
+    if (retained.length) windows[site] = retained.slice(-Core.DELIVERY_LIMITS.receiptLimit);
+    else delete windows[site];
+  }
+  async function creationPacket(packet, access) {
+    if (!access[packet.site]) return packet;
+    const stored = await api.storage.local.get('_accessWindows');
+    const windows = stored._accessWindows?.[packet.site] || [];
+    const legacyAllowed =
+      access[packet.site].enabled && (access[packet.site].goalAllowed || access[packet.site].remainingMs > 0);
+    if (!windows.length && legacyAllowed)
+      windows.push({
+        start: 0,
+        end: access[packet.site].goalAllowed
+          ? Number.MAX_SAFE_INTEGER
+          : access[packet.site].expiresAt || Date.now() + access[packet.site].remainingMs
+      });
+    const coverage = [];
+    for (const window of windows.slice().sort((a, b) => a.start - b.start)) {
+      const last = coverage.at(-1);
+      if (last && window.start <= last.end) last.end = Math.max(last.end, window.end);
+      else coverage.push({ ...window });
+    }
+    const segments = packet.segments.flatMap(segment => {
+      if (segment.start === undefined) return legacyAllowed ? [segment] : [];
+      return coverage.flatMap(window => {
+        const start = Math.max(segment.start, window.start),
+          end = Math.min(segment.end, window.end);
+        return end > start ? [{ ...segment, start, end, sec: (end - start) / 1000 }] : [];
+      });
+    });
+    const actions = packet.actions.filter(action =>
+      action.at === undefined
+        ? legacyAllowed
+        : windows.some(window => action.at >= window.start && action.at < window.end)
+    );
+    return { ...packet, segments, actions };
   }
   function ruleIds(site) {
     return SITES[site].ruleIds;
@@ -91,18 +150,35 @@ const SiteAccess = (() => {
   async function closeTabs(site) {
     const patterns = SITES[site].domains.flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']);
     const tabs = await api.tabs.query({ url: patterns });
-    await Promise.all(
+    const navigated = await Promise.all(
       tabs
         .filter(tab => siteForURL(tab.url) === site)
-        .map(tab => api.tabs.update(tab.id, { url: gateURL(site) }).catch(() => {}))
+        .map(async tab => {
+          try {
+            await beforeNavigate(tab);
+          } catch (error) {
+            console.warn('CreateRatio: unable to drain tracker.', error.message);
+          }
+          try {
+            await api.tabs.update(tab.id, { url: gateURL(site) });
+            return tab.id;
+          } catch (_) {
+            return null;
+          }
+        })
     );
+    return navigated.filter(id => id !== null);
   }
   async function reconcile(closeAll = false) {
     const restart = !(await api.storage.session.get('_accessInitialized'))._accessInitialized;
     const now = Date.now(),
       clock = new Date(now),
       date = Core.localDate(clock);
-    const stored = /** @type {StoredData} */ (await api.storage.local.get(['_access', 'settings', date]));
+    const stored = /** @type {StoredData} */ (
+      await api.storage.local.get(['_access', '_accessWindows', 'settings', date])
+    );
+    const windows = accessState(stored._accessWindows),
+      originalWindows = JSON.stringify(windows);
     const goalAllowed =
       stored.settings?.allowAboveGoal === true &&
       Core.score(Core.aggregate(stored[date])) > Core.dailyTarget(stored.settings);
@@ -119,6 +195,7 @@ const SiteAccess = (() => {
       expired = [];
     for (const [site, definition] of Object.entries(SITES)) {
       if (!Core.trackingEnabled(site, stored.settings)) {
+        delete windows[site];
         rules.push(...definition.unrestrictedRules);
         delete access[site];
         await api.alarms.clear('access-' + site);
@@ -127,15 +204,22 @@ const SiteAccess = (() => {
       if (Object.hasOwn(access, site) && !validSession(access[site], now)) delete access[site];
       const entry = access[site] || {},
         minutes = Core.siteSettings(site, stored.settings).accessMinutes;
+      let windowStart = now;
       const hadSession = Number.isFinite(entry.remainingMs) || Number.isFinite(entry.expiresAt);
       if (!Number.isFinite(entry.remainingMs) && Number.isFinite(entry.expiresAt))
         entry.remainingMs = Math.max(0, entry.expiresAt - now);
       if (entry.date && entry.date !== date) {
-        const runningAtMidnight = !restart && entry.expiresAt >= dayStart;
+        const runningAtMidnight =
+          !restart && (entry.expiresAt >= dayStart || (!goalAllowed && entry.goalActive === true));
+        const pausedAtMidnight = !restart && entry.remainingMs > 0 && !entry.expiresAt;
+        if (runningAtMidnight || pausedAtMidnight) windowStart = dayStart;
         entry.remainingMs = Core.millisecondsFromMinutes(minutes);
         entry.refilledAt = dayStart;
         entry.expiresAt = runningAtMidnight ? dayStart + entry.remainingMs : 0;
       }
+      const authorizedUntil = entry.expiresAt;
+      if (goalAllowed && activeSite === site && entry.remainingMs > 0) entry.goalActive = true;
+      else delete entry.goalActive;
       if (entry.remainingMs > 0) entry.date = date;
       if (!restart && entry.expiresAt)
         entry.remainingMs = Math.min(entry.remainingMs, Math.max(0, entry.expiresAt - now));
@@ -153,6 +237,18 @@ const SiteAccess = (() => {
       if (!validWait(entry, now)) {
         delete entry.readyAt;
         delete entry.waitMs;
+      }
+      if (windows[site] || entry.refilledAt > 0 || entry.expiresAt || goalAllowed) {
+        updateWindows(
+          windows,
+          site,
+          windowStart,
+          goalAllowed
+            ? midnight
+            : entry.remainingMs > 0 && !entry.expiresAt
+              ? Number.MAX_SAFE_INTEGER
+              : entry.expiresAt || Math.min(now, authorizedUntil || now)
+        );
       }
     }
     const keys = list =>
@@ -174,7 +270,11 @@ const SiteAccess = (() => {
         removeRuleIds: Object.keys(SITES).flatMap(ruleIds),
         addRules: rules
       });
-    if (JSON.stringify(access) !== original) await api.storage.local.set({ _access: access });
+    const changes = {
+      ...(JSON.stringify(access) !== original ? { _access: access } : {}),
+      ...(JSON.stringify(windows) !== originalWindows ? { _accessWindows: windows } : {})
+    };
+    if (Object.keys(changes).length) await api.storage.local.set(changes);
     if (Object.keys(SITES).some(site => access[site]?.date))
       await api.alarms.create('access-midnight', { when: midnight });
     else await api.alarms.clear('access-midnight');
@@ -245,10 +345,20 @@ const SiteAccess = (() => {
     }
     return { ok: true };
   }
-  async function readAccessStatus() {
+  async function readAccessStatus(sender) {
     const access = await reconcile();
+    const site = sender?.frameId === 0 && sender?.tab && siteForURL(sender.url);
+    const navigated =
+      site && access[site].enabled && !access[site].goalAllowed && !access[site].remainingMs
+        ? await closeTabs(site)
+        : [];
     const stored = /** @type {StoredData} */ (await api.storage.local.get('settings'));
-    return { ok: true, access, intentionHistoryEnabled: stored.settings?.intentionHistoryEnabled === true };
+    return {
+      ok: true,
+      access,
+      intentionHistoryEnabled: stored.settings?.intentionHistoryEnabled === true,
+      navigationHandled: navigated.includes(sender?.tab?.id)
+    };
   }
   async function beginWait(message, state, stored, now) {
     if (!Core.validIntention(message.reason))
@@ -282,9 +392,12 @@ const SiteAccess = (() => {
     await api.storage.local.set({ _access: access });
   }
   async function endAccess(site, access) {
+    const stored = await api.storage.local.get('_accessWindows');
+    const windows = accessState(stored._accessWindows);
+    updateWindows(windows, site, Date.now(), Date.now());
     delete access[site];
     await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: ruleIds(site) });
-    await api.storage.local.set({ _access: access });
+    await api.storage.local.set({ _access: access, _accessWindows: windows });
     await api.alarms.clear('access-' + site);
     await closeTabs(site);
   }
@@ -341,10 +454,10 @@ const SiteAccess = (() => {
       case 'access-duration':
         return setDuration(message, sender);
       case 'access-status':
-        return readAccessStatus();
+        return readAccessStatus(sender);
       default:
         return handleSession(message, sender);
     }
   }
-  return { handle, reconcile, siteForURL, gateURL };
+  return { handle, reconcile, siteForURL, gateURL, creationPacket, setBeforeNavigate };
 })();
