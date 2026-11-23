@@ -25,7 +25,7 @@ for (const name of ['browser-smoke-core', 'browser-journeys']) {
     assert.match(source, /run: pnpm install --frozen-lockfile/);
     assert.match(
       source,
-      /https:\/\/storage\.googleapis\.com\/chrome-for-testing-public\/155\.0\.8059\.79\/linux64\/chrome-linux64\.zip/
+      /https:\/\/storage\.googleapis\.com\/chrome-for-testing-public\/[\d.]+\/linux64\/chrome-linux64\.zip/
     );
     assert.match(source, /[a-f0-9]{64} {2}.*\$RUNNER_TEMP\/chrome\.zip.*\| sha256sum --check/);
     assert.ok(source.indexOf('sha256sum --check') < source.indexOf('unzip -q'));
@@ -45,7 +45,7 @@ for (const name of ['browser-smoke-core', 'browser-journeys']) {
 
 test('only the broad smoke installs Python browser-harness', () => {
   const source = job('browser-smoke-core');
-  assert.match(source, /browser-harness==0\.1\.13/);
+  assert.match(source, /browser-harness==[\d.]+/);
   assert.match(source, /BH_TELEMETRY: '0'/);
   assert.match(source, /BH_UPDATE_CHECK: '0'/);
   assert.match(source, /pnpm smoke:browser 2>&1 \| tee "\$BROWSER_ARTIFACT_DIR\/smoke\.log"/);

@@ -14,6 +14,8 @@ test('built extension keeps focused settings, narrow tasks and history readable'
     findByRole,
     openSettingsSection,
     seedAccess,
+    selectAllText,
+    typeAhead,
     withFailureArtifacts
   } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
@@ -40,8 +42,8 @@ test('built extension keeps focused settings, narrow tasks and history readable'
     );
     assert.ok(sizes.document <= sizes.width && sizes.body <= sizes.width, JSON.stringify(sizes));
   };
-  const key = async (page, name, code, modifiers = 0) => {
-    const details = { key: name, code: name === 'a' ? 'KeyA' : name, windowsVirtualKeyCode: code, modifiers };
+  const key = async (page, name, code) => {
+    const details = { key: name, code: name, windowsVirtualKeyCode: code };
     await browser.cdp.send(
       'Input.dispatchKeyEvent',
       { type: 'keyDown', ...details, ...(name === 'Enter' ? { text: '\r' } : {}) },
@@ -56,7 +58,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
   };
   const customDuration = async (page, site, value) => {
     await focusDuration(page, site.name);
-    await key(page, 'End', 35);
+    await typeAhead(browser, page, 'c');
     await eventually(
       () =>
         inspect(
@@ -65,7 +67,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         ),
       'custom duration editor focused'
     );
-    await key(page, 'a', 65, 2);
+    await selectAllText(browser, page);
     await browser.cdp.send('Input.insertText', { text: String(value) }, page.session);
     await clickByRole(browser, page, 'button', 'Save custom session time for ' + site.name);
     await eventually(
@@ -218,12 +220,12 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       })()`
       );
       await focusDuration(page, 'X');
-      await key(page, 'End', 35);
+      await typeAhead(browser, page, 'c');
       await eventually(
         () => inspect(page, 'document.activeElement.id === "customMinutes-site-x"'),
         'custom editor focused'
       );
-      await key(page, 'a', 65, 2);
+      await selectAllText(browser, page);
       await browser.cdp.send('Input.insertText', { text: '17' }, page.session);
       await clickByRole(browser, page, 'button', 'Save custom session time for X');
       await eventually(
@@ -326,12 +328,12 @@ test('built extension keeps focused settings, narrow tasks and history readable'
           await browser.cdp.send('Target.activateTarget', { targetId: page.targetId });
           const waitMenu = await findByRole(browser, page, 'combobox', 'Intention wait for X');
           await browser.cdp.send('DOM.focus', { backendNodeId: waitMenu.backendDOMNodeId }, page.session);
-          await key(page, 'End', 35);
+          await typeAhead(browser, page, 'c');
           await eventually(
             () => inspect(page, 'document.activeElement.id === "customWaitMinutes-site-x"'),
             'custom wait editor focused'
           );
-          await key(page, 'a', 65, 2);
+          await selectAllText(browser, page);
           await browser.cdp.send('Input.insertText', { text: '7' }, page.session);
           await clickByRole(browser, page, 'button', 'Save custom intention wait for X');
           await eventually(
@@ -427,12 +429,12 @@ test('built extension keeps focused settings, narrow tasks and history readable'
           'saved On switches survive reload'
         );
         await focusDuration(page, 'X');
-        await key(page, 'End', 35);
+        await typeAhead(browser, page, 'c');
         await eventually(
           () => inspect(page, 'document.activeElement.id === "customMinutes-site-x"'),
           'custom editor focused'
         );
-        await key(page, 'a', 65, 2);
+        await selectAllText(browser, page);
         await browser.cdp.send('Input.insertText', { text: '17' }, page.session);
         await evaluate(
           browser,
@@ -467,7 +469,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         const page = await pageAt('/settings.html', 1000);
         await eventually(() => inspect(page, '!!document.querySelector("#accessMinutes-default")'), 'Settings ready');
         await focusDuration(page, 'Default');
-        await key(page, 'ArrowDown', 40);
+        await typeAhead(browser, page, '1');
         await eventually(
           () =>
             inspect(
@@ -498,7 +500,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
           true
         );
         await focusDuration(page, 'X');
-        await key(page, 'Home', 36);
+        await typeAhead(browser, page, 'd');
         await eventually(
           () =>
             inspect(

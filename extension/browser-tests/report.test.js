@@ -6,7 +6,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 test('built dashboard downloads local daily and weekly reports that render and print offline', async () => {
-  const { launch, evaluate, eventually, click, withFailureArtifacts } = await import('./chromium.mjs');
+  const { launch, evaluate, eventually, click, typeAhead, withFailureArtifacts } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   const { cdp } = browser;
   const inspect = (page, source) => evaluate(browser, page.session, source);
@@ -72,19 +72,10 @@ test('built dashboard downloads local daily and weekly reports that render and p
       assert.match(daily, /<dt>Period creation score<\/dt><dd>1\.00<\/dd>/);
       assert.doesNotMatch(daily, /2026-03-03|retired/);
       await click(browser, dashboard, '#report-range');
+      await typeAhead(browser, dashboard, 'l');
       await cdp.send(
         'Input.dispatchKeyEvent',
-        { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 },
-        dashboard.session
-      );
-      await cdp.send(
-        'Input.dispatchKeyEvent',
-        { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 },
-        dashboard.session
-      );
-      await cdp.send(
-        'Input.dispatchKeyEvent',
-        { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 },
+        { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' },
         dashboard.session
       );
       await cdp.send(
