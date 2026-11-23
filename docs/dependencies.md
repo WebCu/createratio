@@ -8,7 +8,9 @@ extension or website. TypeScript is a root dev-only dependency for
 `pnpm check:types`; it checks the JavaScript sources without compiling them and
 is not packaged. `@types/chrome` is a root dev-only dependency that types the
 `chrome` and `browser` extension APIs for `pnpm check:types`; it contains only
-declarations and is not packaged. The landing website's only library dependency is the
+declarations and is not packaged. Biome (`@biomejs/biome`) is a root dev-only dependency for
+`pnpm format` and `pnpm check:format`; it installs one prebuilt binary package
+for the current platform, and it is not packaged. The landing website's only library dependency is the
 official Plausible tracker, served locally. New dependencies require maintainer
 approval; prefer built-in browser and Node.js capabilities.
 
