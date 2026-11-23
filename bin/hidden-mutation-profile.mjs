@@ -5,13 +5,7 @@ import { release, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
-import {
-  launch,
-  evaluate,
-  eventually,
-  seedAccess,
-  withFailureArtifacts
-} from '../extension/browser-tests/chromium.mjs';
+import { launch, evaluate, eventually, withFailureArtifacts } from '../extension/browser-tests/chromium.mjs';
 import { bundleFingerprint } from './scroll-profile-report.mjs';
 
 export function mutationMetrics(coverage, profile, origin) {
@@ -46,8 +40,24 @@ export function validateMutationRun(run) {
   );
 }
 
+export async function seedMutationAccess(browser) {
+  await evaluate(
+    browser,
+    browser.worker,
+    `(async () => {
+      const core = globalThis.Core ?? globalThis.C3;
+      const { settings = {} } = await chrome.storage.local.get('settings');
+      await chrome.storage.local.set({
+        _access: { x: { remainingMs: 300000, date: core.localDate() } },
+        settings: { ...settings, trackedSites: ['x'], scrollFrictionEnabled: false }
+      });
+      await SiteAccess.reconcile();
+    })()`
+  );
+}
+
 async function workload(browser) {
-  await seedAccess(browser, ['x'], { trackedSites: ['x'], scrollFrictionEnabled: false });
+  await seedMutationAccess(browser);
   const page = await browser.page('https://x.com/home');
   const send = (method, params = {}) => browser.cdp.send(method, params, page.session);
   await eventually(
@@ -119,14 +129,14 @@ async function workload(browser) {
       (await evaluate(
         browser,
         browser.worker,
-        'chrome.storage.local.get(null).then(data => data[Core.localDate()]?.x?.consumeSec || 0)'
+        'chrome.storage.local.get(null).then(data => data[(globalThis.Core ?? globalThis.C3).localDate()]?.x?.consumeSec || 0)'
       )) > 22,
     'visible time saved'
   );
   const consumeSec = await evaluate(
     browser,
     browser.worker,
-    'chrome.storage.local.get(null).then(data => data[Core.localDate()].x.consumeSec)'
+    'chrome.storage.local.get(null).then(data => data[(globalThis.Core ?? globalThis.C3).localDate()].x.consumeSec)'
   );
   return { phases, consumeSec };
 }

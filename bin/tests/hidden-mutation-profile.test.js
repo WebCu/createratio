@@ -1,6 +1,55 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
+
+test('mutation access seeding supports both worker globals and preserves settings', async () => {
+  const { seedMutationAccess } = await import('../hidden-mutation-profile.mjs');
+  for (const name of ['Core', 'C3']) {
+    for (const settings of [undefined, { retained: true }]) {
+      let saved,
+        reconciled = false;
+      const context = {
+        [name]: { localDate: () => '2026-11-21' },
+        chrome: {
+          storage: {
+            local: {
+              get: async () => ({ settings }),
+              set: async value => {
+                saved = JSON.parse(JSON.stringify(value));
+              }
+            }
+          }
+        },
+        SiteAccess: {
+          reconcile: async () => {
+            reconciled = true;
+          }
+        }
+      };
+      const browser = {
+        worker: 'worker',
+        cdp: {
+          send: async (method, params, session) => {
+            assert.equal(method, 'Runtime.evaluate');
+            assert.equal(session, 'worker');
+            return { result: { value: await vm.runInNewContext(params.expression, context) } };
+          }
+        }
+      };
+      await seedMutationAccess(browser);
+      assert.deepEqual(saved, {
+        _access: { x: { remainingMs: 300000, date: '2026-11-21' } },
+        settings: { ...settings, trackedSites: ['x'], scrollFrictionEnabled: false }
+      });
+      assert.equal(reconciled, true);
+      browser.cdp.send = async () => {
+        throw new Error('worker unavailable');
+      };
+      await assert.rejects(seedMutationAccess(browser), /worker unavailable/);
+    }
+  }
+});
 
 test('mutation metrics count adapter calls and attribute only extension content CPU', async () => {
   const { mutationMetrics } = await import('../hidden-mutation-profile.mjs');
