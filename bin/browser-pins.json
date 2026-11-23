@@ -1,0 +1,20 @@
+{
+  "chromeForTesting": {
+    "version": "155.0.8059.79",
+    "archives": {
+      "linux64": {
+        "sha256": "bcd9a79130d7e44d70f93be87042e9bcee7fe0f0b3898e06b8c9bed5fb619dcd",
+        "executable": "chrome-linux64/chrome"
+      },
+      "mac-arm64": {
+        "sha256": "e141a7cbf948780bb7d381860bd5a7944c6736f79b9918b9826fccb199d28ea4",
+        "executable": "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+      },
+      "mac-x64": {
+        "sha256": "11c407e24d7d98cacaec055a4d9ab2f33023db2478d30544c24e829d81022096",
+        "executable": "chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+      }
+    }
+  },
+  "browserHarness": "0.1.13"
+}

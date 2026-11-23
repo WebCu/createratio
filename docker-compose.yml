@@ -31,3 +31,26 @@ services:
       - '127.0.0.1:${WEB_PORT:-4173}:4173'
     labels:
       traefik.enable: 'false'
+
+  browser-tests:
+    profiles:
+      - browser
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.browser
+      platforms:
+        - linux/amd64
+    platform: linux/amd64
+    init: true
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 4096
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+      - /work:size=1g,mode=1777
+    volumes:
+      - ./dist/container:/out

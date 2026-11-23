@@ -80,3 +80,31 @@ test('syntax checks resolve files from the repository root when invoked in a sub
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /root\.js/);
 });
+
+test('type-only JSDoc passes only in the files the root tsconfig type-checks, across workers', t => {
+  const directory = repository(t);
+  fs.mkdirSync(path.join(directory, 'node_modules'));
+  fs.symlinkSync(
+    path.resolve(__dirname, '../../node_modules/typescript'),
+    path.join(directory, 'node_modules', 'typescript'),
+    'dir'
+  );
+  fs.writeFileSync(
+    path.join(directory, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: { allowJs: true, checkJs: true, noEmit: true, types: [] },
+      include: ['typed/*.js']
+    })
+  );
+  fs.mkdirSync(path.join(directory, 'typed'));
+  for (const name of ['a.js', 'b.js', 'c.js'])
+    fs.writeFileSync(path.join(directory, 'typed', name), '/** @type {number} */\nconst value = 1;\n');
+  fs.writeFileSync(path.join(directory, 'untyped.js'), '/** @type {number} */\nconst value = 1;\n');
+  const rejected = check(directory);
+  assert.notEqual(rejected.status, 0);
+  assert.equal(rejected.stderr.trim(), `Code comments are not allowed:\n${fs.realpathSync(directory)}/untyped.js:1:1`);
+  fs.rmSync(path.join(directory, 'untyped.js'));
+  const accepted = check(directory);
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.match(accepted.stdout, /3 JavaScript syntax checks passed/);
+});

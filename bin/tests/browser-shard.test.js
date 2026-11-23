@@ -16,11 +16,20 @@ function fixture(t) {
   const save = () => writeFileSync(path.join(root, 'bin/browser-shards.json'), JSON.stringify(shards));
   save();
   for (let index = 1; index <= shards.length; index++) {
-    writeFileSync(path.join(root, `extension/browser-tests/case-${index}.test.js`), `require('node:test').test('journey ${index}', () => console.log('visited-${index}'));`);
+    writeFileSync(
+      path.join(root, `extension/browser-tests/case-${index}.test.js`),
+      `require('node:test').test('journey ${index}', () => console.log('visited-${index}'));`
+    );
   }
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
-  const run = (...args) => spawnSync(process.execPath, [path.join(root, 'bin/browser-shard.js'), ...args], { cwd: root, env, encoding: 'utf8', timeout: 10000 });
+  const run = (...args) =>
+    spawnSync(process.execPath, [path.join(root, 'bin/browser-shard.js'), ...args], {
+      cwd: root,
+      env,
+      encoding: 'utf8',
+      timeout: 10000
+    });
   return { root, shards, save, run };
 }
 
@@ -38,7 +47,10 @@ test('each browser shard runs only its assigned real test files', t => {
 
 test('a failing browser journey makes its shard fail', t => {
   const { root, run } = fixture(t);
-  writeFileSync(path.join(root, 'extension/browser-tests/case-1.test.js'), "require('node:test').test('broken journey', () => { throw new Error('browser regression'); });");
+  writeFileSync(
+    path.join(root, 'extension/browser-tests/case-1.test.js'),
+    "require('node:test').test('broken journey', () => { throw new Error('browser regression'); });"
+  );
   const result = run('1');
   assert.equal(result.status, 1);
   assert.match(result.stdout, /browser regression/);
@@ -102,6 +114,8 @@ test('the committed browser plan is a complete disjoint partition', () => {
   const shards = JSON.parse(readFileSync(path.resolve(__dirname, '../browser-shards.json'), 'utf8'));
   assert.equal(shards.length, 8);
   const { readdirSync } = require('node:fs');
-  const files = readdirSync(path.resolve(__dirname, '../../extension/browser-tests')).filter(file => file.endsWith('.test.js')).sort();
+  const files = readdirSync(path.resolve(__dirname, '../../extension/browser-tests'))
+    .filter(file => file.endsWith('.test.js'))
+    .sort();
   assert.deepEqual(shards.flat().sort(), files);
 });

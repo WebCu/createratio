@@ -16,18 +16,22 @@ async function start(t, ...args) {
   t.after(() => new Promise(resolve => server.close(resolve)));
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
-  return (pathname, method = 'GET') => new Promise((resolve, reject) => {
-    const request = http.request({ hostname: '127.0.0.1', port: server.address().port,
-      path: pathname, method }, response => {
-      const chunks = [];
-      response.on('data', chunk => chunks.push(chunk));
-      response.on('end', () => resolve({ status: response.statusCode,
-        headers: response.headers, body: Buffer.concat(chunks).toString() }));
-      response.on('error', reject);
+  return (pathname, method = 'GET') =>
+    new Promise((resolve, reject) => {
+      const request = http.request(
+        { hostname: '127.0.0.1', port: server.address().port, path: pathname, method },
+        response => {
+          const chunks = [];
+          response.on('data', chunk => chunks.push(chunk));
+          response.on('end', () =>
+            resolve({ status: response.statusCode, headers: response.headers, body: Buffer.concat(chunks).toString() })
+          );
+          response.on('error', reject);
+        }
+      );
+      request.on('error', reject);
+      request.end();
     });
-    request.on('error', reject);
-    request.end();
-  });
 }
 
 test('preview serves every public asset with its MIME type and no caching', async t => {
@@ -76,7 +80,11 @@ test('built preview delivers discoverable agent and crawler assets without expos
   assert.equal(schema['@type'], 'SoftwareApplication');
   assert.equal(new URL(schema.url).protocol, 'https:');
   for (const link of schema.downloadUrl) assert.ok(homepage.includes(`href="${link}"`));
-  for (const [url, type] of [['/llms.txt', 'text/plain'], ['/robots.txt', 'text/plain'], ['/sitemap.xml', 'application/xml']]) {
+  for (const [url, type] of [
+    ['/llms.txt', 'text/plain'],
+    ['/robots.txt', 'text/plain'],
+    ['/sitemap.xml', 'application/xml']
+  ]) {
     const response = await request(url);
     assert.equal(response.status, 200);
     assert.ok(response.headers['content-type'].startsWith(type));
@@ -105,8 +113,18 @@ test('built preview delivers discoverable agent and crawler assets without expos
 
 test('preview rejects non-public files, traversal, and write methods', async t => {
   const request = await start(t);
-  for (const url of ['/missing', '/.env', '/.git/config', '/README.md', '/tests/',
-    '/dev-server.js', '/../LICENSE', '/%2e%2e/LICENSE', '/__proto__', '/constructor']) {
+  for (const url of [
+    '/missing',
+    '/.env',
+    '/.git/config',
+    '/README.md',
+    '/tests/',
+    '/dev-server.js',
+    '/../LICENSE',
+    '/%2e%2e/LICENSE',
+    '/__proto__',
+    '/constructor'
+  ]) {
     assert.equal((await request(url)).status, 404, url);
   }
   for (const method of ['POST', 'PUT', 'DELETE']) {
@@ -133,7 +151,10 @@ test('legal pages are discoverable and their local links and anchors resolve', a
   const request = await start(t);
   const homepage = (await request('/')).body;
   const origin = 'https://createratio.com';
-  for (const [page, other] of [['privacy', 'terms'], ['terms', 'privacy']]) {
+  for (const [page, other] of [
+    ['privacy', 'terms'],
+    ['terms', 'privacy']
+  ]) {
     assert.ok(homepage.includes(`href="${page}.html"`), `homepage links to ${page}`);
     const html = (await request(`/${page}.html`)).body;
     assert.ok(html.includes(`href="${other}.html"`), `${page} links to ${other}`);
@@ -143,8 +164,10 @@ test('legal pages are discoverable and their local links and anchors resolve', a
       const target = await request(url.pathname + url.search);
       assert.equal(target.status, 200, `${page}: ${href}`);
       if (url.hash) {
-        assert.ok(target.body.includes(`id="${decodeURIComponent(url.hash.slice(1))}"`),
-          `${page}: ${href} has a target`);
+        assert.ok(
+          target.body.includes(`id="${decodeURIComponent(url.hash.slice(1))}"`),
+          `${page}: ${href} has a target`
+        );
       }
     }
   }

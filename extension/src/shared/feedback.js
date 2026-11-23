@@ -1,6 +1,6 @@
 'use strict';
 (async () => {
-  const link = document.getElementById('feedback');
+  const link = /** @type {HTMLAnchorElement} */ (document.getElementById('feedback'));
   const note = document.getElementById('feedback-privacy');
   if (link.dataset.store !== 'chrome') return;
   try {

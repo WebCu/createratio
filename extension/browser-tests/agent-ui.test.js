@@ -4,7 +4,16 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 test('agents discover site-specific actions and complete the existing access UI through accessibility names', async () => {
-  const { launch, evaluate, eventually, withFailureArtifacts, accessibilityNodes, findByRole, clickByRole, openSettingsSection } = await import('./chromium.mjs');
+  const {
+    launch,
+    evaluate,
+    eventually,
+    withFailureArtifacts,
+    accessibilityNodes,
+    findByRole,
+    clickByRole,
+    openSettingsSection
+  } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   const inspect = (page, source) => evaluate(browser, page.session, source);
   const nodes = page => accessibilityNodes(browser, page);
@@ -13,24 +22,44 @@ test('agents discover site-specific actions and complete the existing access UI 
   try {
     await withFailureArtifacts(browser, 'agent accessibility journey', async () => {
       const popup = await browser.page(browser.origin + '/popup.html');
-      await eventually(() => inspect(popup, 'document.querySelectorAll(".access-row button").length === 7'), 'popup loaded');
+      await eventually(
+        () => inspect(popup, 'document.querySelectorAll(".access-row button").length === 7'),
+        'popup loaded'
+      );
       for (const site of ['X', 'LinkedIn', 'TikTok', 'Instagram', 'Facebook', 'YouTube', 'Reddit']) {
         const button = await find(popup, 'button', `Request access to ${site}`);
         assert.equal(button.description?.value, 'Blocked');
         await find(popup, 'group', `${site} access`);
       }
-      assert.equal((await nodes(popup)).some(node => node.role?.value === 'spinbutton' || node.role?.value === 'combobox'), false);
+      assert.equal(
+        (await nodes(popup)).some(node => node.role?.value === 'spinbutton' || node.role?.value === 'combobox'),
+        false
+      );
       await clickNamed(popup, 'Request access to LinkedIn');
-      await eventually(async () => (await browser.cdp.send('Target.getTargets')).targetInfos.some(target => target.url === browser.origin + '/blocked.html?site=linkedin'), 'named action opens the matching site gate');
+      await eventually(
+        async () =>
+          (await browser.cdp.send('Target.getTargets')).targetInfos.some(
+            target => target.url === browser.origin + '/blocked.html?site=linkedin'
+          ),
+        'named action opens the matching site gate'
+      );
       const gate = await browser.page(browser.origin + '/blocked.html?site=x');
       await eventually(() => inspect(gate, '!document.querySelector("#begin").disabled'), 'gate loaded');
       await find(gate, 'form', 'Request access to X');
       const reason = await find(gate, 'textbox', 'What do you need to do?');
       assert.match(reason.description.value, /20–280 characters\. A little clarity, then 5 minutes to pause\./);
       await browser.cdp.send('DOM.focus', { backendNodeId: reason.backendDOMNodeId }, gate.session);
-      await browser.cdp.send('Input.insertText', { text: 'Review the synthetic launch plan, then leave.' }, gate.session);
+      await browser.cdp.send(
+        'Input.insertText',
+        { text: 'Review the synthetic launch plan, then leave.' },
+        gate.session
+      );
       await clickNamed(gate, 'Start the 5-minute wait');
-      await eventually(() => inspect(gate, '!document.querySelector("#waiting").hidden && !document.querySelector("#cancel").disabled'), 'waiting acknowledged');
+      await eventually(
+        () =>
+          inspect(gate, '!document.querySelector("#waiting").hidden && !document.querySelector("#cancel").disabled'),
+        'waiting acknowledged'
+      );
       await find(gate, 'region', 'A little breathing room.');
       const openName = 'Open X for 5 active minutes';
       const open = await find(gate, 'button', openName);
@@ -42,7 +71,10 @@ test('agents discover site-specific actions and complete the existing access UI 
       assert.equal(await inspect(gate, 'location.pathname'), '/blocked.html', 'waiting never navigates automatically');
       await clickNamed(gate, openName);
       await eventually(() => inspect(gate, 'location.hostname === "x.com"'), 'named confirmation opens X');
-      await eventually(async () => (await find(popup, 'button', 'End session for X')).description?.value.includes('left'), 'popup reflects active session');
+      await eventually(
+        async () => (await find(popup, 'button', 'End session for X')).description?.value.includes('left'),
+        'popup reflects active session'
+      );
       await clickNamed(popup, 'End session for X');
       await eventually(() => find(popup, 'button', 'Request access to X'), 'ended session is blocked again');
       const settings = await browser.page(browser.origin + '/settings.html');
@@ -60,8 +92,14 @@ test('agents discover site-specific actions and complete the existing access UI 
       await find(dashboard, 'button', 'Export activity CSV');
       await clickNamed(dashboard, 'Website time');
       await find(dashboard, 'region', 'Website time');
-      assert.equal((await nodes(dashboard)).some(node => node.role?.value === 'region' && node.name?.value === 'Creation score'), false, 'hidden view is absent from accessibility tree');
+      assert.equal(
+        (await nodes(dashboard)).some(node => node.role?.value === 'region' && node.name?.value === 'Creation score'),
+        false,
+        'hidden view is absent from accessibility tree'
+      );
     });
     assert.deepEqual(browser.errors, []);
-  } finally { await browser.cleanup(); }
+  } finally {
+    await browser.cleanup();
+  }
 });

@@ -11,10 +11,54 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 function fixture(layout = 'document') {
   const files = [{ path: 'manifest.json', bytes: 2, sha256: hash('{}') }];
   const bundle = { sha256: hash(JSON.stringify(files)), files };
-  const report = { schemaVersion: 1, status: 'complete', startedAt: '2026-01-01T00:00:00Z', completedAt: '2026-01-01T00:10:00Z', provenance: { baseline: bundle, candidate: bundle, workloadSha256: hash('workload') }, environment: { node: 'v24.22.0', platform: 'linux', architecture: 'arm64' }, layout, tabCount: 8, cycles: 30, lifecycleWheelEvents: 61, wheelEvents: 100, idleMs: 6000, runs: [] };
-  for (const [variant, repetition] of [['baseline', 1], ['candidate', 1], ['candidate', 2], ['baseline', 2], ['baseline', 3], ['candidate', 3]]) {
+  const report = {
+    schemaVersion: 1,
+    status: 'complete',
+    startedAt: '2026-01-01T00:00:00Z',
+    completedAt: '2026-01-01T00:10:00Z',
+    provenance: { baseline: bundle, candidate: bundle, workloadSha256: hash('workload') },
+    environment: { node: 'v24.22.0', platform: 'linux', architecture: 'arm64' },
+    layout,
+    tabCount: 8,
+    cycles: 30,
+    lifecycleWheelEvents: 61,
+    wheelEvents: 100,
+    idleMs: 6000,
+    runs: []
+  };
+  for (const [variant, repetition] of [
+    ['baseline', 1],
+    ['candidate', 1],
+    ['candidate', 2],
+    ['baseline', 2],
+    ['baseline', 3],
+    ['candidate', 3]
+  ]) {
     const heap = variant === 'baseline' ? 100 : 200;
-    report.runs.push({ variant, repetition, layout, bundleSha256: bundle.sha256, browser: 'Chrome/155.0.8059.79', wheelDistance: 40, injectedBytes: 20, controlHeap: { heapBytes: 50 }, checkpoints: [0, 10, 30].map(cycle => ({ cycle, heapBytes: heap + repetition + cycle, nodes: 11, wheelListeners: [{ passive: true }, { passive: false }] })), inactiveListeners: [{ passive: true }], idleRequests: 0, workload: { elapsedMs: 1000 + repetition, scriptMs: 10 + repetition, taskMs: 20 + repetition, layoutMs: repetition } });
+    report.runs.push({
+      variant,
+      repetition,
+      layout,
+      bundleSha256: bundle.sha256,
+      browser: 'Chrome/155.0.8059.79',
+      wheelDistance: 40,
+      injectedBytes: 20,
+      controlHeap: { heapBytes: 50 },
+      checkpoints: [0, 10, 30].map(cycle => ({
+        cycle,
+        heapBytes: heap + repetition + cycle,
+        nodes: 11,
+        wheelListeners: [{ passive: true }, { passive: false }]
+      })),
+      inactiveListeners: [{ passive: true }],
+      idleRequests: 0,
+      workload: {
+        elapsedMs: 1000 + repetition,
+        scriptMs: 10 + repetition,
+        taskMs: 20 + repetition,
+        layoutMs: repetition
+      }
+    });
   }
   return structuredClone(report);
 }
@@ -22,7 +66,10 @@ function fixture(layout = 'document') {
 test('profile reports calculate medians/ranges and include fingerprints', async () => {
   const { renderProfiles } = await import('../scroll-profile-report.mjs');
   const markdown = renderProfiles([fixture(), fixture('body')]);
-  assert.match(markdown, /Retained isolate heap, cycle 30 \(bytes\) \| 132\.000 \[131\.000–133\.000\] \| 232\.000 \[231\.000–233\.000\]/);
+  assert.match(
+    markdown,
+    /Retained isolate heap, cycle 30 \(bytes\) \| 132\.000 \[131\.000–133\.000\] \| 232\.000 \[231\.000–233\.000\]/
+  );
   assert.match(markdown, /Heap growth, cycles 10–30 \(bytes\) \| 20\.000 \[20\.000–20\.000\]/);
   assert.ok(markdown.includes(fixture().provenance.baseline.sha256));
   assert.match(markdown, /## body/);
@@ -31,21 +78,51 @@ test('profile reports calculate medians/ranges and include fingerprints', async 
 test('profile reports reject incomplete, mixed and invalid evidence', async () => {
   const { renderProfiles } = await import('../scroll-profile-report.mjs');
   const mutations = [
-    report => { report.status = 'running'; },
-    report => { report.status = 'failed'; },
-    report => { report.runs.pop(); },
-    report => { report.runs[1] = report.runs[0]; },
-    report => { report.runs[0].layout = 'body'; },
-    report => { report.runs[0].bundleSha256 = hash('other bundle'); },
-    report => { report.provenance.baseline.files[0].bytes++; },
-    report => { report.runs[0].browser = 'Chrome/154.0.0.0'; },
-    report => { report.runs[0].workload.taskMs = NaN; },
-    report => { report.runs[0].checkpoints[2].nodes++; },
-    report => { report.runs[0].checkpoints[1].wheelListeners.push({ passive: false }); },
-    report => { report.runs[0].idleRequests = 1; },
-    report => { report.runs[0].inactiveListeners.push({ passive: false }); },
-    report => { report.completedAt = '2025-01-01'; },
-    report => { report.wheelEvents++; }
+    report => {
+      report.status = 'running';
+    },
+    report => {
+      report.status = 'failed';
+    },
+    report => {
+      report.runs.pop();
+    },
+    report => {
+      report.runs[1] = report.runs[0];
+    },
+    report => {
+      report.runs[0].layout = 'body';
+    },
+    report => {
+      report.runs[0].bundleSha256 = hash('other bundle');
+    },
+    report => {
+      report.provenance.baseline.files[0].bytes++;
+    },
+    report => {
+      report.runs[0].browser = 'Chrome/154.0.0.0';
+    },
+    report => {
+      report.runs[0].workload.taskMs = NaN;
+    },
+    report => {
+      report.runs[0].checkpoints[2].nodes++;
+    },
+    report => {
+      report.runs[0].checkpoints[1].wheelListeners.push({ passive: false });
+    },
+    report => {
+      report.runs[0].idleRequests = 1;
+    },
+    report => {
+      report.runs[0].inactiveListeners.push({ passive: false });
+    },
+    report => {
+      report.completedAt = '2025-01-01';
+    },
+    report => {
+      report.wheelEvents++;
+    }
   ];
   for (const mutate of mutations) {
     const report = fixture();
@@ -53,8 +130,16 @@ test('profile reports reject incomplete, mixed and invalid evidence', async () =
     assert.throws(() => renderProfiles([report]), undefined, mutate.toString());
   }
   assert.throws(() => renderProfiles([fixture(), fixture()]), /Duplicate layout/);
-  for (const mutate of [report => { report.provenance.workloadSha256 = hash('different workload'); }, report => { report.environment.node = 'v24.21.0'; }]) {
-    const other = fixture('body'); mutate(other);
+  for (const mutate of [
+    report => {
+      report.provenance.workloadSha256 = hash('different workload');
+    },
+    report => {
+      report.environment.node = 'v24.21.0';
+    }
+  ]) {
+    const other = fixture('body');
+    mutate(other);
     assert.throws(() => renderProfiles([fixture(), other]), /Mixed/);
   }
 });
@@ -80,7 +165,8 @@ test('distinct bundles and layouts can intentionally produce different stable sc
   const document = fixture();
   const files = [{ path: 'manifest.json', bytes: 3, sha256: hash('{}\n') }];
   document.provenance.baseline = { files, sha256: hash(JSON.stringify(files)) };
-  for (const run of document.runs) if (run.variant === 'baseline') run.bundleSha256 = document.provenance.baseline.sha256;
+  for (const run of document.runs)
+    if (run.variant === 'baseline') run.bundleSha256 = document.provenance.baseline.sha256;
   const body = structuredClone(document);
   body.layout = 'body';
   for (const run of body.runs) {

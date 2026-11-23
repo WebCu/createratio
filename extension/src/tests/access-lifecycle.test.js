@@ -14,7 +14,11 @@ const status = async (w, expectedErrors = 0) => {
 for (const browser of ['chrome', 'browser']) {
   for (const site of ['x', 'linkedin', 'tiktok', 'instagram']) {
     test(`${browser}: ${site} shares intention, wait, custom time, pause, expiry and Off behavior`, async () => {
-      const w = worker({ settings: { trackedSites: [site], siteOverrides: { [site]: { accessMinutes: 2 } } } }, browser, start);
+      const w = worker(
+        { settings: { trackedSites: [site], siteOverrides: { [site]: { accessMinutes: 2 } } } },
+        browser,
+        start
+      );
       let access = await status(w);
       assert.ok(access[site], `${site} needs an access gate`);
       assert.equal(access[site].remainingMs, 0);
@@ -29,11 +33,13 @@ for (const browser of ['chrome', 'browser']) {
       w.activate(home);
       assert.equal((await status(w))[site].remainingMs, 120000);
       assert.deepEqual(rulesFor(w, [site]), require('../../sites/index.js').get(site).access.sessionRules);
-      w.advance(15000); w.blur();
+      w.advance(15000);
+      w.blur();
       assert.equal((await status(w))[site].remainingMs, 105000);
       w.advance(30000);
       assert.equal((await status(w))[site].remainingMs, 105000, 'away time does not spend budget');
-      w.activate(home); access = await status(w);
+      w.activate(home);
+      access = await status(w);
       w.advance(access[site].remainingMs + 1);
       assert.equal((await status(w))[site].remainingMs, 0);
       assert.equal(w.tabs[0].url, gate(site).url);
@@ -147,7 +153,11 @@ for (const browser of ['chrome', 'browser']) {
     first.activate('https://x.com/home');
     await status(first);
     const wake = worker(first.data, browser, start + 300000, { session });
-    wake.tabs.push({ id: 1, url: 'https://x.com/home' }, { id: 2, url: 'http://mobile.twitter.com/home' }, { id: 3, url: 'https://x.com.evil.test/' });
+    wake.tabs.push(
+      { id: 1, url: 'https://x.com/home' },
+      { id: 2, url: 'http://mobile.twitter.com/home' },
+      { id: 3, url: 'https://x.com.evil.test/' }
+    );
     wake.activate('https://x.com/home');
     wake.alarm('access-x');
     const access = await status(wake);
@@ -206,7 +216,9 @@ for (const browser of ['chrome', 'browser']) {
   test(`${browser}: failed cold reconciliation leaves the session marker unset and a successful retry restores the budget`, async () => {
     for (const failure of ['failRules', 'failWrites']) {
       const session = {};
-      const w = worker({ _access: { x: { remainingMs: 240000, expiresAt: start - 600000 } } }, browser, start, { session });
+      const w = worker({ _access: { x: { remainingMs: 240000, expiresAt: start - 600000 } } }, browser, start, {
+        session
+      });
       w[failure] = true;
       assert.equal((await w.send({ type: 'access-status' })).ok, false);
       assert.deepEqual(session, {});
@@ -236,7 +248,15 @@ for (const browser of ['chrome', 'browser']) {
     const ended = worker(wake.data, browser, start + 180000, { session });
     assert.equal((await status(ended)).x.remainingMs, 0);
     assert.equal((await ended.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
-    assert.equal((await ended.send({ type: 'access-begin', site: 'x', reason: 'Reply to Alex about our launch, then leave.' }, gate('x'))).ok, true);
+    assert.equal(
+      (
+        await ended.send(
+          { type: 'access-begin', site: 'x', reason: 'Reply to Alex about our launch, then leave.' },
+          gate('x')
+        )
+      ).ok,
+      true
+    );
     const waiting = worker(ended.data, browser, ended.now + 30000, { session });
     assert.equal((await waiting.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
     assert.equal((await status(waiting)).x.remainingMs, 0);

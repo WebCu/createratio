@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync, readdirSync, existsSync } = require('node:fs');
 const path = require('node:path');
+const util = require('node:util');
 
 const root = path.resolve(__dirname, '../../..');
 const read = file => readFileSync(path.join(root, file), 'utf8');
@@ -95,37 +96,251 @@ test('every external GitHub Action uses a full commit SHA and stable release lab
   assert.ok(count > 0);
 });
 
+const minimalPermissions = { contents: 'read' };
+const oidcPermissions = { contents: 'read', 'id-token': 'write' };
+const oidcJobs = new Set(['deploy-site.yml deploy', 'release-chrome.yml submit']);
+
+const indentOf = line => line.match(/^ */)[0].length;
+const isBlankOrComment = line => /^\s*(?:#.*)?$/.test(line);
+const unquote = text => text.replace(/^(["'])(.*)\1$/, '$2');
+
+function entryOf(line) {
+  const match = line.match(/^ *(?:- )?("[^"]*"|'[^']*'|[\w-]+)\s*:(?:\s+(.*?))?\s*$/);
+  if (!match) return null;
+  const value = (match[2] ?? '').replace(/(?:^|\s+)#.*$/, '').trim();
+  return { key: unquote(match[1]), value: unquote(value) };
+}
+
+const isKeyAt = (line, indent, key) => indentOf(line) === indent && entryOf(line)?.key === key;
+
+function mappingAt(lines, keyIndex) {
+  const indent = indentOf(lines[keyIndex]);
+  const inline = entryOf(lines[keyIndex]).value;
+  if (inline) return { '': inline };
+  const entries = {};
+  for (const line of lines.slice(keyIndex + 1)) {
+    if (isBlankOrComment(line)) continue;
+    const lineIndent = indentOf(line);
+    if (lineIndent <= indent) break;
+    if (lineIndent > indent + 2) continue;
+    const entry = entryOf(line);
+    if (entry) entries[entry.key] = entry.value;
+    else entries[line.trim()] = '';
+  }
+  return entries;
+}
+
+function jobsOf(lines) {
+  const start = lines.findIndex(line => isKeyAt(line, 0, 'jobs'));
+  if (start === -1) return [];
+  const jobs = [];
+  for (const line of lines.slice(start + 1)) {
+    if (isBlankOrComment(line)) continue;
+    const indent = indentOf(line);
+    if (indent === 0) break;
+    if (indent === 2) jobs.push({ name: entryOf(line)?.key ?? line.trim(), lines: [] });
+    jobs.at(-1)?.lines.push(line);
+  }
+  return jobs;
+}
+
+function workflowPolicyViolations(file, workflow) {
+  const violations = [];
+  const lines = workflow.split('\n');
+  const topIndex = lines.findIndex(line => isKeyAt(line, 0, 'permissions'));
+  if (topIndex === -1) violations.push(`${file} needs top-level permissions`);
+  else if (!util.isDeepStrictEqual(mappingAt(lines, topIndex), minimalPermissions)) {
+    violations.push(`${file} top-level permissions must be contents: read`);
+  }
+  const jobs = jobsOf(lines);
+  if (jobs.length === 0) violations.push(`${file} has jobs`);
+  for (const { name, lines: jobLines } of jobs) {
+    const permissionIndex = jobLines.findIndex(line => isKeyAt(line, 4, 'permissions'));
+    if (permissionIndex !== -1) {
+      const permissions = mappingAt(jobLines, permissionIndex);
+      const allowed = oidcJobs.has(`${file} ${name}`) ? oidcPermissions : minimalPermissions;
+      if (!util.isDeepStrictEqual(permissions, allowed)) {
+        violations.push(`${file} ${name} job permissions exceed the allowed scope`);
+      }
+    }
+    if (jobLines.some(line => isKeyAt(line, 4, 'uses'))) continue;
+    const timeout = jobLines.find(line => isKeyAt(line, 4, 'timeout-minutes'));
+    if (!/^\d+$/.test(timeout ? entryOf(timeout).value : '')) {
+      violations.push(`${file} ${name} needs timeout-minutes`);
+    }
+    jobLines.forEach((line, index) => {
+      const step = entryOf(line);
+      if (step?.key !== 'uses' || !step.value.startsWith('actions/checkout@')) return;
+      const keyIndent = indentOf(line.replace('- ', '  '));
+      let inputs = {};
+      for (let at = index + 1; at < jobLines.length; at++) {
+        const candidate = jobLines[at];
+        if (isBlankOrComment(candidate)) continue;
+        if (indentOf(candidate.replace('- ', '  ')) < keyIndent || /^\s*- /.test(candidate)) break;
+        if (isKeyAt(candidate, keyIndent, 'with')) inputs = mappingAt(jobLines, at);
+      }
+      if (inputs['persist-credentials'] !== 'false') {
+        violations.push(`${file} ${name} checkout must not persist credentials`);
+      }
+    });
+  }
+  return violations;
+}
+
+test('every workflow limits token scope, keeps checkout credentials out, and bounds each job', () => {
+  for (const file of readdirSync(path.join(root, '.github/workflows'))) {
+    if (!/\.ya?ml$/.test(file)) continue;
+    assert.deepEqual(workflowPolicyViolations(file, read(`.github/workflows/${file}`)), []);
+  }
+});
+
+test('workflow policy rejects broad permissions and misleading checkout text', () => {
+  const workflow = ({ top = '  contents: read', jobPermissions = '', checkoutWith }) =>
+    [
+      'on: push',
+      'permissions:',
+      top,
+      '',
+      'jobs:',
+      '  build:',
+      '    runs-on: ubuntu-24.04',
+      '    timeout-minutes: 5',
+      jobPermissions,
+      '    steps:',
+      '      - name: Checkout (v1.0.0)',
+      '        uses: actions/checkout@0000000000000000000000000000000000000000',
+      checkoutWith,
+      '      - run: echo done',
+      ''
+    ]
+      .filter(line => line !== '')
+      .join('\n');
+  const safeWith = '        with:\n          persist-credentials: false';
+  assert.deepEqual(workflowPolicyViolations('x.yml', workflow({ checkoutWith: safeWith })), []);
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      workflow({
+        top: '  contents: write\n  issues: write',
+        checkoutWith: safeWith
+      })
+    ),
+    ['x.yml top-level permissions must be contents: read']
+  );
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      workflow({ checkoutWith: safeWith }).replace('permissions:\n  contents: read', 'permissions: write-all')
+    ),
+    ['x.yml top-level permissions must be contents: read']
+  );
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      workflow({
+        jobPermissions: '    permissions:\n      contents: write',
+        checkoutWith: safeWith
+      })
+    ),
+    ['x.yml build job permissions exceed the allowed scope']
+  );
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      workflow({
+        jobPermissions: '    permissions:\n      contents: read\n      id-token: write',
+        checkoutWith: safeWith
+      })
+    ),
+    ['x.yml build job permissions exceed the allowed scope']
+  );
+  for (const checkoutWith of [
+    '        with:\n          persist-credentials: true\n        env:\n          NOTE: |\n            persist-credentials: false',
+    '        env:\n          NOTE: persist-credentials: false',
+    '        with:\n          ref: main\n          extra:\n            persist-credentials: false'
+  ]) {
+    assert.deepEqual(
+      workflowPolicyViolations('x.yml', workflow({ checkoutWith })),
+      ['x.yml build checkout must not persist credentials'],
+      checkoutWith
+    );
+  }
+});
+
+test('workflow policy reads quoted keys, comments, and every job header form', () => {
+  const header = 'on: push\npermissions:\n  contents: read\njobs:\n';
+  const checkout = [
+    '      - name: Checkout (v1.0.0)',
+    '        uses: actions/checkout@0000000000000000000000000000000000000000',
+    '        with:',
+    '          persist-credentials: true'
+  ].join('\n');
+  const stepJob = jobHeader => `${jobHeader}\n    runs-on: ubuntu-24.04\n    steps:\n${checkout}\n`;
+  const writeAfter = ['  "issues": write', '# note\n  issues: write'];
+  for (const extra of writeAfter) {
+    assert.deepEqual(
+      workflowPolicyViolations(
+        'x.yml',
+        `on: push\npermissions:\n  contents: read\n${extra}\njobs:\n  a:\n    uses: ./b.yml\n`
+      ),
+      ['x.yml top-level permissions must be contents: read'],
+      extra
+    );
+    assert.deepEqual(
+      workflowPolicyViolations(
+        'x.yml',
+        `${header}  a:\n    runs-on: ubuntu-24.04\n` +
+          `    timeout-minutes: 5\n    permissions:\n      contents: read\n${extra.replace(/^ {2}/m, '      ')}\n` +
+          '    steps:\n      - run: echo done\n'
+      ),
+      ['x.yml a job permissions exceed the allowed scope'],
+      extra
+    );
+  }
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'x.yml',
+      `${header}  a:\n    runs-on: ubuntu-24.04\n` +
+        '    timeout-minutes: 5\n    "permissions":\n      contents: write\n    steps:\n      - run: echo done\n'
+    ),
+    ['x.yml a job permissions exceed the allowed scope']
+  );
+  for (const jobHeader of ['  package: ', '  package: # packaging', '  "package":']) {
+    assert.deepEqual(
+      workflowPolicyViolations('x.yml', `${header}  checks:\n    uses: ./b.yml\n${stepJob(jobHeader)}`),
+      ['x.yml package needs timeout-minutes', 'x.yml package checkout must not persist credentials'],
+      jobHeader
+    );
+  }
+  assert.deepEqual(
+    workflowPolicyViolations(
+      'deploy-site.yml',
+      `${header}  "deploy":\n` +
+        '    runs-on: ubuntu-24.04\n    timeout-minutes: 5\n    permissions:\n      contents: read\n' +
+        '      id-token: write\n    steps:\n      - run: echo done\n'
+    ),
+    []
+  );
+});
+
 test('CI uses a frozen install, audits security, and runs the shared fail-fast check', () => {
   const workflow = read('.github/workflows/ci.yml');
   for (const command of ['pnpm install --frozen-lockfile', 'pnpm audit --audit-level=high', 'pnpm check']) {
     assert.ok(workflow.includes(`run: ${command}`), command);
   }
   assert.equal(manifests[0].scripts['check:syntax'], 'node bin/check-syntax.js');
-  assert.equal(manifests[0].scripts.check, 'pnpm check:syntax && pnpm test && pnpm build && pnpm build:site');
-  assert.equal(manifests[0].scripts['check:browser'], 'pnpm build:chrome && pnpm test:browser');
+  assert.equal(manifests[0].scripts['check:types'], 'tsc -p tsconfig.json');
   assert.match(workflow, /run: pnpm check:browser/);
   assert.match(workflow, /^  contents: read$/m);
   assert.match(workflow, /persist-credentials: false/);
 });
 
-test('browser verification is a bounded CI job using a pinned, verified browser download', () => {
-  const workflow = read('.github/workflows/ci.yml');
-  for (const name of ['browser-smoke-core', 'browser-journeys']) {
-    const browserJob = workflow.split(`  ${name}:\n`)[1]?.split(/^  [\w-]+:\n/m)[0];
-    assert.ok(browserJob, name);
-    assert.match(browserJob, /timeout-minutes: 10/);
-    assert.match(browserJob, /https:\/\/storage\.googleapis\.com\/chrome-for-testing-public\/\d+\.\d+\.\d+\.\d+\/linux64\/chrome-linux64\.zip/);
-    assert.match(browserJob, /[a-f0-9]{64} {2}.*\$RUNNER_TEMP\/chrome\.zip.*\| sha256sum --check/);
-    assert.ok(browserJob.indexOf('sha256sum --check') < browserJob.indexOf('unzip -q'));
-    assert.match(browserJob, /CHROMIUM_PATH=.*chrome-linux64\/chrome/);
-    assert.doesNotMatch(browserJob, /continue-on-error:|\|\| true/);
-  }
-  assert.match(workflow, /run: pnpm check:browser:shard/);
-});
-
 test('weekly dependency automation proposes Action majors but excludes library and image majors', () => {
   const updates = read('.github/dependabot.yml').split('  - package-ecosystem: ').slice(1);
-  assert.deepEqual(updates.map(update => update.split('\n')[0]), ['npm', 'github-actions', 'docker-compose']);
+  assert.deepEqual(
+    updates.map(update => update.split('\n')[0]),
+    ['npm', 'github-actions', 'docker-compose']
+  );
   for (const update of updates) {
     assert.match(update, /interval: weekly/);
     if (update.startsWith('github-actions\n')) {

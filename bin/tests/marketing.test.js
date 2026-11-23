@@ -19,7 +19,12 @@ test('a release change updates both static website announcements and produces ma
   const output = temporary(t);
   const original = readRelease();
   assert.doesNotThrow(() => assertWebsiteCurrent(html, original));
-  const release = { ...original, headline: 'A new <feature> & more.', summary: 'New summary with $& and <unsafe> text.', activation: 'Enable it in Settings.' };
+  const release = {
+    ...original,
+    headline: 'A new <feature> & more.',
+    summary: 'New summary with $& and <unsafe> text.',
+    activation: 'Enable it in Settings.'
+  };
   assert.throws(() => assertWebsiteCurrent(html, release), /marketing:copy/);
   const updated = syncWebsite(html, release);
   assert.doesNotThrow(() => assertWebsiteCurrent(updated, release));
@@ -27,14 +32,23 @@ test('a release change updates both static website announcements and produces ma
   assert.match(updated, /A new &lt;feature&gt; &amp; more\./);
   assert.match(updated, /New summary with \$&amp; and &lt;unsafe&gt; text\./);
   assert.equal(updated.split('A new &lt;feature&gt; &amp; more.').length - 1, 2);
-  assert.equal(updated.slice(updated.indexOf('<section class="hero"')), html.slice(html.indexOf('<section class="hero"')));
+  assert.equal(
+    updated.slice(updated.indexOf('<section class="hero"')),
+    html.slice(html.indexOf('<section class="hero"'))
+  );
   fs.mkdirSync(path.join(output, 'screenshots'));
   fs.writeFileSync(path.join(output, 'screenshots/stale.png'), 'old capture');
   writeKit(output, release);
   assert.equal(fs.existsSync(path.join(output, 'screenshots')), false, 'new copy invalidates old screenshots');
   assert.equal(fs.readFileSync(path.join(output, 'social-post.txt'), 'utf8').trim(), release.socialPost);
-  assert.equal(fs.readFileSync(path.join(output, 'store-description.txt'), 'utf8').trim(), release.description.join('\n\n'));
-  assert.equal(fs.readFileSync(path.join(output, 'release-notes.txt'), 'utf8').trim(), [release.headline, release.summary, release.activation].join('\n\n'));
+  assert.equal(
+    fs.readFileSync(path.join(output, 'store-description.txt'), 'utf8').trim(),
+    release.description.join('\n\n')
+  );
+  assert.equal(
+    fs.readFileSync(path.join(output, 'release-notes.txt'), 'utf8').trim(),
+    [release.headline, release.summary, release.activation].join('\n\n')
+  );
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(output, 'screenshots.json'), 'utf8')), release.screenshots);
   assert.notEqual(releaseFingerprint(original), releaseFingerprint(release));
 });
