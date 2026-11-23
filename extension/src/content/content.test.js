@@ -5,6 +5,115 @@ const C = require('../../core/core.js');
 const integrations = require('../../sites/index.js');
 const { Element, linkedinFixture } = require('../../sites/test-support.js');
 const { tracker } = require('../tests/content-harness.js');
+const { worker } = require('../tests/background-harness.js');
+test('continuous fractional samples coalesce into one segment and packet', async () => {
+  const t = await tracker();
+  t.input();
+  for (let sample = 1; sample <= 300; sample++) {
+    t.setNow((sample * 5000) / 300);
+    t.input();
+  }
+  await t.tick();
+  assert.equal(t.packets.length, 1);
+  assert.equal(t.packets[0].segments.length, 1);
+  const segment = t.packets[0].segments[0];
+  assert.equal(segment.sec, 5);
+  assert.equal(segment.end - segment.start, segment.sec * 1000);
+});
+test('continuous input coalesces when clock reads advance within each handler', async () => {
+  const options = { sampleStep: 0.01 },
+    t = await tracker('chrome', options);
+  t.setNow(0);
+  t.input();
+  for (let sample = 1; sample <= 300; sample++) {
+    t.setNow((sample * 5000) / 300);
+    t.input();
+  }
+  options.sampleStep = 0;
+  t.setNow(5000);
+  await t.tick();
+  assert.equal(t.packets.length, 1);
+  assert.equal(t.packets[0].segments.length, 1);
+  const segment = t.packets[0].segments[0];
+  assert.equal(segment.sec, 5);
+  assert.equal(segment.end - segment.start, segment.sec * 1000);
+});
+test('wall clock corrections re-anchor active intervals without coalescing across the jump', async () => {
+  for (const jump of [3600000, -3600000]) {
+    const options = {},
+      t = await tracker('chrome', options);
+    t.input();
+    t.setNow(1000);
+    t.input();
+    options.wallOffset = jump;
+    t.setNow(2000);
+    t.input();
+    t.setNow(5000);
+    await t.tick();
+    const segments = t.packets.flatMap(packet => packet.segments);
+    assert.equal(segments.length, 2);
+    assert.equal(segments[0].sec, 2);
+    assert.equal(segments[1].start, segments[0].end + jump);
+    assert.equal(segments[1].sec, 3);
+    assert.equal(segments[1].end - segments[1].start, segments[1].sec * 1000);
+  }
+});
+test('a forward clock jump near expiry preserves the interval captured before correction', async () => {
+  const start = new Date(2026, 9, 11, 12).getTime(),
+    date = C.localDate(new Date(start));
+  const w = worker({ _access: { x: { date, remainingMs: 2500, expiresAt: start + 2500 } } }, 'chrome', start, {
+    session: { _accessInitialized: true }
+  });
+  w.activate('https://x.com/home');
+  const options = { forward: message => w.send(message) },
+    t = await tracker('chrome', options);
+  for (let turn = 0; turn < 20; turn++) await new Promise(resolve => setImmediate(resolve));
+  t.input();
+  t.setNow(1000);
+  w.advance(1000);
+  t.input();
+  options.wallOffset = 3600000;
+  t.setNow(2000);
+  w.advance(3601000);
+  await t.tick();
+  for (let turn = 0; turn < 20; turn++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(w.data[date]?.x.consumeSec || 0, 2);
+});
+test('expiry refresh queues the final partial interval before resetting tracking', async () => {
+  const t = await tracker();
+  t.input();
+  t.setNow(2000);
+  t.setSnapshot({ day: {}, settings: C.DEFAULT_SETTINGS, access: { x: { enabled: true, remainingMs: 0 } } });
+  for (let turn = 0; turn < 20; turn++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(
+    t.packets.flatMap(packet => packet.segments).reduce((sum, segment) => sum + segment.sec, 0),
+    2
+  );
+  t.input();
+  t.setNow(5000);
+  await t.tick();
+  assert.equal(t.packets.length, 1);
+});
+test('a terminal packet refusal does not block later measurements', async () => {
+  let rejected,
+    accepted = [];
+  const t = await tracker('chrome', {
+    reply(message, result) {
+      if (message.type !== 'ingest') return result;
+      rejected ??= message.id;
+      if (message.id === rejected) return { ok: false, retryable: false, error: 'Invalid time interval' };
+      accepted.push(message.id);
+      return result;
+    }
+  });
+  t.input();
+  t.setNow(5000);
+  await t.tick();
+  t.setNow(10000);
+  await t.tick();
+  assert.equal(t.messages.filter(message => message.id === rejected).length, 1);
+  assert.equal(accepted.length, 1);
+});
 test('focused trackers with no fresh input do not keep the worker alive', async () => {
   const t = await tracker();
   const before = t.messages.length;
@@ -567,6 +676,24 @@ function seconds(t, mode) {
     .filter(s => s.mode === mode)
     .reduce((sum, s) => sum + s.sec, 0);
 }
+
+test('expiry acknowledgements do not discard other queued pre-expiry packets', async () => {
+  const options = { failIngest: true };
+  const t = await tracker('chrome', options);
+  t.input();
+  t.setNow(5000);
+  await t.tick();
+  t.setNow(10000);
+  await t.tick();
+  options.failIngest = false;
+  t.setSnapshot({ day: {}, settings: C.DEFAULT_SETTINGS, access: { x: { enabled: true, remainingMs: 0 } } });
+  t.setNow(15000);
+  await t.tick();
+  assert.equal(seconds(t, 'consume'), 15);
+  assert.ok(
+    t.packets.every(packet => packet.segments.every(segment => segment.end - segment.start === segment.sec * 1000))
+  );
+});
 
 test('creating/consuming time and actions require an active access session', async () => {
   const locked = { day: {}, settings: C.DEFAULT_SETTINGS, access: { x: { enabled: true, remainingMs: 0 } } };
