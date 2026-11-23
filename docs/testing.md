@@ -433,8 +433,8 @@ network, a read-only root file system, no Linux capabilities and a non-root user
 It mounts the checkout read-only, copies it without `.git`, `node_modules`,
 `dist` or `.env` files into a temporary folder, and runs the command there.
 Chromium runs with `CHROMIUM_NO_SANDBOX=1`; the container is its sandbox. The
-only writable host folder is `dist/container`, which receives
-`browser-artifacts/` after a failure. On Linux, user ID 1000 must be able to
+only writable host folder is `dist/container`. It receives `browser-artifacts/`
+whenever a run creates that folder, for example after a failure. On Linux, user ID 1000 must be able to
 write that folder.
 
 The run refuses to start when `pnpm-lock.yaml` differs from the image; rebuild
