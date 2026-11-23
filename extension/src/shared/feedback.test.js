@@ -7,20 +7,25 @@ const vm = require('node:vm');
 const extension = resolve(__dirname, '..');
 
 async function feedback({ installType = 'normal', id = 'a'.repeat(32), failure = false, store = 'chrome' } = {}) {
-  const attributes = new Map([['aria-disabled', 'true'], ['tabindex', '-1']]);
+  const attributes = new Map([
+    ['aria-disabled', 'true'],
+    ['tabindex', '-1']
+  ]);
   const link = { dataset: { store }, hidden: true, removeAttribute: key => attributes.delete(key) };
   const note = { textContent: '', hidden: true };
   let getSelfCalls = 0;
   const context = vm.createContext({
-    document: { getElementById: key => key === 'feedback' ? link : note },
+    document: { getElementById: key => (key === 'feedback' ? link : note) },
     chrome: {
       runtime: { id },
-      management: { getSelf: async () => {
-        getSelfCalls++;
-        if (failure) throw new Error('Unavailable');
-        return { installType };
-      } },
-    },
+      management: {
+        getSelf: async () => {
+          getSelfCalls++;
+          if (failure) throw new Error('Unavailable');
+          return { installType };
+        }
+      }
+    }
   });
   await vm.runInContext(readFileSync(resolve(__dirname, 'feedback.js'), 'utf8'), context);
   return { link, note, attributes, getSelfCalls };

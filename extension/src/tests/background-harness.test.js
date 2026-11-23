@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const { worker, unlock, popupSender } = require('./background-harness.js');
 
 test('the default worker clock cannot turn a same-day restart into an accidental midnight refill', async t => {
-  const late = new Date(); late.setHours(23, 55, 0, 0);
+  const late = new Date();
+  late.setHours(23, 55, 0, 0);
   t.mock.method(Date, 'now', () => late.getTime());
   const w = worker({ settings: { accessMinutes: 12, siteOverrides: { x: { accessMinutes: 2 } } } });
   assert.equal((await unlock(w)).access.x.remainingMs, 120000);

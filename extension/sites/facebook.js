@@ -5,22 +5,45 @@
 })(globalThis, function () {
   'use strict';
   const hosts = ['facebook.com', 'www.facebook.com'];
-  const domains = ['facebook.com'], navigationId = 109, resourceId = 110;
+  const domains = ['facebook.com'],
+    navigationId = 109,
+    resourceId = 110;
   const access = {
-    domains, home: 'https://www.facebook.com/', redirectRuleId: 5, ruleIds: [navigationId, resourceId],
+    domains,
+    home: 'https://www.facebook.com/',
+    redirectRuleId: 5,
+    ruleIds: [navigationId, resourceId],
     unrestrictedRules: [
-      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, resourceTypes: ['main_frame'] } },
-      { id: resourceId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] } }
+      {
+        id: navigationId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, resourceTypes: ['main_frame'] }
+      },
+      {
+        id: resourceId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, excludedResourceTypes: ['main_frame'] }
+      }
     ],
     sessionRules: [
-      { id: navigationId, priority: 2, action: { type: 'allow' }, condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] } }
+      {
+        id: navigationId,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: { requestDomains: domains, excludedResourceTypes: ['sub_frame'] }
+      }
     ]
   };
   const selectors = {
     postScope: ['[role="dialog"][aria-label="Create post"]', '[role="dialog"][aria-label="Create a post"]'],
     postEditor: ['[role="textbox"][contenteditable="true"][data-lexical-editor="true"]'],
     commentScope: ['form'],
-    commentEditor: ['[role="textbox"][contenteditable="true"][aria-label^="Write a comment" i]', '[role="textbox"][contenteditable="true"][aria-label^="Write a reply" i]'],
+    commentEditor: [
+      '[role="textbox"][contenteditable="true"][aria-label^="Write a comment" i]',
+      '[role="textbox"][contenteditable="true"][aria-label^="Write a reply" i]'
+    ],
     messageEditor: ['[role="textbox"][contenteditable="true"][aria-label="Message"]'],
     ownProfileLink: ['a[aria-label="Your profile"]', 'a[aria-label="Your profile picture"]'],
     button: ['button', '[role="button"]']
@@ -28,10 +51,20 @@
   function parseURL(url) {
     try {
       const parsed = new URL(url);
-      return parsed.protocol === 'https:' && hosts.includes(parsed.hostname) && !parsed.port && !parsed.username && !parsed.password ? parsed : null;
-    } catch (_) { return null; }
+      return parsed.protocol === 'https:' &&
+        hosts.includes(parsed.hostname) &&
+        !parsed.port &&
+        !parsed.username &&
+        !parsed.password
+        ? parsed
+        : null;
+    } catch (_) {
+      return null;
+    }
   }
-  function pathOf(url) { return url.pathname.replace(/\/+$/, '') || '/'; }
+  function pathOf(url) {
+    return url.pathname.replace(/\/+$/, '') || '/';
+  }
   function route(url) {
     const path = pathOf(url);
     if (/^\/messages(?:\/t\/[a-zA-Z0-9._-]+)?$/.test(path)) return 'message';
@@ -39,18 +72,30 @@
     if (/^\/people\/[^/]+\/\d+$/.test(path)) return 'profile';
     if (['/', '/home.php', '/watch', '/groups/feed'].includes(path)) return 'consume';
     if (/^\/reel\/\d+$/.test(path)) return 'consume';
-    if (/^\/groups\/(?!create$|discover$|joins$)[a-zA-Z0-9._-]+(?:\/posts\/(?:\d+|pfbid[a-zA-Z0-9]+))?$/.test(path)) return 'consume';
+    if (/^\/groups\/(?!create$|discover$|joins$)[a-zA-Z0-9._-]+(?:\/posts\/(?:\d+|pfbid[a-zA-Z0-9]+))?$/.test(path))
+      return 'consume';
     if (/^\/[a-zA-Z0-9._-]+\/posts\/(?:\d+|pfbid[a-zA-Z0-9]+)$/.test(path)) return 'consume';
-    if (path === '/permalink.php' && /^(?:\d+|pfbid[a-zA-Z0-9]+)$/.test(url.searchParams.get('story_fbid') || '') && /^\d+$/.test(url.searchParams.get('id') || '')) return 'consume';
+    if (
+      path === '/permalink.php' &&
+      /^(?:\d+|pfbid[a-zA-Z0-9]+)$/.test(url.searchParams.get('story_fbid') || '') &&
+      /^\d+$/.test(url.searchParams.get('id') || '')
+    )
+      return 'consume';
     return null;
   }
   function ownProfile(url, ownProfileURL) {
     const own = parseURL(ownProfileURL);
     if (!own || route(own) !== 'profile') return false;
-    const profileId = profile => pathOf(profile) === '/profile.php' ? profile.searchParams.get('id') : pathOf(profile).split('/').at(-1);
+    const profileId = profile =>
+      pathOf(profile) === '/profile.php' ? profile.searchParams.get('id') : pathOf(profile).split('/').at(-1);
     return profileId(own) === profileId(url);
   }
-  function classifyPage({ url, facebookEditorFocused = false, facebookMessageEditorFocused = false, ownProfileURL = null }) {
+  function classifyPage({
+    url,
+    facebookEditorFocused = false,
+    facebookMessageEditorFocused = false,
+    ownProfileURL = null
+  }) {
     const parsed = parseURL(url);
     if (!parsed) return 'neutral';
     const kind = route(parsed);
@@ -64,7 +109,14 @@
     function usable(node) {
       if (!dom.enabled(node)) return false;
       for (let current = node; current; current = current.parentElement) {
-        if (current.readOnly || current.disabled || current.inert || ['readonly', 'disabled', 'inert'].some(name => current.getAttribute(name) !== null) || ['aria-readonly', 'aria-disabled'].some(name => current.getAttribute(name) === 'true')) return false;
+        if (
+          current.readOnly ||
+          current.disabled ||
+          current.inert ||
+          ['readonly', 'disabled', 'inert'].some(name => current.getAttribute(name) !== null) ||
+          ['aria-readonly', 'aria-disabled'].some(name => current.getAttribute(name) === 'true')
+        )
+          return false;
       }
       return true;
     }
@@ -95,7 +147,12 @@
       if (!scope) return null;
       for (const button of scope.querySelectorAll(selectors.button.join(','))) {
         const result = submission(button);
-        if (result && dom.closest(button, selectors.commentScope) === scope && dom.find(scope, selectors.commentEditor) === editor) return result;
+        if (
+          result &&
+          dom.closest(button, selectors.commentScope) === scope &&
+          dom.find(scope, selectors.commentEditor) === editor
+        )
+          return result;
       }
       return null;
     }
@@ -111,7 +168,12 @@
         const active = document.activeElement;
         const editor = dom.closest(active, selectors.commentEditor) || dom.closest(active, selectors.postEditor);
         const message = dom.closest(active, selectors.messageEditor);
-        return classifyPage({ url: location.href, ownProfileURL: ownProfileURL(), facebookEditorFocused: usable(editor) && dom.visible(active) && !!editorScope(editor), facebookMessageEditorFocused: usable(message) && dom.visible(active) });
+        return classifyPage({
+          url: location.href,
+          ownProfileURL: ownProfileURL(),
+          facebookEditorFocused: usable(editor) && dom.visible(active) && !!editorScope(editor),
+          facebookMessageEditorFocused: usable(message) && dom.visible(active)
+        });
       },
       action(event) {
         const parsed = parseURL(location.href);
@@ -123,5 +185,14 @@
       }
     };
   }
-  return { id: 'facebook', name: 'Facebook', hosts, defaultEnabled: true, access, actions: ['posts', 'comments'], classifyPage, create };
+  return {
+    id: 'facebook',
+    name: 'Facebook',
+    hosts,
+    defaultEnabled: true,
+    access,
+    actions: ['posts', 'comments'],
+    classifyPage,
+    create
+  };
 });

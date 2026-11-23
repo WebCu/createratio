@@ -3,11 +3,36 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../core.js');
 
+test('duration converters preserve arithmetic without rounding or validation', () => {
+  for (const value of [0, 1, 1.25, -1, NaN, Infinity, -Infinity]) {
+    assert.equal(C.millisecondsFromMinutes(C.asMinutes(value)), value * 60000);
+    assert.equal(C.minutesFromSeconds(C.asSeconds(value)), value / 60);
+    assert.equal(C.secondsFromMilliseconds(C.asMilliseconds(value)), value / 1000);
+    assert.equal(C.minutesFromMilliseconds(C.asMilliseconds(value)), value / 60000);
+    assert.equal(C.secondsFromMinutes(C.asMinutes(value)), value * 60);
+    assert.equal(C.asMilliseconds(value), value);
+    assert.equal(C.asSeconds(value), value);
+    assert.equal(C.asMinutes(value), value);
+  }
+});
+
 test('classifies consuming routes, including profiles and SPA query strings', () => {
-  for (const url of ['https://x.com/home', 'https://x.com/explore/', 'https://x.com/search?q=js', 'https://x.com/someone', 'https://x.com/someone/with_replies', 'https://x.com/someone/status/42', 'https://www.linkedin.com/feed/', 'https://www.linkedin.com/in/someone/', 'https://www.linkedin.com/company/acme/posts/']) assert.equal(C.classifyPage({ url }), 'consume', url);
+  for (const url of [
+    'https://x.com/home',
+    'https://x.com/explore/',
+    'https://x.com/search?q=js',
+    'https://x.com/someone',
+    'https://x.com/someone/with_replies',
+    'https://x.com/someone/status/42',
+    'https://www.linkedin.com/feed/',
+    'https://www.linkedin.com/in/someone/',
+    'https://www.linkedin.com/company/acme/posts/'
+  ])
+    assert.equal(C.classifyPage({ url }), 'consume', url);
 });
 test('creation overrides feed and profile routes when composer state matches', () => {
-  for (const url of ['https://x.com/compose/post', 'https://x.com/compose/tweet', 'https://x.com/compose/anything']) assert.equal(C.classifyPage({ url }), 'create');
+  for (const url of ['https://x.com/compose/post', 'https://x.com/compose/tweet', 'https://x.com/compose/anything'])
+    assert.equal(C.classifyPage({ url }), 'create');
   assert.equal(C.classifyPage({ url: 'https://x.com/home', xComposerOpen: true }), 'create');
   assert.equal(C.classifyPage({ url: 'https://x.com/person/status/42', xComposerOpen: true }), 'create');
   assert.equal(C.classifyPage({ url: 'https://www.linkedin.com/feed/', linkedinEditorFocused: true }), 'create');
@@ -17,8 +42,17 @@ test('empty home composer, own profiles and unsupported pages are neutral or con
   assert.equal(C.classifyPage({ url: 'https://www.linkedin.com/feed/', linkedinEditorFocused: false }), 'consume');
   assert.equal(C.classifyPage({ url: 'https://x.com/ME/media', ownProfilePath: '/me' }), 'neutral');
   assert.equal(C.classifyPage({ url: 'https://www.linkedin.com/in/me/details/', ownProfilePath: '/in/me' }), 'neutral');
-  for (const url of ['https://x.com.evil.test/home', 'https://example.com/home', 'invalid']) assert.equal(C.classifyPage({ url, xComposerOpen: true, linkedinEditorFocused: true }), 'neutral');
-  for (const url of ['https://x.com/messages', 'https://x.com/settings/profile', 'https://x.com/notifications', 'https://x.com/i/bookmarks', 'https://www.linkedin.com/messaging/', 'https://www.linkedin.com/jobs/']) assert.equal(C.classifyPage({ url }), 'neutral');
+  for (const url of ['https://x.com.evil.test/home', 'https://example.com/home', 'invalid'])
+    assert.equal(C.classifyPage({ url, xComposerOpen: true, linkedinEditorFocused: true }), 'neutral');
+  for (const url of [
+    'https://x.com/messages',
+    'https://x.com/settings/profile',
+    'https://x.com/notifications',
+    'https://x.com/i/bookmarks',
+    'https://www.linkedin.com/messaging/',
+    'https://www.linkedin.com/jobs/'
+  ])
+    assert.equal(C.classifyPage({ url }), 'neutral');
 });
 test('score implements the exact formula; light actions and quote subtype add no bonus', () => {
   assert.equal(C.score(C.emptyStats()), 0);
@@ -29,10 +63,42 @@ test('score implements the exact formula; light actions and quote subtype add no
   assert.equal(C.score({ consumeSec: -10, createSec: NaN }), 0);
 });
 test('stats snapshots retain only known nonnegative numbers without coercion or mutation', () => {
-  const saved = { consumeSec: 12.5, createSec: '10', posts: 2, replies: -1, comments: NaN, likes: Infinity, bookmarks: null, quotes: true, reposts: 0.5, unknown: 50 };
+  const saved = {
+    consumeSec: 12.5,
+    createSec: '10',
+    posts: 2,
+    replies: -1,
+    comments: NaN,
+    likes: Infinity,
+    bookmarks: null,
+    quotes: true,
+    reposts: 0.5,
+    unknown: 50
+  };
   const original = { ...saved };
-  assert.deepEqual(C.statsSnapshot(saved), { consumeSec: 12.5, createSec: 0, posts: 2, replies: 0, comments: 0, likes: 0, bookmarks: 0, quotes: 0, reposts: 0.5 });
-  for (const value of [undefined, null, {}, 'invalid', 12, false]) assert.deepEqual(C.statsSnapshot(value), { consumeSec: 0, createSec: 0, posts: 0, replies: 0, comments: 0, likes: 0, bookmarks: 0, quotes: 0, reposts: 0 });
+  assert.deepEqual(C.statsSnapshot(saved), {
+    consumeSec: 12.5,
+    createSec: 0,
+    posts: 2,
+    replies: 0,
+    comments: 0,
+    likes: 0,
+    bookmarks: 0,
+    quotes: 0,
+    reposts: 0.5
+  });
+  for (const value of [undefined, null, {}, 'invalid', 12, false])
+    assert.deepEqual(C.statsSnapshot(value), {
+      consumeSec: 0,
+      createSec: 0,
+      posts: 0,
+      replies: 0,
+      comments: 0,
+      likes: 0,
+      bookmarks: 0,
+      quotes: 0,
+      reposts: 0
+    });
   assert.deepEqual(saved, original);
   const snapshot = C.statsSnapshot(saved);
   snapshot.posts = 10;
@@ -40,11 +106,19 @@ test('stats snapshots retain only known nonnegative numbers without coercion or 
 });
 
 test('score aggregates both sites before dividing and uses exact badge thresholds', () => {
-  const total = C.aggregate({ x: { consumeSec: 240, posts: 1 }, linkedin: { consumeSec: 120, comments: 1, createSec: 60 } });
+  const total = C.aggregate({
+    x: { consumeSec: 240, posts: 1 },
+    linkedin: { consumeSec: 120, comments: 1, createSec: 60 }
+  });
   assert.equal(C.score(total), 300 / 360);
-  assert.equal(C.scoreColor(0.4999), '#be3f43'); assert.equal(C.scoreColor(0.5), '#b77900');
-  assert.equal(C.scoreColor(0.9999), '#b77900'); assert.equal(C.scoreColor(1), '#16804a');
-  assert.equal(C.scoreBand(0.4999), 'low'); assert.equal(C.scoreBand(0.5), 'mid'); assert.equal(C.scoreBand(0.9999), 'mid'); assert.equal(C.scoreBand(1), 'high');
+  assert.equal(C.scoreColor(0.4999), '#be3f43');
+  assert.equal(C.scoreColor(0.5), '#b77900');
+  assert.equal(C.scoreColor(0.9999), '#b77900');
+  assert.equal(C.scoreColor(1), '#16804a');
+  assert.equal(C.scoreBand(0.4999), 'low');
+  assert.equal(C.scoreBand(0.5), 'mid');
+  assert.equal(C.scoreBand(0.9999), 'mid');
+  assert.equal(C.scoreBand(1), 'high');
   assert.equal(C.badgeText(100), '99+');
 });
 test('daily target resolves the current setting with safe defaults for legacy or invalid preferences', () => {
@@ -65,32 +139,36 @@ test('scroll friction defaults on without replacing saved choices or resistance'
     assert.equal(C.settingsSnapshot(settings).scrollFrictionEnabled, true);
     assert.equal(C.settingsSnapshot(settings).scrollFrictionStrength, 50);
   }
-  for (const enabled of [false, true]) for (const strength of [50, 75, 90, 95]) {
-    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
-    for (const resolved of [C.settingsSnapshot(settings), C.updatePreferences(settings, { accessMinutes: 12 })]) {
-      assert.equal(resolved.scrollFrictionEnabled, enabled);
-      assert.equal(resolved.scrollFrictionStrength, strength);
+  for (const enabled of [false, true])
+    for (const strength of [50, 75, 90, 95]) {
+      const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
+      for (const resolved of [C.settingsSnapshot(settings), C.updatePreferences(settings, { accessMinutes: 12 })]) {
+        assert.equal(resolved.scrollFrictionEnabled, enabled);
+        assert.equal(resolved.scrollFrictionStrength, strength);
+      }
+      assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
     }
-    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
-  }
 });
 test('saved zero resistance resolves to Off without mutating preferences', () => {
   for (const enabled of [undefined, false, true]) {
     const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: 0 };
     for (const saved of [settings, C.updatePreferences(settings, { accessMinutes: 12 })]) {
       const resolved = C.settingsSnapshot(saved);
-      assert.equal(resolved.scrollFrictionEnabled, false); assert.equal(resolved.scrollFrictionStrength, 50);
+      assert.equal(resolved.scrollFrictionEnabled, false);
+      assert.equal(resolved.scrollFrictionStrength, 50);
     }
     assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: 0 });
   }
 });
 test('saved strengths below the new minimum resolve to 50% without enabling an Off choice', () => {
-  for (const enabled of [false, true]) for (const strength of [5, 25, 45]) {
-    const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
-    const resolved = C.settingsSnapshot(settings);
-    assert.equal(resolved.scrollFrictionEnabled, enabled); assert.equal(resolved.scrollFrictionStrength, 50);
-    assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
-  }
+  for (const enabled of [false, true])
+    for (const strength of [5, 25, 45]) {
+      const settings = { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength };
+      const resolved = C.settingsSnapshot(settings);
+      assert.equal(resolved.scrollFrictionEnabled, enabled);
+      assert.equal(resolved.scrollFrictionStrength, 50);
+      assert.deepEqual(settings, { scrollFrictionEnabled: enabled, scrollFrictionStrength: strength });
+    }
 });
 test('scroll resistance accepts only 50–95% in five-point steps', () => {
   assert.equal(C.settingsSnapshot({ scrollFrictionEnabled: true }).scrollFrictionStrength, 50);
@@ -98,7 +176,28 @@ test('scroll resistance accepts only 50–95% in five-point steps', () => {
     assert.equal(C.validScrollFrictionStrength(strength), true);
     assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, strength);
   }
-  for (const strength of [undefined, null, false, true, '75', 0, -5, 5, 25, 45, 49, 96, 99, 100, 1, 50.5, NaN, Infinity, [], {}]) {
+  for (const strength of [
+    undefined,
+    null,
+    false,
+    true,
+    '75',
+    0,
+    -5,
+    5,
+    25,
+    45,
+    49,
+    96,
+    99,
+    100,
+    1,
+    50.5,
+    NaN,
+    Infinity,
+    [],
+    {}
+  ]) {
     assert.equal(C.validScrollFrictionStrength(strength), false);
     assert.equal(C.settingsSnapshot({ scrollFrictionStrength: strength }).scrollFrictionStrength, 50);
   }
@@ -106,43 +205,103 @@ test('scroll resistance accepts only 50–95% in five-point steps', () => {
 test('access minutes require a numeric whole number within the access limits', () => {
   assert.deepEqual(C.ACCESS_LIMITS, { minMinutes: 1, maxMinutes: 240 });
   for (const value of [1, 5, 120, 240]) assert.equal(C.validAccessMinutes(value), true);
-  for (const value of [undefined, null, true, false, '5', '', 0, -1, 1.5, 241, NaN, Infinity, {}, [], new Number(5)]) assert.equal(C.validAccessMinutes(value), false);
+  for (const value of [undefined, null, true, false, '5', '', 0, -1, 1.5, 241, NaN, Infinity, {}, [], new Number(5)])
+    assert.equal(C.validAccessMinutes(value), false);
 });
 
 test('intentions use trimmed minimum length and raw maximum length without coercion', () => {
   assert.deepEqual(C.INTENTION_LIMITS, { minLength: 20, maxLength: 280 });
-  for (const value of ['a'.repeat(20), 'a'.repeat(280), `  ${'a'.repeat(20)}  `]) assert.equal(C.validIntention(value), true);
-  for (const value of ['a'.repeat(19), ' '.repeat(20), ` ${'a'.repeat(19)}`, 'a'.repeat(281), `${'a'.repeat(20)}${' '.repeat(261)}`, undefined, null, 123, {}, [], new String('a'.repeat(20))]) assert.equal(C.validIntention(value), false);
+  for (const value of ['a'.repeat(20), 'a'.repeat(280), `  ${'a'.repeat(20)}  `])
+    assert.equal(C.validIntention(value), true);
+  for (const value of [
+    'a'.repeat(19),
+    ' '.repeat(20),
+    ` ${'a'.repeat(19)}`,
+    'a'.repeat(281),
+    `${'a'.repeat(20)}${' '.repeat(261)}`,
+    undefined,
+    null,
+    123,
+    {},
+    [],
+    new String('a'.repeat(20))
+  ])
+    assert.equal(C.validIntention(value), false);
 });
 
 test('delivery policy exposes bounded batches, seconds, identifiers and receipts', () => {
-  assert.deepEqual(C.DELIVERY_LIMITS, { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 });
+  assert.deepEqual(C.DELIVERY_LIMITS, {
+    maxPackets: 64,
+    maxItems: 64,
+    maxSeconds: 3600,
+    maxIdLength: 100,
+    receiptLimit: 512
+  });
 });
 
 test('active time clips exactly at 30 seconds and never backfills after new input', () => {
   const state = { start: 28000, end: 33000, lastInput: 0, visible: true, focused: true, mode: 'consume' };
-  assert.equal(C.activeMillis(state), 2000);
-  assert.equal(C.activeMillis({ ...state, start: 33000, end: 38000 }), 0);
-  assert.equal(C.activeMillis({ ...state, lastInput: 32000 }), 1000);
-  assert.equal(C.activeMillis({ ...state, lastInput: -Infinity }), 0);
-  for (const change of [{ visible: false }, { focused: false }, { mode: 'neutral' }, { end: 60000 }, { end: 27000 }]) assert.equal(C.activeMillis({ ...state, ...change }), 0);
+  assert.equal(C.activeMilliseconds(state), 2000);
+  assert.equal(C.activeMilliseconds({ ...state, start: 33000, end: 38000 }), 0);
+  assert.equal(C.activeMilliseconds({ ...state, lastInput: 32000 }), 1000);
+  assert.equal(C.activeMilliseconds({ ...state, lastInput: -Infinity }), 0);
+  for (const change of [{ visible: false }, { focused: false }, { mode: 'neutral' }, { end: 60000 }, { end: 27000 }])
+    assert.equal(C.activeMilliseconds({ ...state, ...change }), 0);
 });
 test('local dates require an exact calendar day including leap years and years below 100', () => {
-  for (const value of ['2026-10-11', '2024-02-29', '2000-02-29', '0099-01-01', '0000-02-29', '2026-12-31']) assert.equal(C.validLocalDate(value), true, value);
-  for (const value of ['2026-02-29', '1900-02-29', '2026-04-31', '2026-00-10', '2026-13-01', '2026-01-00', '2026-01-32', '2026-1-01', '2026-01-1', '2026-01-01T00:00:00Z', ' 2026-01-01', '2026-01-01\n', 'invalid', undefined, null, 20260101, {}, new Date(2026, 0, 1)]) assert.equal(C.validLocalDate(value), false);
+  for (const value of ['2026-10-11', '2024-02-29', '2000-02-29', '0099-01-01', '0000-02-29', '2026-12-31'])
+    assert.equal(C.validLocalDate(value), true, value);
+  for (const value of [
+    '2026-02-29',
+    '1900-02-29',
+    '2026-04-31',
+    '2026-00-10',
+    '2026-13-01',
+    '2026-01-00',
+    '2026-01-32',
+    '2026-1-01',
+    '2026-01-1',
+    '2026-01-01T00:00:00Z',
+    ' 2026-01-01',
+    '2026-01-01\n',
+    'invalid',
+    undefined,
+    null,
+    20260101,
+    {},
+    new Date(2026, 0, 1)
+  ])
+    assert.equal(C.validLocalDate(value), false);
 });
 
 test('local date buckets split a tick across local midnight without losing time', () => {
   const start = new Date(2026, 9, 11, 23, 59, 58).getTime();
-  assert.deepEqual(C.splitInterval(start, start + 5000), [{ date: '2026-10-11', sec: 2 }, { date: '2026-10-12', sec: 3 }]);
+  assert.deepEqual(C.splitInterval(start, start + 5000), [
+    { date: '2026-10-11', sec: 2 },
+    { date: '2026-10-12', sec: 3 }
+  ]);
   assert.deepEqual(C.recentDates(3, new Date(2026, 0, 1, 10)), ['2025-12-30', '2025-12-31', '2026-01-01']);
 });
 test('settings snapshots omit retired nudges without changing saved preferences', () => {
-  const settings = { accessMinutes: 12, nudgeEnabled: true, nudgeMinutes: 1, trackedSites: [], siteOverrides: { x: { accessMinutes: 2, nudgeEnabled: true, nudgeMinutes: 1 }, linkedin: { nudgeEnabled: true } } };
+  const settings = {
+    accessMinutes: 12,
+    nudgeEnabled: true,
+    nudgeMinutes: 1,
+    trackedSites: [],
+    siteOverrides: { x: { accessMinutes: 2, nudgeEnabled: true, nudgeMinutes: 1 }, linkedin: { nudgeEnabled: true } }
+  };
   const snapshot = C.settingsSnapshot(settings);
-  assert.deepEqual(snapshot, { ...C.DEFAULT_SETTINGS, accessMinutes: 12, trackedSites: [], siteOverrides: { x: { accessMinutes: 2 } } });
-  assert.equal(settings.nudgeEnabled, true); assert.equal(settings.siteOverrides.x.nudgeEnabled, true); assert.deepEqual(settings.siteOverrides.linkedin, { nudgeEnabled: true });
-  assert.equal(C.DEFAULT_SETTINGS.nudgeEnabled, undefined); assert.equal(C.shouldNudge, undefined);
+  assert.deepEqual(snapshot, {
+    ...C.DEFAULT_SETTINGS,
+    accessMinutes: 12,
+    trackedSites: [],
+    siteOverrides: { x: { accessMinutes: 2 } }
+  });
+  assert.equal(settings.nudgeEnabled, true);
+  assert.equal(settings.siteOverrides.x.nudgeEnabled, true);
+  assert.deepEqual(settings.siteOverrides.linkedin, { nudgeEnabled: true });
+  assert.equal(C.DEFAULT_SETTINGS.nudgeEnabled, undefined);
+  assert.equal(C.shouldNudge, undefined);
 });
 test('restored access minutes fall back consistently without changing saved values', () => {
   for (const accessMinutes of [undefined, null, '12', false, 0, -1, 1.5, 241, NaN, Infinity]) {
@@ -183,12 +342,19 @@ test('settings snapshots and daily target resolve the same restored target', () 
     assert.equal(C.dailyTarget(saved), 1);
     assert.deepEqual(saved, { dailyTarget });
   }
-  for (const dailyTarget of [0.1, 1, 2.5, 100]) assert.equal(C.settingsSnapshot({ dailyTarget }).dailyTarget, dailyTarget);
+  for (const dailyTarget of [0.1, 1, 2.5, 100])
+    assert.equal(C.settingsSnapshot({ dailyTarget }).dailyTarget, dailyTarget);
 });
 
 test('malformed site access limits inherit Default while unknown and retired preferences survive', () => {
   for (const accessMinutes of [undefined, null, '2', false, 0, -1, 1.5, 241, NaN, Infinity]) {
-    const saved = { accessMinutes: 12, siteOverrides: { x: { accessMinutes, unknown: 'keep', nudgeMinutes: 1 }, retired: { accessMinutes: 30, unknown: true } } };
+    const saved = {
+      accessMinutes: 12,
+      siteOverrides: {
+        x: { accessMinutes, unknown: 'keep', nudgeMinutes: 1 },
+        retired: { accessMinutes: 30, unknown: true }
+      }
+    };
     const original = structuredClone(saved);
     const snapshot = C.settingsSnapshot(saved);
     assert.deepEqual(snapshot.siteOverrides, { x: { unknown: 'keep' }, retired: { accessMinutes: 30, unknown: true } });
@@ -198,7 +364,11 @@ test('malformed site access limits inherit Default while unknown and retired pre
     assert.equal(C.siteSettings('x', { ...saved, accessMinutes: 'bad' }).accessMinutes, 5);
     assert.deepEqual(saved, original);
   }
-  for (const accessMinutes of [1, 2, 240]) assert.equal(C.siteSettings('x', { accessMinutes: 12, siteOverrides: { x: { accessMinutes } } }).accessMinutes, accessMinutes);
+  for (const accessMinutes of [1, 2, 240])
+    assert.equal(
+      C.siteSettings('x', { accessMinutes: 12, siteOverrides: { x: { accessMinutes } } }).accessMinutes,
+      accessMinutes
+    );
 });
 
 test('malformed override containers and entries cannot manufacture preferences', () => {
@@ -208,9 +378,22 @@ test('malformed override containers and entries cannot manufacture preferences',
     assert.equal(C.siteSettings('x', saved).accessMinutes, 12);
     assert.equal(saved.siteOverrides, siteOverrides);
   }
-  const saved = { accessMinutes: 12, unknown: { mode: 'keep' }, siteOverrides: { x: 'bad', linkedin: [2], retired: { accessMinutes: 30, future: { mode: 'keep' } }, other: null, empty: {}, nudgeOnly: { nudgeEnabled: true } } };
+  const saved = {
+    accessMinutes: 12,
+    unknown: { mode: 'keep' },
+    siteOverrides: {
+      x: 'bad',
+      linkedin: [2],
+      retired: { accessMinutes: 30, future: { mode: 'keep' } },
+      other: null,
+      empty: {},
+      nudgeOnly: { nudgeEnabled: true }
+    }
+  };
   const original = structuredClone(saved);
-  assert.deepEqual(C.settingsSnapshot(saved).siteOverrides, { retired: { accessMinutes: 30, future: { mode: 'keep' } } });
+  assert.deepEqual(C.settingsSnapshot(saved).siteOverrides, {
+    retired: { accessMinutes: 30, future: { mode: 'keep' } }
+  });
   assert.deepEqual(C.settingsSnapshot(saved).unknown, { mode: 'keep' });
   assert.equal(C.siteSettings('x', saved).accessMinutes, 12);
   assert.deepEqual(saved, original);
@@ -239,25 +422,43 @@ test('normalized settings copy valid tracking arrays and site overrides without 
 
 test('site access limits inherit Default and reset without changing creation tracking', () => {
   const original = { accessMinutes: 12, trackedSites: [] };
-  assert.equal(C.siteSettings('x', original).accessMinutes, 12); assert.equal(C.siteSettings('x').accessMinutes, 5);
+  assert.equal(C.siteSettings('x', original).accessMinutes, 12);
+  assert.equal(C.siteSettings('x').accessMinutes, 5);
   let settings = C.updatePreferences(original, { accessMinutes: 2 }, 'x');
-  assert.equal(C.siteSettings('x', settings).accessMinutes, 2); assert.equal(C.siteSettings('linkedin', settings).accessMinutes, 12);
+  assert.equal(C.siteSettings('x', settings).accessMinutes, 2);
+  assert.equal(C.siteSettings('linkedin', settings).accessMinutes, 12);
   settings = C.updatePreferences(settings, { accessMinutes: 30 });
-  assert.equal(C.siteSettings('x', settings).accessMinutes, 2); assert.equal(C.siteSettings('linkedin', settings).accessMinutes, 30);
+  assert.equal(C.siteSettings('x', settings).accessMinutes, 2);
+  assert.equal(C.siteSettings('linkedin', settings).accessMinutes, 30);
   settings = C.updatePreferences(settings, { accessMinutes: null }, 'x');
-  assert.equal(C.siteSettings('x', settings).accessMinutes, 30); assert.deepEqual(settings.siteOverrides, {}); assert.deepEqual(settings.trackedSites, []);
-  assert.equal(original.accessMinutes, 12); assert.equal(original.siteOverrides, undefined);
+  assert.equal(C.siteSettings('x', settings).accessMinutes, 30);
+  assert.deepEqual(settings.siteOverrides, {});
+  assert.deepEqual(settings.trackedSites, []);
+  assert.equal(original.accessMinutes, 12);
+  assert.equal(original.siteOverrides, undefined);
 });
 test('preference updates reject unsupported keys and invalid values without mutating settings', () => {
   const settings = { siteOverrides: { x: { accessMinutes: 2 } } };
-  for (const changes of [{ accessMinutes: 0 }, { accessMinutes: 241 }, { accessMinutes: 1.5 }, { nudgeEnabled: 'false' }, { nudgeMinutes: undefined }, { trackedSites: null }]) {
+  for (const changes of [
+    { accessMinutes: 0 },
+    { accessMinutes: 241 },
+    { accessMinutes: 1.5 },
+    { nudgeEnabled: 'false' },
+    { nudgeMinutes: undefined },
+    { trackedSites: null }
+  ]) {
     assert.throws(() => C.updatePreferences(settings, changes, 'x'));
   }
   assert.throws(() => C.updatePreferences(settings, { accessMinutes: null }));
   assert.deepEqual(settings, { siteOverrides: { x: { accessMinutes: 2 } } });
 });
 test('preference updates reject malformed changes and accept only valid minutes or per-site reset', () => {
-  const saved = { accessMinutes: 12, trackedSites: [], unknown: 'keep', siteOverrides: { x: { accessMinutes: 2 }, retired: { accessMinutes: 30 } } };
+  const saved = {
+    accessMinutes: 12,
+    trackedSites: [],
+    unknown: 'keep',
+    siteOverrides: { x: { accessMinutes: 2 }, retired: { accessMinutes: 30 } }
+  };
   const original = structuredClone(saved);
   for (const changes of [undefined, null, '', 0, false, true, [], [2]]) {
     assert.throws(() => C.updatePreferences(saved, changes));
@@ -268,7 +469,10 @@ test('preference updates reject malformed changes and accept only valid minutes 
     if (accessMinutes !== null) assert.throws(() => C.updatePreferences(saved, { accessMinutes }, 'x'));
   }
   for (const accessMinutes of [1, 240]) {
-    assert.equal(C.siteSettings('linkedin', C.updatePreferences(saved, { accessMinutes })).accessMinutes, accessMinutes);
+    assert.equal(
+      C.siteSettings('linkedin', C.updatePreferences(saved, { accessMinutes })).accessMinutes,
+      accessMinutes
+    );
     assert.equal(C.siteSettings('x', C.updatePreferences(saved, { accessMinutes }, 'x')).accessMinutes, accessMinutes);
   }
   const reset = C.updatePreferences(saved, { accessMinutes: null }, 'x');
@@ -280,7 +484,12 @@ test('preference updates reject malformed changes and accept only valid minutes 
 });
 
 test('preference updates copy restored settings without erasing unrelated saved data', () => {
-  for (const siteOverrides of [null, 'bad', [], { x: 'bad', retired: { accessMinutes: 30, nudgeEnabled: true, unknown: 'keep' } }]) {
+  for (const siteOverrides of [
+    null,
+    'bad',
+    [],
+    { x: 'bad', retired: { accessMinutes: 30, nudgeEnabled: true, unknown: 'keep' } }
+  ]) {
     const saved = { accessMinutes: 'bad', nudgeEnabled: true, unknown: 'keep', trackedSites: [], siteOverrides };
     const original = structuredClone(saved);
     const updated = C.updatePreferences(saved, { accessMinutes: 2 }, 'x');
@@ -290,7 +499,8 @@ test('preference updates copy restored settings without erasing unrelated saved 
     assert.equal(updated.unknown, 'keep');
     assert.equal(C.siteSettings('linkedin', updated).accessMinutes, 5);
     assert.equal(C.siteSettings('x', updated).accessMinutes, 2);
-    if (siteOverrides?.retired) assert.deepEqual(updated.siteOverrides.retired, { accessMinutes: 30, nudgeEnabled: true, unknown: 'keep' });
+    if (siteOverrides?.retired)
+      assert.deepEqual(updated.siteOverrides.retired, { accessMinutes: 30, nudgeEnabled: true, unknown: 'keep' });
     else assert.deepEqual(updated.siteOverrides, { x: { accessMinutes: 2 } });
     assert.deepEqual(saved, original);
   }
@@ -298,23 +508,53 @@ test('preference updates copy restored settings without erasing unrelated saved 
 });
 
 test('retired nudge preferences cannot be changed or used as site access limits', () => {
-  const stored = { accessMinutes: 12, nudgeEnabled: true, nudgeMinutes: 1, siteOverrides: { x: { nudgeEnabled: true, nudgeMinutes: 1 } } };
-  for (const changes of [{ nudgeEnabled: true }, { nudgeMinutes: 1 }, { nudgeEnabled: null }]) assert.throws(() => C.updatePreferences(stored, changes, 'x'), /Unsupported preference/);
+  const stored = {
+    accessMinutes: 12,
+    nudgeEnabled: true,
+    nudgeMinutes: 1,
+    siteOverrides: { x: { nudgeEnabled: true, nudgeMinutes: 1 } }
+  };
+  for (const changes of [{ nudgeEnabled: true }, { nudgeMinutes: 1 }, { nudgeEnabled: null }])
+    assert.throws(() => C.updatePreferences(stored, changes, 'x'), /Unsupported preference/);
   const settings = C.siteSettings('x', stored);
-  assert.equal(settings.accessMinutes, 12); assert.equal(settings.nudgeEnabled, undefined); assert.deepEqual(settings.siteOverrides, {});
+  assert.equal(settings.accessMinutes, 12);
+  assert.equal(settings.nudgeEnabled, undefined);
+  assert.deepEqual(settings.siteOverrides, {});
 });
 test('CSV exports all date buckets and catalog sites, excluding internal keys', () => {
-  const output = C.csv({ settings: C.DEFAULT_SETTINGS, _receipts: ['abc'], '2026-10-11': { x: { consumeSec: 120, posts: 1, quotes: 1 } }, '2026-10-10': {} });
-  const lines = output.trim().split('\r\n'); assert.equal(lines.length, 1 + 2 * C.SITES.length);
+  const output = C.csv({
+    settings: C.DEFAULT_SETTINGS,
+    _receipts: ['abc'],
+    '2026-10-11': { x: { consumeSec: 120, posts: 1, quotes: 1 } },
+    '2026-10-10': {}
+  });
+  const lines = output.trim().split('\r\n');
+  assert.equal(lines.length, 1 + 2 * C.SITES.length);
   for (const date of ['2026-10-10', '2026-10-11']) {
-    assert.deepEqual(lines.slice(1).filter(line => line.startsWith(date + ',')).map(line => line.split(',')[1]), C.SITES.map(site => site.id));
+    assert.deepEqual(
+      lines
+        .slice(1)
+        .filter(line => line.startsWith(date + ','))
+        .map(line => line.split(',')[1]),
+      C.SITES.map(site => site.id)
+    );
   }
   const recorded = lines.find(line => line.startsWith('2026-10-11,x,'));
   assert.match(recorded, /^2026-10-11,x,120\.000,0\.000,1,/);
-  assert.match(recorded, /,1\.000$/); assert.ok(!output.includes('settings')); assert.ok(!output.includes('abc'));
+  assert.match(recorded, /,1\.000$/);
+  assert.ok(!output.includes('settings'));
+  assert.ok(!output.includes('abc'));
 });
 test('tracking defaults enable all seven supported sites and an empty selection disables all sites', () => {
-  assert.deepEqual(C.DEFAULT_SETTINGS.trackedSites, ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit']);
+  assert.deepEqual(C.DEFAULT_SETTINGS.trackedSites, [
+    'x',
+    'linkedin',
+    'tiktok',
+    'instagram',
+    'facebook',
+    'youtube',
+    'reddit'
+  ]);
   for (const { id } of C.SITES) {
     assert.equal(C.trackingEnabled(id), true);
     assert.equal(C.trackingEnabled(id, { nudgeEnabled: true }), true);
@@ -344,8 +584,14 @@ test('malformed saved tracking selections recover to Off without changing missin
   assert.equal(C.trackingEnabled('x', { trackedSites: undefined }), true);
 });
 test('default activation follows module declarations without treating familiar IDs specially', () => {
-  const vm = require('node:vm'), fs = require('node:fs');
-  const sites = [{ id: 'x', defaultEnabled: false }, { id: 'linkedin', defaultEnabled: false }, { id: 'example', defaultEnabled: true }, { id: 'reading' }];
+  const vm = require('node:vm'),
+    fs = require('node:fs');
+  const sites = [
+    { id: 'x', defaultEnabled: false },
+    { id: 'linkedin', defaultEnabled: false },
+    { id: 'example', defaultEnabled: true },
+    { id: 'reading' }
+  ];
   const context = vm.createContext({ Sites: { sites } });
   vm.runInContext(fs.readFileSync(require.resolve('../core.js'), 'utf8'), context);
   assert.deepEqual(Array.from(context.Core.DEFAULT_SETTINGS.trackedSites), ['example']);
@@ -413,7 +659,10 @@ test('intention wait uses validated defaults, site inheritance and reset', () =>
   assert.equal(C.siteSettings('x', { accessMinutes: 12 }).waitMinutes, 5);
   assert.equal(C.siteSettings('x', { waitMinutes: 1 }).waitMinutes, 1);
   for (const value of [null, '5', 0, -1, 1.5, 241, NaN, Infinity]) {
-    assert.equal(C.siteSettings('x', { waitMinutes: value, siteOverrides: { x: { waitMinutes: value } } }).waitMinutes, 5);
+    assert.equal(
+      C.siteSettings('x', { waitMinutes: value, siteOverrides: { x: { waitMinutes: value } } }).waitMinutes,
+      5
+    );
     assert.throws(() => C.updatePreferences({}, { waitMinutes: value }));
   }
   let settings = C.updatePreferences({}, { waitMinutes: 10 });

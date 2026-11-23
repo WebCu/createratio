@@ -38,44 +38,116 @@ test('all browser bundles include the exact shared core and every referenced ass
     assert.match(settings, new RegExp(`data-store="${browser}"`));
     const dashboard = await fs.readFile(path.join(output, 'dashboard.html'), 'utf8');
     const blocked = await fs.readFile(path.join(output, 'blocked.html'), 'utf8');
-    const pageAssets = [settings, dashboard, popup, blocked].flatMap(html => [...html.matchAll(/(?:src|href)="([^"#:]+\.(?:js|css|html))"/g)].map(match => match[1]));
-    const assets = [manifest.options_ui.page, 'dashboard.html', ...pageAssets, ...scripts, ...backgrounds, ...Object.values(manifest.icons), manifest.action.default_popup, 'popup.css', 'popup.js', ...popupScripts, 'blocker.js', 'blocked.css', 'blocked.js', ...manifest.web_accessible_resources.flatMap(entry => entry.resources), ...manifest.declarative_net_request.rule_resources.map(entry => entry.path)];
+    const pageAssets = [settings, dashboard, popup, blocked].flatMap(html =>
+      [...html.matchAll(/(?:src|href)="([^"#:]+\.(?:js|css|html))"/g)].map(match => match[1])
+    );
+    const assets = [
+      manifest.options_ui.page,
+      'dashboard.html',
+      ...pageAssets,
+      ...scripts,
+      ...backgrounds,
+      ...Object.values(manifest.icons),
+      manifest.action.default_popup,
+      'popup.css',
+      'popup.js',
+      ...popupScripts,
+      'blocker.js',
+      'blocked.css',
+      'blocked.js',
+      ...manifest.web_accessible_resources.flatMap(entry => entry.resources),
+      ...manifest.declarative_net_request.rule_resources.map(entry => entry.path)
+    ];
     for (const asset of assets) assert.ok((await fs.stat(path.join(output, asset))).isFile(), `${browser}: ${asset}`);
     assert.equal(await fs.readFile(path.join(output, 'core.js'), 'utf8'), core);
     assert.equal(await fs.readFile(path.join(output, 'LICENSE'), 'utf8'), license);
     assert.deepEqual(manifest.permissions, ['storage', 'alarms', 'declarativeNetRequestWithHostAccess', 'scripting']);
     assert.deepEqual(manifest.optional_permissions, ['tabs', 'idle']);
     assert.ok((await fs.stat(path.join(output, 'web-time.js'))).isFile());
-    const trackingHosts = require('../../sites/index.js').sites.filter(site => !site.gated).flatMap(site => site.hosts);
-    assert.deepEqual(manifest.host_permissions, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'reddit.com'].flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*']).concat(trackingHosts.map(host => 'https://' + host + '/*')));
-    for (const entry of manifest.content_scripts.slice(1)) for (const host of trackingHosts) assert.ok(entry.matches.includes('https://' + host + '/*'));
-    for (const host of trackingHosts) assert.ok(!manifest.content_scripts[0].matches.includes('https://' + host + '/*'), 'tracking-only hosts do not get access guards');
-    assert.deepEqual(manifest.declarative_net_request.rule_resources, [{ id: 'site-blocking', enabled: true, path: 'block-rules.json' }]);
+    const trackingHosts = require('../../sites/index.js')
+      .sites.filter(site => !site.gated)
+      .flatMap(site => site.hosts);
+    assert.deepEqual(
+      manifest.host_permissions,
+      [
+        'x.com',
+        'twitter.com',
+        'linkedin.com',
+        'tiktok.com',
+        'instagram.com',
+        'facebook.com',
+        'youtube.com',
+        'reddit.com'
+      ]
+        .flatMap(domain => ['http://*.' + domain + '/*', 'https://*.' + domain + '/*'])
+        .concat(trackingHosts.map(host => 'https://' + host + '/*'))
+    );
+    for (const entry of manifest.content_scripts.slice(1))
+      for (const host of trackingHosts) assert.ok(entry.matches.includes('https://' + host + '/*'));
+    for (const host of trackingHosts)
+      assert.ok(
+        !manifest.content_scripts[0].matches.includes('https://' + host + '/*'),
+        'tracking-only hosts do not get access guards'
+      );
+    assert.deepEqual(manifest.declarative_net_request.rule_resources, [
+      { id: 'site-blocking', enabled: true, path: 'block-rules.json' }
+    ]);
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
     assert.equal(rules.length, 8);
-    assert.deepEqual(rules.slice(0, 7).map(rule => rule.action.redirect.extensionPath), ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit'].map(site => '/blocked.html?site=' + site));
+    assert.deepEqual(
+      rules.slice(0, 7).map(rule => rule.action.redirect.extensionPath),
+      ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit'].map(
+        site => '/blocked.html?site=' + site
+      )
+    );
     assert.ok(rules.every(rule => rule.priority === 1));
     assert.equal(rules[7].action.type, 'block');
     assert.deepEqual(rules[7].condition.excludedResourceTypes, ['main_frame']);
-    assert.deepEqual(rules[7].condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'reddit.com']);
+    assert.deepEqual(rules[7].condition.requestDomains, [
+      'x.com',
+      'twitter.com',
+      'linkedin.com',
+      'tiktok.com',
+      'instagram.com',
+      'facebook.com',
+      'youtube.com',
+      'reddit.com'
+    ]);
     assert.equal(rules[7].condition.resourceTypes, undefined, 'block all non-navigation requests, not just frames');
     assert.match(manifest.content_security_policy.extension_pages, /connect-src 'none'/);
     assert.equal(manifest.content_scripts[0].run_at, 'document_start');
     assert.deepEqual(manifest.content_scripts[0].js, ['sites.js', 'messages.js', 'lifecycle.js', 'access-guard.js']);
     assert.equal(manifest.content_scripts[1].world, 'MAIN');
-    assert.equal(manifest.content_scripts[2].js.indexOf('sites.js') < manifest.content_scripts[2].js.indexOf('core.js'), true);
-    assert.equal(manifest.content_scripts[2].js.indexOf('core.js') < manifest.content_scripts[2].js.indexOf('messages.js'), true);
-    assert.equal(manifest.content_scripts[2].js.indexOf('messages.js') < manifest.content_scripts[2].js.indexOf('content.js'), true);
+    assert.equal(
+      manifest.content_scripts[2].js.indexOf('sites.js') < manifest.content_scripts[2].js.indexOf('core.js'),
+      true
+    );
+    assert.equal(
+      manifest.content_scripts[2].js.indexOf('core.js') < manifest.content_scripts[2].js.indexOf('messages.js'),
+      true
+    );
+    assert.equal(
+      manifest.content_scripts[2].js.indexOf('messages.js') < manifest.content_scripts[2].js.indexOf('content.js'),
+      true
+    );
     assert.ok(manifest.content_scripts[2].js.includes('scroll-friction.js'));
-    assert.ok(manifest.content_scripts[2].js.indexOf('scroll-friction.js') < manifest.content_scripts[2].js.indexOf('content.js'));
+    assert.ok(
+      manifest.content_scripts[2].js.indexOf('scroll-friction.js') <
+        manifest.content_scripts[2].js.indexOf('content.js')
+    );
     for (const html of [settings, dashboard, popup, blocked]) {
       const pageScripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]);
       assert.ok(pageScripts.includes('messages.js'));
       assert.ok(pageScripts.indexOf('messages.js') < pageScripts.length - 1);
     }
-    if (browser === 'firefox') assert.ok(backgrounds.indexOf('message-contracts.js') < backgrounds.indexOf('blocker.js'));
+    if (browser === 'firefox')
+      assert.ok(backgrounds.indexOf('message-contracts.js') < backgrounds.indexOf('blocker.js'));
     const plugins = await fs.readFile(path.join(output, 'sites.js'), 'utf8');
-    for (const script of SITE_SCRIPTS) assert.ok(plugins.includes(await fs.readFile(path.join(__dirname, '../..', script), 'utf8')), `${browser}: ${script}`);
+    for (const script of SITE_SCRIPTS)
+      assert.ok(
+        plugins.includes(await fs.readFile(path.join(__dirname, '../..', script), 'utf8')),
+        `${browser}: ${script}`
+      );
     assert.ok(popupScripts.indexOf('sites.js') < popupScripts.indexOf('core.js'));
     for (const excluded of ['tests', 'package.json', 'build.js', 'README.md']) {
       await assert.rejects(fs.access(path.join(output, excluded)), { code: 'ENOENT' });
@@ -85,7 +157,16 @@ test('all browser bundles include the exact shared core and every referenced ass
 
 test('organized runtime sources ship unchanged at flat bundle paths with icons preserved', async t => {
   const root = await temporaryOutput(t);
-  const directories = ['background', 'content', 'shared', 'pages/popup', 'pages/settings', 'pages/dashboard', 'pages/blocked', 'icons'];
+  const directories = [
+    'background',
+    'content',
+    'shared',
+    'pages/popup',
+    'pages/settings',
+    'pages/dashboard',
+    'pages/blocked',
+    'icons'
+  ];
   for (const browser of BROWSERS) {
     const output = await build(browser, root);
     const expectedFiles = ['manifest.json', 'sites.js', 'core.js', 'LICENSE', 'block-rules.json'];
@@ -99,11 +180,22 @@ test('organized runtime sources ship unchanged at flat bundle paths with icons p
         const target = directory === 'icons' ? `icons/${file}` : file;
         expectedFiles.push(target);
         const original = await fs.readFile(path.join(source, file));
-        const expected = file === 'settings.html' ? Buffer.from(original.toString().replace('data-store="chrome"', `data-store="${browser}"`)) : original;
-        assert.deepEqual(await fs.readFile(path.join(output, target)), expected, `${browser}: ${directory}/${file} → ${target}`);
+        const expected =
+          file === 'settings.html'
+            ? Buffer.from(original.toString().replace('data-store="chrome"', `data-store="${browser}"`))
+            : original;
+        assert.deepEqual(
+          await fs.readFile(path.join(output, target)),
+          expected,
+          `${browser}: ${directory}/${file} → ${target}`
+        );
       }
     }
-    assert.deepEqual((await fs.readdir(output, { recursive: true })).sort(), [...expectedFiles, 'icons'].sort(), browser);
+    assert.deepEqual(
+      (await fs.readdir(output, { recursive: true })).sort(),
+      [...expectedFiles, 'icons'].sort(),
+      browser
+    );
   }
 });
 
@@ -112,9 +204,11 @@ test('every bundle links to the hosted privacy policy in a separate tab and remo
   for (const browser of BROWSERS) {
     const destination = path.join(root, browser);
     await fs.mkdir(destination, { recursive: true });
-    for (const file of ['privacy.html', 'privacy.css']) await fs.writeFile(path.join(destination, file), 'Obsolete offline policy');
+    for (const file of ['privacy.html', 'privacy.css'])
+      await fs.writeFile(path.join(destination, file), 'Obsolete offline policy');
     const output = await build(browser, root);
-    for (const file of ['privacy.html', 'privacy.css']) await assert.rejects(fs.access(path.join(output, file)), { code: 'ENOENT' });
+    for (const file of ['privacy.html', 'privacy.css'])
+      await assert.rejects(fs.access(path.join(output, file)), { code: 'ENOENT' });
     for (const page of ['popup.html', 'settings.html', 'blocked.html']) {
       const html = await fs.readFile(path.join(output, page), 'utf8');
       const links = [...html.matchAll(/<a\b([^>]+)>Privacy policy<\/a>/g)];
@@ -151,11 +245,16 @@ test('all distributions share source metadata and use Create > Consume as the su
     assert.match(popup, /<h1>CreateRatio<\/h1><p class="eyebrow">Create &gt; Consume<\/p>/);
     const dashboardScript = await fs.readFile(path.join(output, 'dashboard.js'), 'utf8');
     const filenames = [...dashboardScript.matchAll(/link\.download = (`[^`]+`);/g)].flatMap(([, expression]) =>
-      [false, true].map(websites => vm.runInNewContext(expression, {
-        websites, Core: { localDate: () => '2026-01-02' }
-      })));
+      [false, true].map(websites =>
+        vm.runInNewContext(expression, {
+          websites,
+          Core: { localDate: () => '2026-01-02' }
+        })
+      )
+    );
     assert.deepEqual([...new Set(filenames)].sort(), [
-      'CreateRatio-2026-01-02.csv', 'CreateRatio-websites-2026-01-02.csv'
+      'CreateRatio-2026-01-02.csv',
+      'CreateRatio-websites-2026-01-02.csv'
     ]);
     const background = await fs.readFile(path.join(output, 'background.js'), 'utf8');
     assert.match(background, /CreateRatio - today's score:/);
@@ -176,7 +275,19 @@ test('browser manifests differ only in Firefox platform settings and background 
   assert.deepEqual(manifests.chrome, manifests.edge);
   assert.deepEqual(manifests.chrome.background, { service_worker: 'background.js' });
   const firefox = manifests.firefox;
-  assert.deepEqual(firefox.background, { scripts: ['sites.js', 'core.js', 'messages.js', 'message-contracts.js', 'blocker.js', 'history.js', 'web-time.js', 'updates.js', 'background.js'] });
+  assert.deepEqual(firefox.background, {
+    scripts: [
+      'sites.js',
+      'core.js',
+      'messages.js',
+      'message-contracts.js',
+      'blocker.js',
+      'history.js',
+      'web-time.js',
+      'updates.js',
+      'background.js'
+    ]
+  });
   assert.equal(firefox.minimum_chrome_version, undefined);
   assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '140.0');
   assert.deepEqual(firefox.browser_specific_settings.gecko.data_collection_permissions.required, ['none']);
@@ -191,7 +302,8 @@ test('built plugin catalog and core execute in browser worlds and rebuilt bundle
   const output = await build('chrome', root);
   const originalBundle = await fs.readFile(path.join(output, 'sites.js'), 'utf8');
   const context = vm.createContext({ URL });
-  for (const file of ['sites.js', 'core.js']) vm.runInContext(await fs.readFile(path.join(output, file), 'utf8'), context);
+  for (const file of ['sites.js', 'core.js'])
+    vm.runInContext(await fs.readFile(path.join(output, file), 'utf8'), context);
   assert.equal(context.Core.siteForURL('https://x.com/home'), 'x');
   assert.equal(context.Core.classifyPage({ url: 'https://www.linkedin.com/feed/' }), 'consume');
   assert.equal(typeof context.Sites.get('x').create, 'function');
@@ -202,7 +314,10 @@ test('built plugin catalog and core execute in browser worlds and rebuilt bundle
   await fs.writeFile(path.join(output, 'unused.js'), 'obsolete runtime file');
   await fs.writeFile(path.join(output, 'icons', 'obsolete.png'), 'obsolete icon');
   await fs.mkdir(path.join(output, '_metadata', 'generated_indexed_rulesets'), { recursive: true });
-  await fs.writeFile(path.join(output, '_metadata', 'generated_indexed_rulesets', '_ruleset1'), 'browser-generated ruleset');
+  await fs.writeFile(
+    path.join(output, '_metadata', 'generated_indexed_rulesets', '_ruleset1'),
+    'browser-generated ruleset'
+  );
   await build('chrome', root);
   await assert.rejects(fs.access(path.join(output, 'sites')), { code: 'ENOENT' });
   await assert.rejects(fs.access(path.join(output, 'selectors.js')), { code: 'ENOENT' });
@@ -216,8 +331,11 @@ test('blocking rules are generated from registered site modules without shipping
   const root = await temporaryOutput(t);
   const x = require('../../sites/x.js');
   const linkedin = require('../../sites/linkedin.js');
-  const originalX = x.access, originalLinkedin = linkedin.access;
-  const others = ['tiktok', 'instagram', 'facebook', 'youtube', 'reddit'].map(id => require('../../sites/' + id + '.js'));
+  const originalX = x.access,
+    originalLinkedin = linkedin.access;
+  const others = ['tiktok', 'instagram', 'facebook', 'youtube', 'reddit'].map(id =>
+    require('../../sites/' + id + '.js')
+  );
   const originalOthers = others.map(plugin => plugin.access);
   try {
     for (const plugin of others) delete plugin.access;
@@ -226,8 +344,18 @@ test('blocking rules are generated from registered site modules without shipping
     const output = await build('chrome', root);
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
     assert.deepEqual(rules, [
-      { id: 7, priority: 1, action: { type: 'redirect', redirect: { extensionPath: '/blocked.html?site=x' } }, condition: { requestDomains: ['example.test', 'alias.test'], resourceTypes: ['main_frame'] } },
-      { id: 8, priority: 1, action: { type: 'block' }, condition: { requestDomains: ['example.test', 'alias.test'], excludedResourceTypes: ['main_frame'] } }
+      {
+        id: 7,
+        priority: 1,
+        action: { type: 'redirect', redirect: { extensionPath: '/blocked.html?site=x' } },
+        condition: { requestDomains: ['example.test', 'alias.test'], resourceTypes: ['main_frame'] }
+      },
+      {
+        id: 8,
+        priority: 1,
+        action: { type: 'block' },
+        condition: { requestDomains: ['example.test', 'alias.test'], excludedResourceTypes: ['main_frame'] }
+      }
     ]);
     delete x.access;
     await build('chrome', root);
@@ -235,16 +363,21 @@ test('blocking rules are generated from registered site modules without shipping
   } finally {
     x.access = originalX;
     linkedin.access = originalLinkedin;
-    others.forEach((plugin, index) => { plugin.access = originalOthers[index]; });
+    others.forEach((plugin, index) => {
+      plugin.access = originalOthers[index];
+    });
   }
 });
 
 test('new gated and tracking-only modules need only site files and catalog registration', async t => {
   const root = await temporaryOutput(t);
-  const project = path.join(root, 'project'), extension = path.join(project, 'extension');
+  const project = path.join(root, 'project'),
+    extension = path.join(project, 'extension');
   await fs.cp(path.join(__dirname, '../..'), extension, { recursive: true });
   await fs.copyFile(path.join(__dirname, '../../../LICENSE'), path.join(project, 'LICENSE'));
-  await fs.writeFile(path.join(extension, 'sites/example.js'), `(function (root) {
+  await fs.writeFile(
+    path.join(extension, 'sites/example.js'),
+    `(function (root) {
     const domains = ['example.test', 'alias.test'];
     const access = {
       domains, home: 'https://example.test/write', redirectRuleId: 9, ruleIds: [201, 202],
@@ -259,17 +392,27 @@ test('new gated and tracking-only modules need only site files and catalog regis
     };
     if (typeof module === 'object' && module.exports) module.exports = plugin;
     else (root.SITE_MODULES ||= {}).example = plugin;
-  })(globalThis);`);
-  await fs.writeFile(path.join(extension, 'sites/reading.js'), `(function (root) {
+  })(globalThis);`
+  );
+  await fs.writeFile(
+    path.join(extension, 'sites/reading.js'),
+    `(function (root) {
     const plugin = { id: 'reading', name: 'Reading', hosts: ['reading.test'], actions: ['posts'],
       classifyPage() { return 'neutral'; }, create() { return { mode() { return 'neutral'; }, action() { return null; } }; }
     };
     if (typeof module === 'object' && module.exports) module.exports = plugin;
     else (root.SITE_MODULES ||= {}).reading = plugin;
-  })(globalThis);`);
+  })(globalThis);`
+  );
   const catalogPath = path.join(extension, 'sites/index.js');
   const catalog = await fs.readFile(catalogPath, 'utf8');
-  await fs.writeFile(catalogPath, catalog.replace(/const catalog = (\[[^\n]+\]);/, (_, entries) => "const catalog = " + entries.slice(0, -1) + ", { id: 'example' }, { id: 'reading' }];"));
+  await fs.writeFile(
+    catalogPath,
+    catalog.replace(
+      /const catalog = (\[[^;]+\]);/,
+      (_, entries) => 'const catalog = ' + entries.slice(0, -1) + ", { id: 'example' }, { id: 'reading' }];"
+    )
+  );
   const { build: fixtureBuild } = require(path.join(extension, 'build.js'));
   for (const browser of BROWSERS) {
     const output = await fixtureBuild(browser, path.join(root, 'output'));
@@ -291,21 +434,42 @@ test('new gated and tracking-only modules need only site files and catalog regis
     }
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
     assert.equal(rules.find(rule => rule.id === 9).action.redirect.extensionPath, '/blocked.html?site=example');
-    assert.deepEqual(rules.at(-1).condition.requestDomains, ['x.com', 'twitter.com', 'linkedin.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'youtube.com', 'reddit.com', 'example.test', 'alias.test']);
+    assert.deepEqual(rules.at(-1).condition.requestDomains, [
+      'x.com',
+      'twitter.com',
+      'linkedin.com',
+      'tiktok.com',
+      'instagram.com',
+      'facebook.com',
+      'youtube.com',
+      'reddit.com',
+      'example.test',
+      'alias.test'
+    ]);
     const context = vm.createContext({ URL });
-    for (const file of ['sites.js', 'core.js']) vm.runInContext(await fs.readFile(path.join(output, file), 'utf8'), context);
+    for (const file of ['sites.js', 'core.js'])
+      vm.runInContext(await fs.readFile(path.join(output, file), 'utf8'), context);
     assert.equal(context.Sites.forAccessURL('http://mobile.alias.test/').id, 'example');
     assert.equal(context.Sites.forAccessURL('https://reading.test/'), null);
     assert.equal(context.Core.siteForURL('https://reading.test/'), 'reading');
     assert.equal(context.Core.SITES.find(site => site.id === 'example').gated, true);
     assert.equal(context.Core.SITES.find(site => site.id === 'reading').gated, false);
-    assert.deepEqual(Array.from(context.Core.DEFAULT_SETTINGS.trackedSites), ['x', 'linkedin', 'tiktok', 'instagram', 'facebook', 'youtube', 'reddit']);
+    assert.deepEqual(Array.from(context.Core.DEFAULT_SETTINGS.trackedSites), [
+      'x',
+      'linkedin',
+      'tiktok',
+      'instagram',
+      'facebook',
+      'youtube',
+      'reddit'
+    ]);
   }
 });
 
 test('highest redirect ID leaves a valid browser ID for the shared blocking rule', async t => {
   const root = await temporaryOutput(t);
-  const x = require('../../sites/x.js'), original = x.access;
+  const x = require('../../sites/x.js'),
+    original = x.access;
   const maximumRuleId = 2 ** 31 - 1;
   try {
     x.access = { ...original, redirectRuleId: maximumRuleId - 1 };
@@ -313,7 +477,9 @@ test('highest redirect ID leaves a valid browser ID for the shared blocking rule
     const rules = JSON.parse(await fs.readFile(path.join(output, 'block-rules.json'), 'utf8'));
     assert.equal(rules[0].id, maximumRuleId - 1);
     assert.equal(rules.at(-1).id, maximumRuleId);
-  } finally { x.access = original; }
+  } finally {
+    x.access = original;
+  }
 });
 
 test('invalid blocking metadata fails before writing a browser bundle', async t => {
@@ -338,7 +504,9 @@ test('invalid blocking metadata fails before writing a browser bundle', async t 
       await assert.rejects(build('chrome', root), /Invalid blocking/);
       assert.deepEqual(await fs.readdir(root), []);
     }
-  } finally { x.access = original; }
+  } finally {
+    x.access = original;
+  }
 });
 
 test('unsupported plugin action fields fail before writing a browser bundle', async t => {
@@ -348,7 +516,9 @@ test('unsupported plugin action fields fail before writing a browser bundle', as
   try {
     await assert.rejects(build('chrome', root), /Unsupported action field/);
     assert.deepEqual(await fs.readdir(root), []);
-  } finally { actions.pop(); }
+  } finally {
+    actions.pop();
+  }
 });
 
 test('unknown browser targets fail without creating output', async t => {

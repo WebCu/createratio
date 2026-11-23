@@ -22,7 +22,10 @@ async function auditActions(workflows, loadManifest = fetchManifest) {
       problems.push(`${name}: pin ubuntu-latest to an explicit Ubuntu release`);
     }
     for (const match of source.matchAll(/^\s*(?:-\s*)?uses:\s*([^\r\n]+)/gm)) {
-      const reference = match[1].replace(/\s+#.*$/, '').trim().replace(/^['"]|['"]$/g, '');
+      const reference = match[1]
+        .replace(/\s+#.*$/, '')
+        .trim()
+        .replace(/^['"]|['"]$/g, '');
       if (reference.startsWith('./')) continue;
       if (!/^[\w.-]+\/[\w.-]+(?:\/[\w.-]+)*@[a-f\d]{40}$/i.test(reference)) {
         problems.push(`${name}: pin ${reference} to a full commit SHA`);
@@ -51,19 +54,24 @@ async function auditActions(workflows, loadManifest = fetchManifest) {
 
 if (require.main === module) {
   const directory = path.resolve(__dirname, '../.github/workflows');
-  const workflows = fs.readdirSync(directory).filter(name => /\.ya?ml$/.test(name)).sort()
+  const workflows = fs
+    .readdirSync(directory)
+    .filter(name => /\.ya?ml$/.test(name))
+    .sort()
     .map(name => ({ name, source: fs.readFileSync(path.join(directory, name), 'utf8') }));
-  auditActions(workflows).then(problems => {
-    if (problems.length) {
-      console.error(problems.join('\n'));
+  auditActions(workflows)
+    .then(problems => {
+      if (problems.length) {
+        console.error(problems.join('\n'));
+        process.exitCode = 1;
+      } else {
+        console.log(`Action runtime audit passed for ${workflows.length} workflows.`);
+      }
+    })
+    .catch(error => {
+      console.error(error.message);
       process.exitCode = 1;
-    } else {
-      console.log(`Action runtime audit passed for ${workflows.length} workflows.`);
-    }
-  }).catch(error => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
+    });
 }
 
 module.exports = { auditActions, fetchManifest };
