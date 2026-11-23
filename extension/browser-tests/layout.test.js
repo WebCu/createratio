@@ -550,7 +550,8 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         [{ createSec: 0 }, '0.00'],
         [{ createSec: 120 }, '120.00'],
         [{ createSec: 86400 }, '86400.00'],
-        [{ createSec: 86400, posts: 300 }, '122400.00']
+        [{ createSec: 86400, posts: 300 }, '122400.00'],
+        [{ createSec: 86400, posts: 7614 }, '1000080.00']
       ]) {
         await evaluate(
           browser,
@@ -565,7 +566,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
           );
           const box = await inspect(
             page,
-            '(() => { const range = document.createRange(); range.selectNodeContents(document.querySelector("#score")); const rect = element => { const { left, right, top, bottom } = element.getBoundingClientRect(); return { left, right, top, bottom }; }; return { score: rect(range), goal: rect(document.querySelector(".goal")), card: rect(document.querySelector("#score-card")), size: parseFloat(getComputedStyle(document.querySelector("#score")).fontSize) }; })()'
+            '(() => { const range = document.createRange(); range.selectNodeContents(document.querySelector("#score")); const rect = element => { const { left, right, top, bottom } = element.getBoundingClientRect(); return { left, right, top, bottom }; }; return { lines: range.getClientRects().length, score: rect(range), goal: rect(document.querySelector(".goal")), card: rect(document.querySelector("#score-card")), size: parseFloat(getComputedStyle(document.querySelector("#score")).fontSize) }; })()'
           );
           const detail = JSON.stringify({ text, width, ...box });
           const { score, goal, card } = box;
@@ -573,7 +574,8 @@ test('built extension keeps focused settings, narrow tasks and history readable'
             score.left < goal.right && goal.left < score.right && score.top < goal.bottom && goal.top < score.bottom;
           assert.equal(overlaps, false, detail);
           assert.ok(score.left >= card.left && score.right <= card.right, detail);
-          assert.ok(box.size >= 40, detail);
+          assert.equal(box.lines, 1, detail);
+          assert.ok(box.size >= 32, detail);
           await noOverflow(page);
           await browser.cdp.send('Target.closeTarget', { targetId: page.targetId });
         }

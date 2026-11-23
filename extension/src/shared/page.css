@@ -946,14 +946,18 @@
   padding: 28px;
   gap: 24px;
 }
+.dashboard-page .score-card > div {
+  container-type: inline-size;
+}
 .dashboard-page .caption {
   font-size: 12px;
   letter-spacing: 0;
   font-weight: 600;
 }
 .dashboard-page .score {
-  font-size: 64px;
-  overflow-wrap: anywhere;
+  /* Bold tabular digits are at most 0.7em wide; 2.5px undoes the negative letter-spacing. */
+  --score-fit: calc((100cqi / var(--score-length, 1) + 2.5px) / 0.7);
+  font-size: min(64px, var(--score-fit));
 }
 .dashboard-page .score-card p {
   font-size: 14px;
@@ -1198,7 +1202,7 @@
     gap: 16px;
   }
   .dashboard-page .score {
-    font-size: 52px;
+    font-size: min(52px, var(--score-fit));
   }
   .dashboard-page .goal {
     min-width: 80px;
@@ -1268,9 +1272,6 @@
 @container score-card (width < 360px) {
   .dashboard-page .score-card > div {
     grid-column: 1 / -1;
-  }
-  .dashboard-page .score {
-    font-size: min(52px, 20cqi);
   }
   .dashboard-page .goal {
     grid-column: 1 / -1;
