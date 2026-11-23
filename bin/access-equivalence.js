@@ -7,17 +7,14 @@ const assert = require('node:assert/strict');
 const now = new Date(2026, 0, 15, 12).getTime();
 const date = '2026-01-15';
 
-function engine(folder, initial = {}, url = '', restart = false) {
-  const data = structuredClone(initial),
-    alarms = {},
-    tabs = [{ id: 1, url }];
-  let rules = [];
+function engine(folder) {
+  const world = { data: {}, alarms: {}, tabs: [], rules: [], restart: false };
   const api = {
     runtime: { getURL: file => 'chrome-extension://fixture/' + file },
     storage: {
       session: {
         async get() {
-          return { _accessInitialized: !restart };
+          return { _accessInitialized: !world.restart };
         },
         async set() {}
       },
@@ -25,29 +22,29 @@ function engine(folder, initial = {}, url = '', restart = false) {
         async get(keys) {
           return Object.fromEntries(
             (Array.isArray(keys) ? keys : [keys])
-              .filter(key => Object.hasOwn(data, key))
-              .map(key => [key, structuredClone(data[key])])
+              .filter(key => Object.hasOwn(world.data, key))
+              .map(key => [key, structuredClone(world.data[key])])
           );
         },
         async set(changes) {
-          Object.assign(data, structuredClone(changes));
+          Object.assign(world.data, structuredClone(changes));
         }
       }
     },
     declarativeNetRequest: {
       async getSessionRules() {
-        return structuredClone(rules);
+        return structuredClone(world.rules);
       },
       async updateSessionRules({ removeRuleIds, addRules = [] }) {
-        rules = [...rules.filter(rule => !removeRuleIds.includes(rule.id)), ...structuredClone(addRules)];
+        world.rules = [...world.rules.filter(rule => !removeRuleIds.includes(rule.id)), ...structuredClone(addRules)];
       }
     },
     alarms: {
       async clear(name) {
-        delete alarms[name];
+        delete world.alarms[name];
       },
       async create(name, settings) {
-        alarms[name] = settings;
+        world.alarms[name] = settings;
       }
     },
     windows: {
@@ -57,11 +54,11 @@ function engine(folder, initial = {}, url = '', restart = false) {
     },
     tabs: {
       async query() {
-        return structuredClone(tabs);
+        return structuredClone(world.tabs);
       },
       async update(id, changes) {
         Object.assign(
-          tabs.find(tab => tab.id === id),
+          world.tabs.find(tab => tab.id === id),
           changes
         );
       }
@@ -90,8 +87,11 @@ function engine(folder, initial = {}, url = '', restart = false) {
   return {
     catalog: JSON.parse(JSON.stringify(catalog)),
     siteForURL: raw => access.siteForURL(raw),
-    async snapshot() {
-      return JSON.parse(JSON.stringify({ status: await access.reconcile(), rules, data, alarms, tabs }));
+    async snapshot(initial, url, restart) {
+      Object.assign(world, { data: structuredClone(initial), alarms: {}, tabs: [{ id: 1, url }], rules: [], restart });
+      const status = await access.reconcile();
+      const { rules, data, alarms, tabs } = world;
+      return JSON.parse(JSON.stringify({ status, rules, data, alarms, tabs }));
     },
     parsedSnapshot(snapshot) {
       if (!model || !snapshot.data._access) return snapshot;
@@ -182,7 +182,9 @@ async function compare(baseline, candidate) {
     const read = folder => JSON.parse(fs.readFileSync(path.join(folder, file), 'utf8'));
     assert.deepEqual(read(candidate), read(baseline), file);
   }
-  const { urls, states, restarts } = matrix(engine(candidate).catalog);
+  const original = engine(baseline),
+    updated = engine(candidate);
+  const { urls, states, restarts } = matrix(updated.catalog);
   let count = 0;
   const runs = Object.entries(states).flatMap(([state, initial]) => [
     [state, initial, false],
@@ -190,12 +192,10 @@ async function compare(baseline, candidate) {
   ]);
   for (const [label, initial, restart] of runs) {
     for (const url of urls) {
-      const original = engine(baseline, initial, url, restart),
-        updated = engine(candidate, initial, url, restart);
       assert.equal(updated.siteForURL(url), original.siteForURL(url), `${label}: ${url}: lookup`);
       assert.deepEqual(
-        updated.parsedSnapshot(await updated.snapshot()),
-        updated.parsedSnapshot(await original.snapshot()),
+        updated.parsedSnapshot(await updated.snapshot(initial, url, restart)),
+        updated.parsedSnapshot(await original.snapshot(initial, url, restart)),
         `${label}: ${url}: lifecycle`
       );
       count++;
