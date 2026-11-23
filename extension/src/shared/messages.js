@@ -133,7 +133,10 @@
         }
         if (!object(reply) || (reply.ok !== true && reply.ok !== false)) throw new Error(fallbackMessage);
         if (reply.ok === false)
-          throw new Error(typeof reply.error === 'string' && reply.error ? reply.error : fallbackMessage);
+          throw Object.assign(
+            new Error(typeof reply.error === 'string' && reply.error ? reply.error : fallbackMessage),
+            reply.retryable === false ? { retryable: false } : {}
+          );
         if (
           ['snapshot', 'ingest', 'tracking', 'clear-history', 'scroll-friction-setting'].includes(message.type) &&
           !snapshot(reply)

@@ -123,6 +123,16 @@ function blocker(data = {}, browser = 'chrome', core = C) {
 const tracking = (site = 'x', enabled = false) => ({ type: 'tracking', site, enabled });
 const writes = w => w.calls.filter(call => call.type === 'local.set').map(call => call.value);
 
+test('gate navigation is attempted even when the pre-navigation drain throws', async () => {
+  const w = blocker({ _access: { x: { remainingMs: 0 } } });
+  w.tabs.push({ id: 1, url: 'https://x.com/home' });
+  w.setBeforeNavigate(async () => {
+    throw new Error('Drain unavailable');
+  });
+  await assert.doesNotReject(w.reconcile());
+  assert.equal(w.tabs[0].url, 'chrome-extension://test-extension/blocked.html?site=x');
+});
+
 for (const browser of ['chrome', 'browser']) {
   test(`${browser}: tracking owns selection and gate changes without producing a background snapshot`, async () => {
     const settings = {

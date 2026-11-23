@@ -737,16 +737,6 @@ footer div {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .arrival-stage {
-    height: min(70vh, 640px);
-  }
-  .attention-orbit,
-  .distractions {
-    display: none;
-  }
-}
-
 @media (max-width: 1000px) {
   .page {
     padding: 0 32px;
@@ -926,12 +916,6 @@ footer div {
 }
 
 @media (max-height: 450px) {
-  .distractions {
-    display: none;
-  }
-  .arrival-stage {
-    min-height: 0;
-  }
   .arrival-thought {
     font-size: clamp(40px, 9vh, 64px);
   }
@@ -939,16 +923,38 @@ footer div {
     margin-top: 20px;
     font-size: 18px;
   }
-  .arrival-header {
-    top: 12px;
-    flex-direction: row;
-    align-items: center;
+}
+
+@media (max-height: 38rem), (max-width: 20rem), (prefers-reduced-motion: reduce) {
+  .arrival {
+    --arrival-layout: compact;
   }
-  .arrival-header p {
-    max-width: 32ch;
-    font-size: 12px;
+  .arrival-stage {
+    height: auto;
+    min-height: min(70vh, 640px);
+    padding: 20px clamp(16px, 5vw, 32px);
+    grid-template-rows: auto 1fr auto;
+    gap: 20px;
+    overflow-wrap: anywhere;
+  }
+  .arrival-header {
+    position: static;
+    width: 100%;
+    align-self: start;
+    flex-wrap: wrap;
+  }
+  .arrival-center {
+    padding: 0;
   }
   .scroll-hint {
-    bottom: 12px;
+    position: static;
+    align-self: end;
+    transform: none;
+    animation: none;
+    white-space: normal;
+  }
+  .attention-orbit,
+  .distractions {
+    display: none;
   }
 }
