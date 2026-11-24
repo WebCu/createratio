@@ -955,7 +955,6 @@
   font-weight: 600;
 }
 .dashboard-page .score {
-  /* Bold tabular digits are at most 0.7em wide; 2.5px undoes the negative letter-spacing. */
   --score-fit: calc((100cqi / var(--score-length, 1) + 2.5px) / 0.7);
   font-size: min(64px, var(--score-fit));
 }
