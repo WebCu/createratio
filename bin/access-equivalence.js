@@ -7,17 +7,14 @@ const assert = require('node:assert/strict');
 const now = new Date(2026, 0, 15, 12).getTime();
 const date = '2026-01-15';
 
-function engine(folder, initial = {}, url = '') {
-  const data = structuredClone(initial),
-    alarms = {},
-    tabs = [{ id: 1, url }];
-  let rules = [];
+function engine(folder) {
+  const world = { data: {}, alarms: {}, tabs: [], rules: [], restart: false };
   const api = {
     runtime: { getURL: file => 'chrome-extension://fixture/' + file },
     storage: {
       session: {
         async get() {
-          return { _accessInitialized: true };
+          return { _accessInitialized: !world.restart };
         },
         async set() {}
       },
@@ -25,29 +22,29 @@ function engine(folder, initial = {}, url = '') {
         async get(keys) {
           return Object.fromEntries(
             (Array.isArray(keys) ? keys : [keys])
-              .filter(key => Object.hasOwn(data, key))
-              .map(key => [key, structuredClone(data[key])])
+              .filter(key => Object.hasOwn(world.data, key))
+              .map(key => [key, structuredClone(world.data[key])])
           );
         },
         async set(changes) {
-          Object.assign(data, structuredClone(changes));
+          Object.assign(world.data, structuredClone(changes));
         }
       }
     },
     declarativeNetRequest: {
       async getSessionRules() {
-        return structuredClone(rules);
+        return structuredClone(world.rules);
       },
       async updateSessionRules({ removeRuleIds, addRules = [] }) {
-        rules = [...rules.filter(rule => !removeRuleIds.includes(rule.id)), ...structuredClone(addRules)];
+        world.rules = [...world.rules.filter(rule => !removeRuleIds.includes(rule.id)), ...structuredClone(addRules)];
       }
     },
     alarms: {
       async clear(name) {
-        delete alarms[name];
+        delete world.alarms[name];
       },
       async create(name, settings) {
-        alarms[name] = settings;
+        world.alarms[name] = settings;
       }
     },
     windows: {
@@ -57,11 +54,11 @@ function engine(folder, initial = {}, url = '') {
     },
     tabs: {
       async query() {
-        return structuredClone(tabs);
+        return structuredClone(world.tabs);
       },
       async update(id, changes) {
         Object.assign(
-          tabs.find(tab => tab.id === id),
+          world.tabs.find(tab => tab.id === id),
           changes
         );
       }
@@ -78,6 +75,7 @@ function engine(folder, initial = {}, url = '') {
   const context = vm.createContext({ URL, Date: Clock, chrome: api });
   const scripts = ['sites.js', 'core.js'];
   if (fs.existsSync(path.join(folder, 'message-contracts.js'))) scripts.push('message-contracts.js');
+  if (fs.existsSync(path.join(folder, 'site-access.js'))) scripts.push('site-access.js');
   scripts.push('blocker.js');
   for (const file of scripts) vm.runInContext(fs.readFileSync(path.join(folder, file), 'utf8'), context);
   const access = vm.runInContext('SiteAccess', context);
@@ -85,11 +83,29 @@ function engine(folder, initial = {}, url = '') {
     'Sites.sites.filter(site => site.gated).map(site => ({ ...site, access: Sites.get(site.id).access }))',
     context
   );
+  const model = fs.existsSync(path.join(folder, 'site-access.js')) ? vm.runInContext('SiteAccessModel', context) : null;
   return {
     catalog: JSON.parse(JSON.stringify(catalog)),
     siteForURL: raw => access.siteForURL(raw),
-    async snapshot() {
-      return JSON.parse(JSON.stringify({ status: await access.reconcile(), rules, data, alarms, tabs }));
+    async snapshot(initial, url, restart) {
+      Object.assign(world, { data: structuredClone(initial), alarms: {}, tabs: [{ id: 1, url }], rules: [], restart });
+      const status = await access.reconcile();
+      const { rules, data, alarms, tabs } = world;
+      return JSON.parse(JSON.stringify({ status, rules, data, alarms, tabs }));
+    },
+    normalizedBaseline(snapshot) {
+      if (!model || !snapshot.data._access) return snapshot;
+      const normalized = Object.fromEntries(
+        Object.entries(snapshot.data._access).flatMap(([site, raw]) => {
+          const state = model.siteAccessFromStored(raw, now);
+          if (state === null) return [];
+          if (state.phase !== 'request') return [[site, raw]];
+          const { expiresAt, remainingMs, ...entry } = raw;
+          if (state.waitMs === null) delete entry.waitMs;
+          return [[site, entry]];
+        })
+      );
+      return { ...snapshot, data: { ...snapshot.data, _access: normalized } };
     }
   };
 }
@@ -117,6 +133,10 @@ function matrix(catalog) {
     )
   ];
   const enabled = { trackedSites: catalog.map(site => site.id) };
+  const aboveGoal = {
+    settings: { ...enabled, allowAboveGoal: true },
+    [date]: { [first.id]: { createSec: 121, consumeSec: 120 } }
+  };
   const states = {
     defaults: {},
     blocked: { settings: enabled },
@@ -125,10 +145,7 @@ function matrix(catalog) {
     paused: { settings: enabled, _access: entries({ remainingMs: 300000, date, expiresAt: 0 }) },
     running: { settings: enabled, _access: entries({ remainingMs: 300000, date, expiresAt: now + 299000 }) },
     expired: { settings: enabled, _access: entries({ remainingMs: 1000, date, expiresAt: now - 1 }) },
-    aboveGoal: {
-      settings: { ...enabled, allowAboveGoal: true },
-      [date]: { [first.id]: { createSec: 121, consumeSec: 120 } }
-    },
+    aboveGoal,
     atGoal: {
       settings: { ...enabled, allowAboveGoal: true },
       [date]: { [first.id]: { createSec: 120, consumeSec: 120 } }
@@ -137,9 +154,31 @@ function matrix(catalog) {
     midnight: {
       settings: { ...enabled, accessMinutes: 12, siteOverrides: { [first.id]: { accessMinutes: 2 } } },
       _access: entries({ remainingMs: 60000, date: '2026-01-14', expiresAt: 0 })
-    }
+    },
+    exhausted: { settings: enabled, _access: entries({ refilledAt: now - 3600000, date }) },
+    exhaustedYesterday: {
+      settings: enabled,
+      _access: entries({ refilledAt: now - 86400000, date: '2026-01-14' })
+    },
+    legacyDeadline: { settings: enabled, _access: entries({ expiresAt: now + 60000 }) },
+    runningAtMidnight: {
+      settings: enabled,
+      _access: entries({
+        remainingMs: 60000,
+        date: '2026-01-14',
+        expiresAt: new Date(2026, 0, 15, 0, 0, 30).getTime()
+      })
+    },
+    aboveGoalSession: {
+      ...aboveGoal,
+      _access: entries({ remainingMs: 300000, date, expiresAt: 0, refilledAt: now - 60000 })
+    },
+    exhaustedAboveGoal: { ...aboveGoal, _access: entries({ refilledAt: now - 3600000, date }) },
+    waitAboveGoal: { ...aboveGoal, _access: entries({ readyAt: now + 30000, waitMs: 300000 }) },
+    staleWait: { settings: enabled, _access: entries({ readyAt: now + 3600000, waitMs: 60000 }) }
   };
-  return { urls, states };
+  const restarts = ['running', 'midnight', 'runningAtMidnight'];
+  return { urls, states, restarts };
 }
 
 async function compare(baseline, candidate) {
@@ -147,14 +186,22 @@ async function compare(baseline, candidate) {
     const read = folder => JSON.parse(fs.readFileSync(path.join(folder, file), 'utf8'));
     assert.deepEqual(read(candidate), read(baseline), file);
   }
-  const { urls, states } = matrix(engine(candidate).catalog);
+  const original = engine(baseline),
+    updated = engine(candidate);
+  const { urls, states, restarts } = matrix(updated.catalog);
   let count = 0;
-  for (const [state, initial] of Object.entries(states)) {
+  const runs = Object.entries(states).flatMap(([state, initial]) => [
+    [state, initial, false],
+    ...(restarts.includes(state) ? [[`${state} (restart)`, initial, true]] : [])
+  ]);
+  for (const [label, initial, restart] of runs) {
     for (const url of urls) {
-      const original = engine(baseline, initial, url),
-        updated = engine(candidate, initial, url);
-      assert.equal(updated.siteForURL(url), original.siteForURL(url), `${state}: ${url}: lookup`);
-      assert.deepEqual(await updated.snapshot(), await original.snapshot(), `${state}: ${url}: lifecycle`);
+      assert.equal(updated.siteForURL(url), original.siteForURL(url), `${label}: ${url}: lookup`);
+      assert.deepEqual(
+        await updated.snapshot(initial, url, restart),
+        updated.normalizedBaseline(await original.snapshot(initial, url, restart)),
+        `${label}: ${url}: lifecycle`
+      );
       count++;
     }
   }
@@ -162,6 +209,7 @@ async function compare(baseline, candidate) {
     cases: count,
     urls: urls.length,
     states: Object.keys(states).length,
+    restarts: restarts.length,
     verification: 'mocked browser-world VM, not live-browser QA'
   };
 }
