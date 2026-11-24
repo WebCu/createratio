@@ -29,6 +29,13 @@ A website with recorded activity, whether its integration is currently available
 **Clear history**:
 The user's choice to delete recorded creation tracking and website time. Saved intentions, preferences, and access sessions remain separate.
 
+**Site access**:
+A gated website's current standing for the user: no access, an access request, or an access session. A site has at most one access request or access session at a time.
+_Avoid_: Gate
+
+**Access request**:
+A user's stated intention to visit a gated website, followed by a waiting period. Confirming it after the wait starts an access session; cancelling it ends the request without granting access.
+
 **Access session**:
 A temporary period of permission to visit a gated website after expressing an intention, waiting, and explicitly confirming access. Its shared active-time budget pauses away from the site and refills daily unless ended or disabled.
 
