@@ -18,12 +18,14 @@ approval; prefer built-in browser and Node.js capabilities.
 
 - Use stable Node.js 24.x and pnpm 12.x. The `engines` ranges in `package.json`
   and workspace `engineStrict` setting reject other majors during installation,
-  while accepting minor and patch updates. `.node-version` selects Node.js 24
-  for compatible version managers. Stay on Node.js 24 until a newer major reaches
-  LTS and a maintainer explicitly approves the upgrade. GitHub Actions' internal
-  runtimes are separate from the project's Node.js version.
+  while accepting minor and patch updates. `.node-version` selects the exact
+  Node.js version that the workflows pin, so compatible version managers match
+  CI. A test fails when the two differ, so change them together. Stay on Node.js
+  24 until a newer major reaches LTS and a maintainer explicitly approves the
+  upgrade. GitHub Actions' internal runtimes are separate from the project's
+  Node.js version.
 - CI and website deployment pin matching versions within those majors in
-  workflow files. Contributors do not need to match the exact minor or patch.
+  workflow files.
 - Install pnpm using the [official instructions](https://pnpm.io/installation).
   Select a stable pnpm 12 release from npm's `latest-12` tag, never `next`,
   beta, or release-candidate channels. A version without a prerelease suffix

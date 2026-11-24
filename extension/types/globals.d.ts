@@ -45,6 +45,7 @@ declare global {
   var PageQueries: typeof import('../src/content/dom.js');
   var RuntimeMessages: typeof import('../src/shared/messages.js');
   var MessageContracts: typeof import('../src/background/message-contracts.js');
+  var SiteAccessModel: typeof import('../src/background/site-access.js');
   var ActivityHistory: typeof import('../src/background/history.js');
   var WebTime: typeof import('../src/background/web-time.js');
   var ExtensionUpdates: typeof import('../src/background/updates.js');

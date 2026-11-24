@@ -652,11 +652,11 @@ pnpm verify:access /tmp/baseline/chrome dist/chrome
 ```
 
 The comparison checks exact manifests and static rules, plus metadata-derived
-URL variants across eleven access states, including untouched defaults. It compares
+URL variants across nineteen access states, including untouched defaults; three of them run again after a simulated browser restart. It compares
 lookup, status, session rules, storage, alarms, and redirects in a fixed-clock
 browser-world VM. Its own tests
 prove that lifecycle and static-rule changes fail. Intentional manifest or policy
-changes require separate review, not a skipped comparison. This is not browser QA.
+changes require separate review, not a skipped comparison. Stored access entries are compared exactly, after the baseline is normalized by the accepted stored-shape differences: when the candidate ships `site-access.js`, its parser drops empty entries, drops `expiresAt` and `remainingMs` from entries it reads as requests, and drops a `waitMs` that is not a valid wait duration. Everything else is compared exactly. This is not browser QA.
 
 ## Disposable Chromium smoke
 
