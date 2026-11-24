@@ -51,6 +51,7 @@ flowchart LR
   Queue --> Website["Website time sampling<br/>src/background/web-time.js"]
   Dispatch --> Contracts["Command and sender contracts<br/>src/background/message-contracts.js"]
   Access --> Contracts
+  Access --> Model["Site access decisions<br/>src/background/site-access.js"]
   Dispatch --> Access
   Dispatch --> Website
   Dispatch --> History["History recording and retention<br/>src/background/history.js"]
@@ -59,7 +60,7 @@ flowchart LR
   Access --> Effects["Storage, request rules, alarms, tabs"]
 ```
 
-The access module owns Limit & track changes and recovery. The history module
+The access module owns Limit & track changes and recovery; its reconcile and access-request decisions are pure functions in `site-access.js`, and `blocker.js` applies them. The history module
 owns date buckets, accumulation, receipt rollover, retention, and clearing;
 creation tracking and website time remain distinct measurements.
 

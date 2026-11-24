@@ -281,6 +281,7 @@ test('browser manifests differ only in Firefox platform settings and background 
       'core.js',
       'messages.js',
       'message-contracts.js',
+      'site-access.js',
       'blocker.js',
       'history.js',
       'web-time.js',
