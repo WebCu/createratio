@@ -942,8 +942,12 @@
   letter-spacing: 0;
 }
 .dashboard-page .score-card {
+  container: score-card / inline-size;
   padding: 28px;
   gap: 24px;
+}
+.dashboard-page .score-card > div:first-child {
+  container-type: inline-size;
 }
 .dashboard-page .caption {
   font-size: 12px;
@@ -951,7 +955,8 @@
   font-weight: 600;
 }
 .dashboard-page .score {
-  font-size: 64px;
+  --score-fit: calc((100cqi / var(--score-length, 1) + 2.5px) / 0.7);
+  font-size: min(64px, var(--score-fit));
 }
 .dashboard-page .score-card p {
   font-size: 14px;
@@ -1196,7 +1201,7 @@
     gap: 16px;
   }
   .dashboard-page .score {
-    font-size: 52px;
+    font-size: min(52px, var(--score-fit));
   }
   .dashboard-page .goal {
     min-width: 80px;
@@ -1260,6 +1265,26 @@
   .dashboard-page footer {
     flex-wrap: wrap;
     gap: 12px;
+  }
+}
+
+@container score-card (width < 360px) {
+  .dashboard-page .score-card > div {
+    grid-column: 1 / -1;
+  }
+  .dashboard-page .goal {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    padding: 16px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--card-line);
+    text-align: left;
+  }
+  .dashboard-page .score-card p {
+    margin-top: 0;
   }
 }
 

@@ -145,6 +145,7 @@ function renderRatio(days) {
   /** @type {HTMLTimeElement} */
   (document.getElementById('date')).dateTime = today;
   $('score').textContent = score.toFixed(2);
+  $('score').style.setProperty('--score-length', String(score.toFixed(2).length));
   $('score').style.color = hasActivity ? Core.scoreColor(score) : '';
   $('score-card').setAttribute('data-score', hasActivity ? Core.scoreBand(score) : 'none');
   $('score-status').textContent = !hasActivity
