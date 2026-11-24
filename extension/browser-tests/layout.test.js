@@ -545,6 +545,43 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       assert.deepEqual(table.last.slice(1), ['48.00', '32.00']);
       await noOverflow(page);
     });
+    await journey('dashboard score never paints into the daily target at any width', async () => {
+      for (const [stats, text] of [
+        [{ createSec: 0 }, '0.00'],
+        [{ createSec: 120 }, '120.00'],
+        [{ createSec: 86400 }, '86400.00'],
+        [{ createSec: 86400, posts: 300 }, '122400.00'],
+        [{ createSec: 86400, posts: 7614 }, '1000080.00']
+      ]) {
+        await evaluate(
+          browser,
+          browser.worker,
+          `chrome.storage.local.set({ [Core.localDate()]: { x: ${JSON.stringify(stats)} } })`
+        );
+        for (const width of [320, 360, 400, 480, 600, 601, 1280]) {
+          const page = await pageAt('/dashboard.html', width);
+          await eventually(
+            () => inspect(page, `document.querySelector("#score").textContent === "${text}"`),
+            `${text} score rendered`
+          );
+          const box = await inspect(
+            page,
+            '(() => { const range = document.createRange(); range.selectNodeContents(document.querySelector("#score")); const rect = element => { const { left, right, top, bottom } = element.getBoundingClientRect(); return { left, right, top, bottom }; }; const label = document.createRange(); label.selectNodeContents(document.querySelector(".goal small")); return { lines: range.getClientRects().length, labelLines: label.getClientRects().length, score: rect(range), goal: rect(document.querySelector(".goal")), card: rect(document.querySelector("#score-card")), size: parseFloat(getComputedStyle(document.querySelector("#score")).fontSize) }; })()'
+          );
+          const detail = JSON.stringify({ text, width, ...box });
+          const { score, goal, card } = box;
+          const overlaps =
+            score.left < goal.right && goal.left < score.right && score.top < goal.bottom && goal.top < score.bottom;
+          assert.equal(overlaps, false, detail);
+          assert.ok(score.left >= card.left && score.right <= card.right, detail);
+          assert.equal(box.lines, 1, detail);
+          assert.equal(box.labelLines, 1, detail);
+          assert.ok(box.size >= 32, detail);
+          await noOverflow(page);
+          await browser.cdp.send('Target.closeTarget', { targetId: page.targetId });
+        }
+      }
+    });
     assert.deepEqual(browser.errors, []);
   } finally {
     await browser.cleanup();
