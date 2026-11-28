@@ -8,6 +8,10 @@ declare global {
   type VettedSiteId = SiteId & { readonly __vetted: true };
   type WebsiteDomain = string & { readonly __brand: 'WebsiteDomain' };
   type Intention = string & { readonly __brand: 'Intention' };
+  type CreationStatsField = (typeof Core.FIELDS)[number];
+  type CreationStats = Record<CreationStatsField, number> & { readonly __brand: 'CreationStats' };
+  type CreationScore = number & { readonly __brand: 'CreationScore' };
+  type DailyTarget = number & { readonly __brand: 'DailyTarget' };
   type EpochTime = number & { readonly __brand: 'EpochTime' };
   type PageTime = number & { readonly __brand: 'PageTime' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {

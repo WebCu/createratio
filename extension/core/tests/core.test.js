@@ -137,6 +137,13 @@ test('score aggregates both sites before dividing and uses exact badge threshold
   assert.equal(C.scoreBand(1), 'high');
   assert.equal(C.badgeText(100), '99+');
 });
+test('above-goal access needs a score strictly above the daily target', () => {
+  const target = C.dailyTarget({ dailyTarget: 1.5 });
+  const scoreOf = createSec => C.score(C.statsSnapshot({ consumeSec: 100, createSec }));
+  assert.equal(C.aboveDailyTarget(scoreOf(149), target), false);
+  assert.equal(C.aboveDailyTarget(scoreOf(150), target), false);
+  assert.equal(C.aboveDailyTarget(scoreOf(151), target), true);
+});
 test('daily target resolves the current setting with safe defaults for legacy or invalid preferences', () => {
   assert.equal(C.dailyTarget(), 1);
   assert.equal(C.dailyTarget({}), 1);

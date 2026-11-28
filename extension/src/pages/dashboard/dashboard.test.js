@@ -182,6 +182,17 @@ test('dashboard preserves scores, actions, history and removed-integration total
   assert.equal(p.nodes.quotes.textContent, '1');
   assert.ok(p.nodes.sites.children.some(row => row.children[0].textContent === 'retired (unavailable)'));
 });
+test('dashboard site rows count invalid stored numbers as zero, like the totals', async () => {
+  const p = dashboard();
+  await p.ready();
+  p.setDay({ retired: { consumeSec: 120, createSec: '600' } });
+  p.change();
+  await p.ready();
+  const row = p.nodes.sites.children.find(row => row.children[0].textContent === 'retired (unavailable)');
+  assert.equal(p.nodes['create-min'].textContent, '0.0m');
+  assert.equal(row.children[1].textContent, '0.0m');
+  assert.equal(row.children[2].textContent, '2.0m');
+});
 test('dashboard charts use the same semantic colors as the time legend', async () => {
   const p = dashboard();
   await p.ready();

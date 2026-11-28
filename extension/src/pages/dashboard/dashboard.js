@@ -164,7 +164,7 @@ function renderRatio(days) {
   const names = new Map(Core.SITES.map(site => [site.id, site.name]));
   for (const site of new Set([...names.keys(), ...Core.recordedSites(day)])) {
     const name = names.get(site) || site + ' (unavailable)';
-    const s = { ...Core.emptyStats(), ...day[site] },
+    const s = Core.statsSnapshot(day[site]),
       row = document.createElement('tr');
     for (const value of [name, minutes(s.createSec), minutes(s.consumeSec), Core.score(s).toFixed(2)]) {
       const cell = document.createElement('td');
