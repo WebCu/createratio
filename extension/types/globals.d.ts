@@ -3,6 +3,8 @@ declare global {
   type Milliseconds = number & { readonly __brand: 'Milliseconds' };
   type Seconds = number & { readonly __brand: 'Seconds' };
   type Minutes = number & { readonly __brand: 'Minutes' };
+  type EpochTime = number & { readonly __brand: 'EpochTime' };
+  type PageTime = number & { readonly __brand: 'PageTime' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {
     siteOverrides?: Record<string, Record<string, unknown>>;
   };
@@ -14,9 +16,9 @@ declare global {
     name: string;
     home: string;
     remainingMs: Milliseconds;
-    expiresAt: number;
-    readyAt: number;
-    refilledAt: number;
+    expiresAt: EpochTime;
+    readyAt: EpochTime;
+    refilledAt: EpochTime;
     waitSeconds: Seconds;
     sessionMinutes: Minutes;
   };

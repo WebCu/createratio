@@ -101,7 +101,7 @@ const SiteAccess = (() => {
   function status(
     site,
     state = null,
-    now = Date.now(),
+    now = Core.asEpochTime(Date.now()),
     minutes = Core.DEFAULT_SETTINGS.accessMinutes,
     enabled = true,
     goalAllowed = false,
@@ -111,8 +111,8 @@ const SiteAccess = (() => {
     const session = state?.phase === 'session' ? state : null,
       request = state?.phase === 'request' ? state : null;
     const remainingMs = Core.asMilliseconds(session?.remainingMs ?? 0);
-    const expiresAt = remainingMs && session.expiresAt > now ? session.expiresAt : 0;
-    const readyAt = request ? request.readyAt : 0;
+    const expiresAt = remainingMs && session.expiresAt > now ? session.expiresAt : Core.UNSET_EPOCH_TIME;
+    const readyAt = request ? request.readyAt : Core.UNSET_EPOCH_TIME;
     const waitSeconds = request
       ? Core.secondsFromMilliseconds(SiteAccessModel.waitDuration(request))
       : Core.secondsFromMinutes(waitMinutes);
@@ -125,7 +125,7 @@ const SiteAccess = (() => {
       remainingMs,
       expiresAt,
       readyAt,
-      refilledAt: session?.refilledAt || 0,
+      refilledAt: session?.refilledAt || Core.UNSET_EPOCH_TIME,
       waitSeconds,
       sessionMinutes: minutes
     };
@@ -154,7 +154,7 @@ const SiteAccess = (() => {
   }
   async function reconcile(closeAll = false) {
     const restart = !(await api.storage.session.get('_accessInitialized'))._accessInitialized;
-    const now = Date.now(),
+    const now = Core.asEpochTime(Date.now()),
       clock = new Date(now),
       date = Core.localDate(clock);
     const stored = /** @type {StoredData} */ (
@@ -167,8 +167,8 @@ const SiteAccess = (() => {
       Core.score(Core.aggregate(stored[date])) > Core.dailyTarget(stored.settings);
     const current = await api.declarativeNetRequest.getSessionRules();
     const access = accessState(stored._access);
-    const dayStart = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate()).getTime();
-    const midnight = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate() + 1).getTime();
+    const dayStart = Core.asEpochTime(new Date(clock.getFullYear(), clock.getMonth(), clock.getDate()).getTime());
+    const midnight = Core.asEpochTime(new Date(clock.getFullYear(), clock.getMonth(), clock.getDate() + 1).getTime());
     const window = await api.windows.getLastFocused();
     const [tab] =
       window.focused && (window.type === 'normal' || window.type === 'popup')

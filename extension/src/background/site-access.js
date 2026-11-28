@@ -4,12 +4,13 @@
   else root.SiteAccessModel = api;
 })(globalThis, function (Core) {
   'use strict';
-  /** @typedef {{ phase: 'request', readyAt: number, waitMs: Milliseconds | null }} AccessRequest */
-  /** @typedef {{ phase: 'session', remainingMs: Milliseconds | null, expiresAt: number | null, refilledAt: number | null, date: LocalDate | null, goalActive: boolean }} AccessSession */
+  /** @typedef {{ phase: 'request', readyAt: EpochTime, waitMs: Milliseconds | null }} AccessRequest */
+  /** @typedef {{ phase: 'session', remainingMs: Milliseconds | null, expiresAt: EpochTime | null, refilledAt: EpochTime | null, date: LocalDate | null, goalActive: boolean }} AccessSession */
   /** @typedef {AccessRequest | AccessSession | null} SiteAccessState */
-  /** @typedef {{ now: number, date: LocalDate, dayStart: number, midnight: number, restart: boolean, enabled: boolean, goalAllowed: boolean, focused: boolean, accessMinutes: Minutes, hasRules: boolean, hasWindows: boolean, closeAll: boolean }} AccessFacts */
-  /** @typedef {{ state: SiteAccessState, rules: 'unrestricted' | 'session' | 'none', alarmAt: number, expire: boolean, window: { start: number, end: number } | null, clearWindows: boolean }} AccessDecision */
+  /** @typedef {{ now: EpochTime, date: LocalDate, dayStart: EpochTime, midnight: EpochTime, restart: boolean, enabled: boolean, goalAllowed: boolean, focused: boolean, accessMinutes: Minutes, hasRules: boolean, hasWindows: boolean, closeAll: boolean }} AccessFacts */
+  /** @typedef {{ state: SiteAccessState, rules: 'unrestricted' | 'session' | 'none', alarmAt: EpochTime, expire: boolean, window: { start: EpochTime, end: EpochTime } | null, clearWindows: boolean }} AccessDecision */
   const MAXIMUM_BUDGET = Core.millisecondsFromMinutes(Core.ACCESS_LIMITS.maxMinutes);
+  const OPEN_WINDOW_END = Core.asEpochTime(Number.MAX_SAFE_INTEGER);
   const SESSION_FIELDS = ['remainingMs', 'expiresAt', 'refilledAt'];
   /**
    * @param {unknown} value
@@ -36,12 +37,13 @@
   function validWait(raw, now) {
     return Number.isFinite(raw.readyAt) && raw.readyAt > 0 && raw.readyAt <= now + waitDurationFromStored(raw.waitMs);
   }
-  function numberOrNull(value) {
-    return Number.isFinite(value) ? value : null;
+  /** @returns {EpochTime | null} */
+  function epochTimeOrNull(value) {
+    return Number.isFinite(value) ? Core.asEpochTime(value) : null;
   }
   /**
    * @param {unknown} raw
-   * @param {number} now
+   * @param {EpochTime} now
    * @returns {SiteAccessState}
    */
   function siteAccessFromStored(raw, now) {
@@ -56,8 +58,8 @@
       /** @type {AccessSession} */ ({
         phase: 'session',
         remainingMs: remaining === null ? null : Core.asMilliseconds(remaining),
-        expiresAt: numberOrNull(raw.expiresAt),
-        refilledAt: numberOrNull(raw.refilledAt),
+        expiresAt: epochTimeOrNull(raw.expiresAt),
+        refilledAt: epochTimeOrNull(raw.refilledAt),
         date: hasDate ? raw.date : null,
         goalActive: raw.goalActive === true
       });
@@ -65,7 +67,7 @@
     if (validWait(raw, now))
       return {
         phase: 'request',
-        readyAt: raw.readyAt,
+        readyAt: Core.asEpochTime(raw.readyAt),
         waitMs: validWaitDuration(raw.waitMs) ? Core.asMilliseconds(raw.waitMs) : null
       };
     return Number.isFinite(raw.remainingMs) || Number.isFinite(raw.expiresAt) ? session() : null;
@@ -106,12 +108,12 @@
   /**
    * @param {SiteAccessState} state
    * @param {Milliseconds} waitMilliseconds
-   * @param {number} now
+   * @param {EpochTime} now
    * @returns {SiteAccessState}
    */
   function requestAccess(state, waitMilliseconds, now) {
     if (state?.phase === 'request' || (state?.phase === 'session' && state.remainingMs)) return state;
-    return { phase: 'request', readyAt: now + waitMilliseconds, waitMs: waitMilliseconds };
+    return { phase: 'request', readyAt: Core.timeAfter(now, waitMilliseconds), waitMs: waitMilliseconds };
   }
   /**
    * @param {SiteAccessState} state
@@ -123,7 +125,7 @@
   /**
    * @param {SiteAccessState} state
    * @param {Minutes} sessionMinutes
-   * @param {number} now
+   * @param {EpochTime} now
    * @returns {{ ready: true, state: AccessSession } | { ready: false }}
    */
   function confirmRequest(state, sessionMinutes, now) {
@@ -133,7 +135,7 @@
       state: {
         phase: 'session',
         remainingMs: Core.millisecondsFromMinutes(sessionMinutes),
-        expiresAt: 0,
+        expiresAt: Core.UNSET_EPOCH_TIME,
         refilledAt: now,
         date: null,
         goalActive: false
@@ -148,7 +150,14 @@
   function reconcileSiteAccess(state, facts) {
     const { now, date, dayStart, midnight, restart, goalAllowed, focused } = facts;
     if (!facts.enabled)
-      return { state: null, rules: 'unrestricted', alarmAt: 0, expire: false, window: null, clearWindows: true };
+      return {
+        state: null,
+        rules: 'unrestricted',
+        alarmAt: Core.UNSET_EPOCH_TIME,
+        expire: false,
+        window: null,
+        clearWindows: true
+      };
     const budget = state?.phase === 'session' ? state : null;
     let remaining = budget?.remainingMs ?? null;
     let expiresAt = budget?.expiresAt ?? null;
@@ -164,17 +173,18 @@
       if (runningAtMidnight || pausedAtMidnight) windowStart = dayStart;
       remaining = Core.millisecondsFromMinutes(facts.accessMinutes);
       refilledAt = dayStart;
-      expiresAt = runningAtMidnight ? dayStart + remaining : 0;
+      expiresAt = runningAtMidnight ? Core.timeAfter(dayStart, remaining) : Core.UNSET_EPOCH_TIME;
     }
     const authorizedUntil = expiresAt;
     goalActive = goalAllowed && focused && remaining > 0;
     if (remaining > 0) sessionDate = date;
-    if (!restart && expiresAt) remaining = Core.asMilliseconds(Math.min(remaining, Math.max(0, expiresAt - now)));
+    if (!restart && expiresAt)
+      remaining = Core.asMilliseconds(Math.min(remaining, Math.max(0, Core.millisecondsBetween(now, expiresAt))));
     let rules = /** @type {AccessDecision['rules']} */ ('none'),
-      alarmAt = 0,
+      alarmAt = Core.UNSET_EPOCH_TIME,
       expire = false;
     if (goalAllowed || remaining > 0) {
-      expiresAt = !goalAllowed && focused ? now + remaining : 0;
+      expiresAt = !goalAllowed && focused ? Core.timeAfter(now, remaining) : Core.UNSET_EPOCH_TIME;
       rules = 'session';
       alarmAt = expiresAt;
     } else {
@@ -189,8 +199,8 @@
             end: goalAllowed
               ? midnight
               : remaining > 0 && !expiresAt
-                ? Number.MAX_SAFE_INTEGER
-                : expiresAt || Math.min(now, authorizedUntil || now)
+                ? OPEN_WINDOW_END
+                : expiresAt || Core.asEpochTime(Math.min(now, authorizedUntil || now))
           }
         : null;
     const next =

@@ -3,8 +3,8 @@ declare global {
   type HistoryKind = 'ratio' | 'websites';
   type HistoryRange = 'today' | 'week' | 'month';
   type SegmentMode = 'create' | 'consume';
-  type TimeSegment = { date: LocalDate; mode: SegmentMode; sec: Seconds; start?: number; end?: number };
-  type SiteActionEntry = { date: LocalDate; action: string; at?: number };
+  type TimeSegment = { date: LocalDate; mode: SegmentMode; sec: Seconds; start?: EpochTime; end?: EpochTime };
+  type SiteActionEntry = { date: LocalDate; action: string; at?: EpochTime };
   type PreferenceMessage =
     | { type: 'tracking'; site: string; enabled: boolean }
     | { type: 'access-duration'; site?: string; minutes: number | null; preference?: AccessPreference }
@@ -50,7 +50,7 @@ declare global {
     websiteTimeEnabled: boolean;
   };
   type AccessReply = { ok: true; access: Record<string, ReplyAccess> };
-  type SavedIntention = { site: string; reason: string; requestedAt: number };
+  type SavedIntention = { site: string; reason: string; requestedAt: EpochTime };
   type ReplyTable<T extends Record<RuntimeMessage['type'], { ok: true }>> = T;
   type RuntimeReplies = {
     snapshot: SnapshotReply;
