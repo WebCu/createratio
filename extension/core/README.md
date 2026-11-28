@@ -68,7 +68,8 @@ A saved zero resolves to Off and 50% strength without rewriting storage. New
 commands require positive resistance; native scrolling uses the Off switch.
 
 `validAccessMinutes`, `validIntention`, and their exported limits supply the same
-rules to forms and receivers. Intentions use a trimmed minimum but a raw maximum;
+rules to forms and receivers. `validAccessMinutes` is the only way to get the
+`AccessMinutes` type. Intentions use a trimmed minimum but a raw maximum;
 new commands never coerce values. `validLocalDate` rejects impossible calendar
 dates. `DELIVERY_LIMITS` bounds packets, items, seconds, IDs, and receipts.
 `statsSnapshot` resolves missing or invalid known numbers to zero without

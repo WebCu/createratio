@@ -6,7 +6,10 @@
   'use strict';
   const FIELDS = ['consumeSec', 'createSec', 'posts', 'replies', 'comments', 'likes', 'bookmarks', 'quotes', 'reposts'];
   const SITES = integrations.sites;
-  const ACCESS_LIMITS = { minMinutes: asMinutes(1), maxMinutes: asMinutes(240) };
+  const ACCESS_LIMITS = {
+    minMinutes: /** @type {AccessMinutes} */ (1),
+    maxMinutes: /** @type {AccessMinutes} */ (240)
+  };
   const INTENTION_LIMITS = { minLength: 20, maxLength: 280 };
   const SCROLL_FRICTION_LIMITS = { minStrength: 50, maxStrength: 95, step: 5 };
   const DELIVERY_LIMITS = { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 };
@@ -17,7 +20,7 @@
       value.trim().length >= INTENTION_LIMITS.minLength
     );
   }
-  /** @returns {value is Minutes} */
+  /** @returns {value is AccessMinutes} */
   function validAccessMinutes(value) {
     return Number.isInteger(value) && value >= ACCESS_LIMITS.minMinutes && value <= ACCESS_LIMITS.maxMinutes;
   }
@@ -108,8 +111,8 @@
   const ACCESS_PREFERENCES = { accessMinutes: true, waitMinutes: true };
   const ACCESS_PREFERENCE_KEYS = Object.keys(ACCESS_PREFERENCES);
   const DEFAULT_SETTINGS = {
-    accessMinutes: asMinutes(5),
-    waitMinutes: asMinutes(5),
+    accessMinutes: /** @type {AccessMinutes} */ (5),
+    waitMinutes: /** @type {AccessMinutes} */ (5),
     dailyTarget: 1,
     allowAboveGoal: false,
     intentionHistoryEnabled: false,

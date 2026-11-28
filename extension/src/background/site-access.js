@@ -8,7 +8,7 @@
   /** @typedef {{ running: true, expiresAt: EpochTime } | { running: false }} SessionClock */
   /** @typedef {{ phase: 'session', remainingMs: Milliseconds | null, clock: SessionClock | null, refilledAt: EpochTime | null, date: LocalDate | null, goalActive: boolean }} AccessSession */
   /** @typedef {AccessRequest | AccessSession | null} SiteAccessState */
-  /** @typedef {{ now: EpochTime, date: LocalDate, dayStart: EpochTime, midnight: EpochTime, restart: boolean, enabled: boolean, goalAllowed: boolean, focused: boolean, accessMinutes: Minutes, hasRules: boolean, hasWindows: boolean, closeAll: boolean }} AccessFacts */
+  /** @typedef {{ now: EpochTime, date: LocalDate, dayStart: EpochTime, midnight: EpochTime, restart: boolean, enabled: boolean, goalAllowed: boolean, focused: boolean, accessMinutes: AccessMinutes, hasRules: boolean, hasWindows: boolean, closeAll: boolean }} AccessFacts */
   /** @typedef {{ state: SiteAccessState, rules: 'unrestricted' | 'session' | 'none', alarmAt: EpochTime | null, expire: boolean, window: { start: EpochTime, end: EpochTime | null } | null, clearWindows: boolean }} AccessDecision */
   const MAXIMUM_BUDGET = Core.millisecondsFromMinutes(Core.ACCESS_LIMITS.maxMinutes);
   /** @type {SessionClock} */
@@ -147,7 +147,7 @@
   }
   /**
    * @param {SiteAccessState} state
-   * @param {Minutes} sessionMinutes
+   * @param {AccessMinutes} sessionMinutes
    * @param {EpochTime} now
    * @returns {{ ready: true, state: AccessSession } | { ready: false }}
    */

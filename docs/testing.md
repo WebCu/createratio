@@ -538,7 +538,10 @@ fails `pnpm check:types`. `bin/tests/message-types.test.js` covers both failures
 `globals.d.ts` also brands local dates and durations as `LocalDate`,
 `Milliseconds`, `Seconds` and `Minutes`. Raw values enter through
 `Core.validLocalDate`, `Core.validAccessMinutes`, `Core.asMilliseconds`,
-`Core.asSeconds` and `Core.asMinutes`. Points in time use two clocks:
+`Core.asSeconds` and `Core.asMinutes`. `AccessMinutes` is a `Minutes` value
+that is a whole number from 1 to 240: the session and wait preferences.
+Only `Core.validAccessMinutes` creates it, so a converted or tagged `Minutes`
+value cannot start an access session. Points in time use two clocks:
 `EpochTime` for `Date.now()` values and `PageTime` for `performance.now()`
 values. Code reads a clock at the call site and tags the reading with
 `Core.asEpochTime` or `Core.asPageTime`, so tests can substitute time.
