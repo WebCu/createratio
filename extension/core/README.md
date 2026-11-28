@@ -77,12 +77,16 @@ coerce values. `validLocalDate` rejects impossible calendar
 dates. `DELIVERY_LIMITS` bounds packets, items, seconds, IDs, and receipts.
 `statsSnapshot` resolves missing or invalid known numbers to zero without
 coercing numeric strings; history reads preserve unknown fields and partial rows.
+`score` takes only `CreationStats` from `emptyStats`, `statsSnapshot` or
+`aggregate`, so read one stored site row through `statsSnapshot` first.
 
 `trackingEnabled(site, settings)` reads the site's combined Limit & track choice
 from `trackedSites`. Access-session eligibility is enforced by the extension;
 creation-score measurements on gated sites require timed or optional above-goal
 access. `dailyTarget(settings)` validates the current daily target with a safe
-legacy default; goal-based access is off by default. Website time
+legacy default; goal-based access is off by default.
+`aboveDailyTarget(score, target)` is true only when the score is strictly above
+the target. Website time
 is a separate browsing overview and never enters the score.
 `scoreColor` and `badgeText` provide consistent display thresholds.
 

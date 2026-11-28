@@ -460,3 +460,55 @@ test('intentions enter only as trimmed text through Core', t => {
   ])
     assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
 });
+
+test('creation stats, scores and daily targets enter only through Core', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @type {CreationStats[]} */',
+      'const stats = [Core.emptyStats(), Core.statsSnapshot({ consumeSec: 60 }), Core.aggregate({})];',
+      '/** @type {CreationScore} */',
+      'const score = Core.score(stats[0]);',
+      '/** @type {number} */',
+      'const plain = score;',
+      '/** @param {unknown} value */',
+      'function guarded(value) {',
+      '  if (!Core.validDailyTarget(value)) return;',
+      '  /** @type {DailyTarget} */',
+      '  const target = value;',
+      '}',
+      '/** @type {DailyTarget} */',
+      'const target = Core.dailyTarget({});',
+      '/** @type {boolean} */',
+      'const above = Core.aboveDailyTarget(score, target);',
+      '/** @type {string[]} */',
+      'const shown = [Core.scoreColor(score), Core.scoreBand(score), Core.badgeText(score)];',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @type {CreationScore} */',
+      'const fromNumber = 1;',
+      '/** @type {DailyTarget} */',
+      'const targetFromNumber = 1;',
+      '/** @type {CreationStats} */',
+      'const fromLiteral = { consumeSec: 0, createSec: 0, posts: 0, replies: 0, comments: 0, likes: 0, bookmarks: 0, quotes: 0, reposts: 0 };',
+      'const color = Core.scoreColor(0.5);',
+      'const mixed = Core.aboveDailyTarget(Core.dailyTarget({}), Core.dailyTarget({}));',
+      '/** @type {string} */',
+      'const notString = Core.score(Core.emptyStats());',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [2, "Type 'number' is not assignable to type 'CreationScore'"],
+    [4, "Type 'number' is not assignable to type 'DailyTarget'"],
+    [6, "is not assignable to type 'CreationStats'"],
+    [7, "Argument of type 'number' is not assignable to parameter of type 'CreationScore'"],
+    [8, "Argument of type 'DailyTarget' is not assignable to parameter of type 'CreationScore'"],
+    [10, "Type 'CreationScore' is not assignable to type 'string'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
+});

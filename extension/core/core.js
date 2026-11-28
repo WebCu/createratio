@@ -4,7 +4,17 @@
   else root.Core = api;
 })(globalThis, function (integrations) {
   'use strict';
-  const FIELDS = ['consumeSec', 'createSec', 'posts', 'replies', 'comments', 'likes', 'bookmarks', 'quotes', 'reposts'];
+  const FIELDS = /** @type {const} */ ([
+    'consumeSec',
+    'createSec',
+    'posts',
+    'replies',
+    'comments',
+    'likes',
+    'bookmarks',
+    'quotes',
+    'reposts'
+  ]);
   const { sites: SITES, validSiteId } = /** @type {typeof Sites} */ (integrations);
   const ACCESS_LIMITS = {
     minMinutes: /** @type {AccessMinutes} */ (1),
@@ -121,7 +131,7 @@
   const DEFAULT_SETTINGS = {
     accessMinutes: /** @type {AccessMinutes} */ (5),
     waitMinutes: /** @type {AccessMinutes} */ (5),
-    dailyTarget: 1,
+    dailyTarget: /** @type {DailyTarget} */ (1),
     allowAboveGoal: false,
     intentionHistoryEnabled: false,
     scrollFrictionEnabled: true,
@@ -202,42 +212,62 @@
   function recordedSites(day = {}) {
     return Object.keys(isRecord(day) ? day : {}).filter(validSiteId);
   }
+  /** @returns {CreationStats} */
   function emptyStats() {
-    return Object.fromEntries(FIELDS.map(k => [k, 0]));
+    return statsSnapshot(undefined);
   }
   function nonnegative(n) {
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }
+  /** @returns {CreationStats} */
   function statsSnapshot(stats) {
-    return Object.fromEntries(FIELDS.map(key => [key, nonnegative(stats?.[key])]));
+    return /** @type {CreationStats} */ (Object.fromEntries(FIELDS.map(key => [key, nonnegative(stats?.[key])])));
   }
+  /** @returns {CreationStats} */
   function aggregate(day = {}) {
     const total = emptyStats();
     for (const id of recordedSites(day)) for (const k of FIELDS) total[k] += nonnegative(day[id]?.[k]);
     return total;
   }
+  /**
+   * @param {CreationStats} stats
+   * @returns {CreationScore}
+   */
   function score(stats) {
-    return (
+    return /** @type {CreationScore} */ (
       (nonnegative(stats.createSec) +
         120 * (nonnegative(stats.posts) + nonnegative(stats.replies) + nonnegative(stats.comments))) /
-      Math.max(nonnegative(stats.consumeSec), 1)
+        Math.max(nonnegative(stats.consumeSec), 1)
     );
   }
+  /** @returns {value is DailyTarget} */
   function validDailyTarget(value) {
     return (
       Number.isFinite(value) && value >= 0.1 && value <= 100 && Math.abs(value * 10 - Math.round(value * 10)) < 1e-9
     );
   }
+  /** @returns {DailyTarget} */
   function dailyTarget(settings = {}) {
-    return validDailyTarget(settings?.dailyTarget) ? settings.dailyTarget : DEFAULT_SETTINGS.dailyTarget;
+    const value = settings?.dailyTarget;
+    return validDailyTarget(value) ? value : DEFAULT_SETTINGS.dailyTarget;
+  }
+  /**
+   * @param {CreationScore} value
+   * @param {DailyTarget} target
+   */
+  function aboveDailyTarget(value, target) {
+    return value > target;
   }
   const SCORE_COLORS = { high: '#16804a', mid: '#b77900', low: '#be3f43' };
+  /** @param {CreationScore} value */
   function scoreBand(value) {
     return value >= 1 ? 'high' : value >= 0.5 ? 'mid' : 'low';
   }
+  /** @param {CreationScore} value */
   function scoreColor(value) {
     return SCORE_COLORS[scoreBand(value)];
   }
+  /** @param {CreationScore} value */
   function badgeText(value) {
     return value >= 100 ? '99+' : value >= 10 ? value.toFixed(0) : value.toFixed(1);
   }
@@ -305,14 +335,11 @@
       .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
       .sort()) {
       for (const site of new Set([...SITES.map(site => site.id), ...recordedSites(all[date])])) {
-        const stats = { ...emptyStats(), ...all[date][site] };
+        const stats = statsSnapshot(all[date][site]);
         rows.push(
-          [
-            date,
-            site,
-            ...FIELDS.map(k => nonnegative(stats[k]).toFixed(k.endsWith('Sec') ? 3 : 0)),
-            score(stats).toFixed(3)
-          ].join(',')
+          [date, site, ...FIELDS.map(k => stats[k].toFixed(k.endsWith('Sec') ? 3 : 0)), score(stats).toFixed(3)].join(
+            ','
+          )
         );
       }
     }
@@ -356,6 +383,7 @@
     score,
     validDailyTarget,
     dailyTarget,
+    aboveDailyTarget,
     scoreBand,
     scoreColor,
     badgeText,

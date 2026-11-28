@@ -168,7 +168,7 @@ const SiteAccess = (() => {
       originalWindows = JSON.stringify(windows);
     const goalAllowed =
       stored.settings?.allowAboveGoal === true &&
-      Core.score(Core.aggregate(stored[date])) > Core.dailyTarget(stored.settings);
+      Core.aboveDailyTarget(Core.score(Core.aggregate(stored[date])), Core.dailyTarget(stored.settings));
     const current = await api.declarativeNetRequest.getSessionRules();
     const access = accessState(stored._access);
     const dayStart = Core.asEpochTime(new Date(clock.getFullYear(), clock.getMonth(), clock.getDate()).getTime());
