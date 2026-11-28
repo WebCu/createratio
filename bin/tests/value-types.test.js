@@ -118,11 +118,13 @@ test('access sessions start only from access minutes', t => {
       '/** @param {Parameters<typeof SiteAccessModel.reconcileSiteAccess>[1]} facts */',
       'function refill(facts) { facts.accessMinutes = minutes; }',
       'SiteAccessModel.confirmRequest(null, Core.DEFAULT_SETTINGS.accessMinutes, now);',
+      '/** @param {ReplyAccess} reply */',
+      'function fromReply(reply) { SiteAccessModel.confirmRequest(null, reply.sessionMinutes, now); }',
       ''
     ].join('\n')
   });
   assert.notEqual(result.status, 0);
-  for (const line of [3, 5, 7])
+  for (const line of [3, 5, 7, 10])
     assert.match(
       result.stdout,
       new RegExp(`sessions\\.js\\(${line},\\d+\\): error TS\\d+: .*'Minutes' is not assignable to .*'AccessMinutes'`)
