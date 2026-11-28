@@ -296,3 +296,83 @@ test('duration converters reject mismatched source units and raw numbers', t => 
       )
     );
 });
+
+test('vetted site IDs come from the catalog and recorded IDs only through the guard', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @param {unknown} value */',
+      'function guarded(value) {',
+      '  if (!Sites.validRecordedSiteId(value)) return;',
+      '  /** @type {RecordedSiteId} */',
+      '  const recorded = value;',
+      '}',
+      '/** @type {VettedSiteId[]} */',
+      'const vetted = [Sites.sites[0].id, Core.SITES[0].id];',
+      '/** @type {RecordedSiteId[]} */',
+      'const recorded = [...vetted, ...Core.recordedSites({})];',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @param {unknown} value */',
+      'function recordedOnly(value) {',
+      '  if (!Sites.validRecordedSiteId(value)) return;',
+      '  /** @type {VettedSiteId} */',
+      '  const vetted = value;',
+      '}',
+      '/** @type {RecordedSiteId} */',
+      "const fromString = 'x';",
+      '/** @type {VettedSiteId} */',
+      "const fromLiteral = 'x';",
+      '/** @type {number[]} */',
+      'const notNumbers = [Sites.sites[0].id, Core.SITES[0].id];',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, source, target] of [
+    [5, 'RecordedSiteId', 'VettedSiteId'],
+    [8, 'string', 'RecordedSiteId'],
+    [10, 'string', 'VettedSiteId'],
+    [12, 'VettedSiteId', 'number']
+  ])
+    assert.match(
+      rejected.stdout,
+      new RegExp(
+        `rejected\\.js\\(${line},\\d+\\): error TS2322: Type '${source}' is not assignable to type '${target}'`
+      )
+    );
+});
+
+test('access records, saved intentions and gate URLs require branded site IDs', t => {
+  const result = typeCheck(t, {
+    'records.js': [
+      '/** @param {AccessStatus} status @param {RecordedSiteId} recorded */',
+      'function stale(status, recorded) { status.site = recorded; }',
+      '/** @type {SavedIntention} */',
+      "const intention = { site: 'x', reason: 'r', requestedAt: Core.asEpochTime(1) };",
+      '/** @param {RecordedSiteId} recorded */',
+      'function gate(recorded) { return SiteAccess.gateURL(recorded); }',
+      '/** @type {VettedSiteId | null} */',
+      "const located = SiteAccess.siteForURL('https://x.com/');",
+      '/** @type {RecordedSiteId[]} */',
+      'const recorded = Core.recordedSites({});',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(result.status, 0);
+  for (const [line, source, target] of [
+    [2, 'RecordedSiteId', 'VettedSiteId'],
+    [4, 'string', 'RecordedSiteId'],
+    [6, 'RecordedSiteId', 'VettedSiteId']
+  ])
+    assert.match(
+      result.stdout,
+      new RegExp(
+        `records\\.js\\(${line},\\d+\\): error TS\\d+: .*'${source}' is not assignable to (parameter of )?type '${target}'`
+      )
+    );
+  assert.doesNotMatch(result.stdout, /records\.js\((8|10),/);
+});
