@@ -3,51 +3,98 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-test('Default session reconciles after blur when another Settings tab saves', async () => {
+for (const [name, field] of [
+  ['Session time', 'accessMinutes'],
+  ['Intention wait', 'waitMinutes']
+])
+  test(`Default ${name} reconciles after blur when another Settings tab saves`, async () => {
+    const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
+    const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
+    try {
+      await withFailureArtifacts(browser, `Default ${name} after external save and blur`, async () => {
+        const a = await browser.page(browser.origin + '/settings.html');
+        const b = await browser.page(browser.origin + '/settings.html');
+        for (const page of [a, b])
+          await eventually(
+            () => evaluate(browser, page.session, `!!document.querySelector("#${field}-default")`),
+            'Settings renders'
+          );
+        await evaluate(browser, a.session, `document.querySelector("#${field}-default").focus()`);
+        await evaluate(
+          browser,
+          b.session,
+          `(() => {
+          const input = document.querySelector('#${field}-default');
+          input.value = '15'; input.dispatchEvent(new Event('change', { bubbles: true }));
+        })()`
+        );
+        await eventually(
+          () => evaluate(browser, b.session, '!!document.querySelector("#save-status").textContent'),
+          'second tab saves'
+        );
+        await eventually(
+          () =>
+            evaluate(
+              browser,
+              a.session,
+              `document.querySelector("#${field}-site-x").selectedOptions[0].textContent === "Default · 15 min"`
+            ),
+          'inherited rows receive saved default'
+        );
+        assert.equal(await evaluate(browser, a.session, 'document.activeElement.id'), `${field}-default`);
+        await browser.cdp.send('Page.bringToFront', {}, a.session);
+        await evaluate(browser, a.session, `document.querySelector("#${field}-default").blur()`);
+        assert.equal(await evaluate(browser, a.session, `document.querySelector("#${field}-default").value`), '15');
+        const inherited = await evaluate(
+          browser,
+          a.session,
+          `Array.from(document.querySelectorAll('#site-settings select[id^="${field}-site-"]'), input => ({ value: input.value, label: input.selectedOptions[0].textContent }))`
+        );
+        assert.ok(inherited.length > 0);
+        for (const row of inherited) assert.deepEqual(row, { value: 'default', label: 'Default · 15 min' });
+        assert.deepEqual(browser.errors, []);
+      });
+    } finally {
+      await browser.cleanup();
+    }
+  });
+
+test('Website Intention wait reconciles after blur when another Settings tab saves', async () => {
   const { launch, evaluate, eventually, withFailureArtifacts } = await import('./chromium.mjs');
   const browser = await launch(path.resolve(__dirname, '../../dist/chrome'));
   try {
-    await withFailureArtifacts(browser, 'Default session after external save and blur', async () => {
+    await withFailureArtifacts(browser, 'website Intention wait after external save and blur', async () => {
       const a = await browser.page(browser.origin + '/settings.html');
       const b = await browser.page(browser.origin + '/settings.html');
       for (const page of [a, b])
         await eventually(
-          () => evaluate(browser, page.session, '!!document.querySelector("#accessMinutes-default")'),
+          () => evaluate(browser, page.session, '!!document.querySelector("#waitMinutes-site-x")'),
           'Settings renders'
         );
-      await evaluate(browser, a.session, 'document.querySelector("#accessMinutes-default").focus()');
+      await evaluate(browser, a.session, 'document.querySelector("#waitMinutes-site-x").focus()');
       await evaluate(
         browser,
         b.session,
         `(() => {
-        const input = document.querySelector('#accessMinutes-default');
-        input.value = '15'; input.dispatchEvent(new Event('change', { bubbles: true }));
+        const input = document.querySelector('#waitMinutes-site-x');
+        input.value = '30'; input.dispatchEvent(new Event('change', { bubbles: true }));
       })()`
       );
       await eventually(
-        () => evaluate(browser, b.session, '!!document.querySelector("#save-status").textContent'),
-        'second tab saves'
+        () => evaluate(browser, a.session, '!document.querySelector("#wait-reset-x").hidden'),
+        'first tab receives the website override'
       );
-      await eventually(
-        () =>
-          evaluate(
-            browser,
-            a.session,
-            'document.querySelector("#accessMinutes-site-x").selectedOptions[0].textContent === "Default · 15 min"'
-          ),
-        'inherited rows receive saved default'
-      );
-      assert.equal(await evaluate(browser, a.session, 'document.activeElement.id'), 'accessMinutes-default');
+      assert.equal(await evaluate(browser, a.session, 'document.activeElement.id'), 'waitMinutes-site-x');
       await browser.cdp.send('Page.bringToFront', {}, a.session);
-      await evaluate(browser, a.session, 'document.querySelector("#accessMinutes-default").blur()');
-      assert.equal(await evaluate(browser, a.session, 'document.querySelector("#accessMinutes-default").value'), '15');
-      const inherited = await evaluate(
-        browser,
-        a.session,
-        `Array.from(document.querySelectorAll('#site-settings select[id^="accessMinutes-site-"]'), input => ({ value: input.value, label: input.selectedOptions[0].textContent }))`
+      await evaluate(browser, a.session, 'document.querySelector("#waitMinutes-site-x").blur()');
+      assert.deepEqual(
+        await evaluate(
+          browser,
+          a.session,
+          '(input => ({ value: input.value, label: input.selectedOptions[0].textContent }))(document.querySelector("#waitMinutes-site-x"))'
+        ),
+        { value: '30', label: '30 min' }
       );
-      assert.ok(inherited.length > 0);
-      for (const row of inherited) assert.deepEqual(row, { value: 'default', label: 'Default · 15 min' });
       assert.deepEqual(browser.errors, []);
     });
   } finally {
