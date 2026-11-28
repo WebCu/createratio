@@ -9,12 +9,14 @@ const today = '2026-01-15';
 const session = fields => ({
   phase: 'session',
   remainingMs: null,
-  expiresAt: null,
+  clock: null,
   refilledAt: null,
   date: null,
   goalActive: false,
   ...fields
 });
+const running = expiresAt => ({ running: true, expiresAt });
+const PAUSED = { running: false };
 const request = fields => ({ phase: 'request', waitMs: null, ...fields });
 
 test('unreadable or invalid stored entries have no site access', () => {
@@ -54,11 +56,11 @@ test('stored budgets become access sessions, including exhausted and legacy-dead
   );
   assert.deepEqual(
     M.siteAccessFromStored({ expiresAt: now + 60000 }, now),
-    session({ remainingMs: 60000, expiresAt: now + 60000 })
+    session({ remainingMs: 60000, clock: running(now + 60000) })
   );
   assert.deepEqual(
     M.siteAccessFromStored({ expiresAt: now - 1 }, now),
-    session({ remainingMs: 0, expiresAt: now - 1 })
+    session({ remainingMs: 0, clock: running(now - 1) })
   );
   assert.deepEqual(
     M.siteAccessFromStored({ remainingMs: 1000, readyAt: now + 30000 }, now),
@@ -78,7 +80,7 @@ test('every shape the extension writes survives a round trip unchanged', () => {
   for (const raw of shapes) assert.deepEqual(M.storedFromSiteAccess(M.siteAccessFromStored(raw, now)), raw);
   assert.deepEqual(
     M.siteAccessFromStored({ refilledAt: now - 600000, date: today, expiresAt: 0 }, now),
-    session({ remainingMs: 0, expiresAt: 0, refilledAt: now - 600000, date: today })
+    session({ remainingMs: 0, clock: PAUSED, refilledAt: now - 600000, date: today })
   );
   assert.equal(M.storedFromSiteAccess(null), undefined);
   assert.deepEqual(M.storedFromSiteAccess(session({})), {});
@@ -98,7 +100,7 @@ test('stored entries compare by content, not key order', () => {
 });
 
 test('a request starts only when no request or budget is open', () => {
-  const open = session({ remainingMs: 300000, expiresAt: 0, refilledAt: now });
+  const open = session({ remainingMs: 300000, clock: PAUSED, refilledAt: now });
   const waiting = request({ readyAt: now + 1000, waitMs: 300000 });
   assert.deepEqual(M.requestAccess(null, 300000, now), request({ readyAt: now + 300000, waitMs: 300000 }));
   assert.equal(M.requestAccess(open, 300000, now), open);
@@ -119,7 +121,7 @@ test('cancelling removes only a request', () => {
 test('confirming after the wait starts a full session; anything else is not ready', () => {
   assert.deepEqual(M.confirmRequest(request({ readyAt: now }), 5, now), {
     ready: true,
-    state: session({ remainingMs: 300000, expiresAt: 0, refilledAt: now })
+    state: session({ remainingMs: 300000, clock: PAUSED, refilledAt: now })
   });
   assert.deepEqual(M.storedFromSiteAccess(M.confirmRequest(request({ readyAt: now }), 5, now).state), {
     remainingMs: 300000,
@@ -142,7 +144,7 @@ test('a valid wait with leftover session fields stays a request', () => {
 test('a live legacy deadline is migrated before a wait is considered', () => {
   assert.deepEqual(
     M.siteAccessFromStored({ expiresAt: now + 60000, readyAt: now + 1000, waitMs: 300000 }, now),
-    session({ remainingMs: 60000, expiresAt: now + 60000 })
+    session({ remainingMs: 60000, clock: running(now + 60000) })
   );
 });
 
@@ -166,13 +168,13 @@ const facts = changes => ({
 });
 const decision = changes => ({
   rules: 'none',
-  alarmAt: 0,
+  alarmAt: null,
   expire: false,
   window: null,
   clearWindows: false,
   ...changes
 });
-const paused = session({ remainingMs: 300000, expiresAt: 0, refilledAt: refilled, date: today });
+const paused = session({ remainingMs: 300000, clock: PAUSED, refilledAt: refilled, date: today });
 
 const cases = [
   [
@@ -185,14 +187,14 @@ const cases = [
     'paused budget stays paused away from the site',
     paused,
     {},
-    decision({ state: paused, rules: 'session', window: { start: now, end: Number.MAX_SAFE_INTEGER } })
+    decision({ state: paused, rules: 'session', window: { start: now, end: null } })
   ],
   [
     'focused budget starts running with an expiry alarm',
     paused,
     { focused: true },
     decision({
-      state: { ...paused, expiresAt: now + 300000 },
+      state: { ...paused, clock: running(now + 300000) },
       rules: 'session',
       alarmAt: now + 300000,
       window: { start: now, end: now + 300000 }
@@ -200,7 +202,7 @@ const cases = [
   ],
   [
     'spent running budget expires and keeps refill eligibility',
-    session({ remainingMs: 1000, expiresAt: now - 1, refilledAt: refilled, date: today }),
+    session({ remainingMs: 1000, clock: running(now - 1), refilledAt: refilled, date: today }),
     {},
     decision({
       state: session({ refilledAt: refilled, date: today }),
@@ -210,27 +212,32 @@ const cases = [
   ],
   [
     'midnight refill back-dates a paused budget window to midnight',
-    session({ remainingMs: 60000, expiresAt: 0, refilledAt: dayStart - 3600000, date: '2026-01-14' }),
+    session({ remainingMs: 60000, clock: PAUSED, refilledAt: dayStart - 3600000, date: '2026-01-14' }),
     {},
     decision({
-      state: session({ remainingMs: 300000, expiresAt: 0, refilledAt: dayStart, date: today }),
+      state: session({ remainingMs: 300000, clock: PAUSED, refilledAt: dayStart, date: today }),
       rules: 'session',
-      window: { start: dayStart, end: Number.MAX_SAFE_INTEGER }
+      window: { start: dayStart, end: null }
     })
   ],
   [
     'midnight refill after restart starts the window now',
-    session({ remainingMs: 60000, expiresAt: 0, refilledAt: dayStart - 3600000, date: '2026-01-14' }),
+    session({ remainingMs: 60000, clock: PAUSED, refilledAt: dayStart - 3600000, date: '2026-01-14' }),
     { restart: true },
     decision({
-      state: session({ remainingMs: 300000, expiresAt: 0, refilledAt: dayStart, date: today }),
+      state: session({ remainingMs: 300000, clock: PAUSED, refilledAt: dayStart, date: today }),
       rules: 'session',
-      window: { start: now, end: Number.MAX_SAFE_INTEGER }
+      window: { start: now, end: null }
     })
   ],
   [
     'budget running at midnight is refilled and spent by noon',
-    session({ remainingMs: 60000, expiresAt: dayStart + 30000, refilledAt: dayStart - 3600000, date: '2026-01-14' }),
+    session({
+      remainingMs: 60000,
+      clock: running(dayStart + 30000),
+      refilledAt: dayStart - 3600000,
+      date: '2026-01-14'
+    }),
     {},
     decision({
       state: session({ refilledAt: dayStart, date: today }),
@@ -240,10 +247,10 @@ const cases = [
   ],
   [
     'restart keeps a running budget and restarts its clock',
-    session({ remainingMs: 300000, expiresAt: now + 100000, refilledAt: refilled, date: today }),
+    session({ remainingMs: 300000, clock: running(now + 100000), refilledAt: refilled, date: today }),
     { restart: true, focused: true },
     decision({
-      state: session({ remainingMs: 300000, expiresAt: now + 300000, refilledAt: refilled, date: today }),
+      state: session({ remainingMs: 300000, clock: running(now + 300000), refilledAt: refilled, date: today }),
       rules: 'session',
       alarmAt: now + 300000,
       window: { start: now, end: now + 300000 }
@@ -262,20 +269,20 @@ const cases = [
     decision({ state: { ...paused, goalActive: true }, rules: 'session', window: { start: now, end: midnight } })
   ],
   [
-    'above goal stamps an exhausted session with a zero deadline',
+    'above goal gives an exhausted session a paused clock',
     session({ refilledAt: refilled, date: today }),
     { goalAllowed: true },
     decision({
-      state: session({ expiresAt: 0, refilledAt: refilled, date: today }),
+      state: session({ clock: PAUSED, refilledAt: refilled, date: today }),
       rules: 'session',
       window: { start: now, end: midnight }
     })
   ],
   [
     'legacy deadline becomes a paused budget',
-    session({ remainingMs: 60000, expiresAt: now + 60000 }),
+    session({ remainingMs: 60000, clock: running(now + 60000) }),
     {},
-    decision({ state: session({ remainingMs: 60000, expiresAt: 0, date: today }), rules: 'session' })
+    decision({ state: session({ remainingMs: 60000, clock: PAUSED, date: today }), rules: 'session' })
   ],
   [
     'above goal keeps a pending request as a request',

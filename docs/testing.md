@@ -661,7 +661,7 @@ URL variants across nineteen access states, including untouched defaults; three 
 lookup, status, session rules, storage, alarms, and redirects in a fixed-clock
 browser-world VM. Its own tests
 prove that lifecycle and static-rule changes fail. Intentional manifest or policy
-changes require separate review, not a skipped comparison. Stored access entries are compared exactly, after the baseline is normalized by the accepted stored-shape differences: when the candidate ships `site-access.js`, its parser drops empty entries, drops `expiresAt` and `remainingMs` from entries it reads as requests, and drops a `waitMs` that is not a valid wait duration. Everything else is compared exactly. This is not browser QA.
+changes require separate review, not a skipped comparison. Stored access entries are compared exactly, after the baseline is normalized by the accepted stored-shape differences: when the candidate ships `site-access.js`, its parser drops empty entries, drops `expiresAt` and `remainingMs` from entries it reads as requests, and drops a `waitMs` that is not a valid wait duration. In the status reply, a baseline `expiresAt`, `readyAt` or `refilledAt` of `0` matches a candidate `null` in the same place, because `null` now means "no time". Everything else is compared exactly. This is not browser QA.
 
 ## Disposable Chromium smoke
 

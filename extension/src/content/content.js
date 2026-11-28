@@ -8,12 +8,12 @@
   const scrollFriction = ScrollFriction.create({ document, Element, getComputedStyle });
   let scrollFrictionEnabled = false,
     scrollSpeed = 1;
-  const NO_INPUT = Core.asPageTime(-Infinity);
   const INPUT_ACTIVE_DURATION = Core.asMilliseconds(30000);
   const session = crypto.randomUUID();
   let sequence = 0,
     lastSample = Core.asPageTime(performance.now()),
-    lastInput = NO_INPUT;
+    /** @type {PageTime | null} */
+    lastInput = null;
   let pageOrigin = Core.pageOriginFromClocks(Core.asEpochTime(Date.now()), lastSample);
   let enabled = false,
     mode = 'neutral';
@@ -47,7 +47,7 @@
   const clicks = new WeakMap();
 
   function resetInput() {
-    lastInput = NO_INPUT;
+    lastInput = null;
     lastSample = Core.asPageTime(performance.now());
   }
   function queuePacket() {
@@ -166,7 +166,7 @@
     segments = [];
     actions = [];
     outbox = [];
-    lastInput = NO_INPUT;
+    lastInput = null;
     lastSample = Core.asPageTime(performance.now());
     console.warn(`CreateRatio: ${integration.name} integration paused until page reload.`, error.message);
   }
@@ -308,7 +308,7 @@
   listen(window, 'pagehide', () => {
     settle();
     pageActive = false;
-    lastInput = NO_INPUT;
+    lastInput = null;
     boundary();
     if (outbox.length) void pump();
   });
@@ -376,6 +376,7 @@
         pageActive &&
         document.hasFocus() &&
         document.visibilityState === 'visible' &&
+        lastInput !== null &&
         Core.millisecondsBetween(lastInput, Core.asPageTime(performance.now())) < INPUT_ACTIVE_DURATION
       )
         return false;

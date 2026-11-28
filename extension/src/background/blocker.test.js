@@ -301,7 +301,7 @@ test('invalid restored session dates cannot grant a daily refill or retain acces
     const w = blocker({ _access: { x: { date, remainingMs: 120000, expiresAt: 0 } } });
     const state = (await w.handle({ type: 'access-status' })).access.x;
     assert.equal(state.remainingMs, 0, JSON.stringify(date));
-    assert.equal(state.refilledAt, 0);
+    assert.equal(state.refilledAt, null);
     assert.deepEqual(rulesFor(w), []);
     assert.equal(w.alarms['access-midnight'], undefined);
     await assert.rejects(w.handle({ type: 'access-open', site: 'x' }, gate('x')), /Finish the waiting period/);
@@ -315,7 +315,7 @@ for (const browser of ['chrome', 'browser']) {
       const w = worker({ _access: { x: entry } }, browser, now);
       const result = await w.send({ type: 'access-status' });
       assert.equal(result.ok, true);
-      assert.equal(result.access.x.readyAt, 0);
+      assert.equal(result.access.x.readyAt, null);
       assert.equal(w.errors.length, 0);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       assert.deepEqual(rulesFor(w), []);
@@ -365,7 +365,7 @@ test('invalid restored session numbers cannot revive access through legacy deadl
       const w = blocker({ _access: { x: entry } });
       const result = await w.handle({ type: 'access-status' });
       assert.equal(result.access.x.remainingMs, 0, field + ': ' + String(invalid));
-      assert.equal(result.access.x.refilledAt, 0);
+      assert.equal(result.access.x.refilledAt, null);
       assert.deepEqual(rulesFor(w), []);
       assert.equal(w.alarms['access-midnight'], undefined);
     }
@@ -441,7 +441,8 @@ test('valid restored paused budgets and waits remain unchanged and exhausted ses
     assert.deepEqual(data._access.x, entry);
     assert.deepEqual(writes(w), []);
     assert.equal(state.remainingMs, entry.remainingMs || 0);
-    assert.equal(state.readyAt, entry.readyAt || 0);
+    assert.equal(state.readyAt, entry.readyAt ?? null);
+    assert.equal(state.refilledAt, entry.refilledAt || null);
     assert.equal(Boolean(w.alarms['access-midnight']), Boolean(entry.date));
     if (entry.date && !entry.remainingMs) {
       const midnight = new Date(2026, 9, 12).getTime();
@@ -611,7 +612,7 @@ test('restored waits cannot have more time remaining than their original validat
       const entry = { readyAt: now + duration + 1, ...(waitMs === undefined ? {} : { waitMs }) };
       const w = worker({ _access: { x: entry } }, browser, now);
       const rejected = (await w.send({ type: 'access-status' })).access.x;
-      assert.equal(rejected.readyAt, 0);
+      assert.equal(rejected.readyAt, null);
       assert.equal(w.data._access.x?.waitMs, undefined);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       const boundary = worker({ _access: { x: { ...entry, readyAt: now + duration } } }, browser, now);

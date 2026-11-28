@@ -106,7 +106,7 @@ test('a timed budget paused above goal continues authorizing from its midnight r
   w.activate('https://x.com/home');
   const before = (await w.send({ type: 'access-status' })).access.x;
   assert.equal(before.goalAllowed, true);
-  assert.equal(before.expiresAt, 0);
+  assert.equal(before.expiresAt, null);
   w.advance(5000);
   const result = await w.send({
     type: 'ingest',
@@ -508,7 +508,7 @@ test('goal-based access is opt-in, uses today’s exact score and keeps frame re
     for (const site of ['x', 'linkedin']) {
       assert.equal(result.access[site].goalAllowed, true);
       assert.equal(result.access[site].remainingMs, 0);
-      assert.equal(result.access[site].expiresAt, 0);
+      assert.equal(result.access[site].expiresAt, null);
     }
     assert.equal(rulesFor(w).length, 3);
     assert.deepEqual(w.rules.find(rule => rule.id === 101).condition.excludedResourceTypes, ['sub_frame']);
@@ -619,7 +619,7 @@ test('goal-based access pauses an existing timed budget and resumes it below the
   const above = await w.send({ type: 'access-status' });
   assert.equal(above.access.x.goalAllowed, true);
   assert.equal(above.access.x.remainingMs, 290000);
-  assert.equal(above.access.x.expiresAt, 0);
+  assert.equal(above.access.x.expiresAt, null);
   assert.equal(w.alarms['access-x'], undefined);
   w.data[C.localDate()].x.consumeSec = 120;
   const below = await w.send({ type: 'access-status' });
@@ -639,9 +639,9 @@ test('cancelling a ready wait during goal-based access clears the wait but keeps
   assert.ok(access.x.readyAt > 0);
   const cancelled = await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
   assert.equal(cancelled.access.x.goalAllowed, true);
-  assert.equal(cancelled.access.x.readyAt, 0);
+  assert.equal(cancelled.access.x.readyAt, null);
   assert.ok(rulesFor(w).length > 0);
-  assert.equal((await w.send({ ...goal, enabled: false }, popupSender)).access.x.readyAt, 0);
+  assert.equal((await w.send({ ...goal, enabled: false }, popupSender)).access.x.readyAt, null);
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
 });
 
@@ -654,7 +654,7 @@ test('a stale wait cancellation during goal-based access does not prevent midnig
   w.advance(300000);
   const expired = await w.send({ type: 'access-status' });
   assert.equal(expired.access.x.remainingMs, 0);
-  assert.equal(expired.access.x.readyAt, 0);
+  assert.equal(expired.access.x.readyAt, null);
   w.data[C.localDate(new Date(w.now))] = { x: { posts: 1 } };
   await w.send({ type: 'access-goal-setting', enabled: true }, popupSender);
   const cancelled = await w.send({ type: 'access-cancel', site: 'x' }, gate('x'));
@@ -758,7 +758,7 @@ test('all seven sites start enabled and blocked without an access session', asyn
     for (const { id } of C.SITES) {
       assert.equal(result.access[id].enabled, true, id);
       assert.equal(result.access[id].remainingMs, 0, id);
-      assert.equal(result.access[id].expiresAt, 0, id);
+      assert.equal(result.access[id].expiresAt, null, id);
       assert.deepEqual(rulesFor(w, [id]), [], id);
     }
   }
@@ -805,11 +805,15 @@ test('unlock requires a specific intention, the full wait and explicit confirmat
   w.advance(299999);
   assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
   w.advance(1);
-  assert.equal((await w.send({ type: 'access-status' })).access.x.expiresAt, 0, 'waiting alone never opens the site');
+  assert.equal(
+    (await w.send({ type: 'access-status' })).access.x.expiresAt,
+    null,
+    'waiting alone never opens the site'
+  );
   const result = await w.send({ type: 'access-open', site: 'x' }, gate('x'));
   assert.equal(result.access.x.remainingMs, 300000);
-  assert.equal(result.access.x.expiresAt, 0, 'access starts paused on the gate');
-  assert.equal(result.access.linkedin.expiresAt, 0);
+  assert.equal(result.access.x.expiresAt, null, 'access starts paused on the gate');
+  assert.equal(result.access.linkedin.expiresAt, null);
   assert.deepEqual(
     rulesFor(w).map(rule => rule.condition.requestDomains),
     [['x.com', 'twitter.com']]
@@ -935,7 +939,7 @@ test('expiry revokes access and redirects all matching open tabs, not unrelated 
   w.advance(300000);
   w.alarm('access-x');
   const result = await w.send({ type: 'access-status' });
-  assert.equal(result.access.x.expiresAt, 0);
+  assert.equal(result.access.x.expiresAt, null);
   assert.deepEqual(rulesFor(w), []);
   assert.equal(w.tabs[0].url, gate('x').url);
   assert.equal(w.tabs[1].url, gate('x').url);
@@ -955,7 +959,7 @@ test('startup restores unused budgets, migrates legacy deadlines and blocks pre-
   const expired = worker({ _access: { x: { expiresAt: first.now + 300000 } } }, 'chrome', first.now + 300000);
   expired.tabs.push({ id: 1, url: 'https://x.com/home' });
   expired.startup();
-  assert.equal((await expired.send({ type: 'access-status' })).access.x.expiresAt, 0);
+  assert.equal((await expired.send({ type: 'access-status' })).access.x.expiresAt, null);
   assert.deepEqual(rulesFor(expired), []);
   assert.equal(expired.tabs[0].url, gate('x').url);
   const fresh = worker();
@@ -980,7 +984,7 @@ test('both sites have independent sessions and ending one does not end the other
     { id: 'test-extension', url: 'chrome-extension://test-extension/popup.html' }
   );
   assert.equal(result.ok, true);
-  assert.equal(result.access.x.expiresAt, 0);
+  assert.equal(result.access.x.expiresAt, null);
   assert.ok(result.access.linkedin.remainingMs);
   assert.deepEqual(
     rulesFor(w).map(rule => rule.id),
@@ -1008,7 +1012,7 @@ test('failed rule revocation preserves the running budget for a retry', async ()
   assert.equal((await w.send({ type: 'access-status' })).ok, false);
   assert.ok(w.data._access.x.remainingMs);
   w.failRules = false;
-  assert.equal((await w.send({ type: 'access-status' })).access.x.expiresAt, 0);
+  assert.equal((await w.send({ type: 'access-status' })).access.x.expiresAt, null);
   assert.deepEqual(rulesFor(w), []);
 });
 
@@ -1149,7 +1153,7 @@ test('turning Limit & track off drops time and actions, preserves history, and u
     result.settings.trackedSites,
     C.DEFAULT_SETTINGS.trackedSites.filter(id => id !== 'x')
   );
-  assert.equal(result.access.x.expiresAt, 0);
+  assert.equal(result.access.x.expiresAt, null);
   assert.equal(result.day.x.consumeSec, 5);
   const after = packet('disabled');
   after.actions = [{ date: C.localDate(), action: 'posts' }];
@@ -1236,7 +1240,7 @@ test('access budget pauses away from the site and resumes across tabs without do
   w.advance(600000);
   let state = (await w.send({ type: 'access-status' })).access.x;
   assert.equal(state.remainingMs, 300000, 'unused access must not expire');
-  assert.equal(state.expiresAt, 0, 'paused sessions have no wall-clock deadline');
+  assert.equal(state.expiresAt, null, 'paused sessions have no wall-clock deadline');
   w.activate('https://x.com/home');
   await w.send({ type: 'access-status' });
   w.advance(20000);
@@ -1516,7 +1520,7 @@ test('paused access refills at local midnight using the current configured durat
     let state = (await w.send({ type: 'access-status' })).access.x;
     assert.equal(state.remainingMs, 720000);
     assert.equal(state.refilledAt, midnight);
-    assert.equal(state.expiresAt, 0);
+    assert.equal(state.expiresAt, null);
     assert.equal(rulesFor(w).length, 1);
     assert.equal(w.alarms['access-midnight'].when, new Date(2026, 9, 13).getTime());
     w.activate('https://x.com/home');
@@ -1559,7 +1563,7 @@ test('restart after missed midnights refills unused access without charging brow
   w.startup();
   const state = (await w.send({ type: 'access-status' })).access.x;
   assert.equal(state.remainingMs, 300000);
-  assert.equal(state.expiresAt, 0);
+  assert.equal(state.expiresAt, null);
   assert.equal(w.alarms['access-midnight'].when, new Date(2026, 9, 16).getTime());
 });
 
@@ -1630,8 +1634,8 @@ test('midnight refills use current per-site overrides and inherited Default inde
     assert.equal(states.linkedin.refilledAt, midnight);
     assert.equal(states.x.sessionMinutes, 4);
     assert.equal(states.linkedin.sessionMinutes, 15);
-    assert.equal(states.x.expiresAt, 0);
-    assert.equal(states.linkedin.expiresAt, 0);
+    assert.equal(states.x.expiresAt, null);
+    assert.equal(states.linkedin.expiresAt, null);
     await w.send({ type: 'access-duration', site: 'x', minutes: null }, popupSender);
     assert.equal((await w.send({ type: 'access-status' })).access.x.remainingMs, 240000);
     w.advance(86400000);
@@ -1657,13 +1661,13 @@ test('Off cancels midnight refills and pending waits without deleting intention 
     let state = (await w.send({ type: 'access-status' })).access.x;
     assert.equal(state.enabled, false);
     assert.equal(state.remainingMs, 0);
-    assert.equal(state.refilledAt, 0);
+    assert.equal(state.refilledAt, null);
     await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));
     assert.equal(w.data._intentions.length, 1);
     assert.equal(w.data._access.x, undefined);
     state = (await w.send(tracking('x', true), popupSender)).access.x;
     assert.equal(state.remainingMs, 0);
-    assert.equal(state.readyAt, 0);
+    assert.equal(state.readyAt, null);
     assert.equal(state.sessionMinutes, 2);
     assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
     await w.send({ type: 'access-begin', site: 'x', reason: intent }, gate('x'));

@@ -106,7 +106,25 @@ test('equivalence detects a stored budget dropped while a session runs', async t
   await mutate(
     candidate,
     'remainingMs: state.remainingMs,',
-    'remainingMs: state.expiresAt ? null : state.remainingMs,'
+    'remainingMs: state.clock?.running ? null : state.remainingMs,'
   );
+  await assert.rejects(compare(baseline, candidate), /lifecycle/);
+});
+
+test('equivalence accepts null in place of a zero time in the status reply', async t => {
+  const { baseline, candidate } = await bundles(t);
+  await mutate(
+    baseline,
+    'const readyAt = request ? request.readyAt : null;',
+    'const readyAt = request ? request.readyAt : 0;'
+  );
+  await mutate(baseline, 'deadline > now ? deadline : null;', 'deadline > now ? deadline : 0;');
+  await mutate(baseline, 'refilledAt: session?.refilledAt || null,', 'refilledAt: session?.refilledAt || 0,');
+  await compare(baseline, candidate);
+});
+
+test('equivalence still rejects a changed nonzero time in the status reply', async t => {
+  const { baseline, candidate } = await bundles(t);
+  await mutate(candidate, 'refilledAt: session?.refilledAt || null,', 'refilledAt: session?.refilledAt ? 1 : null,');
   await assert.rejects(compare(baseline, candidate), /lifecycle/);
 });

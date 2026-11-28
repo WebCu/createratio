@@ -62,7 +62,7 @@ function render() {
   if (!access) return;
   const now = Date.now(),
     active = access.goalAllowed || access.remainingMs > 0;
-  const waiting = !active && access.readyAt > 0;
+  const waiting = !active && access.readyAt !== null;
   const waitSeconds =
     typeof access.waitSeconds === 'number' && Number.isFinite(access.waitSeconds) && access.waitSeconds > 0
       ? Core.asSeconds(access.waitSeconds)
@@ -139,7 +139,7 @@ async function send(type, extra = {}) {
  * @param {{ reason?: string }} [extra] */
 async function action(type, extra = {}, navigate = false) {
   if (busy) return;
-  const previousRefill = access?.refilledAt || 0;
+  const previousRefill = access?.refilledAt ?? null;
   const previousFocus = document.activeElement;
   const restoreFocus = target => {
     if (document.activeElement === previousFocus || document.activeElement === document.body) target?.focus();

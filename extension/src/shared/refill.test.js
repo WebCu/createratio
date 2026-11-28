@@ -88,7 +88,7 @@ test('countdown ticks and storage refreshes never replay the same refill', () =>
 });
 
 test('normal opens, old or future refills and exhausted budgets do not animate', () => {
-  for (const refilledAt of [undefined, 0, 39999, 100001, NaN, Infinity]) {
+  for (const refilledAt of [undefined, null, 0, 39999, 100001, NaN, Infinity]) {
     const a = animation();
     a.render(a.target, { remainingMs: 300000, refilledAt });
     assert.equal(a.target.children.length, 0);
@@ -109,7 +109,7 @@ test('malformed refill timestamps from replies never throw or animate', () => {
 
 test('an already-open view announces a missed refill on wake, without replaying it', () => {
   const a = animation();
-  a.render(a.target, { remainingMs: 100000, refilledAt: 0 });
+  a.render(a.target, { remainingMs: 100000, refilledAt: null });
   a.advance(3600000);
   a.render(a.target, { remainingMs: 300000, refilledAt: 100000 });
   assert.equal(a.target.children.length, 1);
@@ -123,7 +123,7 @@ test('separate sites animate independently and ending access cancels its notice'
     second = a.createTarget();
   a.render(a.target, { remainingMs: 300000, refilledAt: 100000 });
   a.render(second, { remainingMs: 300000, refilledAt: 100000 });
-  a.render(a.target, { remainingMs: 0, refilledAt: 0 });
+  a.render(a.target, { remainingMs: 0, refilledAt: null });
   assert.equal(a.target.children.length, 0);
   assert.equal(second.children.length, 1);
   assert.equal(a.timers.size, 1);

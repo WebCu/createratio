@@ -15,8 +15,8 @@ function accessState(site, changes = {}, catalog = Sites) {
     enabled: true,
     goalAllowed: false,
     remainingMs: 0,
-    expiresAt: 0,
-    readyAt: 0,
+    expiresAt: null,
+    readyAt: null,
     sessionMinutes: 5,
     waitSeconds: Core.DEFAULT_SETTINGS.waitMinutes * 60,
     ...changes
@@ -216,7 +216,7 @@ function page(name, data = { [Core.localDate()]: { x: { consumeSec: 60 } } }, en
           return { ok: true, enabled };
         }
         if (message.type === 'access-end')
-          state.access[message.site] = { ...state.access[message.site], remainingMs: 0, expiresAt: 0 };
+          state.access[message.site] = { ...state.access[message.site], remainingMs: 0, expiresAt: null };
         return {
           ok: true,
           date: Core.localDate(),

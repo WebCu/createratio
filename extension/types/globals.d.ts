@@ -16,9 +16,9 @@ declare global {
     name: string;
     home: string;
     remainingMs: Milliseconds;
-    expiresAt: EpochTime;
-    readyAt: EpochTime;
-    refilledAt: EpochTime;
+    expiresAt: EpochTime | null;
+    readyAt: EpochTime | null;
+    refilledAt: EpochTime | null;
     waitSeconds: Seconds;
     sessionMinutes: Minutes;
   };

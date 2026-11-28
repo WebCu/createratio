@@ -260,7 +260,7 @@ test('active time clips exactly at 30 seconds and never backfills after new inpu
   assert.equal(C.activeMilliseconds(state), 2000);
   assert.equal(C.activeMilliseconds({ ...state, start: 33000, end: 38000 }), 0);
   assert.equal(C.activeMilliseconds({ ...state, lastInput: 32000 }), 1000);
-  assert.equal(C.activeMilliseconds({ ...state, lastInput: -Infinity }), 0);
+  assert.equal(C.activeMilliseconds({ ...state, start: 1000, end: 5000, lastInput: null }), 0);
   for (const change of [{ visible: false }, { focused: false }, { mode: 'neutral' }, { end: 60000 }, { end: 27000 }])
     assert.equal(C.activeMilliseconds({ ...state, ...change }), 0);
 });

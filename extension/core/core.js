@@ -65,7 +65,6 @@
   function asPageTime(time) {
     return /** @type {PageTime} */ (time);
   }
-  const UNSET_EPOCH_TIME = asEpochTime(0);
   /**
    * @template {EpochTime | PageTime} T
    * @param {T} time
@@ -260,9 +259,17 @@
   function classifyPage(state) {
     return integrations.forURL(state.url)?.classifyPage(state) || 'neutral';
   }
-  /** @param {{ start: PageTime, end: PageTime, lastInput: PageTime, visible: boolean, focused: boolean, mode: string }} sample */
+  /** @param {{ start: PageTime, end: PageTime, lastInput: PageTime | null, visible: boolean, focused: boolean, mode: string }} sample */
   function activeMilliseconds({ start, end, lastInput, visible, focused, mode }) {
-    if (!visible || !focused || !['create', 'consume'].includes(mode) || end < start || end - start > 15000) return 0;
+    if (
+      lastInput === null ||
+      !visible ||
+      !focused ||
+      !['create', 'consume'].includes(mode) ||
+      end < start ||
+      end - start > 15000
+    )
+      return 0;
     return Math.max(0, Math.min(end, lastInput + 30000) - Math.max(start, lastInput));
   }
   /**
@@ -318,7 +325,6 @@
     asMilliseconds,
     asSeconds,
     asMinutes,
-    UNSET_EPOCH_TIME,
     asEpochTime,
     asPageTime,
     timeAfter,

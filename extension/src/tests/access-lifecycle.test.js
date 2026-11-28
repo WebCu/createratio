@@ -145,7 +145,7 @@ for (const browser of ['chrome', 'browser']) {
       const wake = worker(first.data, browser, first.now + 600000, { session: nextSession });
       const access = await status(wake);
       assert.equal(access.x.remainingMs, 280000);
-      assert.equal(access.x.expiresAt, 0);
+      assert.equal(access.x.expiresAt, null);
       assert.equal(wake.alarms['access-x'], undefined);
     }
   });
@@ -183,7 +183,7 @@ for (const browser of ['chrome', 'browser']) {
     wake.alarm('access-x');
     const access = await status(wake);
     assert.equal(access.x.remainingMs, 0);
-    assert.equal(access.x.expiresAt, 0);
+    assert.equal(access.x.expiresAt, null);
     assert.equal(wake.alarms['access-x'], undefined);
     assert.deepEqual(rulesFor(wake), []);
     assert.equal(wake.tabs[0].url, gate('x').url);
@@ -226,7 +226,7 @@ for (const browser of ['chrome', 'browser']) {
     let access = await status(wake);
     assert.equal(access.x.goalAllowed, true);
     assert.equal(access.x.remainingMs, 290000);
-    assert.equal(access.x.expiresAt, 0);
+    assert.equal(access.x.expiresAt, null);
     wake.data[date].x.consumeSec = 120;
     access = await status(wake);
     assert.equal(access.x.goalAllowed, false);

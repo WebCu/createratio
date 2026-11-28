@@ -4,7 +4,7 @@ const RefillAnimation = (() => {
   const views = new WeakMap();
   function render(target, access) {
     const previous = views.get(target);
-    const refilledAt = typeof access.refilledAt === 'number' ? access.refilledAt : 0;
+    const refilledAt = typeof access.refilledAt === 'number' ? access.refilledAt : null;
     if (previous?.refilledAt === refilledAt && access.remainingMs > 0) return;
     if (previous?.notice) {
       clearTimeout(previous.timeout);
@@ -14,6 +14,7 @@ const RefillAnimation = (() => {
     views.set(target, view);
     const age = Date.now() - refilledAt;
     if (
+      refilledAt === null ||
       !Number.isFinite(refilledAt) ||
       refilledAt <= 0 ||
       age < 0 ||

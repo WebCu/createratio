@@ -5,12 +5,14 @@
 })(globalThis, function (Core) {
   'use strict';
   /** @typedef {{ phase: 'request', readyAt: EpochTime, waitMs: Milliseconds | null }} AccessRequest */
-  /** @typedef {{ phase: 'session', remainingMs: Milliseconds | null, expiresAt: EpochTime | null, refilledAt: EpochTime | null, date: LocalDate | null, goalActive: boolean }} AccessSession */
+  /** @typedef {{ running: true, expiresAt: EpochTime } | { running: false }} SessionClock */
+  /** @typedef {{ phase: 'session', remainingMs: Milliseconds | null, clock: SessionClock | null, refilledAt: EpochTime | null, date: LocalDate | null, goalActive: boolean }} AccessSession */
   /** @typedef {AccessRequest | AccessSession | null} SiteAccessState */
   /** @typedef {{ now: EpochTime, date: LocalDate, dayStart: EpochTime, midnight: EpochTime, restart: boolean, enabled: boolean, goalAllowed: boolean, focused: boolean, accessMinutes: Minutes, hasRules: boolean, hasWindows: boolean, closeAll: boolean }} AccessFacts */
-  /** @typedef {{ state: SiteAccessState, rules: 'unrestricted' | 'session' | 'none', alarmAt: EpochTime, expire: boolean, window: { start: EpochTime, end: EpochTime } | null, clearWindows: boolean }} AccessDecision */
+  /** @typedef {{ state: SiteAccessState, rules: 'unrestricted' | 'session' | 'none', alarmAt: EpochTime | null, expire: boolean, window: { start: EpochTime, end: EpochTime | null } | null, clearWindows: boolean }} AccessDecision */
   const MAXIMUM_BUDGET = Core.millisecondsFromMinutes(Core.ACCESS_LIMITS.maxMinutes);
-  const OPEN_WINDOW_END = Core.asEpochTime(Number.MAX_SAFE_INTEGER);
+  /** @type {SessionClock} */
+  const PAUSED = { running: false };
   const SESSION_FIELDS = ['remainingMs', 'expiresAt', 'refilledAt'];
   /**
    * @param {unknown} value
@@ -42,6 +44,27 @@
     return Number.isFinite(value) ? Core.asEpochTime(value) : null;
   }
   /**
+   * @param {EpochTime} expiresAt
+   * @returns {SessionClock}
+   */
+  function runningUntil(expiresAt) {
+    return { running: true, expiresAt };
+  }
+  /** @returns {SessionClock | null} */
+  function clockFromStored(value) {
+    if (!Number.isFinite(value)) return null;
+    return value === 0 ? PAUSED : runningUntil(Core.asEpochTime(value));
+  }
+  /** @param {SessionClock | null} clock */
+  function storedFromClock(clock) {
+    if (clock === null) return null;
+    return clock.running ? clock.expiresAt : 0;
+  }
+  /** @param {SessionClock | null} clock */
+  function deadline(clock) {
+    return clock?.running ? clock.expiresAt : null;
+  }
+  /**
    * @param {unknown} raw
    * @param {EpochTime} now
    * @returns {SiteAccessState}
@@ -58,7 +81,7 @@
       /** @type {AccessSession} */ ({
         phase: 'session',
         remainingMs: remaining === null ? null : Core.asMilliseconds(remaining),
-        expiresAt: epochTimeOrNull(raw.expiresAt),
+        clock: clockFromStored(raw.expiresAt),
         refilledAt: epochTimeOrNull(raw.refilledAt),
         date: hasDate ? raw.date : null,
         goalActive: raw.goalActive === true
@@ -83,7 +106,7 @@
         ? { readyAt: state.readyAt, waitMs: state.waitMs }
         : {
             remainingMs: state.remainingMs,
-            expiresAt: state.expiresAt,
+            expiresAt: storedFromClock(state.clock),
             refilledAt: state.refilledAt,
             date: state.date,
             goalActive: state.goalActive || null
@@ -135,7 +158,7 @@
       state: {
         phase: 'session',
         remainingMs: Core.millisecondsFromMinutes(sessionMinutes),
-        expiresAt: Core.UNSET_EPOCH_TIME,
+        clock: PAUSED,
         refilledAt: now,
         date: null,
         goalActive: false
@@ -153,66 +176,66 @@
       return {
         state: null,
         rules: 'unrestricted',
-        alarmAt: Core.UNSET_EPOCH_TIME,
+        alarmAt: null,
         expire: false,
         window: null,
         clearWindows: true
       };
     const budget = state?.phase === 'session' ? state : null;
     let remaining = budget?.remainingMs ?? null;
-    let expiresAt = budget?.expiresAt ?? null;
+    let clock = budget?.clock ?? null;
     let refilledAt = budget?.refilledAt ?? null;
     let sessionDate = budget?.date ?? null;
     let goalActive = budget?.goalActive ?? false;
     let windowStart = now;
-    const hadSession = remaining !== null || expiresAt !== null;
+    const hadSession = remaining !== null || clock !== null;
     if (sessionDate && sessionDate !== date) {
+      const previousDeadline = deadline(clock);
       const runningAtMidnight =
-        !restart && ((expiresAt !== null && expiresAt >= dayStart) || (!goalAllowed && goalActive));
-      const pausedAtMidnight = !restart && remaining > 0 && !expiresAt;
+        !restart && ((previousDeadline !== null && previousDeadline >= dayStart) || (!goalAllowed && goalActive));
+      const pausedAtMidnight = !restart && remaining > 0 && !clock?.running;
       if (runningAtMidnight || pausedAtMidnight) windowStart = dayStart;
       remaining = Core.millisecondsFromMinutes(facts.accessMinutes);
       refilledAt = dayStart;
-      expiresAt = runningAtMidnight ? Core.timeAfter(dayStart, remaining) : Core.UNSET_EPOCH_TIME;
+      clock = runningAtMidnight ? runningUntil(Core.timeAfter(dayStart, remaining)) : PAUSED;
     }
-    const authorizedUntil = expiresAt;
+    const authorizedUntil = deadline(clock);
     goalActive = goalAllowed && focused && remaining > 0;
     if (remaining > 0) sessionDate = date;
-    if (!restart && expiresAt)
-      remaining = Core.asMilliseconds(Math.min(remaining, Math.max(0, Core.millisecondsBetween(now, expiresAt))));
+    if (!restart && authorizedUntil !== null)
+      remaining = Core.asMilliseconds(Math.min(remaining, Math.max(0, Core.millisecondsBetween(now, authorizedUntil))));
     let rules = /** @type {AccessDecision['rules']} */ ('none'),
-      alarmAt = Core.UNSET_EPOCH_TIME,
       expire = false;
     if (goalAllowed || remaining > 0) {
-      expiresAt = !goalAllowed && focused ? Core.timeAfter(now, remaining) : Core.UNSET_EPOCH_TIME;
+      clock = !goalAllowed && focused ? runningUntil(Core.timeAfter(now, remaining)) : PAUSED;
       rules = 'session';
-      alarmAt = expiresAt;
     } else {
       expire = hadSession || facts.closeAll || facts.hasRules;
-      expiresAt = null;
+      clock = null;
       remaining = null;
     }
+    const alarmAt = deadline(clock);
     const window =
-      facts.hasWindows || refilledAt > 0 || expiresAt || goalAllowed
+      facts.hasWindows || refilledAt > 0 || alarmAt !== null || goalAllowed
         ? {
             start: windowStart,
             end: goalAllowed
               ? midnight
-              : remaining > 0 && !expiresAt
-                ? OPEN_WINDOW_END
-                : expiresAt || Core.asEpochTime(Math.min(now, authorizedUntil || now))
+              : remaining > 0 && alarmAt === null
+                ? null
+                : (alarmAt ?? Core.asEpochTime(Math.min(now, authorizedUntil ?? now)))
           }
         : null;
     const next =
       state?.phase === 'request'
         ? state
         : budget === null ||
-            (remaining === null && expiresAt === null && refilledAt === null && sessionDate === null && !goalActive)
+            (remaining === null && clock === null && refilledAt === null && sessionDate === null && !goalActive)
           ? null
           : /** @type {AccessSession} */ ({
               phase: 'session',
               remainingMs: remaining,
-              expiresAt,
+              clock,
               refilledAt,
               date: sessionDate,
               goalActive

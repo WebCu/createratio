@@ -227,7 +227,7 @@ for (const browser of ['chrome', 'browser']) {
     w.blur();
     snapshot = await w.send({ type: 'snapshot' });
     assert.equal(snapshot.access.x.remainingMs, 100000);
-    assert.equal(snapshot.access.x.expiresAt, 0);
+    assert.equal(snapshot.access.x.expiresAt, null);
     popup.refresh();
     await until(
       () => accessRow(popup).children[0].children[1].textContent === '1:40 left · paused',

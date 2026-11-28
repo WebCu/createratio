@@ -160,14 +160,14 @@ function page(options = {}) {
               return { ok: false, error: 'Finish the waiting period before opening the site.' };
             access = {
               ...access,
-              readyAt: 0,
+              readyAt: null,
               remainingMs: access.sessionMinutes * 60000,
-              expiresAt: 0,
+              expiresAt: null,
               refilledAt: now
             };
           }
           if (message.type === 'access-cancel' || message.type === 'access-end')
-            access = { ...access, readyAt: 0, expiresAt: 0, remainingMs: 0 };
+            access = { ...access, readyAt: null, expiresAt: null, remainingMs: 0 };
           return {
             ok: true,
             access: { [site]: structuredClone(access) },
