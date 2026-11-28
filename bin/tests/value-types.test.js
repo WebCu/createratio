@@ -297,19 +297,19 @@ test('duration converters reject mismatched source units and raw numbers', t => 
     );
 });
 
-test('vetted site IDs come from the catalog and recorded IDs only through the guard', t => {
+test('vetted site IDs come from the catalog and other site IDs only through the guard', t => {
   const accepted = typeCheck(t, {
     'accepted.js': [
       '/** @param {unknown} value */',
       'function guarded(value) {',
-      '  if (!Sites.validRecordedSiteId(value)) return;',
-      '  /** @type {RecordedSiteId} */',
-      '  const recorded = value;',
+      '  if (!Sites.validSiteId(value)) return;',
+      '  /** @type {SiteId} */',
+      '  const site = value;',
       '}',
       '/** @type {VettedSiteId[]} */',
       'const vetted = [Sites.sites[0].id, Core.SITES[0].id];',
-      '/** @type {RecordedSiteId[]} */',
-      'const recorded = [...vetted, ...Core.recordedSites({})];',
+      '/** @type {SiteId[]} */',
+      'const sites = [...vetted, ...Core.recordedSites({})];',
       ''
     ].join('\n')
   });
@@ -318,11 +318,11 @@ test('vetted site IDs come from the catalog and recorded IDs only through the gu
     'rejected.js': [
       '/** @param {unknown} value */',
       'function recordedOnly(value) {',
-      '  if (!Sites.validRecordedSiteId(value)) return;',
+      '  if (!Sites.validSiteId(value)) return;',
       '  /** @type {VettedSiteId} */',
       '  const vetted = value;',
       '}',
-      '/** @type {RecordedSiteId} */',
+      '/** @type {SiteId} */',
       "const fromString = 'x';",
       '/** @type {VettedSiteId} */',
       "const fromLiteral = 'x';",
@@ -333,8 +333,8 @@ test('vetted site IDs come from the catalog and recorded IDs only through the gu
   });
   assert.notEqual(rejected.status, 0);
   for (const [line, source, target] of [
-    [5, 'RecordedSiteId', 'VettedSiteId'],
-    [8, 'string', 'RecordedSiteId'],
+    [5, 'SiteId', 'VettedSiteId'],
+    [8, 'string', 'SiteId'],
     [10, 'string', 'VettedSiteId'],
     [12, 'VettedSiteId', 'number']
   ])
@@ -349,24 +349,24 @@ test('vetted site IDs come from the catalog and recorded IDs only through the gu
 test('access records, saved intentions and gate URLs require branded site IDs', t => {
   const result = typeCheck(t, {
     'records.js': [
-      '/** @param {AccessStatus} status @param {RecordedSiteId} recorded */',
-      'function stale(status, recorded) { status.site = recorded; }',
+      '/** @param {AccessStatus} status @param {SiteId} site */',
+      'function stale(status, site) { status.site = site; }',
       '/** @type {SavedIntention} */',
       "const intention = { site: 'x', reason: 'r', requestedAt: Core.asEpochTime(1) };",
-      '/** @param {RecordedSiteId} recorded */',
-      'function gate(recorded) { return SiteAccess.gateURL(recorded); }',
+      '/** @param {SiteId} site */',
+      'function gate(site) { return SiteAccess.gateURL(site); }',
       '/** @type {VettedSiteId | null} */',
       "const located = SiteAccess.siteForURL('https://x.com/');",
-      '/** @type {RecordedSiteId[]} */',
+      '/** @type {SiteId[]} */',
       'const recorded = Core.recordedSites({});',
       ''
     ].join('\n')
   });
   assert.notEqual(result.status, 0);
   for (const [line, source, target] of [
-    [2, 'RecordedSiteId', 'VettedSiteId'],
-    [4, 'string', 'RecordedSiteId'],
-    [6, 'RecordedSiteId', 'VettedSiteId']
+    [2, 'SiteId', 'VettedSiteId'],
+    [4, 'string', 'SiteId'],
+    [6, 'SiteId', 'VettedSiteId']
   ])
     assert.match(
       result.stdout,

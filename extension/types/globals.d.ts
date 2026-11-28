@@ -4,8 +4,8 @@ declare global {
   type Seconds = number & { readonly __brand: 'Seconds' };
   type Minutes = number & { readonly __brand: 'Minutes' };
   type AccessMinutes = Minutes & { readonly __range: 'AccessMinutes' };
-  type RecordedSiteId = string & { readonly __brand: 'RecordedSiteId' };
-  type VettedSiteId = RecordedSiteId & { readonly __vetted: true };
+  type SiteId = string & { readonly __brand: 'SiteId' };
+  type VettedSiteId = SiteId & { readonly __vetted: true };
   type EpochTime = number & { readonly __brand: 'EpochTime' };
   type PageTime = number & { readonly __brand: 'PageTime' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {

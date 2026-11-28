@@ -15,8 +15,8 @@
   function validRedirectRuleId(value) {
     return validRuleId(value) && value <= MAX_REDIRECT_RULE_ID;
   }
-  /** @returns {value is RecordedSiteId} */
-  function validRecordedSiteId(value) {
+  /** @returns {value is SiteId} */
+  function validSiteId(value) {
     return typeof value === 'string' && /^[a-z][a-z0-9_-]*$/.test(value);
   }
   function validateAccessRules(id, rules, ruleIds) {
@@ -50,7 +50,7 @@
     { id: 'reddit' }
   ];
   const plugins = catalog.map(({ id }) => {
-    if (!validRecordedSiteId(id)) throw new Error('Invalid integration ID: ' + id);
+    if (!validSiteId(id)) throw new Error('Invalid integration ID: ' + id);
     const plugin = load(id);
     if (
       !plugin ||
@@ -139,5 +139,5 @@
       return null;
     }
   }
-  return { sites, get, forURL, forAccessURL, validRedirectRuleId, validRecordedSiteId };
+  return { sites, get, forURL, forAccessURL, validRedirectRuleId, validSiteId };
 });

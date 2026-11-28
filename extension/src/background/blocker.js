@@ -12,7 +12,7 @@ const SiteAccess = (() => {
     return value.filter(
       entry =>
         record(entry) &&
-        Sites.validRecordedSiteId(entry.site) &&
+        Sites.validSiteId(entry.site) &&
         typeof entry.reason === 'string' &&
         entry.reason.trim().length > 0 &&
         entry.reason.length <= Core.INTENTION_LIMITS.maxLength &&

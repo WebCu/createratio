@@ -5,7 +5,7 @@
 })(globalThis, function (integrations) {
   'use strict';
   const FIELDS = ['consumeSec', 'createSec', 'posts', 'replies', 'comments', 'likes', 'bookmarks', 'quotes', 'reposts'];
-  const { sites: SITES, validRecordedSiteId } = /** @type {typeof Sites} */ (integrations);
+  const { sites: SITES, validSiteId } = /** @type {typeof Sites} */ (integrations);
   const ACCESS_LIMITS = {
     minMinutes: /** @type {AccessMinutes} */ (1),
     maxMinutes: /** @type {AccessMinutes} */ (240)
@@ -192,7 +192,7 @@
     return SITES.some(definition => definition.id === site) && trackingSelection(settings).includes(site);
   }
   function recordedSites(day = {}) {
-    return Object.keys(isRecord(day) ? day : {}).filter(validRecordedSiteId);
+    return Object.keys(isRecord(day) ? day : {}).filter(validSiteId);
   }
   function emptyStats() {
     return Object.fromEntries(FIELDS.map(k => [k, 0]));

@@ -154,9 +154,9 @@ test('catalog rejects missing modules, mismatched IDs, overlapping hosts, and in
   }
 });
 
-test('recorded site IDs follow the stable ID format, whether or not the catalog vets them', () => {
+test('site IDs follow the stable ID format, whether or not the catalog vets them', () => {
   for (const id of ['x', 'removed_site', 'old-site2', 'constructor'])
-    assert.equal(integrations.validRecordedSiteId(id), true, id);
+    assert.equal(integrations.validSiteId(id), true, id);
   for (const id of ['X', '1site', '-site', '', 'site.com', 'my site', 42, null, undefined, ['x']])
-    assert.equal(integrations.validRecordedSiteId(id), false, String(id));
+    assert.equal(integrations.validSiteId(id), false, String(id));
 });
