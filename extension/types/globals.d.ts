@@ -7,6 +7,7 @@ declare global {
   type SiteId = string & { readonly __brand: 'SiteId' };
   type VettedSiteId = SiteId & { readonly __vetted: true };
   type WebsiteDomain = string & { readonly __brand: 'WebsiteDomain' };
+  type Intention = string & { readonly __brand: 'Intention' };
   type EpochTime = number & { readonly __brand: 'EpochTime' };
   type PageTime = number & { readonly __brand: 'PageTime' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {

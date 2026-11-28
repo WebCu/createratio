@@ -69,8 +69,11 @@ commands require positive resistance; native scrolling uses the Off switch.
 
 `validAccessMinutes`, `validIntention`, and their exported limits supply the same
 rules to forms and receivers. Raw values get the `AccessMinutes` type only
-through `validAccessMinutes`; the defaults and `ACCESS_LIMITS` are cast. Intentions use a trimmed minimum but a raw maximum;
-new commands never coerce values. `validLocalDate` rejects impossible calendar
+through `validAccessMinutes`; the defaults and `ACCESS_LIMITS` are cast. An
+`Intention` is trimmed text of 20–280 characters, and `validIntention` is its
+guard. `intentionFromText` checks submitted text with a raw maximum and a trimmed
+minimum, then returns the trimmed `Intention` or `null`. New commands never
+coerce values. `validLocalDate` rejects impossible calendar
 dates. `DELIVERY_LIMITS` bounds packets, items, seconds, IDs, and receipts.
 `statsSnapshot` resolves missing or invalid known numbers to zero without
 coercing numeric strings; history reads preserve unknown fields and partial rows.

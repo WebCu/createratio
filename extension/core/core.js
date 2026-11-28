@@ -13,12 +13,20 @@
   const INTENTION_LIMITS = { minLength: 20, maxLength: 280 };
   const SCROLL_FRICTION_LIMITS = { minStrength: 50, maxStrength: 95, step: 5 };
   const DELIVERY_LIMITS = { maxPackets: 64, maxItems: 64, maxSeconds: 3600, maxIdLength: 100, receiptLimit: 512 };
+  /** @returns {value is Intention} */
   function validIntention(value) {
     return (
       typeof value === 'string' &&
-      value.length <= INTENTION_LIMITS.maxLength &&
-      value.trim().length >= INTENTION_LIMITS.minLength
+      value === value.trim() &&
+      value.length >= INTENTION_LIMITS.minLength &&
+      value.length <= INTENTION_LIMITS.maxLength
     );
+  }
+  /** @returns {Intention | null} */
+  function intentionFromText(value) {
+    if (typeof value !== 'string' || value.length > INTENTION_LIMITS.maxLength) return null;
+    const text = value.trim();
+    return validIntention(text) ? text : null;
   }
   /** @returns {value is AccessMinutes} */
   function validAccessMinutes(value) {
@@ -335,6 +343,7 @@
     pageOriginFromClocks,
     epochTimeFromPageTime,
     validIntention,
+    intentionFromText,
     DEFAULT_SETTINGS,
     settingsSnapshot,
     siteSettings,
