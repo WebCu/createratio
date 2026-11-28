@@ -43,7 +43,7 @@ async function snapshot() {
   const stored = /** @type {StoredData} */ (
     await extensionAPI.storage.local.get([date, 'settings', '_historyGeneration'])
   );
-  const day = history.creationDay(stored[date]);
+  const day = Core.creationDayFromStored(stored[date]);
   await badge(day);
   return {
     ok: true,

@@ -138,6 +138,7 @@
     scrollFrictionStrength: 50,
     trackedSites: /** @type {string[]} */ (SITES.filter(site => site.defaultEnabled).map(site => site.id))
   };
+  /** @returns {value is Record<string, unknown>} */
   function isRecord(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
@@ -219,15 +220,57 @@
   function nonnegative(n) {
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }
+  function knownStats(stats) {
+    return Object.fromEntries(FIELDS.map(key => [key, nonnegative(stats?.[key])]));
+  }
   /** @returns {CreationStats} */
   function statsSnapshot(stats) {
-    return /** @type {CreationStats} */ (Object.fromEntries(FIELDS.map(key => [key, nonnegative(stats?.[key])])));
+    return /** @type {CreationStats} */ (knownStats(stats));
+  }
+  /** @returns {CreationStats} */
+  function sumStats(rows) {
+    const sums = Object.fromEntries(FIELDS.map(key => [key, 0]));
+    for (const row of rows) for (const key of FIELDS) sums[key] += nonnegative(row?.[key]);
+    return statsSnapshot(sums);
   }
   /** @returns {CreationStats} */
   function aggregate(day = {}) {
-    const sums = Object.fromEntries(FIELDS.map(key => [key, 0]));
-    for (const id of recordedSites(day)) for (const k of FIELDS) sums[k] += nonnegative(day[id]?.[k]);
-    return statsSnapshot(sums);
+    return sumStats(recordedSites(day).map(id => day[id]));
+  }
+  /**
+   * @param {unknown} value
+   * @returns {CreationDay}
+   */
+  function creationDayFromStored(value) {
+    const rows = Object.entries(isRecord(value) ? value : {}).map(([site, row]) => {
+      if (!isRecord(row)) return [site, {}];
+      const known = knownStats(row);
+      return [
+        site,
+        Object.fromEntries(
+          Object.entries(row).map(([key, field]) => [key, Object.hasOwn(known, key) ? known[key] : field])
+        )
+      ];
+    });
+    return /** @type {CreationDay} */ (Object.fromEntries(rows));
+  }
+  /**
+   * @param {unknown} stored
+   * @param {string} site
+   * @param {Pick<TimeSegment, 'mode' | 'sec'>[]} segments
+   * @param {Pick<SiteActionEntry, 'action'>[]} actions
+   * @returns {Record<string, unknown>}
+   */
+  function creditCreationDay(stored, site, segments, actions) {
+    const day = isRecord(stored) ? stored : {};
+    const row = isRecord(day[site]) ? day[site] : {};
+    const totals = knownStats(row);
+    for (const segment of segments) totals[segment.mode + 'Sec'] += segment.sec;
+    for (const { action } of actions) {
+      totals[action] += 1;
+      if (action === 'quotes') totals.posts += 1;
+    }
+    return { ...day, [site]: { ...row, ...totals } };
   }
   /**
    * @param {CreationStats} stats
@@ -379,7 +422,10 @@
     recordedSites,
     emptyStats,
     statsSnapshot,
+    sumStats,
     aggregate,
+    creationDayFromStored,
+    creditCreationDay,
     score,
     validDailyTarget,
     dailyTarget,

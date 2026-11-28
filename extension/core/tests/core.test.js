@@ -145,6 +145,79 @@ test('aggregate keeps every total finite when a sum overflows', () => {
   assert.equal(total.createSec, 0);
   assert.equal(total.posts, 3);
 });
+test('summed stats add rows across days and keep every total finite', () => {
+  const total = C.sumStats([
+    { createSec: 60, posts: 1, consumeSec: '10' },
+    null,
+    { createSec: 30, consumeSec: 20, likes: -4 }
+  ]);
+  assert.deepEqual(total, { ...C.emptyStats(), createSec: 90, consumeSec: 20, posts: 1 });
+  assert.deepEqual(C.sumStats([]), C.emptyStats());
+  const overflow = C.sumStats([
+    { createSec: Number.MAX_VALUE, posts: 1 },
+    { createSec: Number.MAX_VALUE, posts: 2 }
+  ]);
+  assert.equal(overflow.createSec, 0);
+  assert.equal(overflow.posts, 3);
+});
+
+test('a creation day read from storage keeps unknown sites and fields and checks known numbers', () => {
+  const stored = {
+    x: { consumeSec: '10', posts: -2, createSec: 4, unknown: { saved: true } },
+    retired: { consumeSec: 8, posts: 3, retiredField: 'kept' },
+    future_site: { futureField: 12 },
+    null_site: null,
+    array_site: [7],
+    string_site: 'broken',
+    number_site: 7
+  };
+  const before = structuredClone(stored);
+  const day = C.creationDayFromStored(stored);
+  assert.deepEqual(day, {
+    x: { consumeSec: 0, posts: 0, createSec: 4, unknown: { saved: true } },
+    retired: { consumeSec: 8, posts: 3, retiredField: 'kept' },
+    future_site: { futureField: 12 },
+    null_site: {},
+    array_site: {},
+    string_site: {},
+    number_site: {}
+  });
+  assert.deepEqual(stored, before);
+  for (const malformed of [undefined, null, [], [7], 'broken', 12, true])
+    assert.deepEqual(C.creationDayFromStored(malformed), {});
+});
+
+test('crediting a creation day adds time and actions to one site row and leaves the rest as stored', () => {
+  const stored = {
+    retired: { consumeSec: 8, retiredField: 'kept' },
+    x: { unknown: 'kept', consumeSec: '10', posts: -2, createSec: 4 },
+    null_site: null
+  };
+  const before = structuredClone(stored);
+  const credited = C.creditCreationDay(
+    stored,
+    'x',
+    [
+      { mode: 'consume', sec: C.asSeconds(5) },
+      { mode: 'create', sec: C.asSeconds(2) }
+    ],
+    [{ action: 'quotes' }, { action: 'likes' }]
+  );
+  assert.equal(
+    JSON.stringify(credited),
+    '{"retired":{"consumeSec":8,"retiredField":"kept"},"x":{"unknown":"kept","consumeSec":5,"posts":1,"createSec":6,"replies":0,"comments":0,"likes":1,"bookmarks":0,"quotes":1,"reposts":0},"null_site":null}'
+  );
+  assert.deepEqual(stored, before);
+  assert.equal(credited.retired, stored.retired);
+  for (const malformed of [undefined, null, [9], 'broken', 12])
+    assert.deepEqual(C.creditCreationDay(malformed, 'x', [], [{ action: 'posts' }]), {
+      x: { ...C.emptyStats(), posts: 1 }
+    });
+  assert.deepEqual(C.creditCreationDay({ x: [9] }, 'x', [{ mode: 'create', sec: C.asSeconds(1) }], []), {
+    x: { ...C.emptyStats(), createSec: 1 }
+  });
+});
+
 test('above-goal access needs a score strictly above the daily target', () => {
   const target = C.dailyTarget({ dailyTarget: 1.5 });
   const scoreOf = createSec => C.score(C.statsSnapshot({ consumeSec: 100, createSec }));
