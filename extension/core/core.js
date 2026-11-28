@@ -38,6 +38,10 @@
     return /** @type {Seconds} */ (minutes * 60);
   }
   /** @param {Seconds} seconds */
+  function millisecondsFromSeconds(seconds) {
+    return /** @type {Milliseconds} */ (seconds * 1000);
+  }
+  /** @param {Seconds} seconds */
   function minutesFromSeconds(seconds) {
     return /** @type {Minutes} */ (seconds / 60);
   }
@@ -52,6 +56,46 @@
   /** @param {number} minutes */
   function asMinutes(minutes) {
     return /** @type {Minutes} */ (minutes);
+  }
+  /** @param {number} time */
+  function asEpochTime(time) {
+    return /** @type {EpochTime} */ (time);
+  }
+  /** @param {number} time */
+  function asPageTime(time) {
+    return /** @type {PageTime} */ (time);
+  }
+  const UNSET_EPOCH_TIME = asEpochTime(0);
+  /**
+   * @template {EpochTime | PageTime} T
+   * @param {T} time
+   * @param {Milliseconds} duration
+   * @returns {T}
+   */
+  function timeAfter(time, duration) {
+    return /** @type {T} */ (time + duration);
+  }
+  /**
+   * @template {EpochTime | PageTime} T
+   * @param {T} start
+   * @param {NoInfer<T>} end
+   */
+  function millisecondsBetween(start, end) {
+    return asMilliseconds(end - start);
+  }
+  /**
+   * @param {EpochTime} epochTime
+   * @param {PageTime} pageTime
+   */
+  function pageOriginFromClocks(epochTime, pageTime) {
+    return asEpochTime(epochTime - pageTime);
+  }
+  /**
+   * @param {PageTime} pageTime
+   * @param {EpochTime} pageOrigin
+   */
+  function epochTimeFromPageTime(pageTime, pageOrigin) {
+    return asEpochTime(pageOrigin + pageTime);
   }
   function validScrollFrictionStrength(value) {
     return (
@@ -216,18 +260,23 @@
   function classifyPage(state) {
     return integrations.forURL(state.url)?.classifyPage(state) || 'neutral';
   }
+  /** @param {{ start: PageTime, end: PageTime, lastInput: PageTime, visible: boolean, focused: boolean, mode: string }} sample */
   function activeMilliseconds({ start, end, lastInput, visible, focused, mode }) {
     if (!visible || !focused || !['create', 'consume'].includes(mode) || end < start || end - start > 15000) return 0;
     return Math.max(0, Math.min(end, lastInput + 30000) - Math.max(start, lastInput));
   }
-  function splitInterval(startMs, endMs) {
+  /**
+   * @param {EpochTime} start
+   * @param {EpochTime} end
+   */
+  function splitInterval(start, end) {
     const parts = [];
-    for (let cursor = startMs; cursor < endMs; ) {
+    for (let cursor = start; cursor < end; ) {
       const date = new Date(cursor);
       const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
-      const end = Math.min(endMs, midnight);
-      parts.push({ date: localDate(date), sec: secondsFromMilliseconds(asMilliseconds(end - cursor)) });
-      cursor = end;
+      const partEnd = asEpochTime(Math.min(end, midnight));
+      parts.push({ date: localDate(date), sec: secondsFromMilliseconds(millisecondsBetween(cursor, partEnd)) });
+      cursor = partEnd;
     }
     return parts;
   }
@@ -264,10 +313,18 @@
     secondsFromMilliseconds,
     minutesFromMilliseconds,
     secondsFromMinutes,
+    millisecondsFromSeconds,
     minutesFromSeconds,
     asMilliseconds,
     asSeconds,
     asMinutes,
+    UNSET_EPOCH_TIME,
+    asEpochTime,
+    asPageTime,
+    timeAfter,
+    millisecondsBetween,
+    pageOriginFromClocks,
+    epochTimeFromPageTime,
     validIntention,
     DEFAULT_SETTINGS,
     settingsSnapshot,

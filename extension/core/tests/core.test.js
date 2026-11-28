@@ -10,10 +10,26 @@ test('duration converters preserve arithmetic without rounding or validation', (
     assert.equal(C.secondsFromMilliseconds(C.asMilliseconds(value)), value / 1000);
     assert.equal(C.minutesFromMilliseconds(C.asMilliseconds(value)), value / 60000);
     assert.equal(C.secondsFromMinutes(C.asMinutes(value)), value * 60);
+    assert.equal(C.millisecondsFromSeconds(C.asSeconds(value)), value * 1000);
     assert.equal(C.asMilliseconds(value), value);
     assert.equal(C.asSeconds(value), value);
     assert.equal(C.asMinutes(value), value);
   }
+});
+
+test('clock converters keep exact arithmetic and preserve sentinel values', () => {
+  for (const value of [0, 1, 1.25, -1, NaN, Infinity, -Infinity, 1_795_000_000_000]) {
+    assert.equal(C.asEpochTime(value), value);
+    assert.equal(C.asPageTime(value), value);
+    assert.equal(C.timeAfter(C.asEpochTime(value), C.asMilliseconds(250)), value + 250);
+    assert.equal(C.timeAfter(C.asPageTime(value), C.asMilliseconds(-250)), value - 250);
+    assert.equal(C.millisecondsBetween(C.asEpochTime(1000), C.asEpochTime(value)), value - 1000);
+    assert.equal(C.millisecondsBetween(C.asPageTime(value), C.asPageTime(1000)), 1000 - value);
+  }
+  const pageOrigin = C.pageOriginFromClocks(C.asEpochTime(1_795_000_010_000), C.asPageTime(10_000.5));
+  assert.equal(pageOrigin, 1_794_999_999_999.5);
+  assert.equal(C.epochTimeFromPageTime(C.asPageTime(10_000.5), pageOrigin), 1_795_000_010_000);
+  assert.equal(C.epochTimeFromPageTime(C.asPageTime(-Infinity), pageOrigin), -Infinity);
 });
 
 test('classifies consuming routes, including profiles and SPA query strings', () => {

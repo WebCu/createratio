@@ -538,8 +538,13 @@ fails `pnpm check:types`. `bin/tests/message-types.test.js` covers both failures
 `globals.d.ts` also brands local dates and durations as `LocalDate`,
 `Milliseconds`, `Seconds` and `Minutes`. Raw values enter through
 `Core.validLocalDate`, `Core.validAccessMinutes`, `Core.asMilliseconds`,
-`Core.asSeconds` and `Core.asMinutes`. `bin/tests/value-types.test.js` checks
-that mixed units fail.
+`Core.asSeconds` and `Core.asMinutes`. Points in time use two clocks:
+`EpochTime` for `Date.now()` values and `PageTime` for `performance.now()`
+values. Code reads a clock at the call site and tags the reading with
+`Core.asEpochTime` or `Core.asPageTime`, so tests can substitute time.
+`Core.timeAfter` and `Core.millisecondsBetween` accept only one clock per call;
+`Core.epochTimeFromPageTime` is the only conversion between the clocks.
+`bin/tests/value-types.test.js` checks that mixed units and mixed clocks fail.
 The pre-commit hook checks staged whitespace, including newly added files.
 `pnpm check` rejects Git-tracked root `.pi`, `.agents/skills`, and `.claude/skills`
 paths, including skill-directory symlinks and files force-added while ignored.

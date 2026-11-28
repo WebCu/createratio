@@ -25,7 +25,7 @@ test('value types accept local dates, guarded values and duration conversions', 
       '/** @type {Minutes[]} */',
       'const minutes = [Core.DEFAULT_SETTINGS.accessMinutes, Core.ACCESS_LIMITS.maxMinutes, Core.minutesFromMilliseconds(Core.asMilliseconds(60000)), Core.minutesFromSeconds(segment.sec)];',
       '/** @type {{ date: LocalDate, sec: Seconds }[]} */',
-      'const parts = Core.splitInterval(0, 1000);',
+      'const parts = Core.splitInterval(Core.asEpochTime(0), Core.asEpochTime(1000));',
       ''
     ].join('\n')
   });
@@ -63,6 +63,126 @@ test('value types reject raw dates, unguarded values and mixed duration units', 
     /invalid\.js\(8,\d+\): error TS2322: Type 'string' is not assignable to type 'LocalDate'/
   );
   assert.match(result.stdout, /invalid\.js\(11,\d+\): error TS2322: Type 'number' is not assignable to type 'Seconds'/);
+});
+
+test('clock types accept same-clock arithmetic and explicit clock conversion', t => {
+  const result = typeCheck(t, {
+    'clocks.js': [
+      'const epochNow = Core.asEpochTime(Date.now());',
+      'const pageNow = Core.asPageTime(performance.now());',
+      '/** @type {EpochTime} */',
+      'const later = Core.timeAfter(epochNow, Core.asMilliseconds(1000));',
+      '/** @type {PageTime} */',
+      'const pageLater = Core.timeAfter(pageNow, Core.asMilliseconds(1000));',
+      '/** @type {Milliseconds[]} */',
+      'const gaps = [Core.millisecondsBetween(epochNow, later), Core.millisecondsBetween(pageNow, pageLater)];',
+      'const pageOrigin = Core.pageOriginFromClocks(epochNow, pageNow);',
+      '/** @type {EpochTime} */',
+      'const converted = Core.epochTimeFromPageTime(pageLater, pageOrigin);',
+      '/** @type {EpochTime[]} */',
+      'const sentinels = [Core.asEpochTime(0), Core.asEpochTime(Number.MAX_SAFE_INTEGER)];',
+      ''
+    ].join('\n')
+  });
+  assert.equal(result.status, 0, result.stdout);
+});
+
+test('clock types reject mixed clocks, durations and raw numbers', t => {
+  const result = typeCheck(t, {
+    'mixed.js': [
+      'const epochNow = Core.asEpochTime(Date.now());',
+      'const pageNow = Core.asPageTime(performance.now());',
+      '/** @type {EpochTime} */',
+      'const fromPage = pageNow;',
+      '/** @type {EpochTime} */',
+      'const fromNumber = 1;',
+      '/** @type {EpochTime} */',
+      'const fromDuration = Core.asMilliseconds(1);',
+      'Core.millisecondsBetween(epochNow, pageNow);',
+      'Core.timeAfter(epochNow, 1000);',
+      'Core.epochTimeFromPageTime(epochNow, epochNow);',
+      '/** @type {EpochTime} */',
+      'const pageResult = Core.timeAfter(pageNow, Core.asMilliseconds(1));',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(result.status, 0);
+  for (const [line, pattern] of [
+    [4, "Type 'PageTime' is not assignable to type 'EpochTime'"],
+    [6, "Type 'number' is not assignable to type 'EpochTime'"],
+    [8, "Type 'Milliseconds' is not assignable to type 'EpochTime'"],
+    [9, "Argument of type 'PageTime' is not assignable to parameter of type 'EpochTime'"],
+    [10, "Argument of type 'number' is not assignable to parameter of type 'Milliseconds'"],
+    [11, "Argument of type 'EpochTime' is not assignable to parameter of type 'PageTime'"],
+    [13, "Type 'PageTime' is not assignable to type 'EpochTime'"]
+  ])
+    assert.match(result.stdout, new RegExp(`mixed\\.js\\(${line},\\d+\\): error TS\\d+: ${pattern}`));
+});
+
+test('access and history records require epoch times', t => {
+  const result = typeCheck(t, {
+    'records.js': [
+      '/** @param {AccessStatus} status */',
+      'function pageClock(status) { status.expiresAt = Core.asPageTime(performance.now()); }',
+      '/** @param {AccessStatus} status */',
+      'function rawReady(status) { status.readyAt = 1; }',
+      '/** @type {SavedIntention} */',
+      "const intention = { site: 'x', reason: 'r', requestedAt: 1 };",
+      '/** @type {SiteActionEntry} */',
+      "const action = { date: Core.localDate(), action: 'posts', at: Core.asPageTime(performance.now()) };",
+      'SiteAccessModel.requestAccess(null, Core.asMilliseconds(1), 1);',
+      'SiteAccessModel.confirmRequest(null, Core.asMinutes(1), Core.asPageTime(performance.now()));',
+      '/** @type {TimeSegment} */',
+      "const segment = { date: Core.localDate(), mode: 'create', sec: Core.asSeconds(1), start: Core.asPageTime(performance.now()) };",
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(result.status, 0);
+  for (const [line, source] of [
+    [2, 'PageTime'],
+    [4, 'number'],
+    [6, 'number'],
+    [8, 'PageTime'],
+    [9, 'number'],
+    [10, 'PageTime'],
+    [12, 'PageTime']
+  ])
+    assert.match(
+      result.stdout,
+      new RegExp(
+        `records\\.js\\(${line},\\d+\\): error TS\\d+: .*'${source}' is not assignable to (parameter of )?type 'EpochTime'`
+      )
+    );
+});
+
+test('tracker helpers keep page time and epoch time on their own side', t => {
+  const accepted = typeCheck(t, {
+    'helpers.js': [
+      'const pageNow = Core.asPageTime(performance.now());',
+      "Core.activeMilliseconds({ start: pageNow, end: pageNow, lastInput: pageNow, visible: true, focused: true, mode: 'create' });",
+      'Core.splitInterval(Core.asEpochTime(Date.now()), Core.asEpochTime(Date.now()));',
+      '/** @type {Milliseconds} */',
+      'const duration = Core.millisecondsFromSeconds(Core.asSeconds(1));',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'helpers.js': [
+      'const epochNow = Core.asEpochTime(Date.now());',
+      "Core.activeMilliseconds({ start: epochNow, end: epochNow, lastInput: epochNow, visible: true, focused: true, mode: 'create' });",
+      'Core.splitInterval(Core.asPageTime(performance.now()), Core.asPageTime(performance.now()));',
+      'Core.millisecondsFromSeconds(Core.asMilliseconds(1));',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [2, "Type 'EpochTime' is not assignable to type 'PageTime'"],
+    [3, "Argument of type 'PageTime' is not assignable to parameter of type 'EpochTime'"],
+    [4, "Argument of type 'Milliseconds' is not assignable to parameter of type 'Seconds'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`helpers\\.js\\(${line},\\d+\\): error TS\\d+: ${pattern}`));
 });
 
 test('duration converters reject mismatched source units and raw numbers', t => {

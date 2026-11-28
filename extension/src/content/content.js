@@ -8,11 +8,13 @@
   const scrollFriction = ScrollFriction.create({ document, Element, getComputedStyle });
   let scrollFrictionEnabled = false,
     scrollSpeed = 1;
+  const NO_INPUT = Core.asPageTime(-Infinity);
+  const INPUT_ACTIVE_DURATION = Core.asMilliseconds(30000);
   const session = crypto.randomUUID();
   let sequence = 0,
-    lastSample = performance.now(),
-    lastInput = -Infinity;
-  let wallOffset = Date.now() - lastSample;
+    lastSample = Core.asPageTime(performance.now()),
+    lastInput = NO_INPUT;
+  let pageOrigin = Core.pageOriginFromClocks(Core.asEpochTime(Date.now()), lastSample);
   let enabled = false,
     mode = 'neutral';
   let wasVisible = document.visibilityState === 'visible',
@@ -39,14 +41,14 @@
     recordingPaused = false,
     activeBeforeUpdate = false;
   let syncPending = true,
-    syncRetryAt = 0,
+    syncRetryAt = Core.asPageTime(0),
     syncRetryDelay = 5000;
   const { maxPackets: MAX_PACKETS, maxItems: MAX_ITEMS, maxSeconds: MAX_SECONDS } = Core.DELIVERY_LIMITS;
   const clicks = new WeakMap();
 
   function resetInput() {
-    lastInput = -Infinity;
-    lastSample = performance.now();
+    lastInput = NO_INPUT;
+    lastSample = Core.asPageTime(performance.now());
   }
   function queuePacket() {
     if (!segments.length && !actions.length) return;
@@ -60,8 +62,8 @@
     }
   }
 
-  /** @param {number} start
-   * @param {number} end
+  /** @param {EpochTime} start
+   * @param {EpochTime} end
    * @param {SegmentMode} segmentMode */
   function appendTime(start, end, segmentMode) {
     let cursor = start;
@@ -70,14 +72,14 @@
       if (segments.reduce((sum, segment) => sum + segment.sec, 0) + part.sec > MAX_SECONDS) queuePacket();
       if (recordingPaused) break;
       const tail = segments.at(-1);
-      const partEnd = index === parts.length - 1 ? end : cursor + part.sec * 1000;
+      const partEnd = index === parts.length - 1 ? end : Core.timeAfter(cursor, Core.millisecondsFromSeconds(part.sec));
       if (tail && tail.mode === segmentMode && tail.date === part.date && tail.end === cursor) {
         tail.end = partEnd;
-        tail.sec = Core.secondsFromMilliseconds(Core.asMilliseconds(tail.end - tail.start));
+        tail.sec = Core.secondsFromMilliseconds(Core.millisecondsBetween(tail.start, tail.end));
       } else
         segments.push({
           ...part,
-          sec: Core.secondsFromMilliseconds(Core.asMilliseconds(partEnd - cursor)),
+          sec: Core.secondsFromMilliseconds(Core.millisecondsBetween(cursor, partEnd)),
           mode: segmentMode,
           start: cursor,
           end: partEnd
@@ -88,8 +90,8 @@
     }
   }
   function settle() {
-    const now = performance.now();
-    const wallNow = Date.now();
+    const now = Core.asPageTime(performance.now());
+    const epochNow = Core.asEpochTime(Date.now());
     const ms = recordingPaused
       ? 0
       : Core.activeMilliseconds({
@@ -101,11 +103,17 @@
           mode
         });
     if (ms > 0 && (mode === 'create' || mode === 'consume')) {
-      const activeEnd = Math.min(now, lastInput + 30000);
-      appendTime(wallOffset + Math.max(lastSample, lastInput), wallOffset + activeEnd, mode);
+      const activeStart = Core.asPageTime(Math.max(lastSample, lastInput));
+      const activeEnd = Core.asPageTime(Math.min(now, Core.timeAfter(lastInput, INPUT_ACTIVE_DURATION)));
+      appendTime(
+        Core.epochTimeFromPageTime(activeStart, pageOrigin),
+        Core.epochTimeFromPageTime(activeEnd, pageOrigin),
+        mode
+      );
     }
     lastSample = now;
-    if (Math.abs(wallNow - (wallOffset + now)) > 2) wallOffset = wallNow - now;
+    if (Math.abs(Core.millisecondsBetween(Core.epochTimeFromPageTime(now, pageOrigin), epochNow)) > 2)
+      pageOrigin = Core.pageOriginFromClocks(epochNow, now);
   }
   function refresh() {
     if (stopped) return;
@@ -158,8 +166,8 @@
     segments = [];
     actions = [];
     outbox = [];
-    lastInput = -Infinity;
-    lastSample = performance.now();
+    lastInput = NO_INPUT;
+    lastSample = Core.asPageTime(performance.now());
     console.warn(`CreateRatio: ${integration.name} integration paused until page reload.`, error.message);
   }
   function synchronizeTracking(nextEnabled, nextGeneration, preserveOutbox) {
@@ -203,7 +211,7 @@
       generation === nextGeneration && Core.trackingEnabled(site, result.settings)
     );
     syncPending = false;
-    syncRetryAt = 0;
+    syncRetryAt = Core.asPageTime(0);
     syncRetryDelay = 5000;
     refresh();
   }
@@ -244,7 +252,7 @@
         stop();
       } else {
         syncPending = true;
-        syncRetryAt = performance.now() + syncRetryDelay;
+        syncRetryAt = Core.timeAfter(Core.asPageTime(performance.now()), Core.asMilliseconds(syncRetryDelay));
         syncRetryDelay = Math.min(syncRetryDelay * 2, 60000);
         console.warn('CreateRatio: tracking will retry.', error.message);
       }
@@ -254,10 +262,10 @@
     if (stopped) return;
     settle();
     queuePacket();
-    if (!syncPending || performance.now() >= syncRetryAt) void pump();
+    if (!syncPending || Core.asPageTime(performance.now()) >= syncRetryAt) void pump();
   }
   function counted(button) {
-    const now = performance.now();
+    const now = Core.asPageTime(performance.now());
     if (now - (clicks.get(button) ?? -Infinity) < 1000) return false;
     clicks.set(button, now);
     return true;
@@ -271,7 +279,7 @@
     )
       throw new Error('Invalid action recognition');
     if (!counted(result.button)) return;
-    actions.push({ date: Core.localDate(), action: result.action, at: Date.now() });
+    actions.push({ date: Core.localDate(), action: result.action, at: Core.asEpochTime(Date.now()) });
     flush();
   }
   function onInteraction(event) {
@@ -300,12 +308,12 @@
   listen(window, 'pagehide', () => {
     settle();
     pageActive = false;
-    lastInput = -Infinity;
+    lastInput = NO_INPUT;
     boundary();
     if (outbox.length) void pump();
   });
   listen(window, 'pageshow', () => {
-    lastSample = performance.now();
+    lastSample = Core.asPageTime(performance.now());
     pageActive = true;
     boundary();
   });
@@ -328,7 +336,12 @@
     if (stopped || updating) return;
     if (outbox.length || (pageActive && document.visibilityState === 'visible' && document.hasFocus())) {
       refresh();
-      if (outbox.length || segments.length || actions.length || (syncPending && performance.now() >= syncRetryAt))
+      if (
+        outbox.length ||
+        segments.length ||
+        actions.length ||
+        (syncPending && Core.asPageTime(performance.now()) >= syncRetryAt)
+      )
         flush();
     }
   }, 5000);
@@ -363,7 +376,7 @@
         pageActive &&
         document.hasFocus() &&
         document.visibilityState === 'visible' &&
-        performance.now() - lastInput < 30000
+        Core.millisecondsBetween(lastInput, Core.asPageTime(performance.now())) < INPUT_ACTIVE_DURATION
       )
         return false;
       settle();
