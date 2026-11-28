@@ -37,7 +37,8 @@ The exported object is:
 }
 ```
 
-`id` is a stable lowercase ID using letters, digits, `_`, or `-`. `hosts` lists
+`id` is a stable lowercase ID that starts with a letter and uses letters, digits,
+`_`, or `-`; `Sites.validRecordedSiteId` checks it. `hosts` lists
 exact HTTPS hosts, without wildcards or aliases. `actions` lists supported
 existing action fields only.
 

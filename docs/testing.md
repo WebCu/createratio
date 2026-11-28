@@ -544,7 +544,14 @@ Raw values become `AccessMinutes` only through `Core.validAccessMinutes`;
 Core's defaults and `ACCESS_LIMITS` are the only casts. A converted or tagged
 `Minutes` value cannot start an access session. Access replies carry
 `sessionMinutes` as `Minutes`, because content scripts check replies without
-Core. Points in time use two clocks:
+Core. Site IDs use the glossary terms. A `RecordedSiteId` matches the stable ID
+format; raw values get it only through `Sites.validRecordedSiteId`, which also
+checks catalog IDs as they load. A `VettedSiteId` is a `RecordedSiteId` from the
+catalog: `Sites.sites` casts it once, and no guard creates it. Saved intentions
+and recorded history keep recorded IDs, because a removed integration keeps its
+history; access statuses and gate URLs need vetted IDs. Runtime messages and
+stored `trackedSites` stay plain strings until their receivers check them.
+Points in time use two clocks:
 `EpochTime` for `Date.now()` values and `PageTime` for `performance.now()`
 values. Code reads a clock at the call site and tags the reading with
 `Core.asEpochTime` or `Core.asPageTime`, so tests can substitute time.
