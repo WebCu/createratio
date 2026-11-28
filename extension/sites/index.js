@@ -15,6 +15,10 @@
   function validRedirectRuleId(value) {
     return validRuleId(value) && value <= MAX_REDIRECT_RULE_ID;
   }
+  /** @returns {value is SiteId} */
+  function validSiteId(value) {
+    return typeof value === 'string' && /^[a-z][a-z0-9_-]*$/.test(value);
+  }
   function validateAccessRules(id, rules, ruleIds) {
     if (!nonemptyArray(rules)) throw new Error('Invalid access rules: ' + id);
     if (rules.some(rule => !rule || !ruleIds.includes(rule.id))) throw new Error('Unknown access rule ID: ' + id);
@@ -46,7 +50,7 @@
     { id: 'reddit' }
   ];
   const plugins = catalog.map(({ id }) => {
-    if (!/^[a-z][a-z0-9_-]*$/.test(id)) throw new Error('Invalid integration ID: ' + id);
+    if (!validSiteId(id)) throw new Error('Invalid integration ID: ' + id);
     const plugin = load(id);
     if (
       !plugin ||
@@ -83,7 +87,7 @@
     return plugin;
   });
   const sites = plugins.map(({ id, name, hosts, actions, defaultEnabled, access }) => ({
-    id,
+    id: /** @type {VettedSiteId} */ (id),
     name,
     hosts,
     actions,
@@ -135,5 +139,5 @@
       return null;
     }
   }
-  return { sites, get, forURL, forAccessURL, validRedirectRuleId };
+  return { sites, get, forURL, forAccessURL, validRedirectRuleId, validSiteId };
 });

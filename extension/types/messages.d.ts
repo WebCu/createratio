@@ -51,7 +51,7 @@ declare global {
     websiteTimeEnabled: boolean;
   };
   type AccessReply = { ok: true; access: Record<string, ReplyAccess> };
-  type SavedIntention = { site: string; reason: string; requestedAt: EpochTime };
+  type SavedIntention = { site: SiteId; reason: string; requestedAt: EpochTime };
   type ReplyTable<T extends Record<RuntimeMessage['type'], { ok: true }>> = T;
   type RuntimeReplies = {
     snapshot: SnapshotReply;

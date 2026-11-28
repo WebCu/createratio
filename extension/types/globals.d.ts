@@ -4,6 +4,8 @@ declare global {
   type Seconds = number & { readonly __brand: 'Seconds' };
   type Minutes = number & { readonly __brand: 'Minutes' };
   type AccessMinutes = Minutes & { readonly __range: 'AccessMinutes' };
+  type SiteId = string & { readonly __brand: 'SiteId' };
+  type VettedSiteId = SiteId & { readonly __vetted: true };
   type EpochTime = number & { readonly __brand: 'EpochTime' };
   type PageTime = number & { readonly __brand: 'PageTime' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {
@@ -11,7 +13,7 @@ declare global {
   };
   type StoredData = { settings?: StoredSettings; [key: string]: unknown };
   type AccessStatus = {
-    site: string;
+    site: VettedSiteId;
     enabled: boolean;
     goalAllowed: boolean;
     name: string;
@@ -26,8 +28,8 @@ declare global {
   type SiteAccessApi = {
     handle(message: RuntimeMessage, sender: chrome.runtime.MessageSender): Promise<unknown>;
     reconcile(closeAll?: boolean): Promise<Record<string, AccessStatus>>;
-    siteForURL(raw: string): string | null;
-    gateURL(site: string): string;
+    siteForURL(raw: string): VettedSiteId | null;
+    gateURL(site: VettedSiteId): string;
     creationPacket(packet: IngestMessage, access: Record<string, Partial<AccessStatus>>): Promise<IngestMessage>;
     setBeforeNavigate(handler: (tab: chrome.tabs.Tab) => Promise<void>): void;
   };

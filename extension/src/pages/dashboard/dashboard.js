@@ -160,6 +160,7 @@ function renderRatio(days) {
   for (const key of ['posts', 'replies', 'comments', 'likes', 'quotes', 'reposts', 'bookmarks'])
     $(key).textContent = String(total[key]);
   $('sites').replaceChildren();
+  /** @type {Map<SiteId, string>} */
   const names = new Map(Core.SITES.map(site => [site.id, site.name]));
   for (const site of new Set([...names.keys(), ...Core.recordedSites(day)])) {
     const name = names.get(site) || site + ' (unavailable)';

@@ -5,7 +5,7 @@
 })(globalThis, function (integrations) {
   'use strict';
   const FIELDS = ['consumeSec', 'createSec', 'posts', 'replies', 'comments', 'likes', 'bookmarks', 'quotes', 'reposts'];
-  const SITES = integrations.sites;
+  const { sites: SITES, validSiteId } = /** @type {typeof Sites} */ (integrations);
   const ACCESS_LIMITS = {
     minMinutes: /** @type {AccessMinutes} */ (1),
     maxMinutes: /** @type {AccessMinutes} */ (240)
@@ -118,7 +118,7 @@
     intentionHistoryEnabled: false,
     scrollFrictionEnabled: true,
     scrollFrictionStrength: 50,
-    trackedSites: SITES.filter(site => site.defaultEnabled).map(site => site.id)
+    trackedSites: /** @type {string[]} */ (SITES.filter(site => site.defaultEnabled).map(site => site.id))
   };
   function isRecord(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -192,7 +192,7 @@
     return SITES.some(definition => definition.id === site) && trackingSelection(settings).includes(site);
   }
   function recordedSites(day = {}) {
-    return Object.keys(isRecord(day) ? day : {}).filter(id => /^[a-z][a-z0-9_-]*$/.test(id));
+    return Object.keys(isRecord(day) ? day : {}).filter(validSiteId);
   }
   function emptyStats() {
     return Object.fromEntries(FIELDS.map(k => [k, 0]));

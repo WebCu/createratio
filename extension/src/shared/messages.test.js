@@ -176,7 +176,13 @@ test('history replies must support rendering and CSV export without requiring fu
   }
   const reply = { ok: true, intentions: [{ site: 'retired', reason: 'Legacy intention', requestedAt: 1 }] };
   assert.equal(await client(reply).send({ type: 'access-history-list' }, 'Failed.'), reply);
-  for (const intentions of [null, {}, [null], [{ reason: 'Missing site' }]])
+  for (const intentions of [
+    null,
+    {},
+    [null],
+    [{ reason: 'Missing site' }],
+    [{ site: 'Bad Site', reason: 'Malformed site ID', requestedAt: 1 }]
+  ])
     await assert.rejects(client({ ok: true, intentions }).send({ type: 'access-history-list' }, 'Failed.'), {
       message: 'Failed.'
     });

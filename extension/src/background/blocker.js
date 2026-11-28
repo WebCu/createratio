@@ -12,8 +12,7 @@ const SiteAccess = (() => {
     return value.filter(
       entry =>
         record(entry) &&
-        typeof entry.site === 'string' &&
-        /^[a-z][a-z0-9_-]*$/.test(entry.site) &&
+        Sites.validSiteId(entry.site) &&
         typeof entry.reason === 'string' &&
         entry.reason.trim().length > 0 &&
         entry.reason.length <= Core.INTENTION_LIMITS.maxLength &&
@@ -21,8 +20,10 @@ const SiteAccess = (() => {
         entry.requestedAt >= 0
     );
   }
+  const GATED_SITES = Sites.sites.filter(site => site.gated);
+  const GATED_SITE_IDS = GATED_SITES.map(site => site.id);
   const SITES = Object.fromEntries(
-    Sites.sites.filter(site => site.gated).map(site => [site.id, { name: site.name, ...Sites.get(site.id).access }])
+    GATED_SITES.map(site => [site.id, { name: site.name, ...Sites.get(site.id).access }])
   );
   const api = globalThis.browser || globalThis.chrome;
   const STORED_OPEN_WINDOW_END = Number.MAX_SAFE_INTEGER;
@@ -98,7 +99,7 @@ const SiteAccess = (() => {
     return SITES[site].ruleIds;
   }
   /**
-   * @param {string} site
+   * @param {VettedSiteId} site
    * @param {ReturnType<typeof SiteAccessModel.siteAccessFromStored>} state
    */
   function status(
@@ -229,7 +230,7 @@ const SiteAccess = (() => {
         .sort();
     if (JSON.stringify(keys(current)) !== JSON.stringify(keys(rules)))
       await api.declarativeNetRequest.updateSessionRules({
-        removeRuleIds: Object.keys(SITES).flatMap(ruleIds),
+        removeRuleIds: GATED_SITE_IDS.flatMap(ruleIds),
         addRules: rules
       });
     const changes = {
@@ -237,13 +238,12 @@ const SiteAccess = (() => {
       ...(JSON.stringify(windows) !== originalWindows ? { _accessWindows: windows } : {})
     };
     if (Object.keys(changes).length) await api.storage.local.set(changes);
-    if (Object.keys(SITES).some(site => access[site]?.date))
-      await api.alarms.create('access-midnight', { when: midnight });
+    if (GATED_SITE_IDS.some(site => access[site]?.date)) await api.alarms.create('access-midnight', { when: midnight });
     else await api.alarms.clear('access-midnight');
     await Promise.all(expired.map(closeTabs));
     if (restart) await api.storage.session.set({ _accessInitialized: true });
     return Object.fromEntries(
-      Object.keys(SITES).map(site => [
+      GATED_SITE_IDS.map(site => [
         site,
         status(
           site,
