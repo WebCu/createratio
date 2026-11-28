@@ -84,10 +84,10 @@
       )
         throw new Error('Use exact hosts: ' + id);
     }
-    return plugin;
+    return /** @type {SiteIntegration} */ (plugin);
   });
   const sites = plugins.map(({ id, name, hosts, actions, defaultEnabled, access }) => ({
-    id: /** @type {VettedSiteId} */ (id),
+    id,
     name,
     hosts,
     actions,
@@ -95,6 +95,10 @@
     gated: !!access
   }));
   if (new Set(sites.map(site => site.id)).size !== sites.length) throw new Error('Duplicate site integration');
+  /** @returns {value is VettedSiteId} */
+  function validVettedSiteId(value) {
+    return validSiteId(value) && sites.some(site => site.id === value);
+  }
   const hosts = sites.flatMap(site => site.hosts);
   if (new Set(hosts).size !== hosts.length) throw new Error('Overlapping site hosts');
   const gated = plugins.filter(plugin => plugin.access);
@@ -139,5 +143,5 @@
       return null;
     }
   }
-  return { sites, get, forURL, forAccessURL, validRedirectRuleId, validSiteId };
+  return { sites, get, forURL, forAccessURL, validRedirectRuleId, validSiteId, validVettedSiteId };
 });
