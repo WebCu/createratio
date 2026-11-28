@@ -127,7 +127,8 @@
   }
   /** @type {Record<AccessPreference, true>} */
   const ACCESS_PREFERENCES = { accessMinutes: true, waitMinutes: true };
-  const ACCESS_PREFERENCE_KEYS = Object.keys(ACCESS_PREFERENCES);
+  const ACCESS_PREFERENCE_KEYS = /** @type {AccessPreference[]} */ (Object.keys(ACCESS_PREFERENCES));
+  const RETIRED_PREFERENCES = ['nudgeEnabled', 'nudgeMinutes'];
   const DEFAULT_SETTINGS = {
     accessMinutes: /** @type {AccessMinutes} */ (5),
     waitMinutes: /** @type {AccessMinutes} */ (5),
@@ -138,6 +139,10 @@
     scrollFrictionStrength: 50,
     trackedSites: /** @type {string[]} */ (SITES.filter(site => site.defaultEnabled).map(site => site.id))
   };
+  /**
+   * @param {unknown} value
+   * @returns {value is Record<string, unknown>}
+   */
   function isRecord(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
@@ -145,45 +150,103 @@
     const selected = isRecord(settings) ? settings.trackedSites : undefined;
     return selected === undefined ? DEFAULT_SETTINGS.trackedSites : Array.isArray(selected) ? selected : [];
   }
-  /** @param {StoredSettings} [settings] */
+  /**
+   * @param {unknown} value
+   * @param {AccessMinutes} fallback
+   */
+  function accessMinutesFromStored(value, fallback) {
+    return validAccessMinutes(value) ? value : fallback;
+  }
+  /**
+   * @param {unknown} value
+   * @param {boolean} fallback
+   */
+  function choiceFromStored(value, fallback) {
+    return typeof value === 'boolean' ? value : fallback;
+  }
+  /**
+   * @param {unknown} value
+   * @param {number} fallback
+   */
+  function scrollFrictionStrengthFromStored(value, fallback) {
+    return typeof value === 'number' && validScrollFrictionStrength(value) ? value : fallback;
+  }
+  /**
+   * @param {Record<string, unknown>} stored
+   * @returns {SiteOverride}
+   */
+  function siteOverrideFromStored(stored) {
+    const override = { ...stored };
+    for (const key of ACCESS_PREFERENCE_KEYS) if (!validAccessMinutes(override[key])) delete override[key];
+    for (const key of RETIRED_PREFERENCES) delete override[key];
+    return /** @type {SiteOverride} */ (override);
+  }
+  /**
+   * @param {unknown} stored
+   * @returns {Record<string, SiteOverride>}
+   */
+  function siteOverridesFromStored(stored) {
+    /** @type {Record<string, SiteOverride>} */
+    const overrides = {};
+    for (const [site, entry] of Object.entries(isRecord(stored) ? stored : {})) {
+      if (!isRecord(entry)) continue;
+      const override = siteOverrideFromStored(entry);
+      if (Object.keys(override).length) overrides[site] = override;
+    }
+    return overrides;
+  }
+  /**
+   * @param {unknown} [settings]
+   * @returns {Preferences}
+   */
   function settingsSnapshot(settings = {}) {
-    if (!isRecord(settings)) settings = {};
-    /** @type {typeof DEFAULT_SETTINGS & { siteOverrides?: Record<string, Record<string, unknown>>, nudgeEnabled?: unknown, nudgeMinutes?: unknown }} */
-    const resolved = { ...DEFAULT_SETTINGS, ...settings };
-    resolved.dailyTarget = dailyTarget(settings);
-    resolved.trackedSites = trackingSelection(settings).filter(site => typeof site === 'string');
-    for (const key of ACCESS_PREFERENCE_KEYS)
-      if (!validAccessMinutes(resolved[key])) resolved[key] = DEFAULT_SETTINGS[key];
-    if (resolved.scrollFrictionStrength === 0) resolved.scrollFrictionEnabled = false;
-    if (!validScrollFrictionStrength(resolved.scrollFrictionStrength))
-      resolved.scrollFrictionStrength = DEFAULT_SETTINGS.scrollFrictionStrength;
-    for (const key of ['allowAboveGoal', 'intentionHistoryEnabled', 'scrollFrictionEnabled'])
-      if (typeof resolved[key] !== 'boolean') resolved[key] = DEFAULT_SETTINGS[key];
-    delete resolved.nudgeEnabled;
-    delete resolved.nudgeMinutes;
-    if (Object.hasOwn(resolved, 'siteOverrides'))
-      resolved.siteOverrides = Object.fromEntries(
-        Object.entries(isRecord(resolved.siteOverrides) ? resolved.siteOverrides : {})
-          .filter(([, preferences]) => isRecord(preferences))
-          .map(([site, preferences]) => {
-            const overrides = { ...preferences };
-            for (const key of ACCESS_PREFERENCE_KEYS) if (!validAccessMinutes(overrides[key])) delete overrides[key];
-            delete overrides.nudgeEnabled;
-            delete overrides.nudgeMinutes;
-            return [site, overrides];
-          })
-          .filter(([, overrides]) => Object.keys(overrides).length)
-      );
-    return resolved;
+    const stored = isRecord(settings) ? settings : {};
+    /** @type {Preferences} */
+    const preferences = {
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      accessMinutes: accessMinutesFromStored(stored.accessMinutes, DEFAULT_SETTINGS.accessMinutes),
+      waitMinutes: accessMinutesFromStored(stored.waitMinutes, DEFAULT_SETTINGS.waitMinutes),
+      dailyTarget: dailyTarget(stored),
+      allowAboveGoal: choiceFromStored(stored.allowAboveGoal, DEFAULT_SETTINGS.allowAboveGoal),
+      intentionHistoryEnabled: choiceFromStored(
+        stored.intentionHistoryEnabled,
+        DEFAULT_SETTINGS.intentionHistoryEnabled
+      ),
+      scrollFrictionEnabled:
+        stored.scrollFrictionStrength !== 0 &&
+        choiceFromStored(stored.scrollFrictionEnabled, DEFAULT_SETTINGS.scrollFrictionEnabled),
+      scrollFrictionStrength: scrollFrictionStrengthFromStored(
+        stored.scrollFrictionStrength,
+        DEFAULT_SETTINGS.scrollFrictionStrength
+      ),
+      trackedSites: trackingSelection(stored).filter(site => typeof site === 'string'),
+      ...(Object.hasOwn(stored, 'siteOverrides')
+        ? { siteOverrides: siteOverridesFromStored(stored.siteOverrides) }
+        : {})
+    };
+    for (const key of RETIRED_PREFERENCES) delete preferences[key];
+    return preferences;
   }
+  /**
+   * @param {string} site
+   * @param {unknown} [settings]
+   * @returns {Preferences}
+   */
   function siteSettings(site, settings = {}) {
-    const resolved = settingsSnapshot(settings);
-    const overrides = Object.hasOwn(resolved.siteOverrides || {}, site) ? resolved.siteOverrides[site] : {};
-    for (const key of ACCESS_PREFERENCE_KEYS) if (overrides?.[key] !== undefined) resolved[key] = overrides[key];
-    return resolved;
+    const preferences = settingsSnapshot(settings);
+    const override = Object.hasOwn(preferences.siteOverrides || {}, site) ? preferences.siteOverrides[site] : {};
+    for (const key of ACCESS_PREFERENCE_KEYS) if (override[key] !== undefined) preferences[key] = override[key];
+    return preferences;
   }
-  function updatePreferences(settings = {}, changes, site) {
-    if (!isRecord(settings)) settings = {};
+  /**
+   * @param {unknown} settings
+   * @param {unknown} changes
+   * @param {string} [site]
+   * @returns {StoredSettings}
+   */
+  function updatePreferences(settings, changes, site) {
+    const stored = isRecord(settings) ? settings : {};
     if (!isRecord(changes)) throw new Error('Choose valid preferences');
     if (site !== undefined && !SITES.some(definition => definition.id === site))
       throw new Error('Choose a vetted website');
@@ -195,8 +258,8 @@
           `Choose a whole number from ${ACCESS_LIMITS.minMinutes} to ${ACCESS_LIMITS.maxMinutes} minutes`
         );
     }
-    if (site === undefined) return { ...DEFAULT_SETTINGS, ...settings, ...changes };
-    const siteOverrides = { ...(isRecord(settings.siteOverrides) ? settings.siteOverrides : {}) };
+    if (site === undefined) return { ...DEFAULT_SETTINGS, ...stored, ...changes };
+    const siteOverrides = { ...(isRecord(stored.siteOverrides) ? stored.siteOverrides : {}) };
     const overrides = { ...(isRecord(siteOverrides[site]) ? siteOverrides[site] : {}) };
     for (const [key, value] of Object.entries(changes)) {
       if (value === null) delete overrides[key];
@@ -204,7 +267,7 @@
     }
     if (Object.keys(overrides).length) siteOverrides[site] = overrides;
     else delete siteOverrides[site];
-    return { ...DEFAULT_SETTINGS, ...settings, siteOverrides };
+    return { ...DEFAULT_SETTINGS, ...stored, siteOverrides };
   }
   function trackingEnabled(site, settings = {}) {
     return SITES.some(definition => definition.id === site) && trackingSelection(settings).includes(site);

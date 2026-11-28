@@ -580,8 +580,12 @@ totals stay untyped. Only
 only that type. A `DailyTarget` is a number from 0.1 to 100 in steps of 0.1.
 Raw values get it only through `Core.validDailyTarget`, and the default setting
 is the only cast. `Core.aboveDailyTarget` is the only place that compares a
-score with the target. Stored settings and days stay unchecked raw values until
-Core reads them.
+score with the target. Stored days stay unchecked raw values until Core reads
+them. `StoredSettings` is a record of `unknown` values. `Preferences` is the
+checked value: only `Core.settingsSnapshot` and `Core.siteSettings` create it,
+and each field and site override has its checked type. `Core.updatePreferences`
+returns `StoredSettings`: it keeps the saved values unchanged, in their order,
+and adds only the checked change.
 Points in time use two clocks:
 `EpochTime` for `Date.now()` values and `PageTime` for `performance.now()`
 values. Code reads a clock at the call site and tags the reading with

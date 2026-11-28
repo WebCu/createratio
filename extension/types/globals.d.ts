@@ -16,8 +16,11 @@ declare global {
   type DailyTarget = number & { readonly __brand: 'DailyTarget' };
   type EpochTime = number & { readonly __brand: 'EpochTime' };
   type PageTime = number & { readonly __brand: 'PageTime' };
-  type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {
-    siteOverrides?: Record<string, Record<string, unknown>>;
+  type StoredSettings = { [key: string]: unknown };
+  type SiteOverride = { [Preference in AccessPreference]?: AccessMinutes } & { [key: string]: unknown };
+  type Preferences = typeof Core.DEFAULT_SETTINGS & {
+    siteOverrides?: Record<string, SiteOverride>;
+    [key: string]: unknown;
   };
   type StoredData = { settings?: StoredSettings; [key: string]: unknown };
   type AccessStatus = {

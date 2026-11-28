@@ -57,7 +57,10 @@ omitting `site` updates Default, and per-site `null` removes an override without
 changing creation tracking or recorded history. `settingsSnapshot(settings)` omits
 retired nudge preferences without deleting the saved values. Snapshots normalize
 invalid durations, targets, booleans, and overrides without mutating storage;
-an invalid override inherits Default.
+an invalid override inherits Default. Saved settings are unchecked
+(`StoredSettings`); `settingsSnapshot` and `siteSettings` parse them into
+checked `Preferences`. `updatePreferences` returns `StoredSettings` with the
+saved values unchanged and only the checked change added.
 
 `validScrollFrictionStrength` and `SCROLL_FRICTION_LIMITS` share the slider's
 50–95% resistance bounds and five-point steps with command receivers. Missing or

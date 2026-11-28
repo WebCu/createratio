@@ -727,3 +727,147 @@ test('intention wait uses validated defaults, site inheritance and reset', () =>
   settings = C.updatePreferences(settings, { waitMinutes: null }, 'x');
   assert.equal(C.siteSettings('x', settings).waitMinutes, 10);
 });
+
+test('preference updates store saved values unchanged, in their saved order, with only the checked change added', () => {
+  const defaults = {
+    accessMinutes: 5,
+    waitMinutes: 5,
+    dailyTarget: 1,
+    allowAboveGoal: false,
+    intentionHistoryEnabled: false,
+    scrollFrictionEnabled: true,
+    scrollFrictionStrength: 50,
+    trackedSites: C.DEFAULT_SETTINGS.trackedSites
+  };
+  const invalid = {
+    future: { mode: 'keep' },
+    accessMinutes: '12',
+    waitMinutes: 0,
+    dailyTarget: 0.05,
+    allowAboveGoal: 'true',
+    intentionHistoryEnabled: 1,
+    scrollFrictionEnabled: 'no',
+    scrollFrictionStrength: 0,
+    trackedSites: ['x', 7],
+    nudgeEnabled: true,
+    nudgeMinutes: 1,
+    siteOverrides: {
+      x: { accessMinutes: 241, waitMinutes: 2, nudgeMinutes: 1, unknown: 'keep' },
+      linkedin: 'bad',
+      retired: { accessMinutes: 30 },
+      empty: {}
+    }
+  };
+  const original = structuredClone(invalid);
+  const cases = [
+    [C.updatePreferences(undefined, { accessMinutes: 12 }), { ...defaults, accessMinutes: 12 }],
+    [C.updatePreferences('bad', { waitMinutes: 2 }, 'x'), { ...defaults, siteOverrides: { x: { waitMinutes: 2 } } }],
+    [C.updatePreferences({}, { accessMinutes: null }, 'x'), { ...defaults, siteOverrides: {} }],
+    [
+      C.updatePreferences(invalid, { accessMinutes: 12 }),
+      {
+        accessMinutes: 12,
+        waitMinutes: 0,
+        dailyTarget: 0.05,
+        allowAboveGoal: 'true',
+        intentionHistoryEnabled: 1,
+        scrollFrictionEnabled: 'no',
+        scrollFrictionStrength: 0,
+        trackedSites: ['x', 7],
+        future: { mode: 'keep' },
+        nudgeEnabled: true,
+        nudgeMinutes: 1,
+        siteOverrides: invalid.siteOverrides
+      }
+    ],
+    [
+      C.updatePreferences(invalid, { accessMinutes: null, waitMinutes: null }, 'x'),
+      {
+        accessMinutes: '12',
+        waitMinutes: 0,
+        dailyTarget: 0.05,
+        allowAboveGoal: 'true',
+        intentionHistoryEnabled: 1,
+        scrollFrictionEnabled: 'no',
+        scrollFrictionStrength: 0,
+        trackedSites: ['x', 7],
+        future: { mode: 'keep' },
+        nudgeEnabled: true,
+        nudgeMinutes: 1,
+        siteOverrides: {
+          x: { nudgeMinutes: 1, unknown: 'keep' },
+          linkedin: 'bad',
+          retired: { accessMinutes: 30 },
+          empty: {}
+        }
+      }
+    ],
+    [
+      C.updatePreferences({ siteOverrides: [{ accessMinutes: 2 }], trackedSites: null }, { accessMinutes: 12 }),
+      { ...defaults, accessMinutes: 12, trackedSites: null, siteOverrides: [{ accessMinutes: 2 }] }
+    ],
+    [
+      C.updatePreferences({ siteOverrides: [{ accessMinutes: 2 }], trackedSites: null }, { waitMinutes: 2 }, 'x'),
+      { ...defaults, trackedSites: null, siteOverrides: { x: { waitMinutes: 2 } } }
+    ]
+  ];
+  for (const [stored, expected] of cases) assert.equal(JSON.stringify(stored), JSON.stringify(expected));
+  assert.deepEqual(invalid, original);
+});
+
+test('preferences parsed from saved settings keep their reply order, overrides and unknown fields', () => {
+  const saved = {
+    trackedSites: ['linkedin', 'retired'],
+    future: { mode: 'keep' },
+    accessMinutes: 12,
+    waitMinutes: 3,
+    dailyTarget: 2.5,
+    allowAboveGoal: true,
+    intentionHistoryEnabled: true,
+    scrollFrictionEnabled: false,
+    scrollFrictionStrength: 75,
+    nudgeMinutes: 1,
+    siteOverrides: { x: { unknown: 'keep', waitMinutes: 10, accessMinutes: 2 }, linkedin: { waitMinutes: 0 } }
+  };
+  const preferences = {
+    accessMinutes: 12,
+    waitMinutes: 3,
+    dailyTarget: 2.5,
+    allowAboveGoal: true,
+    intentionHistoryEnabled: true,
+    scrollFrictionEnabled: false,
+    scrollFrictionStrength: 75,
+    trackedSites: ['linkedin', 'retired'],
+    future: { mode: 'keep' },
+    siteOverrides: { x: { unknown: 'keep', waitMinutes: 10, accessMinutes: 2 } }
+  };
+  assert.equal(JSON.stringify(C.settingsSnapshot(saved)), JSON.stringify(preferences));
+  assert.equal(
+    JSON.stringify(C.siteSettings('x', saved)),
+    JSON.stringify({ ...preferences, accessMinutes: 2, waitMinutes: 10 })
+  );
+  assert.equal(JSON.stringify(C.siteSettings('linkedin', saved)), JSON.stringify(preferences));
+  const invalid = {
+    future: { mode: 'keep' },
+    accessMinutes: '12',
+    waitMinutes: 0,
+    dailyTarget: 0.05,
+    allowAboveGoal: 'true',
+    intentionHistoryEnabled: 1,
+    scrollFrictionEnabled: 'no',
+    scrollFrictionStrength: 0,
+    trackedSites: ['x', 7],
+    nudgeEnabled: true,
+    siteOverrides: { x: { accessMinutes: 241, waitMinutes: 2, nudgeMinutes: 1, unknown: 'keep' }, linkedin: 'bad' }
+  };
+  assert.equal(
+    JSON.stringify(C.settingsSnapshot(invalid)),
+    JSON.stringify({
+      ...C.DEFAULT_SETTINGS,
+      scrollFrictionEnabled: false,
+      trackedSites: ['x'],
+      future: { mode: 'keep' },
+      siteOverrides: { x: { waitMinutes: 2, unknown: 'keep' } }
+    })
+  );
+});
