@@ -591,3 +591,91 @@ test('creation stats keep creating and consuming time as Seconds and actions as 
   ])
     assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
 });
+
+test('delivery packets reach history and access narrowing only through the contract check', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      'const contracts = MessageContracts.create(Core, chrome.runtime, Sites);',
+      'const history = ActivityHistory.create(null, Core);',
+      '/** @param {IngestMessage} message */',
+      'async function checked(message) {',
+      '  /** @type {boolean} */',
+      '  const current = contracts.inHistoryGeneration(message, null);',
+      '  const packet = contracts.deliveryPacketFromMessage(message);',
+      '  /** @type {DeliveryPacket} */',
+      '  const narrowed = await SiteAccess.creationPacket(packet, {});',
+      '  await history.recordCreation(narrowed);',
+      '}',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      'const contracts = MessageContracts.create(Core, chrome.runtime, Sites);',
+      'const history = ActivityHistory.create(null, Core);',
+      '/** @param {IngestMessage} message */',
+      'async function unchecked(message) {',
+      '  await history.recordCreation(message);',
+      '  await SiteAccess.creationPacket(message, {});',
+      '  /** @type {DeliveryPacket} */',
+      "  const raw = { id: 'packet', site: 'x', segments: [], actions: [] };",
+      '  /** @type {number} */',
+      '  const notNumber = contracts.deliveryPacketFromMessage(message);',
+      '}',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, target] of [
+    [5, 'DeliveryPacket'],
+    [6, 'DeliveryPacket'],
+    [8, 'DeliveryPacket'],
+    [10, 'number']
+  ])
+    assert.match(
+      rejected.stdout,
+      new RegExp(
+        `rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*is not assignable to (parameter of )?type '${target}'`
+      )
+    );
+});
+
+test('scroll friction strengths enter only through the guard or the default setting', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @param {unknown} value */',
+      'function guarded(value) {',
+      '  if (!Core.validScrollFrictionStrength(value)) return;',
+      '  /** @type {ScrollFrictionStrength} */',
+      '  const strength = value;',
+      '  /** @type {number} */',
+      '  const plain = strength;',
+      '}',
+      '/** @type {ScrollFrictionStrength[]} */',
+      'const strengths = [Core.DEFAULT_SETTINGS.scrollFrictionStrength, Core.settingsSnapshot({}).scrollFrictionStrength];',
+      '/** @param {ReplySettings} settings */',
+      'function replied(settings) {',
+      '  /** @type {ScrollFrictionStrength | undefined} */',
+      '  const strength = settings.scrollFrictionStrength;',
+      '}',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @type {ScrollFrictionStrength} */',
+      'const fromNumber = 50;',
+      '/** @type {ScrollFrictionStrength} */',
+      'const fromTarget = Core.DEFAULT_SETTINGS.dailyTarget;',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [2, "Type 'number' is not assignable to type 'ScrollFrictionStrength'"],
+    [4, "Type 'DailyTarget' is not assignable to type 'ScrollFrictionStrength'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
+});

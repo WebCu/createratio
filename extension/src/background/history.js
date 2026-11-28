@@ -187,6 +187,7 @@
       sizes = new Map();
       preparedDate = core.localDate(new Date());
     }
+    /** @param {DeliveryPacket} packet */
     async function recordCreation(packet) {
       const selected = [...new Set([...packet.segments, ...packet.actions].map(item => item.date))].filter(eligible);
       const stored = await storage.get([...selected, '_receipts']);

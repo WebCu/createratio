@@ -35,6 +35,7 @@ declare global {
   } & { readonly __brand: 'CreationStats' };
   type CreationScore = number & { readonly __brand: 'CreationScore' };
   type DailyTarget = number & { readonly __brand: 'DailyTarget' };
+  type ScrollFrictionStrength = number & { readonly __brand: 'ScrollFrictionStrength' };
   type EpochTime = number & { readonly __brand: 'EpochTime' };
   type PageTime = number & { readonly __brand: 'PageTime' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {
@@ -59,7 +60,7 @@ declare global {
     reconcile(closeAll?: boolean): Promise<Record<string, AccessStatus>>;
     siteForURL(raw: string): VettedSiteId | null;
     gateURL(site: VettedSiteId): string;
-    creationPacket(packet: IngestMessage, access: Record<string, Partial<AccessStatus>>): Promise<IngestMessage>;
+    creationPacket(packet: DeliveryPacket, access: Record<string, Partial<AccessStatus>>): Promise<DeliveryPacket>;
     setBeforeNavigate(handler: (tab: chrome.tabs.Tab) => Promise<void>): void;
   };
   type ContentOwner = { prepare(force: boolean): Promise<boolean>; resume(): void; stop(): void };

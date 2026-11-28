@@ -25,6 +25,9 @@ declare global {
     segments: TimeSegment[];
     actions: SiteActionEntry[];
   };
+  type DeliveryPacket = Pick<IngestMessage, 'id' | 'site' | 'segments' | 'actions'> & {
+    readonly __brand: 'DeliveryPacket';
+  };
   type PreferenceRules = {
     [K in PreferenceMessage['type']]: (message: Extract<PreferenceMessage, { type: K }>) => void;
   };
@@ -32,7 +35,7 @@ declare global {
   type ReplySettings = {
     trackedSites?: string[];
     scrollFrictionEnabled?: boolean;
-    scrollFrictionStrength?: number;
+    scrollFrictionStrength?: ScrollFrictionStrength;
     [key: string]: unknown;
   };
   type ReplyAccess = Omit<AccessStatus, 'site' | 'goalAllowed' | 'refilledAt' | 'waitSeconds' | 'sessionMinutes'> & {

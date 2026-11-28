@@ -394,3 +394,103 @@ test('incoming site fields accept every vetted site and reject only unknown or m
   }
   assert.equal(w.data[date], undefined);
 });
+
+const deliveryNow = new Date(2026, 9, 11, 12).getTime(),
+  deliveryDate = C.localDate(new Date(deliveryNow));
+function deliveryPacket(overrides = {}) {
+  return {
+    type: 'ingest',
+    id: 'delivery',
+    site: 'x',
+    segments: [{ date: deliveryDate, mode: 'consume', sec: 5 }],
+    actions: [{ date: deliveryDate, action: 'posts' }],
+    ...overrides
+  };
+}
+function deliveryWorker(data = {}) {
+  return worker({ _access: { x: { remainingMs: 300000 } }, ...data }, 'chrome', deliveryNow);
+}
+const segment = fields => [{ date: deliveryDate, mode: 'consume', sec: 5, ...fields }];
+const limits = C.DELIVERY_LIMITS;
+
+test('delivery packet refusals name the broken rule and record nothing', async () => {
+  for (const [overrides, error] of [
+    [{ id: 7 }, 'Invalid packet'],
+    [{ id: 'i'.repeat(limits.maxIdLength + 1) }, 'Invalid packet'],
+    [{ segments: {} }, 'Invalid packet'],
+    [{ actions: 'posts' }, 'Invalid packet'],
+    [{ segments: Array.from({ length: limits.maxItems + 1 }, () => segment({ sec: 1 })[0]) }, 'Invalid packet'],
+    [
+      { actions: Array.from({ length: limits.maxItems + 1 }, () => ({ date: deliveryDate, action: 'posts' })) },
+      'Invalid packet'
+    ],
+    [{ segments: segment({ date: '2026-02-30' }) }, 'Invalid time segment'],
+    [{ segments: segment({ mode: 'neutral' }) }, 'Invalid time segment'],
+    [{ segments: segment({ sec: 0 }) }, 'Invalid time segment'],
+    [{ segments: segment({ sec: '5' }) }, 'Invalid time segment'],
+    [{ segments: segment({ sec: limits.maxSeconds + 1 }) }, 'Invalid time segment'],
+    [{ segments: [...segment({ sec: limits.maxSeconds }), ...segment({ sec: 1 })] }, 'Time packet too large'],
+    [{ segments: segment({ start: 1000 }) }, 'Invalid time interval'],
+    [{ segments: segment({ start: -1000, end: 4000 }) }, 'Invalid time interval'],
+    [{ segments: segment({ start: 1000, end: 1000 }) }, 'Invalid time interval'],
+    [{ segments: segment({ start: 1000, end: 7000 }) }, 'Invalid time interval'],
+    [{ actions: [{ date: deliveryDate, action: 'connections' }] }, 'Action not supported on this site'],
+    [{ actions: [{ date: 'today', action: 'posts' }] }, 'Action not supported on this site'],
+    [{ actions: [{ date: deliveryDate, action: 'posts', at: -1 }] }, 'Invalid action time'],
+    [{ actions: [{ date: deliveryDate, action: 'posts', at: '1' }] }, 'Invalid action time']
+  ]) {
+    const w = deliveryWorker();
+    assert.deepEqual(
+      await w.send(deliveryPacket(overrides)),
+      { ok: false, error, retryable: false },
+      JSON.stringify(overrides)
+    );
+    assert.equal(w.data._receipts, undefined);
+    assert.equal(w.data[deliveryDate], undefined);
+    assert.deepEqual(w.errors, []);
+  }
+});
+
+test('delivery packets at their limits are recorded once', async () => {
+  const w = deliveryWorker();
+  const packet = deliveryPacket({
+    id: 'i'.repeat(limits.maxIdLength),
+    segments: [...segment({ start: 1000, end: 4000, sec: 3 }), ...segment({ sec: limits.maxSeconds - 3 })],
+    actions: [{ date: deliveryDate, action: 'quotes', at: 0 }]
+  });
+  assert.equal((await w.send(packet)).ok, true);
+  assert.equal((await w.send(packet)).ok, true);
+  assert.equal(w.data[deliveryDate].x.consumeSec, limits.maxSeconds);
+  assert.equal(w.data[deliveryDate].x.quotes, 1);
+  assert.equal(w.data[deliveryDate].x.posts, 1);
+  assert.deepEqual(w.data._receipts, [packet.id]);
+});
+
+test('stale or untracked delivery packets are acknowledged before their contents are checked', async () => {
+  const malformed = deliveryPacket({ segments: segment({ sec: -1 }) });
+  for (const [data, generation] of [
+    [{ _historyGeneration: 'current' }, 'old'],
+    [{ _historyGeneration: 'current' }, null],
+    [{ _historyGeneration: 'current' }, undefined],
+    [{}, 'old'],
+    [{ settings: { trackedSites: [] } }, undefined]
+  ]) {
+    const w = deliveryWorker(data);
+    const result = await w.send({ ...malformed, generation });
+    assert.equal(result.ok, true, JSON.stringify({ data, generation, result }));
+    assert.equal(result.generation, data._historyGeneration ?? null);
+    assert.equal(w.data._receipts, undefined);
+    assert.equal(w.data[deliveryDate], undefined);
+  }
+});
+
+test('a delivery packet without a generation matches history that has none', async () => {
+  for (const generation of [undefined, null]) {
+    const w = deliveryWorker();
+    assert.equal((await w.send(deliveryPacket({ generation }))).ok, true);
+    assert.equal(w.data[deliveryDate].x.consumeSec, 5);
+  }
+  const w = deliveryWorker({ _historyGeneration: 'current' });
+  assert.equal((await w.send(deliveryPacket({ generation: 'current' }))).ok, true);
+  assert.equal(w.data[deliveryDate].x.consumeSec, 5);
+});
