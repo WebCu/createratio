@@ -548,7 +548,8 @@ Core. A `SiteId` matches the stable site ID format; raw values get it only
 through `Sites.validSiteId`, which also checks catalog IDs as they load. A
 `VettedSiteId` is a `SiteId` for a vetted site. The catalog casts each checked
 site module to `SiteIntegration` once, so `Sites.sites`, `Sites.get`,
-`Sites.forURL` and `Sites.forAccessURL` give vetted IDs. Raw values get it only
+`Sites.forURL` and `Sites.forAccessURL` give vetted IDs. `Core.siteForURL` uses
+the same typed catalog. Raw values get it only
 through `Sites.validVettedSiteId`, which accepts only IDs in the catalog. Saved
 intentions and recorded history keep `SiteId`,
 because a removed integration keeps its history; access statuses and gate URLs

@@ -15,7 +15,8 @@
     'quotes',
     'reposts'
   ]);
-  const { sites: SITES, validSiteId } = /** @type {typeof Sites} */ (integrations);
+  const catalog = /** @type {typeof Sites} */ (integrations);
+  const { sites: SITES, validSiteId } = catalog;
   const ACCESS_LIMITS = {
     minMinutes: /** @type {AccessMinutes} */ (1),
     maxMinutes: /** @type {AccessMinutes} */ (240)
@@ -296,10 +297,10 @@
     });
   }
   function siteForURL(raw) {
-    return integrations.forURL(raw)?.id || null;
+    return catalog.forURL(raw)?.id || null;
   }
   function classifyPage(state) {
-    return integrations.forURL(state.url)?.classifyPage(state) || 'neutral';
+    return catalog.forURL(state.url)?.classifyPage(state) || 'neutral';
   }
   /** @param {{ start: PageTime, end: PageTime, lastInput: PageTime | null, visible: boolean, focused: boolean, mode: string }} sample */
   function activeMilliseconds({ start, end, lastInput, visible, focused, mode }) {

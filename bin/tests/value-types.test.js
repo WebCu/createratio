@@ -378,6 +378,8 @@ test('the vetted guard and catalog lookups return vetted site IDs and typed site
       '  /** @type {VettedSiteId} */',
       '  const site = value;',
       '}',
+      '/** @type {number | null} */',
+      "const coreNotNumber = Core.siteForURL('https://x.com/');",
       ''
     ].join('\n')
   });
@@ -386,7 +388,8 @@ test('the vetted guard and catalog lookups return vetted site IDs and typed site
     [2, "Type 'VettedSiteId' is not assignable to type 'number'"],
     [4, "Type 'string' is not assignable to type 'number'"],
     [5, "Property 'missingField' does not exist on type 'SiteIntegration'"],
-    [9, "Type 'string' is not assignable to type 'VettedSiteId'"]
+    [9, "Type 'string' is not assignable to type 'VettedSiteId'"],
+    [12, "Type 'VettedSiteId' is not assignable to type 'number'"]
   ])
     assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: ${pattern}`));
 });
