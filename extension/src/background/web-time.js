@@ -6,10 +6,21 @@
   'use strict';
   /** @type {chrome.permissions.Permissions} */
   const PERMISSIONS = { permissions: ['tabs', 'idle'] };
+  /** @returns {value is WebsiteDomain} */
+  function validWebsiteDomain(value) {
+    try {
+      return typeof value === 'string' && new URL('http://' + value).hostname === value;
+    } catch (_) {
+      return false;
+    }
+  }
+  /** @returns {WebsiteDomain | null} */
   function domainForURL(raw) {
     try {
       const url = new URL(raw);
-      return ['http:', 'https:'].includes(url.protocol) ? url.hostname.replace(/^www\./, '') : null;
+      if (!['http:', 'https:'].includes(url.protocol)) return null;
+      const domain = url.hostname.replace(/^www\./, '');
+      return validWebsiteDomain(domain) ? domain : null;
     } catch (_) {
       return null;
     }
@@ -84,7 +95,7 @@
       if (
         old &&
         typeof old.id === 'string' &&
-        typeof old.domain === 'string' &&
+        validWebsiteDomain(old.domain) &&
         Number.isFinite(old.at) &&
         now > old.at &&
         now - old.at <= 75000 &&
@@ -95,7 +106,8 @@
       try {
         while (pending.length) {
           const entry = pending[0];
-          if (typeof entry.id === 'string') await history.recordWebsiteTime(entry.domain, entry.segments, entry.id);
+          if (typeof entry.id === 'string' && validWebsiteDomain(entry.domain))
+            await history.recordWebsiteTime(entry.domain, entry.segments, entry.id);
           pending.shift();
         }
       } finally {
@@ -197,5 +209,5 @@
       }
     };
   }
-  return { PERMISSIONS, domainForURL, summarize, shares, duration, csv, create };
+  return { PERMISSIONS, validWebsiteDomain, domainForURL, summarize, shares, duration, csv, create };
 });

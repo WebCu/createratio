@@ -182,6 +182,50 @@ test('domain-only HTTP/S identifiers, duration, range totals, ordering and CSV',
   assert.deepEqual(WebTime.summarize({ '2026-10-11': { invalid: -1, nan: NaN } }), []);
 });
 
+test('website domains are normalized URL hostnames', () => {
+  for (const value of ['example.com', 'docs.example.com', '127.0.0.1', '[::1]', 'xn--bcher-kva.de', '=1+1'])
+    assert.equal(WebTime.validWebsiteDomain(value), true, value);
+  for (const value of [
+    '',
+    'Example.com',
+    'example.com/path',
+    'example.com:8080',
+    'user@example.com',
+    ' example.com',
+    'bücher.de',
+    42,
+    null,
+    undefined,
+    {}
+  ])
+    assert.equal(WebTime.validWebsiteDomain(value), false, String(value));
+  assert.equal(WebTime.domainForURL('http://www./'), null);
+});
+
+test('restored website samples and pending entries need a valid website domain', async () => {
+  const segments = [{ date: '2026-10-11', sec: 5 }];
+  const h = harness(
+    { _websiteTimeEnabled: true },
+    {
+      _websiteTimeSample: {
+        id: 'website:sample',
+        domain: 'example.com/path',
+        at: new Date(2026, 9, 11, 11, 59, 55).getTime()
+      },
+      _websiteTimePending: [
+        { id: 'website:missing', segments },
+        { id: 'website:object', domain: {}, segments },
+        { id: 'website:valid', domain: 'docs.example.com', segments }
+      ]
+    }
+  );
+  await h.tracker.start();
+  await h.tick();
+  assert.deepEqual(h.data['_websiteTime:2026-10-11'], { 'docs.example.com': 5 });
+  assert.deepEqual(h.data._websiteTimeReceipts, ['website:valid']);
+  assert.deepEqual(h.session._websiteTimePending, []);
+});
+
 test('website shares round to whole percentages that add up to 100', () => {
   assert.deepEqual(
     WebTime.shares([

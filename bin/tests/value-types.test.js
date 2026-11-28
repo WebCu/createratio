@@ -376,3 +376,53 @@ test('access records, saved intentions and gate URLs require branded site IDs', 
     );
   assert.doesNotMatch(result.stdout, /records\.js\((8|10),/);
 });
+
+test('website domains enter only through the guard and stay apart from site IDs', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @param {unknown} value */',
+      'function guarded(value) {',
+      '  if (!WebTime.validWebsiteDomain(value)) return;',
+      '  /** @type {WebsiteDomain} */',
+      '  const domain = value;',
+      '  /** @type {string} */',
+      '  const text = domain;',
+      '}',
+      '/** @type {WebsiteDomain | null} */',
+      "const located = WebTime.domainForURL('https://example.com/');",
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @type {WebsiteDomain} */',
+      "const fromString = 'example.com';",
+      '/** @param {SiteId} site @param {WebsiteDomain} domain */',
+      'function mixed(site, domain) {',
+      '  /** @type {WebsiteDomain} */',
+      '  const fromSite = site;',
+      '  /** @type {SiteId} */',
+      '  const toSite = domain;',
+      '}',
+      '/** @type {number | null} */',
+      "const notNumber = WebTime.domainForURL('https://example.com/');",
+      "ActivityHistory.create(null, Core).recordWebsiteTime('example.com', [], 'website:1');",
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, source, target] of [
+    [2, 'string', 'WebsiteDomain'],
+    [6, 'SiteId', 'WebsiteDomain'],
+    [8, 'WebsiteDomain', 'SiteId'],
+    [11, 'WebsiteDomain', 'number'],
+    [12, 'string', 'WebsiteDomain']
+  ])
+    assert.match(
+      rejected.stdout,
+      new RegExp(
+        `rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*'${source}' is not assignable to (parameter of )?type '${target}'`
+      )
+    );
+});
