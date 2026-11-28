@@ -137,6 +137,14 @@ test('score aggregates both sites before dividing and uses exact badge threshold
   assert.equal(C.scoreBand(1), 'high');
   assert.equal(C.badgeText(100), '99+');
 });
+test('aggregate keeps every total finite when a sum overflows', () => {
+  const total = C.aggregate({
+    x: { createSec: Number.MAX_VALUE, posts: 1 },
+    linkedin: { createSec: Number.MAX_VALUE, posts: 2 }
+  });
+  assert.equal(total.createSec, 0);
+  assert.equal(total.posts, 3);
+});
 test('above-goal access needs a score strictly above the daily target', () => {
   const target = C.dailyTarget({ dailyTarget: 1.5 });
   const scoreOf = createSec => C.score(C.statsSnapshot({ consumeSec: 100, createSec }));

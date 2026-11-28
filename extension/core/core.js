@@ -225,9 +225,9 @@
   }
   /** @returns {CreationStats} */
   function aggregate(day = {}) {
-    const total = emptyStats();
-    for (const id of recordedSites(day)) for (const k of FIELDS) total[k] += nonnegative(day[id]?.[k]);
-    return total;
+    const sums = Object.fromEntries(FIELDS.map(key => [key, 0]));
+    for (const id of recordedSites(day)) for (const k of FIELDS) sums[k] += nonnegative(day[id]?.[k]);
+    return statsSnapshot(sums);
   }
   /**
    * @param {CreationStats} stats

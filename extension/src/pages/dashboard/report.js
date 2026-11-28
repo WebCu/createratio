@@ -10,8 +10,9 @@
       char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]
     );
   }
+  /** @param {Seconds} seconds */
   function minutes(seconds) {
-    return (seconds / 60).toFixed(1) + 'm';
+    return Core.minutesFromSeconds(seconds).toFixed(1) + 'm';
   }
   function row(label, stats) {
     return `<tr><th scope="row">${escape(label)}</th><td>${minutes(stats.createSec)}</td><td>${minutes(stats.consumeSec)}</td><td>${Core.score(stats).toFixed(2)}</td></tr>`;

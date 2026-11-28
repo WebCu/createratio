@@ -11,8 +11,9 @@ function error(message = '') {
   $('error').hidden = !message;
   refreshFailed = false;
 }
+/** @param {Seconds} sec */
 function minutes(sec) {
-  return (sec / 60).toFixed(1) + 'm';
+  return Core.minutesFromSeconds(sec).toFixed(1) + 'm';
 }
 function createAccessControl(site, state) {
   const row = document.createElement('div');

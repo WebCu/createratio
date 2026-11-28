@@ -9,7 +9,9 @@ declare global {
   type WebsiteDomain = string & { readonly __brand: 'WebsiteDomain' };
   type Intention = string & { readonly __brand: 'Intention' };
   type CreationStatsField = (typeof Core.FIELDS)[number];
-  type CreationStats = Record<CreationStatsField, number> & { readonly __brand: 'CreationStats' };
+  type CreationStats = {
+    [Field in CreationStatsField]: Field extends `${string}Sec` ? Seconds : number;
+  } & { readonly __brand: 'CreationStats' };
   type CreationScore = number & { readonly __brand: 'CreationScore' };
   type DailyTarget = number & { readonly __brand: 'DailyTarget' };
   type EpochTime = number & { readonly __brand: 'EpochTime' };

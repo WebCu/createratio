@@ -568,11 +568,14 @@ text, not to history. The intention list shows every saved entry that has text,
 a `SiteId` and a valid time, whatever its length, and never rewrites storage.
 Saved entries leave storage only when the user clears them or when the latest
 100 push them out.
-`CreationStats` has every creation-stats field as a number of at least 0. Only
-`Core.emptyStats`, `Core.statsSnapshot` and `Core.aggregate` create it; a stored
-site row becomes `CreationStats` through `Core.statsSnapshot`, which gives each
-field a finite value. A sum, from `Core.aggregate` or a caller's running total,
-stays at least 0 but is not checked for overflow to `Infinity`. Only
+`CreationStats` has every creation-stats field as a finite number of at least
+0: `createSec` and `consumeSec` are `Seconds`, and the action fields are counts.
+Only `Core.emptyStats`, `Core.statsSnapshot` and `Core.aggregate` create it, all
+through `Core.statsSnapshot`; a stored site row becomes `CreationStats` the same
+way. `Core.aggregate` adds the rows, then checks the sums, so a total that
+overflows becomes 0. Pages convert the time fields with
+`Core.minutesFromSeconds`. History writes and the report's per-site running
+totals stay untyped. Only
 `Core.score` creates a `CreationScore`, and the score display functions accept
 only that type. A `DailyTarget` is a number from 0.1 to 100 in steps of 0.1.
 Raw values get it only through `Core.validDailyTarget`, and the default setting
