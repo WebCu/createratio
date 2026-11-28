@@ -25,6 +25,9 @@ declare global {
     segments: TimeSegment[];
     actions: SiteActionEntry[];
   };
+  type DeliveryPacket = Pick<IngestMessage, 'id' | 'site' | 'segments' | 'actions'> & {
+    readonly __brand: 'DeliveryPacket';
+  };
   type PreferenceRules = {
     [K in PreferenceMessage['type']]: (message: Extract<PreferenceMessage, { type: K }>) => void;
   };

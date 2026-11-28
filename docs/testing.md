@@ -586,6 +586,13 @@ score with the target. A `ScrollFrictionStrength` is a whole number from 50 to
 Snapshot replies carry it after the reply check. Scroll friction commands keep a
 raw number until the worker checks it. Stored settings and days stay unchecked
 raw values until Core reads them.
+A `DeliveryPacket` is an ingest message that passed the packet checks: its ID,
+site, time segments and actions. Only `deliveryPacketFromMessage` in
+`message-contracts.js` creates it, and history records only a `DeliveryPacket`.
+`inHistoryGeneration` decides whether a message belongs to the current history
+generation; a missing generation and `null` mean the same. The worker drops a
+packet from another generation, or for a site that is not tracked, before it
+checks the packet, and still replies with a snapshot.
 Points in time use two clocks:
 `EpochTime` for `Date.now()` values and `PageTime` for `performance.now()`
 values. Code reads a clock at the call site and tags the reading with

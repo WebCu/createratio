@@ -62,17 +62,19 @@ async function recordPacket(message, sender, access, batch) {
   const preferences = /** @type {StoredData} */ (
     await extensionAPI.storage.local.get(['settings', '_historyGeneration'])
   );
-  if ((message.generation ?? null) !== (batch ? batch.generation : (preferences._historyGeneration ?? null))) return;
+  if (!contracts.inHistoryGeneration(message, batch ? batch.generation : preferences._historyGeneration)) return;
   if (!Core.trackingEnabled(message.site, preferences.settings)) return;
-  contracts.packet(message);
+  const delivery = contracts.deliveryPacketFromMessage(message);
   if (batch) {
-    if (batch.receipts.has(message.id)) return;
-    batch.receipts.add(message.id);
+    if (batch.receipts.has(delivery.id)) return;
+    batch.receipts.add(delivery.id);
   }
-  const packet = await SiteAccess.creationPacket(message, access || (await SiteAccess.reconcile()));
+  const packet = await SiteAccess.creationPacket(delivery, access || (await SiteAccess.reconcile()));
   if (!batch) {
-    const current = await extensionAPI.storage.local.get('_historyGeneration');
-    if ((message.generation ?? null) !== (current._historyGeneration ?? null)) return;
+    const current = /** @type {{ _historyGeneration?: string | null }} */ (
+      await extensionAPI.storage.local.get('_historyGeneration')
+    );
+    if (!contracts.inHistoryGeneration(message, current._historyGeneration)) return;
   }
   if (packet.segments.length || packet.actions.length) await history.recordCreation(packet);
 }

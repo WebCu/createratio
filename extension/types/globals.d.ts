@@ -39,7 +39,7 @@ declare global {
     reconcile(closeAll?: boolean): Promise<Record<string, AccessStatus>>;
     siteForURL(raw: string): VettedSiteId | null;
     gateURL(site: VettedSiteId): string;
-    creationPacket(packet: IngestMessage, access: Record<string, Partial<AccessStatus>>): Promise<IngestMessage>;
+    creationPacket(packet: DeliveryPacket, access: Record<string, Partial<AccessStatus>>): Promise<DeliveryPacket>;
     setBeforeNavigate(handler: (tab: chrome.tabs.Tab) => Promise<void>): void;
   };
   type ContentOwner = { prepare(force: boolean): Promise<boolean>; resume(): void; stop(): void };
