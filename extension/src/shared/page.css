@@ -405,6 +405,9 @@
 .settings-section-body {
   padding: 0 24px 20px;
 }
+#websites-settings > .settings-section-body {
+  container: website-settings / inline-size;
+}
 .settings-page .site-settings {
   margin: 0;
 }
@@ -461,6 +464,9 @@
   grid-template-columns: minmax(0, 1fr) 36px;
   gap: 4px;
   min-width: 0;
+}
+.settings-page .site-field-value:has(> .duration-reset[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
 }
 .settings-page .wait-preference-field .site-field-value {
   grid-column: 3;
@@ -1350,5 +1356,23 @@
   }
   .settings-page .custom-wait-duration {
     grid-row: 5;
+  }
+}
+
+@container website-settings (width < 320px) {
+  .settings-page .site-preference-field > :is(label, .site-field-value) {
+    grid-column: 1 / -1;
+  }
+  .settings-page .wait-preference-field > label {
+    grid-row: 4;
+  }
+  .settings-page .wait-preference-field .site-field-value {
+    grid-row: 5;
+  }
+  .settings-page .custom-duration {
+    grid-row: 6;
+  }
+  .settings-page .custom-wait-duration {
+    grid-row: 7;
   }
 }

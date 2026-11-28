@@ -165,6 +165,7 @@ function createWaitField(site) {
   option('custom', 'Custom…');
   input.addEventListener('change', () => saveWaitDuration(site.id));
   line.append(input);
+  input.addEventListener('blur', () => renderSite(siteControls.get(site.id), currentSettings, site.id + ':wait'));
   let reset = null;
   if (site.id) {
     reset = document.createElement('button');
