@@ -546,3 +546,42 @@ test('creation stats keep creating and consuming time as Seconds and actions as 
   ])
     assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
 });
+
+test('a creation day enters only through Core and credits only Seconds to known modes', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @type {CreationDay} */',
+      "const day = Core.creationDayFromStored(JSON.parse('{}'));",
+      '/** @type {Seconds | undefined} */',
+      'const seconds = day.x.createSec;',
+      '/** @type {CreationStats} */',
+      'const total = Core.sumStats([day.x]);',
+      '/** @type {Record<string, unknown>} */',
+      "const credited = Core.creditCreationDay(day, 'x', [{ mode: 'create', sec: Core.asSeconds(1) }], [{ action: 'posts' }]);",
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @type {CreationDay} */',
+      'const fromLiteral = { x: {} };',
+      "Core.creditCreationDay({}, 'x', [{ mode: 'create', sec: Core.asMilliseconds(1000) }], []);",
+      "Core.creditCreationDay({}, 'x', [{ mode: 'neutral', sec: Core.asSeconds(1) }], []);",
+      '/** @type {Milliseconds} */',
+      'const milliseconds = Core.creationDayFromStored({}).x.consumeSec;',
+      '/** @type {CreationDay} */',
+      'const total = Core.sumStats([]);',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [2, "is not assignable to type 'CreationDay'"],
+    [3, "Type 'Milliseconds' is not assignable to type 'Seconds'"],
+    [4, "Type '\"neutral\"' is not assignable to type 'SegmentMode'"],
+    [6, "Type 'Seconds' is not assignable to type 'Milliseconds'"],
+    [8, "is not assignable to type 'CreationDay'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
+});

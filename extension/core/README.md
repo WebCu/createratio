@@ -76,9 +76,17 @@ minimum, then returns the trimmed `Intention` or `null`. New commands never
 coerce values. `validLocalDate` rejects impossible calendar
 dates. `DELIVERY_LIMITS` bounds packets, items, seconds, IDs, and receipts.
 `statsSnapshot` resolves missing or invalid known numbers to zero without
-coercing numeric strings; history reads preserve unknown fields and partial rows.
-`score` takes only `CreationStats` from `emptyStats`, `statsSnapshot` or
-`aggregate`, so read one stored site row through `statsSnapshot` first.
+coercing numeric strings. `sumStats` adds site rows, such as one site's rows
+across several days. `score` takes only `CreationStats` from `emptyStats`,
+`statsSnapshot`, `sumStats` or `aggregate`, so read one stored site row through
+`statsSnapshot` first.
+
+`creationDayFromStored` reads one stored date of creation history as a
+`CreationDay`. It keeps unknown sites, unknown fields and partial rows, checks
+the known numbers that a row has, and turns a malformed row or day into an empty
+one. `creditCreationDay` adds time segments and actions to one site's row. The
+row gains any missing known field. A quote also counts as a post. Other sites
+and fields stay exactly as stored, so the saved format does not change.
 
 `trackingEnabled(site, settings)` reads the site's combined Limit & track choice
 from `trackedSites`. Access-session eligibility is enforced by the extension;

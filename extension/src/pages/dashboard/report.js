@@ -25,13 +25,11 @@
     const dates = Core.recentDates(range === 'today' ? 1 : 7, now),
       first = dates[0],
       last = dates.at(-1);
-    const bySite = Object.create(null);
+    const rowsBySite = new Map();
     for (const date of dates)
-      for (const site of Core.recordedSites(days[date])) {
-        const stats = Core.statsSnapshot(days[date][site]);
-        bySite[site] ||= Core.emptyStats();
-        for (const key of Core.FIELDS) bySite[site][key] += stats[key];
-      }
+      for (const site of Core.recordedSites(days[date]))
+        rowsBySite.set(site, [...(rowsBySite.get(site) ?? []), days[date][site]]);
+    const bySite = Object.fromEntries([...rowsBySite].map(([site, rows]) => [site, Core.sumStats(rows)]));
     return { dates, first, last, bySite, total: Core.aggregate(bySite) };
   }
   function create(days, range, now = new Date()) {

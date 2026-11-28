@@ -12,6 +12,10 @@ declare global {
   type CreationStats = {
     [Field in CreationStatsField]: Field extends `${string}Sec` ? Seconds : number;
   } & { readonly __brand: 'CreationStats' };
+  type StoredCreationRow = {
+    [Field in CreationStatsField]?: Field extends `${string}Sec` ? Seconds : number;
+  } & { [key: string]: unknown };
+  type CreationDay = { [site: string]: StoredCreationRow } & { readonly __brand: 'CreationDay' };
   type CreationScore = number & { readonly __brand: 'CreationScore' };
   type DailyTarget = number & { readonly __brand: 'DailyTarget' };
   type EpochTime = number & { readonly __brand: 'EpochTime' };

@@ -45,7 +45,7 @@ declare global {
     ok: true;
     generation?: string | null;
     date: LocalDate;
-    day: ReturnType<HistoryStore['creationDay']>;
+    day: CreationDay;
     settings: ReplySettings;
     access: Record<string, ReplyAccess>;
     websiteTimeEnabled: boolean;

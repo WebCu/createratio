@@ -570,12 +570,16 @@ Saved entries leave storage only when the user clears them or when the latest
 100 push them out.
 `CreationStats` has every creation-stats field as a finite number of at least
 0: `createSec` and `consumeSec` are `Seconds`, and the action fields are counts.
-Only `Core.emptyStats`, `Core.statsSnapshot` and `Core.aggregate` create it, all
-through `Core.statsSnapshot`; a stored site row becomes `CreationStats` the same
-way. `Core.aggregate` adds the rows, then checks the sums, so a total that
-overflows becomes 0. Pages convert the time fields with
-`Core.minutesFromSeconds`. History writes and the report's per-site running
-totals stay untyped. Only
+Only `Core.emptyStats`, `Core.statsSnapshot`, `Core.sumStats` and
+`Core.aggregate` create it, all through `Core.statsSnapshot`; a stored site row
+becomes `CreationStats` the same way. `Core.sumStats` and `Core.aggregate` add
+the rows, then check the sums, so a total that overflows becomes 0. Pages convert
+the time fields with `Core.minutesFromSeconds`. A `CreationDay` is the creation
+history of one local date, read from storage. Only `Core.creationDayFromStored`
+creates it: it keeps every site and unknown field, and it checks the known
+numbers of each row. `Core.creditCreationDay` owns the update rule: it adds
+`Seconds` and actions to one site row and returns the stored day with every
+other entry unchanged. Only
 `Core.score` creates a `CreationScore`, and the score display functions accept
 only that type. A `DailyTarget` is a number from 0.1 to 100 in steps of 0.1.
 Raw values get it only through `Core.validDailyTarget`, and the default setting

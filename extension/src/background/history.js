@@ -32,23 +32,6 @@
     function eligible(date) {
       return dates().includes(date);
     }
-    function creationDay(value) {
-      return Object.fromEntries(
-        Object.entries(collection(value)).map(([site, stats]) => {
-          if (!isCollection(stats)) return [site, {}];
-          const normalized = core.statsSnapshot(stats);
-          return [
-            site,
-            Object.fromEntries(
-              Object.entries(stats).map(([key, value]) => [
-                key,
-                Object.hasOwn(normalized, key) ? normalized[key] : value
-              ])
-            )
-          ];
-        })
-      );
-    }
     async function remove(keys) {
       if (!keys.length) return;
       await storage.remove(keys);
@@ -156,7 +139,7 @@
           .filter(date => Object.hasOwn(stored, prefix + date))
           .map(date => [
             date,
-            kind === 'websites' ? websiteDay(stored[prefix + date]) : creationDay(stored[prefix + date])
+            kind === 'websites' ? websiteDay(stored[prefix + date]) : core.creationDayFromStored(stored[prefix + date])
           ])
       );
     }
@@ -193,20 +176,13 @@
       const receipts = stored._receipts || [];
       if (receipts.includes(packet.id)) return;
       const changes = {};
-      for (const date of selected) {
-        const day = collection(stored[date]),
-          stats = collection(day[packet.site]);
-        day[packet.site] = { ...stats, ...core.statsSnapshot(stats) };
-        changes[date] = day;
-      }
-      for (const segment of packet.segments) {
-        if (changes[segment.date]) changes[segment.date][packet.site][segment.mode + 'Sec'] += segment.sec;
-      }
-      for (const item of packet.actions) {
-        if (!changes[item.date]) continue;
-        changes[item.date][packet.site][item.action] += 1;
-        if (item.action === 'quotes') changes[item.date][packet.site].posts += 1;
-      }
+      for (const date of selected)
+        changes[date] = core.creditCreationDay(
+          stored[date],
+          packet.site,
+          packet.segments.filter(segment => segment.date === date),
+          packet.actions.filter(item => item.date === date)
+        );
       if (receipts.length >= receiptLimit) {
         changes._historyGeneration = crypto.randomUUID();
         changes._receipts = [packet.id];
@@ -232,7 +208,7 @@
       if (id !== undefined) changes._websiteTimeReceipts = [...receipts, id].slice(-receiptLimit);
       await save(changes);
     }
-    return { prepare, save, read, clear, retained, creationDay, recordCreation, recordWebsiteTime };
+    return { prepare, save, read, clear, retained, recordCreation, recordWebsiteTime };
   }
   return { DAYS, MAX_BYTES, PREFIX, create };
 });

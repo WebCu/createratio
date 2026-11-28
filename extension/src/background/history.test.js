@@ -626,6 +626,74 @@ test('creation accrual repairs malformed days and site stats without discarding 
     }
   }
 });
+test('creation recording keeps the stored day format byte for byte', async () => {
+  const date = '2026-10-31',
+    yesterday = '2026-10-30',
+    zeros = '"replies":0,"comments":0,"likes":0,"bookmarks":0,"quotes":0,"reposts":0';
+  const cases = [
+    {
+      stored: {
+        [date]: {
+          retired: { consumeSec: 8, retiredField: 'kept' },
+          x: { unknown: { saved: true }, consumeSec: '10', posts: -2, createSec: 4 },
+          null_site: null,
+          array_site: [7],
+          string_site: 'broken'
+        }
+      },
+      segments: [
+        { date, mode: 'consume', sec: 5 },
+        { date, mode: 'create', sec: 2 }
+      ],
+      actions: [
+        { date, action: 'quotes' },
+        { date, action: 'likes' }
+      ],
+      expected: {
+        [date]:
+          '{"retired":{"consumeSec":8,"retiredField":"kept"},"x":{"unknown":{"saved":true},"consumeSec":5,"posts":1,"createSec":6,"replies":0,"comments":0,"likes":1,"bookmarks":0,"quotes":1,"reposts":0},"null_site":null,"array_site":[7],"string_site":"broken"}'
+      }
+    },
+    {
+      stored: { [date]: { x: null, linkedin: { posts: 1 } }, [yesterday]: 'broken' },
+      segments: [
+        { date: yesterday, mode: 'consume', sec: 0.1 },
+        { date, mode: 'create', sec: 3 },
+        { date: yesterday, mode: 'consume', sec: 0.2 }
+      ],
+      actions: [{ date: yesterday, action: 'posts' }],
+      expected: {
+        [date]: `{"x":{"consumeSec":0,"createSec":3,"posts":0,${zeros}},"linkedin":{"posts":1}}`,
+        [yesterday]: `{"x":{"consumeSec":0.30000000000000004,"createSec":0,"posts":1,${zeros}}}`
+      }
+    },
+    {
+      stored: { [date]: { linkedin: { createSec: 1 } } },
+      segments: [],
+      actions: [{ date, action: 'replies' }],
+      expected: {
+        [date]:
+          '{"linkedin":{"createSec":1},"x":{"consumeSec":0,"createSec":0,"posts":0,"replies":1,"comments":0,"likes":0,"bookmarks":0,"quotes":0,"reposts":0}}'
+      }
+    },
+    {
+      stored: { [date]: { x: { createSec: Number.MAX_VALUE, posts: 2 } } },
+      segments: [{ date, mode: 'create', sec: Number.MAX_VALUE }],
+      actions: [],
+      expected: {
+        [date]: `{"x":{"createSec":null,"posts":2,"consumeSec":0,${zeros}}}`
+      }
+    }
+  ];
+  for (const { stored, segments, actions, expected } of cases) {
+    const data = structuredClone(stored),
+      h = harness(data);
+    await h.history.prepare();
+    await h.history.recordCreation({ id: 'fresh', site: 'x', segments, actions });
+    for (const [key, json] of Object.entries(expected)) assert.equal(JSON.stringify(data[key]), json);
+    assert.deepEqual(data._receipts, ['fresh']);
+  }
+});
 test('worker retires malformed receipt journals before validating stale generations without changing totals', async () => {
   const date = '2026-10-31',
     start = new Date(2026, 9, 31, 12).getTime();
@@ -884,36 +952,22 @@ test('history reads return usable day maps for malformed restored envelopes with
     assert.deepEqual(data.unrelated, before.unrelated);
   }
 });
-test('creationDay supplies non-mutating usable rows for snapshots and history reads', async () => {
+test('creation history reads return the stored creation day without rewriting storage', async () => {
   const date = '2026-10-31',
     day = {
       x: { consumeSec: '10', posts: -2, createSec: 4, unknown: { saved: true } },
       retired: { consumeSec: 8, posts: 3, retiredField: 'kept' },
-      future_site: { futureField: 12 },
-      null_site: null,
-      array_site: [7],
-      string_site: 'broken',
-      number_site: 7
+      null_site: null
     };
   const data = { [date]: day, _historyMeta: ['unknown'] },
     before = structuredClone(data),
     h = harness(data);
-  const normalized = h.history.creationDay(day);
-  assert.deepEqual(structuredClone(normalized.x), { consumeSec: 0, posts: 0, createSec: 4, unknown: { saved: true } });
-  assert.deepEqual(structuredClone(normalized.retired), { consumeSec: 8, posts: 3, retiredField: 'kept' });
-  assert.deepEqual(structuredClone(normalized.future_site), { futureField: 12 });
-  for (const site of ['null_site', 'array_site', 'string_site', 'number_site'])
-    assert.deepEqual(structuredClone(normalized[site]), {});
-  assert.equal(h.reads.length, 0);
-  assert.equal(h.writes.length, 0);
-  assert.deepEqual(data, before);
   const ratio = await h.history.read('ratio', 'today');
-  assert.deepEqual(structuredClone(ratio[date]), structuredClone(normalized));
+  assert.deepEqual(structuredClone(ratio[date]), structuredClone(Core.creationDayFromStored(day)));
+  assert.equal(h.writes.length, 0);
   assert.deepEqual(data, before);
   assert.equal(Core.aggregate(ratio[date]).consumeSec, 8);
   assert.ok(Core.csv(ratio).includes(`${date},retired,8.000`));
-  for (const malformed of [undefined, null, [], [7], 'broken', 12, true])
-    assert.deepEqual(structuredClone(h.history.creationDay(malformed)), {});
 });
 test('website history reads normalize invalid totals without rewriting saved domain records', async () => {
   const date = '2026-10-31',
