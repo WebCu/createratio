@@ -35,7 +35,8 @@ declare global {
     scrollFrictionStrength?: number;
     [key: string]: unknown;
   };
-  type ReplyAccess = Omit<AccessStatus, 'site' | 'goalAllowed' | 'refilledAt' | 'waitSeconds'> & {
+  type ReplyAccess = Omit<AccessStatus, 'site' | 'goalAllowed' | 'refilledAt' | 'waitSeconds' | 'sessionMinutes'> & {
+    sessionMinutes: Minutes;
     goalAllowed?: boolean;
     refilledAt?: unknown;
     waitSeconds?: unknown;

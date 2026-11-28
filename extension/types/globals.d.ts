@@ -3,6 +3,7 @@ declare global {
   type Milliseconds = number & { readonly __brand: 'Milliseconds' };
   type Seconds = number & { readonly __brand: 'Seconds' };
   type Minutes = number & { readonly __brand: 'Minutes' };
+  type AccessMinutes = Minutes & { readonly __range: 'AccessMinutes' };
   type EpochTime = number & { readonly __brand: 'EpochTime' };
   type PageTime = number & { readonly __brand: 'PageTime' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {
@@ -20,7 +21,7 @@ declare global {
     readyAt: EpochTime | null;
     refilledAt: EpochTime | null;
     waitSeconds: Seconds;
-    sessionMinutes: Minutes;
+    sessionMinutes: AccessMinutes;
   };
   type SiteAccessApi = {
     handle(message: RuntimeMessage, sender: chrome.runtime.MessageSender): Promise<unknown>;

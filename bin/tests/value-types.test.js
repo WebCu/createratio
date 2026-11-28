@@ -65,6 +65,73 @@ test('value types reject raw dates, unguarded values and mixed duration units', 
   assert.match(result.stdout, /invalid\.js\(11,\d+\): error TS2322: Type 'number' is not assignable to type 'Seconds'/);
 });
 
+test('access minutes enter only through the guard and still count as minutes', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @param {unknown} value */',
+      'function guarded(value) {',
+      '  if (!Core.validAccessMinutes(value)) return;',
+      '  /** @type {AccessMinutes} */',
+      '  const preference = value;',
+      '  /** @type {Minutes} */',
+      '  const minutes = preference;',
+      '}',
+      '/** @type {AccessMinutes[]} */',
+      'const preferences = [Core.DEFAULT_SETTINGS.accessMinutes, Core.DEFAULT_SETTINGS.waitMinutes, Core.ACCESS_LIMITS.minMinutes, Core.ACCESS_LIMITS.maxMinutes];',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @type {AccessMinutes} */',
+      'const fromMinutes = Core.minutesFromMilliseconds(Core.asMilliseconds(90000));',
+      '/** @type {AccessMinutes} */',
+      'const fromNumber = 5;',
+      '/** @type {AccessMinutes} */',
+      'const fromCast = Core.asMinutes(5);',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, source] of [
+    [2, 'Minutes'],
+    [4, 'number'],
+    [6, 'Minutes']
+  ])
+    assert.match(
+      rejected.stdout,
+      new RegExp(
+        `rejected\\.js\\(${line},\\d+\\): error TS2322: Type '${source}' is not assignable to type 'AccessMinutes'`
+      )
+    );
+});
+
+test('access sessions start only from access minutes', t => {
+  const result = typeCheck(t, {
+    'sessions.js': [
+      'const now = Core.asEpochTime(Date.now());',
+      'const minutes = Core.minutesFromMilliseconds(Core.asMilliseconds(90000));',
+      'SiteAccessModel.confirmRequest(null, minutes, now);',
+      '/** @param {AccessStatus} status */',
+      'function session(status) { status.sessionMinutes = minutes; }',
+      '/** @param {Parameters<typeof SiteAccessModel.reconcileSiteAccess>[1]} facts */',
+      'function refill(facts) { facts.accessMinutes = minutes; }',
+      'SiteAccessModel.confirmRequest(null, Core.DEFAULT_SETTINGS.accessMinutes, now);',
+      '/** @param {ReplyAccess} reply */',
+      'function fromReply(reply) { SiteAccessModel.confirmRequest(null, reply.sessionMinutes, now); }',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(result.status, 0);
+  for (const line of [3, 5, 7, 10])
+    assert.match(
+      result.stdout,
+      new RegExp(`sessions\\.js\\(${line},\\d+\\): error TS\\d+: .*'Minutes' is not assignable to .*'AccessMinutes'`)
+    );
+  assert.doesNotMatch(result.stdout, /sessions\.js\(8,/);
+});
+
 test('clock types accept same-clock arithmetic and explicit clock conversion', t => {
   const result = typeCheck(t, {
     'clocks.js': [
@@ -131,7 +198,7 @@ test('access and history records require epoch times', t => {
       '/** @type {SiteActionEntry} */',
       "const action = { date: Core.localDate(), action: 'posts', at: Core.asPageTime(performance.now()) };",
       'SiteAccessModel.requestAccess(null, Core.asMilliseconds(1), 1);',
-      'SiteAccessModel.confirmRequest(null, Core.asMinutes(1), Core.asPageTime(performance.now()));',
+      'SiteAccessModel.confirmRequest(null, Core.DEFAULT_SETTINGS.accessMinutes, Core.asPageTime(performance.now()));',
       '/** @type {TimeSegment} */',
       "const segment = { date: Core.localDate(), mode: 'create', sec: Core.asSeconds(1), start: Core.asPageTime(performance.now()) };",
       ''
