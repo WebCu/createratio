@@ -374,10 +374,11 @@ test('invalid restored session numbers cannot revive access through legacy deadl
 
 const dashboardSender = { id: 'test-extension', url: 'chrome-extension://test-extension/dashboard.html', frameId: 0 };
 
-test('intention listing normalizes malformed history and preserves valid retired-site entries verbatim', async () => {
+test('intention listing skips entries it cannot show, without rewriting history, and keeps the rest verbatim', async () => {
   const valid = [
     { site: 'x', reason: 'Old short intention', requestedAt: 0 },
     { site: 'retired-site', reason: '  Keep the original text  ', requestedAt: 1 },
+    { site: 'x', reason: 'a'.repeat(281), requestedAt: 2 },
     { site: 'older_site2', reason: intent, requestedAt: now }
   ];
   const invalid = [
@@ -392,7 +393,6 @@ test('intention listing normalizes malformed history and preserves valid retired
     { ...valid[0], reason: 1 },
     { ...valid[0], reason: '' },
     { ...valid[0], reason: '   ' },
-    { ...valid[0], reason: 'a'.repeat(281) },
     { ...valid[0], requestedAt: -1 },
     { ...valid[0], requestedAt: Infinity },
     { ...valid[0], requestedAt: NaN },
@@ -409,19 +409,21 @@ test('intention listing normalizes malformed history and preserves valid retired
 });
 
 for (const browser of ['chrome', 'browser']) {
-  test(`${browser}: appended intentions recover malformed history without rejecting an accepted wait`, async () => {
-    const old = { site: 'retired-site', reason: 'Old reason', requestedAt: 0 };
-    for (const history of [{}, 'history', 1, true, null, [null, old, { site: 'x', reason: intent, requestedAt: -1 }]]) {
+  test(`${browser}: appended intentions keep all stored history and list what can be shown without rejecting an accepted wait`, async () => {
+    const old = { site: 'retired-site', reason: 'An intention from a retired site', requestedAt: 0 },
+      short = { site: 'x', reason: 'Old reason', requestedAt: 1 },
+      unshowable = { site: 'x', reason: intent, requestedAt: -1 };
+    for (const history of [{}, 'history', 1, true, null, [null, old, short, unshowable]]) {
       const w = worker({ settings: { intentionHistoryEnabled: true }, _intentions: history }, browser, now);
       const result = await w.send({ type: 'access-begin', site: 'x', reason: '  ' + intent + '  ' }, gate('x'));
       assert.equal(result.ok, true);
       assert.equal(result.access.x.readyAt, now + 300000);
       assert.equal(w.errors.length, 0);
-      const expected = [...(Array.isArray(history) ? [old] : []), { site: 'x', reason: intent, requestedAt: now }];
-      assert.deepEqual(w.data._intentions, expected);
+      const added = { site: 'x', reason: intent, requestedAt: now };
+      assert.deepEqual(w.data._intentions, [...(Array.isArray(history) ? history : []), added]);
       assert.deepEqual(await w.send({ type: 'access-history-list' }, dashboardSender), {
         ok: true,
-        intentions: expected
+        intentions: [...(Array.isArray(history) ? [old, short] : []), added]
       });
     }
   });
@@ -456,7 +458,7 @@ test('valid restored paused budgets and waits remain unchanged and exhausted ses
 });
 
 test('access validation delegates to shared domain policy without applying new-intention rules to saved history', async () => {
-  const validations = { validLocalDate: [], validAccessMinutes: [], validIntention: [] },
+  const validations = { validLocalDate: [], validAccessMinutes: [], intentionFromText: [], validIntention: [] },
     core = { ...C };
   for (const policy of Object.keys(validations))
     core[policy] = value => {
@@ -477,19 +479,19 @@ test('access validation delegates to shared domain policy without applying new-i
   assert.equal(state.sessionMinutes, 5);
   assert.ok(validations.validLocalDate.includes('2026-02-30'));
   for (const reason of [null, 'short', ' '.repeat(20), 'a'.repeat(281)]) {
-    validations.validIntention.length = 0;
+    validations.intentionFromText.length = 0;
     assert.deepEqual(structuredClone(await w.handle({ type: 'access-begin', site: 'x', reason }, gate('x'))), {
       ok: false,
       error: 'Write a specific intention of 20–280 characters.'
     });
-    assert.deepEqual(validations.validIntention, [reason]);
+    assert.deepEqual(validations.intentionFromText, [reason]);
   }
-  validations.validIntention.length = 0;
+  validations.intentionFromText.length = 0;
   assert.equal(
     (await w.handle({ type: 'access-begin', site: 'x', reason: intent }, gate('x'))).access.x.readyAt,
     now + 300000
   );
-  assert.deepEqual(validations.validIntention, [intent]);
+  assert.deepEqual(validations.intentionFromText, [intent]);
   assert.deepEqual(structuredClone(await w.handle({ type: 'access-history-list' }, dashboardSender)), {
     ok: true,
     intentions: []
@@ -514,15 +516,16 @@ test('access validation delegates to shared domain policy without applying new-i
     assert.equal((await legacy.handle({ type: 'access-status' })).access.x.remainingMs, 300000, date);
     assert.ok(validations.validLocalDate.includes(date));
   }
-  const old = { site: 'retired-site', reason: 'Old reason', requestedAt: 0 };
-  const history = blocker({ _intentions: [old] }, 'chrome', core);
+  const kept = { site: 'retired-site', reason: 'An intention from a retired site', requestedAt: 0 },
+    short = { site: 'retired-site', reason: 'Old reason', requestedAt: 1 };
+  const history = blocker({ _intentions: [kept, short] }, 'chrome', core);
   validations.validIntention.length = 0;
   assert.deepEqual(structuredClone(await history.handle({ type: 'access-history-list' }, dashboardSender)), {
     ok: true,
-    intentions: [old]
+    intentions: [kept, short]
   });
   assert.deepEqual(validations.validIntention, []);
-  assert.deepEqual(history.data._intentions, [old]);
+  assert.deepEqual(history.data._intentions, [kept, short]);
 });
 
 test('session messages still reconcile before rejecting authorization or an unknown command', async () => {

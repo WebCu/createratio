@@ -560,6 +560,14 @@ is dropped then and never reaches history. While website time is off, restored
 pending entries wait in session storage unchanged, and a restored sample is
 discarded. `WebsiteDomain` and `SiteId` do not
 convert to each other. Stored website-time days keep plain string keys.
+An `Intention` is trimmed text of 20–280 characters. Raw text gets it only
+through `Core.validIntention` or `Core.intentionFromText`, which trims submitted
+text first. A new saved intention is built from an `Intention`. Saved
+intentions keep `reason` as a plain string: the intention rule applies to new
+text, not to history. The intention list shows every saved entry that has text,
+a `SiteId` and a valid time, whatever its length, and never rewrites storage.
+Saved entries leave storage only when the user clears them or when the latest
+100 push them out.
 Points in time use two clocks:
 `EpochTime` for `Date.now()` values and `PageTime` for `performance.now()`
 values. Code reads a clock at the call site and tags the reading with

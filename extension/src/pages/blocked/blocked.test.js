@@ -151,7 +151,7 @@ function page(options = {}) {
           if (Object.hasOwn(options, 'reply')) return options.reply;
           if (fail) return { ok: false, error: 'Unable to check access.' };
           if (message.type === 'access-begin') {
-            if (!Core.validIntention(message.reason))
+            if (Core.intentionFromText(message.reason) === null)
               return { ok: false, error: 'Write a specific intention of 20–280 characters.' };
             access = { ...access, readyAt: now + access.waitSeconds * 1000 };
           }

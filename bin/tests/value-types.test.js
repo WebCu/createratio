@@ -426,3 +426,37 @@ test('website domains enter only through the guard and stay apart from site IDs'
       )
     );
 });
+
+test('intentions enter only as trimmed text through Core', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @param {unknown} value */',
+      'function guarded(value) {',
+      '  if (!Core.validIntention(value)) return;',
+      '  /** @type {Intention} */',
+      '  const intention = value;',
+      '  /** @type {string} */',
+      '  const text = intention;',
+      '}',
+      '/** @type {Intention | null} */',
+      "const typed = Core.intentionFromText('  Reply to a colleague, then leave.  ');",
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @type {Intention} */',
+      "const fromString = 'Reply to a colleague, then leave.';",
+      '/** @type {number | null} */',
+      "const notNumber = Core.intentionFromText('Reply to a colleague, then leave.');",
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [2, "Type 'string' is not assignable to type 'Intention'"],
+    [4, "is not assignable to type 'number'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
+});

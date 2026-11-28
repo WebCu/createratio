@@ -202,8 +202,8 @@ async function refresh() {
 $('reason').addEventListener('input', clearIntentionError);
 $('request').addEventListener('submit', event => {
   event.preventDefault();
-  const reason = $('reason').value.trim();
-  if (!Core.validIntention(reason)) {
+  const reason = Core.intentionFromText($('reason').value);
+  if (reason === null) {
     intentionError = `Write a specific intention of ${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters.`;
     renderError();
     return;

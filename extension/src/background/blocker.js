@@ -15,7 +15,6 @@ const SiteAccess = (() => {
         Sites.validSiteId(entry.site) &&
         typeof entry.reason === 'string' &&
         entry.reason.trim().length > 0 &&
-        entry.reason.length <= Core.INTENTION_LIMITS.maxLength &&
         Number.isFinite(entry.requestedAt) &&
         entry.requestedAt >= 0
     );
@@ -323,7 +322,8 @@ const SiteAccess = (() => {
     };
   }
   async function beginWait(message, stored, now) {
-    if (!Core.validIntention(message.reason))
+    const reason = Core.intentionFromText(message.reason);
+    if (reason === null)
       return {
         ok: false,
         error: `Write a specific intention of ${Core.INTENTION_LIMITS.minLength}–${Core.INTENTION_LIMITS.maxLength} characters.`
@@ -338,8 +338,8 @@ const SiteAccess = (() => {
     const changes = { _access: access };
     if (stored.settings?.intentionHistoryEnabled === true)
       changes._intentions = [
-        ...savedIntentions(stored._intentions),
-        { site, reason: message.reason.trim(), requestedAt: now }
+        ...(Array.isArray(stored._intentions) ? stored._intentions : []),
+        { site, reason, requestedAt: now }
       ].slice(-100);
     await api.storage.local.set(changes);
   }

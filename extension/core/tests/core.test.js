@@ -225,10 +225,34 @@ test('access minutes require a numeric whole number within the access limits', (
     assert.equal(C.validAccessMinutes(value), false);
 });
 
-test('intentions use trimmed minimum length and raw maximum length without coercion', () => {
+test('an intention is trimmed text of 20 to 280 characters', () => {
   assert.deepEqual(C.INTENTION_LIMITS, { minLength: 20, maxLength: 280 });
-  for (const value of ['a'.repeat(20), 'a'.repeat(280), `  ${'a'.repeat(20)}  `])
+  for (const value of ['a'.repeat(20), 'a'.repeat(280), `a${' '.repeat(18)}a`])
     assert.equal(C.validIntention(value), true);
+  for (const value of [
+    'a'.repeat(19),
+    'a'.repeat(281),
+    ' '.repeat(20),
+    ` ${'a'.repeat(20)}`,
+    `${'a'.repeat(20)}\n`,
+    undefined,
+    null,
+    123,
+    {},
+    [],
+    new String('a'.repeat(20))
+  ])
+    assert.equal(C.validIntention(value), false);
+});
+
+test('intention text uses a trimmed minimum and a raw maximum without coercion', () => {
+  for (const [value, intention] of [
+    ['a'.repeat(20), 'a'.repeat(20)],
+    ['a'.repeat(280), 'a'.repeat(280)],
+    [`  ${'a'.repeat(20)}  `, 'a'.repeat(20)],
+    [`\n${'a'.repeat(278)}\t`, 'a'.repeat(278)]
+  ])
+    assert.equal(C.intentionFromText(value), intention);
   for (const value of [
     'a'.repeat(19),
     ' '.repeat(20),
@@ -242,7 +266,7 @@ test('intentions use trimmed minimum length and raw maximum length without coerc
     [],
     new String('a'.repeat(20))
   ])
-    assert.equal(C.validIntention(value), false);
+    assert.equal(C.intentionFromText(value), null);
 });
 
 test('delivery policy exposes bounded batches, seconds, identifiers and receipts', () => {
