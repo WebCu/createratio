@@ -215,6 +215,7 @@
       }
       await save(changes);
     }
+    /** @param {WebsiteDomain} domain */
     async function recordWebsiteTime(domain, segments, id) {
       await prepare();
       const selected = segments.filter(segment => eligible(segment.date));
