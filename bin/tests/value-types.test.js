@@ -546,3 +546,52 @@ test('creation stats keep creating and consuming time as Seconds and actions as 
   ])
     assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
 });
+
+test('delivery packets reach history and access narrowing only through the contract check', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      'const contracts = MessageContracts.create(Core, chrome.runtime, Sites);',
+      'const history = ActivityHistory.create(null, Core);',
+      '/** @param {IngestMessage} message */',
+      'async function checked(message) {',
+      '  /** @type {boolean} */',
+      '  const current = contracts.inHistoryGeneration(message, null);',
+      '  const packet = contracts.deliveryPacketFromMessage(message);',
+      '  /** @type {DeliveryPacket} */',
+      '  const narrowed = await SiteAccess.creationPacket(packet, {});',
+      '  await history.recordCreation(narrowed);',
+      '}',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      'const contracts = MessageContracts.create(Core, chrome.runtime, Sites);',
+      'const history = ActivityHistory.create(null, Core);',
+      '/** @param {IngestMessage} message */',
+      'async function unchecked(message) {',
+      '  await history.recordCreation(message);',
+      '  await SiteAccess.creationPacket(message, {});',
+      '  /** @type {DeliveryPacket} */',
+      "  const raw = { id: 'packet', site: 'x', segments: [], actions: [] };",
+      '  /** @type {number} */',
+      '  const notNumber = contracts.deliveryPacketFromMessage(message);',
+      '}',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, target] of [
+    [5, 'DeliveryPacket'],
+    [6, 'DeliveryPacket'],
+    [8, 'DeliveryPacket'],
+    [10, 'number']
+  ])
+    assert.match(
+      rejected.stdout,
+      new RegExp(
+        `rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*is not assignable to (parameter of )?type '${target}'`
+      )
+    );
+});

@@ -54,8 +54,14 @@
         core.SITES.some(site => site.id === message.site)
       );
     }
-    /** @param {IngestMessage} message */
-    function packet(message) {
+    /** @param {Pick<IngestMessage, 'generation'>} message
+     * @param {string | null | undefined} generation */
+    function inHistoryGeneration(message, generation) {
+      return (message.generation ?? null) === (generation ?? null);
+    }
+    /** @param {IngestMessage} message
+     * @returns {DeliveryPacket} */
+    function deliveryPacketFromMessage(message) {
       const limits = core.DELIVERY_LIMITS;
       const site = core.SITES.find(site => site.id === message.site);
       if (
@@ -98,6 +104,12 @@
         if (action.at !== undefined && (!Number.isFinite(action.at) || action.at < 0))
           throw refuse('Invalid action time');
       }
+      return /** @type {DeliveryPacket} */ ({
+        id: message.id,
+        site: message.site,
+        segments: message.segments,
+        actions: message.actions
+      });
     }
     /** @param {chrome.runtime.MessageSender} sender */
     function preferencesSender(sender) {
@@ -199,7 +211,8 @@
     return {
       read,
       creationSender,
-      packet,
+      inHistoryGeneration,
+      deliveryPacketFromMessage,
       preferencesSender,
       updateSender,
       preferences,
