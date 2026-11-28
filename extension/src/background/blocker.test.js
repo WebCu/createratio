@@ -10,7 +10,7 @@ const MessageContracts = require('./message-contracts.js');
 const { worker, gate, intent, popupSender, rulesFor } = require('../tests/background-harness.js');
 const now = new Date(2026, 9, 11, 12).getTime();
 
-function blocker(data = {}, browser = 'chrome', core = C) {
+function blocker(data = {}, browser = 'chrome', core = C, integrations = Sites) {
   const calls = [],
     failures = new Map(),
     counts = new Map(),
@@ -104,7 +104,7 @@ function blocker(data = {}, browser = 'chrome', core = C) {
   const context = vm.createContext({
     [browser]: api,
     Core: core,
-    Sites,
+    Sites: integrations,
     MessageContracts,
     URL,
     Date: Clock
@@ -197,7 +197,8 @@ for (const browser of ['chrome', 'browser']) {
 
 test('tracking accepts vetted integrations independently of whole-site gate support', async () => {
   const core = { ...C, SITES: [...C.SITES, { id: 'vetted' }] };
-  const w = blocker({}, 'chrome', core);
+  const integrations = { ...Sites, validVettedSiteId: id => id === 'vetted' || Sites.validVettedSiteId(id) };
+  const w = blocker({}, 'chrome', core, integrations);
   assert.equal((await w.handle(tracking('vetted', true), popupSender)).ok, true);
   assert.deepEqual(w.data.settings.trackedSites, [...C.DEFAULT_SETTINGS.trackedSites, 'vetted']);
   assert.deepEqual(rulesFor(w), []);

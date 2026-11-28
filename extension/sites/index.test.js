@@ -160,3 +160,12 @@ test('site IDs follow the stable ID format, whether or not the catalog vets them
   for (const id of ['X', '1site', '-site', '', 'site.com', 'my site', 42, null, undefined, ['x']])
     assert.equal(integrations.validSiteId(id), false, String(id));
 });
+
+test('vetted site IDs are well-formed IDs in the catalog, not removed or unknown integrations', () => {
+  for (const { id } of integrations.sites) assert.equal(integrations.validVettedSiteId(id), true, id);
+  for (const id of ['retired', 'removed_site', 'constructor', '__proto__', 'X', '', 42, null, undefined, ['x']])
+    assert.equal(integrations.validVettedSiteId(id), false, String(id));
+  const catalog = browserCatalog(modules());
+  assert.equal(catalog.validVettedSiteId('x'), true);
+  assert.equal(catalog.validVettedSiteId('retired'), false);
+});

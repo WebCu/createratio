@@ -363,3 +363,34 @@ for (const browser of ['chrome', 'browser']) {
     assert.equal(w.errors.length, 0);
   });
 }
+
+test('incoming site fields accept every vetted site and reject only unknown or malformed site IDs', async () => {
+  const integrations = require('../../sites/index.js');
+  const date = C.localDate();
+  const unknown = ['retired', 'constructor', '__proto__', 'X', '', null, 42];
+  const w = worker({}, 'chrome');
+  for (const { id, gated, hosts } of integrations.sites) {
+    assert.equal((await w.send({ type: 'tracking', site: id, enabled: true }, popupSender)).ok, true, id);
+    const ingest = { type: 'ingest', id: 'packet-' + id, site: id, segments: [], actions: [] };
+    const sender = { id: 'test-extension', tab: { id: 1 }, frameId: 0, url: 'https://' + hosts[0] + '/' };
+    assert.equal((await w.send(ingest, sender)).ok, true, id);
+    if (!gated) continue;
+    const duration = { type: 'access-duration', site: id, minutes: 7 };
+    assert.equal((await w.send(duration, popupSender)).ok, true, id);
+    assert.equal((await w.send({ type: 'access-cancel', site: id }, gate(id))).ok, true, id);
+  }
+  for (const site of unknown) {
+    const label = String(site);
+    assert.equal((await w.send({ type: 'tracking', site, enabled: true }, popupSender)).ok, false, label);
+    assert.equal((await w.send({ type: 'access-duration', site, minutes: 7 }, popupSender)).ok, false, label);
+    assert.equal((await w.send({ type: 'access-cancel', site }, gate(site))).ok, false, label);
+    assert.equal((await w.send({ type: 'access-end', site }, popupSender)).ok, false, label);
+    const ingest = { type: 'ingest', id: 'packet-' + label, site, segments: [], actions: [] };
+    assert.equal(
+      (await w.send(ingest, { id: 'test-extension', tab: { id: 1 }, frameId: 0, url: 'https://x.com/' })).ok,
+      false,
+      label
+    );
+  }
+  assert.equal(w.data[date], undefined);
+});

@@ -346,6 +346,51 @@ test('vetted site IDs come from the catalog and other site IDs only through the 
     );
 });
 
+test('the vetted guard and catalog lookups return vetted site IDs and typed site integrations', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @param {unknown} value */',
+      'function guarded(value) {',
+      '  if (!Sites.validVettedSiteId(value)) return;',
+      '  /** @type {VettedSiteId} */',
+      '  const site = value;',
+      '}',
+      "const integration = Sites.forURL('https://x.com/');",
+      '/** @type {VettedSiteId[]} */',
+      "const located = [integration ? integration.id : Sites.sites[0].id, Sites.get('x')?.id ?? Sites.sites[0].id];",
+      '/** @type {string | undefined} */',
+      "const home = Sites.forAccessURL('https://x.com/')?.access?.home;",
+      '/** @type {VettedSiteId | null} */',
+      "const fromCore = Core.siteForURL('https://x.com/');",
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @type {number | undefined} */',
+      "const notNumber = Sites.get('x')?.id;",
+      '/** @type {number | undefined} */',
+      "const homeNotNumber = Sites.forAccessURL('https://x.com/')?.access?.home;",
+      "const missing = Sites.forURL('https://x.com/')?.missingField;",
+      '/** @param {string} value */',
+      'function unguarded(value) {',
+      '  /** @type {VettedSiteId} */',
+      '  const site = value;',
+      '}',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [2, "Type 'VettedSiteId' is not assignable to type 'number'"],
+    [4, "Type 'string' is not assignable to type 'number'"],
+    [5, "Property 'missingField' does not exist on type 'SiteIntegration'"],
+    [9, "Type 'string' is not assignable to type 'VettedSiteId'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: ${pattern}`));
+});
+
 test('access records, saved intentions and gate URLs require branded site IDs', t => {
   const result = typeCheck(t, {
     'records.js': [

@@ -60,6 +60,7 @@ async function tracker(browser = 'chrome', options = {}) {
     Sites: {
       ...integrations,
       get: id => (options.integration?.id === id ? options.integration : integrations.get(id)),
+      validVettedSiteId: id => options.integration?.id === id || integrations.validVettedSiteId(id),
       forURL: raw => options.integration || integrations.forURL(raw)
     },
     URL,

@@ -384,6 +384,7 @@ test('shared access lifecycle uses a third module’s home, aliases, session rul
     ...catalog,
     sites: [...catalog.sites, { ...plugin, gated: true, defaultEnabled: false }],
     get: id => (id === plugin.id ? plugin : catalog.get(id)),
+    validVettedSiteId: id => id === plugin.id || catalog.validVettedSiteId(id),
     forURL: raw => (hostname(raw) === 'example.test' ? plugin : catalog.forURL(raw)),
     forAccessURL: raw =>
       access.domains.some(domain => hostname(raw) === domain || hostname(raw).endsWith('.' + domain))

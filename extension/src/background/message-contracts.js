@@ -24,12 +24,17 @@
   const HISTORY_RANGES = { today: true, week: true, month: true };
   /** @type {Record<SegmentMode, true>} */
   const SEGMENT_MODES = { create: true, consume: true };
+  /** @param {typeof Sites} integrations */
   function create(core, runtime, integrations) {
     const pages = Object.fromEntries(
       ['popup', 'settings', 'dashboard', 'blocked'].map(page => [page, runtime.getURL(page + '.html')])
     );
     const gate = new URL(pages.blocked);
     const gated = new Set(integrations.sites.filter(site => site.gated).map(site => site.id));
+    /** @returns {value is VettedSiteId} */
+    function gatedSite(value) {
+      return integrations.validVettedSiteId(value) && gated.has(value);
+    }
     /** @param {chrome.runtime.MessageSender} sender
      * @param {string[]} names */
     function topPage(sender, names) {
@@ -51,7 +56,7 @@
         record(sender?.tab) &&
         sender.frameId === 0 &&
         core.siteForURL(sender.url) === message.site &&
-        core.SITES.some(site => site.id === message.site)
+        integrations.validVettedSiteId(message.site)
       );
     }
     /** @param {IngestMessage} message */
@@ -116,13 +121,13 @@
     /** @type {PreferenceRules} */
     const preferenceRules = {
       tracking(message) {
-        if (!core.SITES.some(site => site.id === message.site) || typeof message.enabled !== 'boolean')
+        if (!integrations.validVettedSiteId(message.site) || typeof message.enabled !== 'boolean')
           throw refuse('Choose a vetted website and enable or disable tracking');
       },
       'access-duration'(message) {
         if (message.preference !== undefined && !member(ACCESS_PREFERENCES, message.preference))
           throw refuse('Unsupported preference');
-        if (message.site !== undefined && !gated.has(message.site)) throw refuse('Unsupported site');
+        if (message.site !== undefined && !gatedSite(message.site)) throw refuse('Unsupported site');
         if (!(message.site !== undefined && message.minutes === null) && !core.validAccessMinutes(message.minutes))
           throw refuse(
             `Choose a whole number from ${core.ACCESS_LIMITS.minMinutes} to ${core.ACCESS_LIMITS.maxMinutes} minutes`
@@ -176,7 +181,7 @@
         } catch (_) {}
       }
       if (
-        !gated.has(site) ||
+        !gatedSite(site) ||
         sender?.frameId !== 0 ||
         !url ||
         url.protocol !== gate.protocol ||
@@ -194,7 +199,7 @@
         const guard = sender?.frameId === 0 && integrations.forAccessURL(sender.url)?.id === message.site;
         if (!popup && !guard) blocked(sender, message.site);
       } else blocked(sender, message.site);
-      if (!gated.has(message.site)) throw refuse('Unsupported site');
+      if (!gatedSite(message.site)) throw refuse('Unsupported site');
     }
     return {
       read,

@@ -7,6 +7,27 @@ declare global {
   type SiteId = string & { readonly __brand: 'SiteId' };
   type VettedSiteId = SiteId & { readonly __vetted: true };
   type WebsiteDomain = string & { readonly __brand: 'WebsiteDomain' };
+  type SiteMode = 'create' | 'consume' | 'neutral';
+  type SiteAction = { button: Element; action: string; submission: boolean };
+  type SiteAdapter = { mode(): SiteMode; action(event: Event): SiteAction | null };
+  type SiteAccessPolicy = {
+    domains: string[];
+    home: string;
+    redirectRuleId: number;
+    ruleIds: number[];
+    unrestrictedRules: chrome.declarativeNetRequest.Rule[];
+    sessionRules: chrome.declarativeNetRequest.Rule[];
+  };
+  type SiteIntegration = {
+    id: VettedSiteId;
+    name: string;
+    hosts: string[];
+    actions: string[];
+    defaultEnabled?: boolean;
+    access?: SiteAccessPolicy;
+    classifyPage(state: { url: string; [key: string]: unknown }): SiteMode;
+    create(context: { document: Document; location: Location; dom: ReturnType<typeof PageQueries> }): SiteAdapter;
+  };
   type Intention = string & { readonly __brand: 'Intention' };
   type CreationStatsField = (typeof Core.FIELDS)[number];
   type CreationStats = {

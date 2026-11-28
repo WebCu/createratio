@@ -546,11 +546,16 @@ Core's defaults and `ACCESS_LIMITS` are the only casts. A converted or tagged
 `sessionMinutes` as `Minutes`, because content scripts check replies without
 Core. A `SiteId` matches the stable site ID format; raw values get it only
 through `Sites.validSiteId`, which also checks catalog IDs as they load. A
-`VettedSiteId` is a `SiteId` for a vetted site: `Sites.sites` casts it once, and
-no guard creates it. Saved intentions and recorded history keep `SiteId`,
+`VettedSiteId` is a `SiteId` for a vetted site. The catalog casts each checked
+site module to `SiteIntegration` once, so `Sites.sites`, `Sites.get`,
+`Sites.forURL` and `Sites.forAccessURL` give vetted IDs. Raw values get it only
+through `Sites.validVettedSiteId`, which accepts only IDs in the catalog. Saved
+intentions and recorded history keep `SiteId`,
 because a removed integration keeps its history; access statuses and gate URLs
 need `VettedSiteId`. Runtime messages and stored `trackedSites` stay plain
-strings until their receivers check them.
+strings. `MessageContracts` checks each incoming `site` field with
+`Sites.validVettedSiteId`, so a test that adds a site to a fake catalog must
+also add it to that guard.
 A `WebsiteDomain` is the hostname that website time records: a normalized URL
 hostname, with one leading `www.` removed by `WebTime.domainForURL`. Raw values
 get it only through `WebTime.validWebsiteDomain`, which `domainForURL` also uses.
