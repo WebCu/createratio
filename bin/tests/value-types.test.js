@@ -546,3 +546,58 @@ test('creation stats keep creating and consuming time as Seconds and actions as 
   ])
     assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
 });
+
+test('stored settings stay unchecked until Core parses them into preferences', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @param {StoredData} stored */',
+      'function read(stored) {',
+      '  /** @type {Preferences} */',
+      '  const preferences = Core.settingsSnapshot(stored.settings);',
+      '  /** @type {AccessMinutes[]} */',
+      "  const minutes = [preferences.accessMinutes, preferences.waitMinutes, Core.siteSettings('x', stored.settings).waitMinutes];",
+      '  /** @type {AccessMinutes | undefined} */',
+      '  const override = preferences.siteOverrides?.x?.accessMinutes;',
+      '  /** @type {DailyTarget} */',
+      '  const target = preferences.dailyTarget;',
+      '  /** @type {boolean[]} */',
+      '  const choices = [preferences.allowAboveGoal, preferences.intentionHistoryEnabled, preferences.scrollFrictionEnabled];',
+      '  /** @type {string[]} */',
+      '  const tracked = preferences.trackedSites;',
+      '  /** @type {StoredSettings} */',
+      '  const saved = Core.updatePreferences(stored.settings, { accessMinutes: preferences.accessMinutes });',
+      '}',
+      "Core.settingsSnapshot('unreadable');",
+      "Core.siteSettings('x', 12);",
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @param {StoredData} stored */',
+      'function raw(stored) {',
+      '  /** @type {AccessMinutes} */',
+      '  const minutes = stored.settings.accessMinutes;',
+      '  /** @type {DailyTarget} */',
+      '  const target = stored.settings.dailyTarget;',
+      '  /** @type {boolean} */',
+      '  const goal = stored.settings.allowAboveGoal;',
+      '  /** @type {Preferences} */',
+      '  const preferences = Core.updatePreferences(stored.settings, {});',
+      '  /** @type {Minutes} */',
+      '  const override = stored.settings.siteOverrides.x.accessMinutes;',
+      '}',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [4, "Type 'unknown' is not assignable to type 'AccessMinutes'"],
+    [6, "Type 'unknown' is not assignable to type 'DailyTarget'"],
+    [8, "Type 'unknown' is not assignable to type 'boolean'"],
+    [10, "is not assignable to type 'Preferences'"],
+    [12, "Property 'x' does not exist on type 'unknown'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
+});
