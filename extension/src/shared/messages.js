@@ -65,7 +65,7 @@
       entries.every(
         entry =>
           object(entry) &&
-          typeof entry.site === 'string' &&
+          sites.validSiteId(entry.site) &&
           typeof entry.reason === 'string' &&
           nonnegative(entry.requestedAt)
       )
