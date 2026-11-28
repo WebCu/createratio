@@ -9,10 +9,11 @@
 })(globalThis, function (Core, report) {
   'use strict';
   const URL = 'https://createratio.com/';
+  /** @param {Seconds} seconds */
   function time(seconds) {
     return seconds > 0 && seconds < 60
       ? `${Math.round(seconds)}s`
-      : `${(seconds / 60).toFixed(1).replace(/\.0$/, '')}m`;
+      : `${Core.minutesFromSeconds(seconds).toFixed(1).replace(/\.0$/, '')}m`;
   }
   function create(days, range, now = new Date()) {
     const { first, last, total } = report.summarize(days, range, now);

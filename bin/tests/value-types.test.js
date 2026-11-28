@@ -493,7 +493,7 @@ test('creation stats, scores and daily targets enter only through Core', t => {
       '/** @type {DailyTarget} */',
       'const targetFromNumber = 1;',
       '/** @type {CreationStats} */',
-      'const fromLiteral = { consumeSec: 0, createSec: 0, posts: 0, replies: 0, comments: 0, likes: 0, bookmarks: 0, quotes: 0, reposts: 0 };',
+      'const fromLiteral = { consumeSec: Core.asSeconds(0), createSec: Core.asSeconds(0), posts: 0, replies: 0, comments: 0, likes: 0, bookmarks: 0, quotes: 0, reposts: 0 };',
       'const color = Core.scoreColor(0.5);',
       'const mixed = Core.aboveDailyTarget(Core.dailyTarget({}), Core.dailyTarget({}));',
       '/** @type {string} */',
@@ -509,6 +509,40 @@ test('creation stats, scores and daily targets enter only through Core', t => {
     [7, "Argument of type 'number' is not assignable to parameter of type 'CreationScore'"],
     [8, "Argument of type 'DailyTarget' is not assignable to parameter of type 'CreationScore'"],
     [10, "Type 'CreationScore' is not assignable to type 'string'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
+});
+
+test('creation stats keep creating and consuming time as Seconds and actions as counts', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      'const stats = Core.aggregate({});',
+      '/** @type {Seconds[]} */',
+      'const seconds = [stats.createSec, stats.consumeSec];',
+      '/** @type {Minutes} */',
+      'const minutes = Core.minutesFromSeconds(stats.createSec);',
+      '/** @type {number} */',
+      'const posts = stats.posts;',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      'const stats = Core.emptyStats();',
+      '/** @type {Milliseconds} */',
+      'const milliseconds = stats.consumeSec;',
+      '/** @type {Seconds} */',
+      'const fromCount = stats.posts;',
+      'stats.createSec = 60;',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [3, "Type 'Seconds' is not assignable to type 'Milliseconds'"],
+    [5, "Type 'number' is not assignable to type 'Seconds'"],
+    [6, "Type 'number' is not assignable to type 'Seconds'"]
   ])
     assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
 });

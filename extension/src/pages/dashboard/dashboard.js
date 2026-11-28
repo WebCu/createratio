@@ -28,8 +28,9 @@ function error(message = '') {
   $('error').textContent = message;
   $('error').hidden = !message;
 }
+/** @param {Seconds} sec */
 function minutes(sec) {
-  return (sec / 60).toFixed(1) + 'm';
+  return Core.minutesFromSeconds(sec).toFixed(1) + 'm';
 }
 function svgElement(tag, attrs = {}, text) {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -40,7 +41,10 @@ function svgElement(tag, attrs = {}, text) {
 function chart(days) {
   const dates = Core.recentDates();
   const totals = dates.map(date => Core.aggregate(days[date]));
-  const max = Math.max(1, ...totals.flatMap(s => [s.consumeSec / 60, s.createSec / 60]));
+  const max = Math.max(
+    1,
+    ...totals.flatMap(s => [Core.minutesFromSeconds(s.consumeSec), Core.minutesFromSeconds(s.createSec)])
+  );
   const top = Math.ceil(max / 5) * 5;
   const svg = $('chart');
   while (svg.children.length > 2) svg.lastChild.remove();
@@ -60,7 +64,7 @@ function chart(days) {
       [0, 'createSec', 'var(--green)'],
       [1, 'consumeSec', 'var(--consume)']
     ])) {
-      const height = (totals[i][key] / 60 / top) * 92;
+      const height = (Core.minutesFromSeconds(totals[i][key]) / top) * 92;
       const bar = svgElement('rect', { x: x + j * 13, y: 112 - height, width: 10, height, rx: 2, fill: color });
       bar.append(svgElement('title', {}, `${date}: ${minutes(totals[i][key])} ${j === 0 ? 'creating' : 'consuming'}`));
       svg.append(bar);
@@ -74,7 +78,11 @@ function chart(days) {
       )
     );
     const row = document.createElement('tr');
-    for (const value of [date, (totals[i].createSec / 60).toFixed(2), (totals[i].consumeSec / 60).toFixed(2)]) {
+    for (const value of [
+      date,
+      Core.minutesFromSeconds(totals[i].createSec).toFixed(2),
+      Core.minutesFromSeconds(totals[i].consumeSec).toFixed(2)
+    ]) {
       const cell = document.createElement('td');
       cell.textContent = value;
       row.append(cell);
