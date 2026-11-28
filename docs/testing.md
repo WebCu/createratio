@@ -554,9 +554,11 @@ strings until their receivers check them.
 A `WebsiteDomain` is the hostname that website time records: a normalized URL
 hostname, with one leading `www.` removed by `WebTime.domainForURL`. Raw values
 get it only through `WebTime.validWebsiteDomain`, which `domainForURL` also uses.
-Restored session samples and pending entries without a valid `WebsiteDomain`
-are dropped. `WebsiteDomain` and `SiteId` do not convert to each other. Stored
-website-time days keep plain string keys.
+Restored session samples and pending entries are checked when they are
+replayed, not when they are restored: an entry without a valid `WebsiteDomain`
+is dropped then and never reaches history. While website time is off, restored
+entries wait in session storage unchanged. `WebsiteDomain` and `SiteId` do not
+convert to each other. Stored website-time days keep plain string keys.
 Points in time use two clocks:
 `EpochTime` for `Date.now()` values and `PageTime` for `performance.now()`
 values. Code reads a clock at the call site and tags the reading with
