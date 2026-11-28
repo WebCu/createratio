@@ -48,7 +48,7 @@ async function accessCase({ random, step, steps }, adapter) {
       assert.equal(access[site].sessionMinutes, minutes[site]);
       assert.equal(
         access[site].expiresAt,
-        focus === site && budget[site] ? now + budget[site] : 0,
+        focus === site && budget[site] ? now + budget[site] : null,
         `${site}: paused access has no active deadline`
       );
     }

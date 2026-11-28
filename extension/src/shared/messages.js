@@ -14,6 +14,9 @@
   function nonnegative(value) {
     return Number.isFinite(value) && value >= 0;
   }
+  function timeOrNull(value) {
+    return value === null || (Number.isFinite(value) && value > 0);
+  }
   function home(site, value) {
     if (typeof value !== 'string') return false;
     try {
@@ -39,7 +42,9 @@
           (state.goalAllowed === undefined || typeof state.goalAllowed === 'boolean') &&
           typeof state.name === 'string' &&
           home(site, state.home) &&
-          ['remainingMs', 'expiresAt', 'readyAt'].every(key => nonnegative(state[key])) &&
+          nonnegative(state.remainingMs) &&
+          timeOrNull(state.expiresAt) &&
+          timeOrNull(state.readyAt) &&
           Number.isInteger(state.sessionMinutes) &&
           state.sessionMinutes > 0
       )

@@ -292,6 +292,12 @@ test('worker refresh bypasses pending activity backoff', async () => {
   assert.deepEqual(t.packets, [options.attempts[0]]);
 });
 
+test('updates do not wait for input that never happened, even early in the page', async () => {
+  const t = await tracker();
+  t.setNow(2000);
+  assert.equal((await t.command({ type: 'prepare-update' })).ready, true);
+});
+
 test('updates defer active input, flush partial measurements and release all listeners on commit', async () => {
   const t = await tracker();
   t.input();

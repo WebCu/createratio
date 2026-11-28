@@ -142,7 +142,7 @@ for (const browser of ['chrome', 'browser']) {
       const w = worker({ _access: { x: entry } }, browser, now);
       const state = await w.send({ type: 'access-status' });
       assert.equal(state.access.x.remainingMs, 0);
-      assert.equal(state.access.x.readyAt, 0);
+      assert.equal(state.access.x.readyAt, null);
       assert.equal((await w.send({ type: 'access-open', site: 'x' }, gate('x'))).ok, false);
       assert.equal(
         w.rules.some(rule => rule.id === 101),
@@ -209,7 +209,7 @@ for (const browser of ['chrome', 'browser']) {
       for (const site of ['x', 'linkedin']) {
         assert.equal(snapshot.access[site].enabled, false);
         assert.equal(snapshot.access[site].remainingMs, 0);
-        assert.equal(snapshot.access[site].readyAt, 0);
+        assert.equal(snapshot.access[site].readyAt, null);
       }
       assert.deepEqual(w.data._access, {});
       assert.deepEqual(w.data.settings, settings);
@@ -246,7 +246,7 @@ for (const browser of ['chrome', 'browser']) {
       assert.deepEqual(repaired.settings.trackedSites, ['x']);
       assert.equal(repaired.access.x.enabled, true);
       assert.equal(repaired.access.x.remainingMs, 0);
-      assert.equal(repaired.access.x.readyAt, 0);
+      assert.equal(repaired.access.x.readyAt, null);
       assert.equal(repaired.access.x.sessionMinutes, 2);
       assert.equal(repaired.access.linkedin.enabled, false);
       assert.deepEqual(w.data.settings, { ...C.DEFAULT_SETTINGS, ...settings, trackedSites: ['x'] });

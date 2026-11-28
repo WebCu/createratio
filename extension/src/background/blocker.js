@@ -25,6 +25,7 @@ const SiteAccess = (() => {
     Sites.sites.filter(site => site.gated).map(site => [site.id, { name: site.name, ...Sites.get(site.id).access }])
   );
   const api = globalThis.browser || globalThis.chrome;
+  const STORED_OPEN_WINDOW_END = Number.MAX_SAFE_INTEGER;
   /** @type {(tab: chrome.tabs.Tab) => Promise<void>} */
   let beforeNavigate = async () => {};
   function setBeforeNavigate(handler) {
@@ -37,7 +38,9 @@ const SiteAccess = (() => {
   function gateURL(site) {
     return api.runtime.getURL('blocked.html') + '?site=' + site;
   }
-  function updateWindows(windows, site, now, end) {
+  /** @param {number | null} openEnd */
+  function updateWindows(windows, site, now, openEnd) {
+    const end = openEnd ?? STORED_OPEN_WINDOW_END;
     const entries = Array.isArray(windows[site])
       ? windows[site].filter(
           item =>
@@ -67,7 +70,7 @@ const SiteAccess = (() => {
       windows.push({
         start: 0,
         end: access[packet.site].goalAllowed
-          ? Number.MAX_SAFE_INTEGER
+          ? STORED_OPEN_WINDOW_END
           : access[packet.site].expiresAt || Date.now() + access[packet.site].remainingMs
       });
     const coverage = [];
@@ -111,8 +114,9 @@ const SiteAccess = (() => {
     const session = state?.phase === 'session' ? state : null,
       request = state?.phase === 'request' ? state : null;
     const remainingMs = Core.asMilliseconds(session?.remainingMs ?? 0);
-    const expiresAt = remainingMs && session.expiresAt > now ? session.expiresAt : Core.UNSET_EPOCH_TIME;
-    const readyAt = request ? request.readyAt : Core.UNSET_EPOCH_TIME;
+    const deadline = session?.clock?.running ? session.clock.expiresAt : null;
+    const expiresAt = remainingMs && deadline !== null && deadline > now ? deadline : null;
+    const readyAt = request ? request.readyAt : null;
     const waitSeconds = request
       ? Core.secondsFromMilliseconds(SiteAccessModel.waitDuration(request))
       : Core.secondsFromMinutes(waitMinutes);
@@ -125,7 +129,7 @@ const SiteAccess = (() => {
       remainingMs,
       expiresAt,
       readyAt,
-      refilledAt: session?.refilledAt || Core.UNSET_EPOCH_TIME,
+      refilledAt: session?.refilledAt || null,
       waitSeconds,
       sessionMinutes: minutes
     };
@@ -197,7 +201,7 @@ const SiteAccess = (() => {
       });
       if (decision.rules === 'unrestricted') rules.push(...definition.unrestrictedRules);
       else if (decision.rules === 'session') rules.push(...definition.sessionRules);
-      if (decision.alarmAt) await api.alarms.create('access-' + site, { when: decision.alarmAt });
+      if (decision.alarmAt !== null) await api.alarms.create('access-' + site, { when: decision.alarmAt });
       else await api.alarms.clear('access-' + site);
       if (decision.expire) expired.push(site);
       if (decision.clearWindows) delete windows[site];

@@ -154,7 +154,7 @@ test('popup links to the pending wait without replacing direct goal-based access
   assert.equal(link.attributes['aria-label'], 'Manage pending wait for X');
   await button.fire('click');
   assert.equal(p.state.tabs[0].url, 'https://x.com/home');
-  p.state.access.x.readyAt = 0;
+  p.state.access.x.readyAt = null;
   p.change();
   await p.ready();
   assert.equal(link.hidden, true);

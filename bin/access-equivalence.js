@@ -181,6 +181,20 @@ function matrix(catalog) {
   return { urls, states, restarts };
 }
 
+const REPLY_TIMES = ['expiresAt', 'readyAt', 'refilledAt'];
+
+function withAcceptedReplyTimes(baseline, candidate) {
+  const status = Object.fromEntries(
+    Object.entries(baseline.status).map(([site, state]) => {
+      const accepted = { ...state };
+      for (const key of REPLY_TIMES)
+        if (state[key] === 0 && candidate.status[site]?.[key] === null) accepted[key] = null;
+      return [site, accepted];
+    })
+  );
+  return { ...baseline, status };
+}
+
 async function compare(baseline, candidate) {
   for (const file of ['manifest.json', 'block-rules.json']) {
     const read = folder => JSON.parse(fs.readFileSync(path.join(folder, file), 'utf8'));
@@ -197,11 +211,9 @@ async function compare(baseline, candidate) {
   for (const [label, initial, restart] of runs) {
     for (const url of urls) {
       assert.equal(updated.siteForURL(url), original.siteForURL(url), `${label}: ${url}: lookup`);
-      assert.deepEqual(
-        await updated.snapshot(initial, url, restart),
-        updated.normalizedBaseline(await original.snapshot(initial, url, restart)),
-        `${label}: ${url}: lifecycle`
-      );
+      const result = await updated.snapshot(initial, url, restart);
+      const expected = updated.normalizedBaseline(await original.snapshot(initial, url, restart));
+      assert.deepEqual(result, withAcceptedReplyTimes(expected, result), `${label}: ${url}: lifecycle`);
       count++;
     }
   }

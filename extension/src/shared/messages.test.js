@@ -11,8 +11,8 @@ const access = {
     enabled: true,
     goalAllowed: false,
     remainingMs: 0,
-    expiresAt: 0,
-    readyAt: 0,
+    expiresAt: null,
+    readyAt: null,
     sessionMinutes: 5
   }
 };
@@ -99,6 +99,11 @@ test('access replies reject unusable budgets and flags, but need no undocumented
   ]) {
     const reply = { ok: true, access };
     assert.equal(await client(reply).send({ type }, 'Site stays blocked.'), reply);
+    const timed = {
+      ok: true,
+      access: { x: { ...access.x, expiresAt: 1_795_000_000_000, readyAt: 1_795_000_060_000 } }
+    };
+    assert.equal(await client(timed).send({ type }, 'Site stays blocked.'), timed);
     assert.deepEqual(await client({ ok: true, access: {} }).send({ type }, 'Failed.'), { ok: true, access: {} });
     for (const invalid of [
       null,
@@ -109,6 +114,11 @@ test('access replies reject unusable budgets and flags, but need no undocumented
       { ...access.x, remainingMs: '60000' },
       { ...access.x, remainingMs: Infinity },
       { ...access.x, remainingMs: -1 },
+      { ...access.x, remainingMs: null },
+      { ...access.x, expiresAt: 0 },
+      { ...access.x, readyAt: 0 },
+      { ...access.x, expiresAt: '1' },
+      { ...access.x, readyAt: Infinity },
       { ...access.x, home: 'javascript:alert(1)' }
     ]) {
       await assert.rejects(client({ ok: true, access: { x: invalid } }).send({ type }, 'Site stays blocked.'), {
