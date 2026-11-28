@@ -261,7 +261,7 @@ test('built extension keeps focused settings, narrow tasks and history readable'
       await noOverflow(page);
     });
     await journey(
-      'session and intention wait columns align with defaults and keep custom wait resets usable',
+      'session and intention wait layouts align with defaults and keep custom wait resets usable',
       async () => {
         const sites = require('../sites/index.js').sites.filter(site => site.gated);
         await seedAccess(
@@ -292,8 +292,13 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         })()`
           );
           for (const { site, session, wait } of columns) {
-            assert.ok(Math.abs(session.top - wait.top) < 1, `${width}: ${site || 'Default'} selectors share a row`);
-            assert.ok(wait.left > session.right, `${width}: intention wait follows session time`);
+            if (width <= 400) {
+              assert.ok(wait.top > session.bottom, `${width}: ${site || 'Default'} selectors stack`);
+              assert.ok(Math.abs(session.left - wait.left) < 1, `${width}: stacked selectors share a column`);
+            } else {
+              assert.ok(Math.abs(session.top - wait.top) < 1, `${width}: ${site || 'Default'} selectors share a row`);
+              assert.ok(wait.left > session.right, `${width}: intention wait follows session time`);
+            }
             assert.ok(
               Math.abs(session.left - columns[0].session.left) < 1 && Math.abs(wait.left - columns[0].wait.left) < 1,
               `${width}: ${site || 'Default'} follows the default columns`
@@ -358,6 +363,61 @@ test('built extension keeps focused settings, narrow tasks and history readable'
         }
       }
     );
+    await journey('Settings duration labels fit their closed menus', async () => {
+      const sites = require('../sites/index.js')
+        .sites.filter(site => site.gated)
+        .map(site => site.id);
+      await seedAccess(browser, sites, {
+        trackedSites: sites,
+        accessMinutes: 240,
+        waitMinutes: 240,
+        siteOverrides: { linkedin: { accessMinutes: 240, waitMinutes: 240 } }
+      });
+      const clipped = [];
+      for (const width of [320, 380, 400, 480, 721, 1242]) {
+        const page = await pageAt('/settings.html', width);
+        await eventually(
+          () =>
+            inspect(
+              page,
+              `['accessMinutes', 'waitMinutes'].every(field =>
+                document.querySelector('#' + field + '-site-x')?.selectedOptions[0]?.textContent === 'Default · 240 min' &&
+                document.querySelector('#' + field + '-site-linkedin')?.selectedOptions[0]?.textContent === '240 min')`
+            ),
+          'long inherited and custom durations ready'
+        );
+        const menus = await inspect(
+          page,
+          `(() => {
+            const measure = document.createElement('span');
+            Object.assign(measure.style, { position: 'fixed', visibility: 'hidden', whiteSpace: 'pre' });
+            document.body.append(measure);
+            const sizes = [...document.querySelectorAll('#default-settings select, #site-settings select')].map(select => {
+              const style = getComputedStyle(select);
+              Object.assign(measure.style, {
+                fontFamily: style.fontFamily,
+                fontSize: style.fontSize,
+                fontWeight: style.fontWeight,
+                fontVariantNumeric: style.fontVariantNumeric
+              });
+              const label = select.selectedOptions[0].textContent;
+              measure.textContent = label;
+              const available = select.getBoundingClientRect().width - [style.paddingLeft, style.paddingRight,
+                style.borderLeftWidth, style.borderRightWidth].reduce((sum, size) => sum + parseFloat(size), 0);
+              return { id: select.id, label, available, needed: measure.getBoundingClientRect().width };
+            });
+            measure.remove();
+            return sizes;
+          })()`
+        );
+        assert.equal(menus.length, (sites.length + 1) * 2);
+        for (const { id, label, available, needed } of menus) {
+          if (needed > available) clipped.push(`${width}px ${id}: ${label} needs ${needed}px, has ${available}px`);
+        }
+        await noOverflow(page);
+      }
+      assert.deepEqual(clipped, []);
+    });
     await journey('all site menus and switches persist at narrow widths without exposing custom fields', async () => {
       const sites = require('../sites/index.js').sites;
       const catalog = sites.filter(site => site.gated),
