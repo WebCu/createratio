@@ -595,3 +595,42 @@ test('delivery packets reach history and access narrowing only through the contr
       )
     );
 });
+
+test('scroll friction strengths enter only through the guard or the default setting', t => {
+  const accepted = typeCheck(t, {
+    'accepted.js': [
+      '/** @param {unknown} value */',
+      'function guarded(value) {',
+      '  if (!Core.validScrollFrictionStrength(value)) return;',
+      '  /** @type {ScrollFrictionStrength} */',
+      '  const strength = value;',
+      '  /** @type {number} */',
+      '  const plain = strength;',
+      '}',
+      '/** @type {ScrollFrictionStrength[]} */',
+      'const strengths = [Core.DEFAULT_SETTINGS.scrollFrictionStrength, Core.settingsSnapshot({}).scrollFrictionStrength];',
+      '/** @param {ReplySettings} settings */',
+      'function replied(settings) {',
+      '  /** @type {ScrollFrictionStrength | undefined} */',
+      '  const strength = settings.scrollFrictionStrength;',
+      '}',
+      ''
+    ].join('\n')
+  });
+  assert.equal(accepted.status, 0, accepted.stdout);
+  const rejected = typeCheck(t, {
+    'rejected.js': [
+      '/** @type {ScrollFrictionStrength} */',
+      'const fromNumber = 50;',
+      '/** @type {ScrollFrictionStrength} */',
+      'const fromTarget = Core.DEFAULT_SETTINGS.dailyTarget;',
+      ''
+    ].join('\n')
+  });
+  assert.notEqual(rejected.status, 0);
+  for (const [line, pattern] of [
+    [2, "Type 'number' is not assignable to type 'ScrollFrictionStrength'"],
+    [4, "Type 'DailyTarget' is not assignable to type 'ScrollFrictionStrength'"]
+  ])
+    assert.match(rejected.stdout, new RegExp(`rejected\\.js\\(${line},\\d+\\): error TS\\d+: .*${pattern}`));
+});

@@ -117,6 +117,7 @@
   function epochTimeFromPageTime(pageTime, pageOrigin) {
     return asEpochTime(pageOrigin + pageTime);
   }
+  /** @returns {value is ScrollFrictionStrength} */
   function validScrollFrictionStrength(value) {
     return (
       Number.isInteger(value) &&
@@ -135,7 +136,7 @@
     allowAboveGoal: false,
     intentionHistoryEnabled: false,
     scrollFrictionEnabled: true,
-    scrollFrictionStrength: 50,
+    scrollFrictionStrength: /** @type {ScrollFrictionStrength} */ (50),
     trackedSites: /** @type {string[]} */ (SITES.filter(site => site.defaultEnabled).map(site => site.id))
   };
   function isRecord(value) {

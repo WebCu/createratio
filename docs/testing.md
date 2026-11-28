@@ -580,8 +580,12 @@ totals stay untyped. Only
 only that type. A `DailyTarget` is a number from 0.1 to 100 in steps of 0.1.
 Raw values get it only through `Core.validDailyTarget`, and the default setting
 is the only cast. `Core.aboveDailyTarget` is the only place that compares a
-score with the target. Stored settings and days stay unchecked raw values until
-Core reads them.
+score with the target. A `ScrollFrictionStrength` is a whole number from 50 to
+95 in steps of 5. Raw values get it only through
+`Core.validScrollFrictionStrength`, and the default setting is the only cast.
+Snapshot replies carry it after the reply check. Scroll friction commands keep a
+raw number until the worker checks it. Stored settings and days stay unchecked
+raw values until Core reads them.
 A `DeliveryPacket` is an ingest message that passed the packet checks: its ID,
 site, time segments and actions. Only `deliveryPacketFromMessage` in
 `message-contracts.js` creates it, and history records only a `DeliveryPacket`.

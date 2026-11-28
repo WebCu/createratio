@@ -14,6 +14,7 @@ declare global {
   } & { readonly __brand: 'CreationStats' };
   type CreationScore = number & { readonly __brand: 'CreationScore' };
   type DailyTarget = number & { readonly __brand: 'DailyTarget' };
+  type ScrollFrictionStrength = number & { readonly __brand: 'ScrollFrictionStrength' };
   type EpochTime = number & { readonly __brand: 'EpochTime' };
   type PageTime = number & { readonly __brand: 'PageTime' };
   type StoredSettings = Partial<typeof Core.DEFAULT_SETTINGS> & {

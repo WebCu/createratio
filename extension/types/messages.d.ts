@@ -35,7 +35,7 @@ declare global {
   type ReplySettings = {
     trackedSites?: string[];
     scrollFrictionEnabled?: boolean;
-    scrollFrictionStrength?: number;
+    scrollFrictionStrength?: ScrollFrictionStrength;
     [key: string]: unknown;
   };
   type ReplyAccess = Omit<AccessStatus, 'site' | 'goalAllowed' | 'refilledAt' | 'waitSeconds' | 'sessionMinutes'> & {
